@@ -30,14 +30,22 @@
                 <a href="{% url 'user_management' %}">Users</a>
                 <a href="{% url 'admin_dashboard' %}">Cameras</a>
                 <a href="{% url 'teacher_meetings' %}">Meetings</a>
+                <a href="{% url 'directory' %}">Directory</a>
+                <a href="{% url 'inbox' %}">Inbox</a>
                 {% elif user.userprofile.user_type == 'teacher' %}
                 <a href="{% url 'teacher_dashboard' %}">Dashboard</a>
+                <a href="{% url 'teacher_classrooms' %}">Classrooms</a>
                 <a href="{% url 'live_monitor' %}">Cameras</a>
                 <a href="{% url 'teacher_meetings' %}">Meetings</a>
+                <a href="{% url 'directory' %}">Directory</a>
+                <a href="{% url 'inbox' %}">Inbox</a>
                 <a href="{% url 'create_meeting' %}">+ New Meeting</a>
                 {% elif user.userprofile.user_type == 'student' %}
                 <a href="{% url 'student_dashboard' %}">Dashboard</a>
+                <a href="{% url 'student_classrooms' %}">Classrooms</a>
                 <a href="{% url 'student_meetings' %}">Meetings</a>
+                <a href="{% url 'directory' %}">Directory</a>
+                <a href="{% url 'inbox' %}">Inbox</a>
                 {% endif %}
             </div>
 

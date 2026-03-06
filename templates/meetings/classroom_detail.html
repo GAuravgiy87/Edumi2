@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ classroom.title }} - EduMi{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1400px; margin: 30px auto; padding: 20px;">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; padding: 30px; margin-bottom: 30px; color: white;">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <h1 style="margin-bottom: 10px;">{{ classroom.title }}</h1>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <span style="padding: 6px 15px; background: rgba(255,255,255,0.2); border-radius: 15px; font-size: 14px; font-weight: 600;">
+                        📚 {{ classroom.class_code }}
+                    </span>
+                    {% if is_teacher %}
+                        <span style="padding: 6px 15px; background: rgba(255,255,255,0.2); border-radius: 15px; font-size: 14px;">
+                            👨‍🏫 Teacher
+                        </span>
+                    {% else %}
+                        <span style="padding: 6px 15px; background: rgba(255,255,255,0.2); border-radius: 15px; font-size: 14px;">
+                            👨‍🎓 Student
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if is_teacher %}
+                <a href="{% url 'start_classroom_meeting' classroom.id %}" 
+                   style="padding: 15px 30px; background: white; color: #667eea; text-decoration: none; border-radius: 5px; font-weight: 600; font-size: 16px;">
+                    🎥 Start New Meeting
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div style="padding: 15px; margin-bottom: 20px; border-radius: 5px; background: {% if message.tags == 'error' %}#fee{% else %}#efe{% endif %}; border-left: 4px solid {% if message.tags == 'error' %}#e74c3c{% else %}#2ecc71{% endif %};">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <!-- Active Meeting Alert -->
+    {% if active_meeting %}
+        <div style="background: #fee; border-left: 4px solid #e74c3c; padding: 20px; border-radius: 5px; margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="color: #e74c3c; margin-bottom: 5px;">🔴 Meeting in Progress</h3>
+                    <p style="color: #555; margin: 0;">{{ active_meeting.title }}</p>
+                </div>
+                <a href="{% url 'join_meeting' active_meeting.meeting_code %}" 
+                   style="padding: 12px 24px; background: #e74c3c; color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
+                    Join Meeting Now
+                </a>
+            </div>
+        </div>
+    {% endif %}
+    
+    <div style="display: grid; grid-template-columns: {% if is_teacher %}1fr 2fr{% else %}1fr{% endif %}; gap: 30px;">
+        <!-- Left Column: Pending Requests (Teacher Only) -->
+        {% if is_teacher %}
+            <div>
+                <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                    <h3 style="color: #2c3e50; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>📬 Join Requests</span>
+                        {% if pending_requests %}
+                            <span style="padding: 4px 12px; background: #e74c3c; color: white; border-radius: 15px; font-size: 12px;">
+                                {{ pending_requests.count }}
+                            </span>
+                        {% endif %}
+                    </h3>
+                    
+                    {% if pending_requests %}
+                        <div id="pending-requests">
+                            {% for membership in pending_requests %}
+                                <div class="request-item" data-id="{{ membership.id }}" style="padding: 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <div>
+                                            <div style="font-weight: 600; color: #2c3e50;">{{ membership.student.get_full_name|default:membership.student.username }}</div>
+                                            <div style="font-size: 12px; color: #7f8c8d;">{{ membership.student.email }}</div>
+                                            <div style="font-size: 11px; color: #95a5a6; margin-top: 5px;">{{ membership.requested_at|timesince }} ago</div>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 5px;">
+                                        <button onclick="approveRequest({{ membership.id }})" 
+                                                style="flex: 1; padding: 8px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                                            ✓ Approve
+                                        </button>
+                                        <button onclick="denyRequest({{ membership.id }})" 
+                                                style="flex: 1; padding: 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                                            ✗ Deny
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div style="text-align: center; padding: 30px; color: #95a5a6;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
+                            <p>No pending requests</p>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Approved Students -->
+                <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <h3 style="color: #2c3e50; margin-bottom: 20px;">
+                        👥 Students ({{ approved_students.count }})
+                    </h3>
+                    
+                    {% if approved_students %}
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            {% for membership in approved_students %}
+                                <div class="student-item" data-id="{{ membership.id }}" style="padding: 12px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-weight: 500; color: #2c3e50;">{{ membership.student.get_full_name|default:membership.student.username }}</div>
+                                        <div style="font-size: 12px; color: #7f8c8d;">{{ membership.student.email }}</div>
+                                    </div>
+                                    <button onclick="removeStudent({{ membership.id }})" 
+                                            style="padding: 6px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">
+                                        Remove
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div style="text-align: center; padding: 20px; color: #95a5a6;">
+                            No students yet
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Right Column: Meetings -->
+        <div>
+            <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="color: #2c3e50; margin-bottom: 20px;">📅 Meeting History</h3>
+                
+                {% if meetings %}
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        {% for meeting in meetings %}
+                            <div style="padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid {% if meeting.status == 'live' %}#e74c3c{% elif meeting.status == 'ended' %}#95a5a6{% else %}#3498db{% endif %};">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                    <div style="flex: 1;">
+                                        <h4 style="color: #2c3e50; margin-bottom: 5px;">{{ meeting.title }}</h4>
+                                        <div style="font-size: 13px; color: #7f8c8d;">
+                                            {{ meeting.scheduled_time|date:"M d, Y - g:i A" }}
+                                            {% if meeting.ended_at %}
+                                                - {{ meeting.ended_at|date:"g:i A" }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <span style="padding: 6px 12px; background: {% if meeting.status == 'live' %}#e74c3c{% elif meeting.status == 'ended' %}#95a5a6{% else %}#3498db{% endif %}; color: white; border-radius: 15px; font-size: 12px; font-weight: 600;">
+                                        {% if meeting.status == 'live' %}🔴 LIVE{% elif meeting.status == 'ended' %}✓ Ended{% else %}Scheduled{% endif %}
+                                    </span>
+                                </div>
+                                
+                                <div style="display: flex; gap: 10px; font-size: 12px; color: #7f8c8d; margin-bottom: 15px;">
+                                    <span>⏱️ {{ meeting.duration_minutes }} min</span>
+                                    <span>👥 {{ meeting.participants.count }} participants</span>
+                                </div>
+                                
+                                {% if meeting.status == 'live' %}
+                                    <a href="{% url 'join_meeting' meeting.meeting_code %}" 
+                                       style="display: inline-block; padding: 10px 20px; background: #e74c3c; color: white; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: 600;">
+                                        Join Meeting
+                                    </a>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 40px; color: #95a5a6;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">📅</div>
+                        <p>No meetings yet</p>
+                        {% if is_teacher %}
+                            <p style="font-size: 14px; margin-top: 10px;">Start your first meeting to begin teaching!</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if is_teacher %}
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function approveRequest(membershipId) {
+    fetch(`/meetings/classroom/approve/${membershipId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            document.querySelector(`[data-id="${membershipId}"]`).remove();
+            location.reload();
+        }
+    });
+}
+
+function denyRequest(membershipId) {
+    if (confirm('Are you sure you want to deny this request?')) {
+        fetch(`/meetings/classroom/deny/${membershipId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.querySelector(`[data-id="${membershipId}"]`).remove();
+            }
+        });
+    }
+}
+
+function removeStudent(membershipId) {
+    if (confirm('Are you sure you want to remove this student from the classroom?')) {
+        fetch(`/meetings/classroom/remove/${membershipId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.querySelector(`.student-item[data-id="${membershipId}"]`).remove();
+                alert(data.message);
+            } else {
+                alert(data.message || 'Failed to remove student');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while removing the student');
+        });
+    }
+}
+</script>
+{% endif %}
+{% endblock %}

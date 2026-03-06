@@ -55,3 +55,7 @@ class UserProfile(models.Model):
         elif self.avatar_url:
             return self.avatar_url
         return f"https://ui-avatars.com/api/?name={self.user.username}&background=1877f2&color=fff&size=200"
+
+
+# Import messaging models
+from .messaging_models import Conversation, Message

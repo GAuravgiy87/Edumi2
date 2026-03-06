@@ -1,6 +1,75 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import random
+import string
+
+class Classroom(models.Model):
+    """Virtual classroom that persists across multiple meeting sessions"""
+    class_code = models.CharField(max_length=20, unique=True)
+    title = models.CharField(max_length=200)
+    password = models.CharField(max_length=128)  # Will be hashed
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_classrooms')
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.title} ({self.class_code})"
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Classroom'
+        verbose_name_plural = 'Classrooms'
+    
+    def get_approved_students(self):
+        """Get all approved students in this classroom"""
+        return User.objects.filter(
+            classroom_memberships__classroom=self,
+            classroom_memberships__status='approved'
+        )
+    
+    def get_approved_memberships(self):
+        """Get all approved memberships (includes membership objects)"""
+        return self.memberships.filter(status='approved').select_related('student')
+    
+    def get_pending_requests(self):
+        """Get all pending join requests"""
+        return self.memberships.filter(status='pending').select_related('student')
+    
+    def has_active_meeting(self):
+        """Check if classroom has an active meeting"""
+        return self.meetings.filter(status='live').exists()
+    
+    def get_active_meeting(self):
+        """Get the current active meeting if any"""
+        return self.meetings.filter(status='live').first()
+
+class ClassroomMembership(models.Model):
+    """Tracks student membership and approval status in classrooms"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved'),
+        ('denied', 'Denied'),
+        ('removed', 'Removed'),
+    ]
+    
+    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='memberships')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='classroom_memberships')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    requested_at = models.DateTimeField(auto_now_add=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_memberships')
+    
+    class Meta:
+        unique_together = ['classroom', 'student']
+        ordering = ['-requested_at']
+        verbose_name = 'Classroom Membership'
+        verbose_name_plural = 'Classroom Memberships'
+    
+    def __str__(self):
+        return f"{self.student.username} - {self.classroom.title} ({self.status})"
 
 class Meeting(models.Model):
     STATUS_CHOICES = [
@@ -10,6 +79,7 @@ class Meeting(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     
+    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='meetings', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hosted_meetings')
@@ -23,6 +93,7 @@ class Meeting(models.Model):
     record_meeting = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):
         return f"{self.title} - {self.meeting_code}"

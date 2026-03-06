@@ -2,6 +2,20 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Classroom Management
+    path('classroom/create/', views.create_classroom, name='create_classroom'),
+    path('classroom/teacher/', views.teacher_classrooms, name='teacher_classrooms'),
+    path('classroom/student/', views.student_classrooms, name='student_classrooms'),
+    path('classroom/<int:classroom_id>/', views.classroom_detail, name='classroom_detail'),
+    path('classroom/join/', views.join_classroom_request, name='join_classroom_request'),
+    path('classroom/approve/<int:membership_id>/', views.approve_join_request, name='approve_join_request'),
+    path('classroom/deny/<int:membership_id>/', views.deny_join_request, name='deny_join_request'),
+    path('classroom/remove/<int:membership_id>/', views.remove_student, name='remove_student'),
+    path('classroom/<int:classroom_id>/delete/', views.delete_classroom, name='delete_classroom'),
+    path('classroom/<int:classroom_id>/leave/', views.leave_classroom, name='leave_classroom'),
+    path('classroom/<int:classroom_id>/start-meeting/', views.start_classroom_meeting, name='start_classroom_meeting'),
+    
+    # Meeting Management (Legacy)
     path('create/', views.create_meeting, name='create_meeting'),
     path('teacher/', views.teacher_meetings, name='teacher_meetings'),
     path('student/', views.student_meetings, name='student_meetings'),

@@ -1,0 +1,925 @@
+================================================================================
+                    EDUMI - TECHNICAL DOCUMENTATION (PART 3)
+                  DATA FLOW, SECURITY, AND DEPLOYMENT
+================================================================================
+
+6. DATA FLOW
+================================================================================
+
+6.1 REQUEST-RESPONSE FLOW (HTTP)
+--------------------------------------------------------------------------------
+
+Standard HTTP Request Flow:
+
+1. Client Browser
+   └─> HTTP Request (GET/POST)
+       └─> URL: http://localhost:8000/path/
+
+2. Django URL Dispatcher
+   └─> Matches URL pattern in urls.py
+       └─> Routes to appropriate view function
+
+3. Middleware Stack (Request Phase)
+   └─> SecurityMiddleware
+   └─> SessionMiddleware (loads session data)
+   └─> CsrfViewMiddleware (validates CSRF token)
+   └─> AuthenticationMiddleware (loads user from session)
+   └─> MessageMiddleware
+
+4. View Function
+   └─> Checks authentication (@login_required)
+   └─> Checks permissions (role-based)
+   └─> Queries database via ORM
+   └─> Processes business logic
+   └─> Prepares context data
+
+5. Template Rendering (if HTML response)
+   └─> Loads template from templates/
+   └─> Renders with context data
+   └─> Generates HTML
+
+6. Middleware Stack (Response Phase)
+   └─> Processes response in reverse order
+   └─> Adds security headers
+   └─> Sets cookies
+
+7. HTTP Response
+   └─> Sent back to client browser
+   └─> Status code (200, 302, 404, etc.)
+   └─> Headers and body
+
+Example: Student Dashboard Request
+
+Client: GET /accounts/student-dashboard/
+  ↓
+URL Router: matches 'student-dashboard/' → student_dashboard view
+  ↓
+Middleware: Authenticates user, loads session
+  ↓
+View: student_dashboard(request)
+  - Checks user.userprofile.user_type == 'student'
+  - Queries Meeting.objects.filter(status__in=['scheduled', 'live']).count()
+  - Queries request.user.meetingparticipant_set.count()
+  - Calculates profile completion percentage
+  ↓
+Template: templates/accounts/student_dashboard.html
+  - Renders with context data
+  ↓
+Response: HTML page with statistics
+  ↓
+Client: Displays dashboard
+
+6.2 AUTHENTICATION FLOW
+--------------------------------------------------------------------------------
+
+Login Flow:
+
+1. User visits /accounts/ (login page)
+   └─> GET request returns login form
+
+2. User submits credentials
+   └─> POST /accounts/
+       └─> username: "john_doe"
+       └─> password: "password123"
+
+3. View: login_view(request)
+   └─> Calls authenticate(username, password)
+       └─> Django checks hashed password
+       └─> Returns User object or None
+
+4. If authentication succeeds:
+   └─> Calls login(request, user)
+       └─> Creates session in database
+       └─> Sets session cookie in response
+   └─> Checks user role:
+       └─> Admin → redirect to /accounts/admin-panel/
+       └─> Teacher → redirect to /accounts/teacher-dashboard/
+       └─> Student → redirect to /accounts/student-dashboard/
+
+5. Subsequent requests:
+   └─> Browser sends session cookie
+   └─> SessionMiddleware loads session
+   └─> AuthenticationMiddleware loads user
+   └─> request.user is populated
+
+6. Logout:
+   └─> GET /accounts/logout/
+   └─> Deletes session from database
+   └─> Clears session cookie
+   └─> Redirects to login page
+
+Registration Flow:
+
+1. User visits /accounts/register/
+   └─> GET request returns registration form
+
+2. User submits registration data
+   └─> POST /accounts/register/
+       └─> username: "new_user"
+       └─> password1: "password123"
+       └─> password2: "password123"
+       └─> user_type: "student"
+
+3. View: register(request)
+   └─> Validates passwords match
+   └─> Creates User object
+       └─> User.objects.create_user(username, password)
+       └─> Password automatically hashed
+   └─> Creates UserProfile object
+       └─> UserProfile.objects.create(user, user_type)
+   └─> Logs in user automatically
+   └─> Redirects to appropriate dashboard
+
+6.3 MEETING FLOW (WebRTC + WebSocket)
+--------------------------------------------------------------------------------
+
+Meeting Creation Flow:
+
+1. Teacher visits /meetings/create/
+   └─> GET request returns meeting form
+
+2. Teacher submits meeting details
+   └─> POST /meetings/create/
+       └─> title, description, scheduled_time, duration_minutes
+
+3. View: create_meeting(request)
+   └─> Generates unique meeting_code (10 characters)
+   └─> Creates Meeting object in database
+   └─> Redirects to /meetings/teacher/
+
+Joining Meeting Flow:
+
+1. User clicks "Join Meeting" with meeting_code
+   └─> GET /meetings/join/<meeting_code>/
+
+2. View: join_meeting(request, meeting_code)
+   └─> Retrieves Meeting object
+   └─> Creates/updates MeetingParticipant record
+       └─> Sets joined_at = now()
+       └─> Sets is_active = True
+   └─> If teacher joins and status='scheduled':
+       └─> Updates meeting.status = 'live'
+   └─> Renders meeting_room.html template
+
+3. Meeting Room Page Loads
+   └─> HTML with video containers
+   └─> JavaScript initializes WebRTC
+   └─> Establishes WebSocket connection
+
+WebSocket Connection Flow:
+
+1. JavaScript opens WebSocket
+   └─> ws://localhost:8000/ws/meeting/<meeting_code>/
+
+2. Server: MeetingConsumer.connect()
+   └─> Authenticates user from session
+   └─> Joins channel group: 'meeting_<meeting_code>'
+   └─> Accepts WebSocket connection
+   └─> Broadcasts 'user_joined' to all participants
+
+3. WebRTC Peer Connection Setup:
+   
+   Participant A (Initiator):
+   └─> Creates RTCPeerConnection
+   └─> Adds local media stream (camera/mic)
+   └─> Creates offer
+   └─> Sets local description
+   └─> Sends offer via WebSocket:
+       {
+         "type": "offer",
+         "offer": {...},
+         "to_user_id": B_id
+       }
+
+   Server:
+   └─> Receives offer
+   └─> Forwards to Participant B via WebSocket
+
+   Participant B (Receiver):
+   └─> Receives offer
+   └─> Creates RTCPeerConnection
+   └─> Sets remote description (offer)
+   └─> Adds local media stream
+   └─> Creates answer
+   └─> Sets local description
+   └─> Sends answer via WebSocket:
+       {
+         "type": "answer",
+         "answer": {...},
+         "to_user_id": A_id
+       }
+
+   Server:
+   └─> Receives answer
+   └─> Forwards to Participant A
+
+   Participant A:
+   └─> Receives answer
+   └─> Sets remote description (answer)
+   └─> Peer connection established
+
+4. ICE Candidate Exchange:
+   └─> Both peers discover network paths
+   └─> Send ICE candidates via WebSocket
+   └─> Server forwards to other peer
+   └─> Peers add remote ICE candidates
+   └─> Best connection path established
+
+5. Media Streaming:
+   └─> Video/audio flows directly between peers (P2P)
+   └─> WebSocket only for signaling
+   └─> Low latency (~50-100ms)
+
+Chat Message Flow:
+
+1. User types message and clicks send
+   └─> JavaScript sends via WebSocket:
+       {
+         "type": "chat",
+         "message": "Hello everyone!",
+         "timestamp": "2024-03-03T10:30:00Z"
+       }
+
+2. Server: MeetingConsumer.receive()
+   └─> Receives chat message
+   └─> Broadcasts to all participants in room:
+       {
+         "type": "chat",
+         "message": "Hello everyone!",
+         "username": "john_doe",
+         "user_id": 5,
+         "timestamp": "2024-03-03T10:30:00Z"
+       }
+
+3. All participants receive message
+   └─> JavaScript appends to chat UI
+   └─> Displays with username and timestamp
+
+Leaving Meeting Flow:
+
+1. User clicks "Leave Meeting"
+   └─> JavaScript sends POST /meetings/leave/<meeting_id>/
+
+2. View: leave_meeting(request, meeting_id)
+   └─> Updates MeetingParticipant:
+       └─> is_active = False
+       └─> left_at = now()
+   └─> Returns JSON success
+
+3. JavaScript closes WebSocket
+   └─> Server: MeetingConsumer.disconnect()
+   └─> Broadcasts 'user_left' to remaining participants
+   └─> Removes from channel group
+
+4. Browser redirects to dashboard
+
+6.4 CAMERA FEED FLOW
+--------------------------------------------------------------------------------
+
+RTSP Camera Streaming Flow:
+
+1. User visits /cameras/view-camera/<camera_id>/
+   └─> View checks permissions
+   └─> Renders HTML with <img> tag:
+       <img src="/cameras/camera-feed/<camera_id>/">
+
+2. Browser requests camera feed
+   └─> GET /cameras/camera-feed/<camera_id>/
+
+3. Main App View: camera_feed(request, camera_id)
+   └─> Checks user permissions
+   └─> Proxies request to camera service:
+       └─> GET http://localhost:8001/api/cameras/<camera_id>/feed/
+
+4. Camera Service: camera_feed(request, camera_id)
+   └─> Gets or creates CameraStreamer instance
+   └─> CameraStreamer runs in background thread:
+       
+       Background Thread:
+       └─> Connects to RTSP URL using OpenCV
+       └─> cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+       └─> Continuously reads frames:
+           └─> ret, frame = cap.read()
+           └─> Resizes frame to 640x360
+           └─> Encodes to JPEG (quality 60%)
+           └─> Stores in self.frame (thread-safe)
+       
+       HTTP Response Generator:
+       └─> Yields frames in MJPEG format:
+           --frame\r\n
+           Content-Type: image/jpeg\r\n
+           \r\n
+           <jpeg_data>\r\n
+
+5. Camera Service streams to Main App
+   └─> Main App proxies stream to browser
+   └─> Browser displays video in <img> tag
+
+6. Automatic Reconnection:
+   └─> If connection fails:
+       └─> Background thread attempts reconnect
+       └─> Max 5 attempts with 2-second delay
+       └─> Continues streaming when reconnected
+
+7. Inactivity Timeout:
+   └─> If no requests for 90 seconds:
+       └─> Background thread stops
+       └─> Releases camera connection
+       └─> Frees resources
+
+Mobile Camera Streaming Flow:
+
+1. Similar to RTSP, but:
+   └─> Uses HTTP/MJPEG instead of RTSP
+   └─> MobileCameraStreamer uses requests library
+   └─> Parses MJPEG stream (JPEG boundaries)
+   └─> Processes and re-encodes frames
+   └─> Streams to browser
+
+Multi-Camera Live Monitor:
+
+1. User visits /cameras/live-monitor/
+   └─> View queries cameras based on permissions
+   └─> Renders grid of <img> tags
+
+2. Browser requests multiple feeds simultaneously
+   └─> Each camera has separate HTTP connection
+   └─> Camera service manages multiple streamers
+   └─> Each streamer runs in own thread
+
+3. Grid layout adjusts based on camera count
+   └─> CSS grid with responsive columns
+   └─> 2-4 columns depending on screen size
+
+6.5 FILE UPLOAD FLOW (Profile Pictures)
+--------------------------------------------------------------------------------
+
+1. User visits profile edit page
+   └─> Form includes file input:
+       <input type="file" name="profile_picture">
+
+2. User selects image and submits
+   └─> POST /accounts/profile/<username>/
+   └─> Content-Type: multipart/form-data
+   └─> File in request.FILES['profile_picture']
+
+3. View: profile_view(request, username)
+   └─> Validates file type and size
+   └─> Saves file:
+       └─> profile.profile_picture = request.FILES['profile_picture']
+       └─> Django saves to MEDIA_ROOT/profile_pictures/
+       └─> Generates unique filename
+
+4. File stored on disk:
+   └─> Path: media/profile_pictures/<filename>
+   └─> Database stores relative path
+
+5. Displaying image:
+   └─> Template: <img src="{{ profile.profile_picture.url }}">
+   └─> URL: /media/profile_pictures/<filename>
+   └─> Served by Django in development
+   └─> Served by Nginx in production
+
+Alternative: Avatar URL
+   └─> User selects pre-generated avatar
+   └─> Stores URL in profile.avatar_url
+   └─> No file upload required
+   └─> Uses external service (ui-avatars.com)
+
+================================================================================
+7. STATIC AND MEDIA FILES HANDLING
+================================================================================
+
+7.1 STATIC FILES (CSS, JavaScript, Images)
+--------------------------------------------------------------------------------
+
+Configuration:
+- STATIC_URL = '/static/'
+- STATICFILES_DIRS = [BASE_DIR / 'static']
+
+Directory Structure:
+static/
+├── css/
+│   ├── auth.css
+│   ├── base.css
+│   ├── buttons.css
+│   ├── dashboard.css
+│   ├── forms.css
+│   ├── home.css
+│   ├── main.css
+│   ├── meeting-room.css
+│   ├── meetings.css
+│   ├── navigation.css
+│   ├── profile.css
+│   └── tables.css
+├── js/
+│   ├── eyes.js
+│   ├── icons.js
+│   └── main.js
+└── logo.svg
+
+Usage in Templates:
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<script src="{% static 'js/main.js' %}"></script>
+
+Development:
+- Django serves static files automatically
+- URL: http://localhost:8000/static/css/main.css
+
+Production:
+- Run: python manage.py collectstatic
+- Collects all static files to STATIC_ROOT
+- Nginx serves static files directly
+- Django doesn't handle static files
+
+7.2 MEDIA FILES (User Uploads)
+--------------------------------------------------------------------------------
+
+Configuration:
+- MEDIA_URL = '/media/'
+- MEDIA_ROOT = BASE_DIR / 'media'
+
+Directory Structure:
+media/
+└── profile_pictures/
+    ├── user1_avatar.jpg
+    ├── user2_avatar.png
+    └── ...
+
+Storage:
+- Local filesystem in development
+- Can use cloud storage (S3, GCS) in production
+- Django-storages package for cloud integration
+
+Access Control:
+- Public access in development
+- Should implement access control in production
+- Serve via Django view with permission checks
+- Or use signed URLs for cloud storage
+
+7.3 CLOUD STORAGE (Production Recommendation)
+--------------------------------------------------------------------------------
+
+AWS S3 Configuration:
+1. Install: pip install django-storages boto3
+2. Settings:
+   DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+   AWS_ACCESS_KEY_ID = 'your-key'
+   AWS_SECRET_ACCESS_KEY = 'your-secret'
+   AWS_STORAGE_BUCKET_NAME = 'your-bucket'
+   AWS_S3_REGION_NAME = 'us-east-1'
+   AWS_S3_FILE_OVERWRITE = False
+   AWS_DEFAULT_ACL = 'private'
+
+Benefits:
+- Scalable storage
+- CDN integration
+- Automatic backups
+- No server disk space concerns
+
+================================================================================
+8. SECURITY FEATURES
+================================================================================
+
+8.1 CSRF PROTECTION
+--------------------------------------------------------------------------------
+
+Mechanism:
+- CsrfViewMiddleware generates CSRF token
+- Token stored in session and cookie
+- Forms include hidden CSRF token field
+- POST requests validated against token
+
+Implementation:
+- Template: {% csrf_token %}
+- Generates: <input type="hidden" name="csrfmiddlewaretoken" value="...">
+- View validates token automatically
+- AJAX requests include token in headers
+
+Configuration:
+- CSRF_COOKIE_SECURE = False (dev), True (production)
+- CSRF_COOKIE_SAMESITE = 'Lax'
+- CSRF_TRUSTED_ORIGINS = ['https://yourdomain.com']
+
+Protection Against:
+- Cross-Site Request Forgery attacks
+- Unauthorized form submissions
+- State-changing requests from malicious sites
+
+8.2 AUTHENTICATION MECHANISM
+--------------------------------------------------------------------------------
+
+Session-Based Authentication:
+- User credentials validated on login
+- Session ID generated and stored in database
+- Session cookie sent to browser
+- Subsequent requests include session cookie
+- Server validates session and loads user
+
+Session Security:
+- SESSION_COOKIE_HTTPONLY = True (prevents JavaScript access)
+- SESSION_COOKIE_SECURE = True (HTTPS only in production)
+- SESSION_COOKIE_SAMESITE = 'Lax' (CSRF protection)
+- SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+- SESSION_COOKIE_AGE = 1209600 (2 weeks)
+
+Login Protection:
+- Rate limiting (can add django-ratelimit)
+- Account lockout after failed attempts (can add)
+- CAPTCHA for repeated failures (can add)
+
+8.3 PASSWORD HASHING
+--------------------------------------------------------------------------------
+
+Algorithm: PBKDF2 with SHA256
+- PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+  ]
+
+Process:
+1. User submits password
+2. Django generates random salt
+3. Applies PBKDF2 with 260,000 iterations
+4. Stores: algorithm$iterations$salt$hash
+5. Example: pbkdf2_sha256$260000$abc123$def456...
+
+Verification:
+1. User submits password
+2. Django extracts salt from stored hash
+3. Applies same algorithm with same salt
+4. Compares resulting hash
+5. Constant-time comparison prevents timing attacks
+
+Password Validation:
+- AUTH_PASSWORD_VALIDATORS = [
+    UserAttributeSimilarityValidator,
+    MinimumLengthValidator (8 characters),
+    CommonPasswordValidator,
+    NumericPasswordValidator,
+  ]
+
+8.4 HTTPS USAGE
+--------------------------------------------------------------------------------
+
+Development:
+- HTTP only (http://localhost:8000)
+- SECURE_SSL_REDIRECT = False
+- SESSION_COOKIE_SECURE = False
+- CSRF_COOKIE_SECURE = False
+
+Production Configuration:
+- SECURE_SSL_REDIRECT = True (redirect HTTP to HTTPS)
+- SESSION_COOKIE_SECURE = True (cookies only over HTTPS)
+- CSRF_COOKIE_SECURE = True
+- SECURE_HSTS_SECONDS = 31536000 (1 year)
+- SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+- SECURE_HSTS_PRELOAD = True
+- SECURE_CONTENT_TYPE_NOSNIFF = True
+- SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+SSL Certificate:
+- Let's Encrypt (free, automated)
+- Certbot for automatic renewal
+- Nginx handles SSL termination
+
+8.5 ADDITIONAL SECURITY MEASURES
+--------------------------------------------------------------------------------
+
+SQL Injection Protection:
+- Django ORM parameterizes queries automatically
+- Never use raw SQL with string formatting
+- Use .raw() or .extra() with parameters
+
+XSS Protection:
+- Django templates auto-escape HTML
+- {{ variable }} → escaped
+- {{ variable|safe }} → not escaped (use carefully)
+- Content-Security-Policy header (can add)
+
+Clickjacking Protection:
+- X-Frame-Options: DENY
+- ClickjackingMiddleware enabled
+- Prevents embedding in iframes
+
+Access Control:
+- @login_required decorator
+- Permission checks in views
+- Role-based access (admin, teacher, student)
+- Object-level permissions for cameras
+
+Input Validation:
+- Django forms validate input
+- Model field validators
+- Clean methods for custom validation
+- Sanitize user input
+
+File Upload Security:
+- Validate file types
+- Limit file sizes
+- Store outside web root
+- Scan for malware (can add)
+
+Logging and Monitoring:
+- Log authentication attempts
+- Log permission denials
+- Monitor for suspicious activity
+- Alert on security events
+
+================================================================================
+9. DEPLOYMENT SETUP
+================================================================================
+
+9.1 WSGI/ASGI CONFIGURATION
+--------------------------------------------------------------------------------
+
+Main Application (ASGI):
+File: school_project/asgi.py
+
+import os
+from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from meetings.routing import websocket_urlpatterns
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'school_project.settings')
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AuthMiddlewareStack(
+        URLRouter(websocket_urlpatterns)
+    ),
+})
+
+Purpose:
+- Handles both HTTP and WebSocket protocols
+- Routes HTTP to Django
+- Routes WebSocket to Channels consumers
+- Applies authentication to WebSocket connections
+
+Camera Service (WSGI):
+File: camera_service/camera_service/wsgi.py
+
+import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'camera_service.settings')
+application = get_wsgi_application()
+
+Purpose:
+- Simple WSGI application
+- No WebSocket support needed
+- Handles HTTP requests only
+
+9.2 SERVER SETUP
+--------------------------------------------------------------------------------
+
+Development Server:
+Main App:
+  python manage.py runserver 8000
+  - Uses Daphne (ASGI server)
+  - Handles WebSocket connections
+  - Auto-reload on code changes
+
+Camera Service:
+  cd camera_service
+  python manage.py runserver 8001
+  - Uses Django development server (WSGI)
+  - Handles camera streaming
+  - Separate process
+
+Production Server (Recommended):
+
+Architecture:
+[Internet] → [Nginx] → [Gunicorn/Daphne] → [Django]
+                    → [Camera Service]
+
+Nginx Configuration:
+- Reverse proxy
+- SSL termination
+- Static file serving
+- Load balancing
+- WebSocket upgrade
+
+Main App with Daphne:
+daphne -b 0.0.0.0 -p 8000 school_project.asgi:application
+
+Or with Gunicorn + Uvicorn:
+gunicorn school_project.asgi:application -k uvicorn.workers.UvicornWorker
+
+Camera Service with Gunicorn:
+cd camera_service
+gunicorn camera_service.wsgi:application --bind 0.0.0.0:8001
+
+Process Management:
+- Systemd services for auto-start
+- Supervisor for process monitoring
+- Docker containers for isolation
+
+9.3 NGINX CONFIGURATION EXAMPLE
+--------------------------------------------------------------------------------
+
+/etc/nginx/sites-available/edumi
+
+upstream django_main {
+    server 127.0.0.1:8000;
+}
+
+upstream camera_service {
+    server 127.0.0.1:8001;
+}
+
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    client_max_body_size 10M;
+
+    location /static/ {
+        alias /path/to/edumi/staticfiles/;
+        expires 30d;
+    }
+
+    location /media/ {
+        alias /path/to/edumi/media/;
+        expires 7d;
+    }
+
+    location /api/cameras/ {
+        proxy_pass http://camera_service;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_buffering off;
+    }
+
+    location /ws/ {
+        proxy_pass http://django_main;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location / {
+        proxy_pass http://django_main;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+9.4 ENVIRONMENT VARIABLES
+--------------------------------------------------------------------------------
+
+Production Settings:
+Create .env file:
+
+# Django
+SECRET_KEY=your-secret-key-here
+DEBUG=False
+ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/edumi
+
+# Redis (for Channels)
+REDIS_URL=redis://localhost:6379/0
+
+# AWS S3 (if using)
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+AWS_STORAGE_BUCKET_NAME=your-bucket
+
+# Email
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-password
+
+Load in settings.py:
+import os
+from pathlib import Path
+import environ
+
+env = environ.Env()
+environ.Env.read_env()
+
+SECRET_KEY = env('SECRET_KEY')
+DEBUG = env.bool('DEBUG', default=False)
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
+
+9.5 DATABASE MIGRATION
+--------------------------------------------------------------------------------
+
+Development to Production:
+
+1. Export data from SQLite:
+   python manage.py dumpdata > data.json
+
+2. Setup PostgreSQL:
+   CREATE DATABASE edumi;
+   CREATE USER edumi_user WITH PASSWORD 'password';
+   GRANT ALL PRIVILEGES ON DATABASE edumi TO edumi_user;
+
+3. Update settings.py:
+   DATABASES = {
+       'default': {
+           'ENGINE': 'django.db.backends.postgresql',
+           'NAME': 'edumi',
+           'USER': 'edumi_user',
+           'PASSWORD': 'password',
+           'HOST': 'localhost',
+           'PORT': '5432',
+       }
+   }
+
+4. Run migrations:
+   python manage.py migrate
+
+5. Import data:
+   python manage.py loaddata data.json
+
+6. Create superuser:
+   python manage.py createsuperuser
+
+9.6 DEPLOYMENT CHECKLIST
+--------------------------------------------------------------------------------
+
+Pre-Deployment:
+□ Set DEBUG = False
+□ Configure ALLOWED_HOSTS
+□ Set strong SECRET_KEY
+□ Enable HTTPS settings
+□ Configure database (PostgreSQL)
+□ Setup Redis for Channels
+□ Configure email backend
+□ Setup static file serving
+□ Configure media file storage
+□ Run security checks: python manage.py check --deploy
+
+Server Setup:
+□ Install Python 3.10+
+□ Install PostgreSQL
+□ Install Redis
+□ Install Nginx
+□ Setup firewall (UFW)
+□ Configure SSL certificate
+□ Setup process manager (systemd/supervisor)
+
+Application Deployment:
+□ Clone repository
+□ Create virtual environment
+□ Install dependencies
+□ Run migrations
+□ Collect static files
+□ Create superuser
+□ Test application
+□ Configure logging
+□ Setup monitoring
+
+Post-Deployment:
+□ Test all functionality
+□ Monitor logs
+□ Setup backups
+□ Configure monitoring (Sentry, New Relic)
+□ Setup log rotation
+□ Document deployment process
+
+================================================================================
+10. CONCLUSION
+================================================================================
+
+This documentation provides a comprehensive technical overview of the EduMi
+Django application, covering:
+
+- Project architecture and technology stack
+- All Django apps and their purposes
+- Complete API endpoint documentation
+- Database schema and relationships
+- Data flow for all major features
+- Security implementations
+- Deployment configurations
+
+For additional information:
+- README.md: Project overview and quick start
+- RUN.md: Running instructions
+- Code comments: Inline documentation
+- Django documentation: https://docs.djangoproject.com/
+
+================================================================================
+                            END OF DOCUMENTATION
+================================================================================

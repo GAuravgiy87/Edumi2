@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="admin-container" style="max-width: 1400px; margin: 30px auto; padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div>
+            <h2 style="color: #2c3e50; margin-bottom: 5px;">👨‍🏫 All Teachers</h2>
+            <p style="color: #7f8c8d;">Total: {{ total_count }} teachers</p>
+        </div>
+        <a href="{% url 'admin_panel' %}" style="padding: 10px 20px; background: #ecf0f1; color: #2c3e50; text-decoration: none; border-radius: 5px; font-weight: 600;">
+            ← Back to Admin Panel
+        </a>
+    </div>
+    
+    <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
+                    <th style="padding: 15px; text-align: left; color: #2c3e50;">Username</th>
+                    <th style="padding: 15px; text-align: left; color: #2c3e50;">Full Name</th>
+                    <th style="padding: 15px; text-align: left; color: #2c3e50;">Email</th>
+                    <th style="padding: 15px; text-align: left; color: #2c3e50;">Employee ID</th>
+                    <th style="padding: 15px; text-align: left; color: #2c3e50;">Department</th>
+                    <th style="padding: 15px; text-align: left; color: #2c3e50;">Date Joined</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for teacher in teachers %}
+                    <tr style="border-bottom: 1px solid #f0f0f0;">
+                        <td style="padding: 15px;">
+                            <a href="{% url 'profile_view' teacher.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">
+                                {{ teacher.username }}
+                            </a>
+                        </td>
+                        <td style="padding: 15px; color: #2c3e50;">
+                            {{ teacher.get_full_name|default:"-" }}
+                        </td>
+                        <td style="padding: 15px; color: #7f8c8d;">
+                            {{ teacher.email|default:"-" }}
+                        </td>
+                        <td style="padding: 15px; color: #7f8c8d;">
+                            {{ teacher.userprofile.employee_id|default:"-" }}
+                        </td>
+                        <td style="padding: 15px; color: #7f8c8d;">
+                            {{ teacher.userprofile.department|default:"-" }}
+                        </td>
+                        <td style="padding: 15px; color: #7f8c8d; font-size: 14px;">
+                            {{ teacher.date_joined|date:"M d, Y" }}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" style="padding: 40px; text-align: center; color: #95a5a6;">
+                            No teachers found
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

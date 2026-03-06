@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Inbox - EduMi{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1400px; margin: 30px auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; padding: 30px; margin-bottom: 30px; color: white;">
+        <h1 style="margin-bottom: 10px;">💬 Inbox</h1>
+        <p style="opacity: 0.9;">Your conversations</p>
+    </div>
+    
+    <div style="background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-height: 600px;">
+        {% if conversations %}
+            <div style="display: flex; flex-direction: column;">
+                {% for conv in conversations %}
+                    <a href="{% url 'conversation_detail' conv.id %}" style="text-decoration: none; color: inherit; border-bottom: 1px solid #f0f0f0; transition: background 0.3s;">
+                        <div style="padding: 20px; display: flex; align-items: center; gap: 15px; position: relative;">
+                            <!-- Profile Picture -->
+                            <div style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; background: {% if conv.other_user.userprofile.user_type == 'teacher' %}#667eea{% else %}#2ecc71{% endif %}; flex-shrink: 0;">
+                                {% if conv.other_user.userprofile.profile_picture %}
+                                    <img src="{{ conv.other_user.userprofile.profile_picture.url }}" alt="{{ conv.other_user.username }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                {% elif conv.other_user.userprofile.avatar_url %}
+                                    <img src="{{ conv.other_user.userprofile.avatar_url }}" alt="{{ conv.other_user.username }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                {% else %}
+                                    <img src="https://ui-avatars.com/api/?name={{ conv.other_user.username }}&background={% if conv.other_user.userprofile.user_type == 'teacher' %}667eea{% else %}2ecc71{% endif %}&color=fff" alt="{{ conv.other_user.username }}" style="width: 100%; height: 100%;">
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Message Info -->
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 5px;">
+                                    <div style="font-weight: 600; color: #2c3e50; font-size: 16px;">
+                                        {{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}
+                                        {% if conv.other_user.userprofile.user_type == 'teacher' %}
+                                            <span style="font-size: 14px;">👨‍🏫</span>
+                                        {% else %}
+                                            <span style="font-size: 14px;">👨‍🎓</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if conv.last_msg %}
+                                        <div style="font-size: 12px; color: #95a5a6;">
+                                            {{ conv.last_msg.created_at|timesince }} ago
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if conv.last_msg %}
+                                    <div style="font-size: 14px; color: #7f8c8d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        {% if conv.last_msg.sender == user %}
+                                            <span style="color: #667eea;">You:</span>
+                                        {% endif %}
+                                        {% if conv.last_msg.image %}
+                                            📷 Photo
+                                        {% elif conv.last_msg.file %}
+                                            📎 File
+                                        {% else %}
+                                            {{ conv.last_msg.content|truncatewords:10 }}
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <div style="font-size: 14px; color: #95a5a6; font-style: italic;">
+                                        No messages yet
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Unread Badge -->
+                            {% if conv.unread_count > 0 %}
+                                <div style="background: #e74c3c; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">
+                                    {{ conv.unread_count }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 100px 20px; color: #95a5a6;">
+                <div style="font-size: 80px; margin-bottom: 20px;">💬</div>
+                <h3 style="color: #7f8c8d; margin-bottom: 10px;">No conversations yet</h3>
+                <p style="margin-bottom: 20px;">Start a conversation from the Directory</p>
+                <a href="{% url 'directory' %}" style="display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
+                    Go to Directory
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+a:hover > div {
+    background: #f8f9fa !important;
+}
+</style>
+{% endblock %}

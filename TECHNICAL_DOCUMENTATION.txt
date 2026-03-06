@@ -1,0 +1,286 @@
+================================================================================
+                    EDUMI - TECHNICAL DOCUMENTATION
+                Educational Video Conferencing Platform
+================================================================================
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+Project Name: EduMi (Educational Meeting Interface)
+
+Purpose:
+EduMi is a comprehensive educational platform designed for schools and 
+universities to facilitate real-time video conferencing, camera monitoring, 
+and user management. The platform enables teachers to conduct virtual classes, 
+monitor campus security cameras, and manage student interactions in a secure 
+and scalable environment.
+
+Target Users:
+- Teachers: Create and host virtual meetings, manage cameras, view analytics
+- Students: Join virtual classes, participate in meetings, view profiles
+- Administrators: Manage users, cameras, meetings, and system-wide settings
+
+Key Features:
+- Real-time video conferencing with WebRTC technology
+- RTSP camera integration for campus monitoring
+- Mobile camera support (IP Webcam for Android, DroidCam for iPhone)
+- Role-based access control with granular permissions
+- Live chat during meetings
+- Screen sharing capabilities
+- User profile management with avatars
+- Meeting scheduling and management
+- Multi-camera live monitoring dashboard
+
+================================================================================
+2. TECHNOLOGY STACK
+================================================================================
+
+Backend Framework:
+- Django Version: 4.2.9
+- Python Version: 3.8+ (recommended 3.10+)
+
+Database:
+- Primary: SQLite (db.sqlite3)
+- Production Ready: PostgreSQL compatible
+- Shared database between main app and camera service
+
+Real-Time Communication:
+- Django Channels: 4.0.0 (WebSocket support)
+- Daphne: 4.0.0 (ASGI server)
+- Channels-Redis: 4.1.0 (Channel layer backend)
+- WebRTC: Browser-native implementation
+
+Video Processing:
+- OpenCV: 4.8.1.78 (RTSP streaming and video processing)
+
+HTTP Client:
+- Requests: 2.31.0 (Inter-service communication)
+
+CORS Handling:
+- django-cors-headers: 4.3.1 (Cross-origin resource sharing)
+
+Frontend:
+- HTML5: Semantic markup
+- CSS3: Custom styling with modern features
+- JavaScript (Vanilla): WebRTC, WebSocket, DOM manipulation
+- No frontend framework (lightweight approach)
+
+Server Architecture:
+- Main Application: ASGI (Daphne) on port 8000
+- Camera Service: WSGI (Django development server) on port 8001
+- WebSocket: Integrated with main application
+
+Hosting Environment:
+- Development: Local (localhost:8000, localhost:8001)
+- Network Access: Configured for LAN access (10.17.2.47)
+- Production: Can be deployed on any WSGI/ASGI compatible server
+- Recommended: Nginx + Gunicorn/Daphne + PostgreSQL
+
+================================================================================
+3. APPLICATION ARCHITECTURE
+================================================================================
+
+3.1 MICROSERVICES DESIGN
+--------------------------------------------------------------------------------
+
+The application follows a microservices architecture with two main services:
+
+Service 1: Main Application (Port 8000)
+- Purpose: Core application logic, authentication, meetings, UI
+- Server: Daphne (ASGI)
+- Protocol: HTTP + WebSocket
+- Responsibilities:
+  * User authentication and authorization
+  * Meeting creation and management
+  * WebRTC signaling via WebSocket
+  * User profile management
+  * Camera management UI
+  * Dashboard and analytics
+  * Template rendering
+
+Service 2: Camera Streaming Service (Port 8001)
+- Purpose: Dedicated video streaming from RTSP and mobile cameras
+- Server: Django development server (WSGI)
+- Protocol: HTTP (MJPEG streaming)
+- Responsibilities:
+  * RTSP camera connection and streaming
+  * Mobile camera (HTTP/MJPEG) streaming
+  * Video frame processing with OpenCV
+  * Automatic reconnection on failure
+  * Frame rate and quality optimization
+  * Resource-intensive video operations
+
+Why Separate Services?
+1. Isolation: Video streaming is resource-intensive and isolated from main app
+2. Scalability: Camera service can be scaled independently
+3. Stability: Camera failures don't affect main application
+4. Protocol: ASGI (WebSocket) and WSGI don't conflict
+5. Performance: Dedicated resources for video processing
+
+Communication Between Services:
+- Main app proxies camera feeds from camera service
+- HTTP requests from main app (port 8000) to camera service (port 8001)
+- CORS enabled for cross-origin requests
+- Shared SQLite database for data consistency
+
+3.2 DJANGO APPS STRUCTURE
+--------------------------------------------------------------------------------
+
+App 1: accounts
+Purpose: User authentication, profiles, and role management
+Models:
+  - UserProfile: Extended user information with role-based fields
+Functionality:
+  - User registration and login
+  - Role-based dashboards (teacher, student, admin)
+  - Profile management with avatars
+  - User statistics and analytics
+  - Admin panel for user management
+
+App 2: cameras
+Purpose: RTSP camera management and monitoring
+Models:
+  - Camera: RTSP camera configuration
+  - CameraPermission: Teacher access control
+Functionality:
+  - Add/delete RTSP cameras
+  - Auto-detect RTSP stream paths
+  - Permission management for teachers
+  - Live camera feed viewing
+  - Multi-camera monitoring dashboard
+  - Camera connection testing
+
+App 3: mobile_cameras
+Purpose: Mobile device camera integration (IP Webcam, DroidCam)
+Models:
+  - MobileCamera: Mobile camera configuration
+  - MobileCameraPermission: Teacher access control
+Functionality:
+  - Add mobile cameras via URL or manual input
+  - Auto-detect stream paths
+  - Support for IP Webcam (Android) and DroidCam (iPhone)
+  - Permission management
+  - Live mobile camera feeds
+  - HTTP/MJPEG streaming
+
+App 4: meetings
+Purpose: Video conferencing and real-time communication
+Models:
+  - Meeting: Meeting configuration and metadata
+  - MeetingParticipant: Participant tracking
+Functionality:
+  - Create and schedule meetings
+  - Generate unique meeting codes
+  - WebRTC video conferencing
+  - Real-time chat via WebSocket
+  - Screen sharing
+  - Participant management
+  - Meeting status tracking (scheduled, live, ended)
+
+App 5: pages
+Purpose: Static pages and landing pages
+Functionality:
+  - Home page
+  - Static content rendering
+
+App 6: camera_service/camera_api
+Purpose: Camera streaming API (microservice)
+Functionality:
+  - RTSP camera streaming endpoints
+  - Mobile camera streaming endpoints
+  - Background thread management for video capture
+  - Frame optimization and compression
+  - Automatic reconnection logic
+  - Connection testing endpoints
+
+3.3 MVT (MODEL-VIEW-TEMPLATE) STRUCTURE
+--------------------------------------------------------------------------------
+
+Models (Data Layer):
+- Define database schema using Django ORM
+- Handle data validation and business logic
+- Relationships: OneToOne, ForeignKey, ManyToMany
+- Located in: <app>/models.py
+
+Views (Controller Layer):
+- Process HTTP requests
+- Implement business logic
+- Query models and prepare data
+- Return HTTP responses or render templates
+- Located in: <app>/views.py
+
+Templates (Presentation Layer):
+- HTML files with Django template language
+- Dynamic content rendering
+- Template inheritance (base.html)
+- Located in: templates/<app>/
+
+URL Routing:
+- Map URLs to views
+- App-level: <app>/urls.py
+- Project-level: school_project/urls.py
+
+3.4 MIDDLEWARE STACK
+--------------------------------------------------------------------------------
+
+Middleware (in order of execution):
+1. SecurityMiddleware: Security headers and HTTPS redirect
+2. SessionMiddleware: Session management
+3. CommonMiddleware: Common HTTP features
+4. CsrfViewMiddleware: CSRF protection
+5. AuthenticationMiddleware: User authentication
+6. MessageMiddleware: Flash messages
+7. ClickjackingMiddleware: X-Frame-Options header
+
+Camera Service Middleware:
+1. CorsMiddleware: Cross-origin resource sharing
+2. CommonMiddleware: Common HTTP features
+
+3.5 AUTHENTICATION SYSTEM
+--------------------------------------------------------------------------------
+
+Type: Session-based authentication (Django default)
+
+Components:
+- Django's built-in User model
+- UserProfile model (OneToOne with User)
+- Session cookies for authentication state
+- CSRF tokens for form security
+
+Authentication Flow:
+1. User submits login form (username + password)
+2. Django authenticates credentials
+3. Session created and cookie sent to browser
+4. Subsequent requests include session cookie
+5. AuthenticationMiddleware populates request.user
+6. Views check user.is_authenticated and permissions
+
+User Roles:
+- Admin: Full system access (username='Admin' or is_superuser=True)
+- Teacher: Create meetings, manage cameras with permissions
+- Student: Join meetings, view cameras
+
+Role Implementation:
+- UserProfile.user_type field ('teacher' or 'student')
+- Permission checks in views using decorators and conditionals
+- Role-based redirects after login
+
+Password Security:
+- Django's PBKDF2 algorithm with SHA256 hash
+- Automatic password hashing on user creation
+- Password validation rules (length, complexity)
+
+Session Security:
+- SESSION_COOKIE_SECURE: False (dev), True (production)
+- CSRF_COOKIE_SECURE: False (dev), True (production)
+- SESSION_COOKIE_SAMESITE: 'Lax'
+
+================================================================================
+4. API STRUCTURE
+================================================================================
+
+4.1 MAIN APPLICATION ENDPOINTS (Port 8000)
+--------------------------------------------------------------------------------
+
+ACCOUNTS APP:

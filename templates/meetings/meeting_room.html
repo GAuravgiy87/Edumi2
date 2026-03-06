@@ -133,7 +133,12 @@
 
 <script>
 // Get data from data attributes to avoid linter errors with Django template syntax
-const scriptTag = document.getElementById('meeting-da
+const scriptTag = document.getElementById('meeting-data');
+const meetingId = scriptTag.dataset.meetingId;
+const meetingCode = scriptTag.dataset.meetingCode;
+const currentUserId = scriptTag.dataset.userId;
+const currentUsername = scriptTag.dataset.username;
+const isHost = scriptTag.dataset.isHost === 'true';
 
 // WebSocket connection
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -153,9 +158,11 @@ const rtcConfig = {
 
 // State
 let localStream = null;
+let localDisplayStream = null; // Separate stream for local display
 let screenStream = null;
 let peerConnections = {};
 let participants = {};
+let localVideoUserId = null; // Track which video is the local one
 let isMicOn = true;
 let isCameraOn = true;
 let isScreenSharing = false;
@@ -169,25 +176,189 @@ let recordingTimerInterval = null;
 
 // Initialize
 async function init() {
-    try {
-        // Get user media with lower quality for better performance
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 480, max: 640 },
-                height: { ideal: 360, max: 480 },
-                frameRate: { ideal: 15, max: 24 },
-                facingMode: 'user'
-            },
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 16000
-            }
-        });
+    console.log('=== INITIALIZING MEETING ===');
+    console.log('currentUserId:', currentUserId);
+    console.log('currentUsername:', currentUsername);
+    console.log('isHost:', isHost);
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Platform:', navigator.platform);
+    
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('getUserMedia not supported');
+        showNotification('Your browser does not support camera/microphone access', 'error');
         
-        // Add local video
-        addVideoElement(currentUserId, currentUsername, localStream, true);
+        // Create placeholder and continue
+        createPlaceholderStream();
+        connectWebSocket();
+        startTimer();
+        return;
+    }
+    
+    try {
+        // Try to get user media with lower quality for better performance
+        try {
+            console.log('Requesting camera and microphone...');
+            
+            // Use simpler constraints for mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            const constraints = isMobile ? {
+                video: {
+                    width: { ideal: 320, max: 480 },
+                    height: { ideal: 240, max: 360 },
+                    frameRate: { ideal: 10, max: 15 },
+                    facingMode: 'user'
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            } : {
+                video: {
+                    width: { ideal: 480, max: 640 },
+                    height: { ideal: 360, max: 480 },
+                    frameRate: { ideal: 15, max: 24 },
+                    facingMode: 'user'
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 16000
+                }
+            };
+            
+            console.log('Using constraints:', constraints);
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            console.log('Got media stream:', localStream);
+            console.log('Video tracks:', localStream.getVideoTracks().length);
+            console.log('Audio tracks:', localStream.getAudioTracks().length);
+            
+            if (localStream.getVideoTracks().length > 0) {
+                console.log('Video track settings:', localStream.getVideoTracks()[0].getSettings());
+            }
+            
+            // Clone the stream for local display to prevent it from being affected by peer connections
+            localDisplayStream = localStream.clone();
+            
+            console.log('=== ABOUT TO ADD LOCAL VIDEO ===');
+            console.log('currentUserId:', currentUserId);
+            console.log('currentUsername:', currentUsername);
+            console.log('localDisplayStream:', localDisplayStream);
+            console.log('localDisplayStream.active:', localDisplayStream.active);
+            console.log('localDisplayStream tracks:', localDisplayStream.getTracks());
+            
+            // Add event listeners to keep tracks alive
+            localDisplayStream.getTracks().forEach(track => {
+                track.addEventListener('ended', () => {
+                    console.warn('Local display track ended:', track.kind);
+                    // Try to re-clone from original stream if still available
+                    if (localStream && localStream.active) {
+                        const newTrack = localStream.getTracks().find(t => t.kind === track.kind);
+                        if (newTrack) {
+                            localDisplayStream.removeTrack(track);
+                            localDisplayStream.addTrack(newTrack.clone());
+                            console.log('Restored local display track:', track.kind);
+                        }
+                    }
+                });
+            });
+            
+            // Add local video using the cloned stream
+            addVideoElement(currentUserId, currentUsername, localDisplayStream, true);
+            localVideoUserId = currentUserId; // Mark this as the local video
+            console.log('=== LOCAL VIDEO ADDED ===');
+            
+        } catch (mediaError) {
+            console.error('Media error:', mediaError.name, mediaError.message);
+            console.error('Full error:', mediaError);
+            
+            // Try to get just video or just audio separately
+            let videoStream = null;
+            let audioStream = null;
+            
+            // Try video only
+            try {
+                console.log('Trying video only...');
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                videoStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: isMobile ? {
+                        width: { ideal: 320, max: 480 },
+                        height: { ideal: 240, max: 360 },
+                        frameRate: { ideal: 10, max: 15 }
+                    } : {
+                        width: { ideal: 480, max: 640 },
+                        height: { ideal: 360, max: 480 },
+                        frameRate: { ideal: 15, max: 24 }
+                    }
+                });
+                console.log('Got video stream');
+            } catch (e) {
+                console.error('Could not get video:', e.name, e.message);
+            }
+            
+            // Try audio only
+            try {
+                console.log('Trying audio only...');
+                audioStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
+                console.log('Got audio stream');
+            } catch (e) {
+                console.error('Could not get audio:', e.name, e.message);
+            }
+            
+            // Combine streams if we got any
+            if (videoStream || audioStream) {
+                if (videoStream && audioStream) {
+                    // Combine both
+                    localStream = new MediaStream([
+                        ...videoStream.getVideoTracks(),
+                        ...audioStream.getAudioTracks()
+                    ]);
+                } else if (videoStream) {
+                    localStream = videoStream;
+                    isMicOn = false;
+                } else {
+                    localStream = audioStream;
+                    isCameraOn = false;
+                }
+                
+                console.log('Created combined stream:', localStream);
+                
+                // Clone for local display
+                localDisplayStream = localStream.clone();
+                console.log('Created localDisplayStream clone');
+                
+                addVideoElement(currentUserId, currentUsername, localDisplayStream, true);
+                localVideoUserId = currentUserId; // Mark this as the local video
+                
+                // Update UI
+                if (!videoStream) {
+                    const camBtn = document.getElementById('camBtn');
+                    if (camBtn) camBtn.classList.add('off');
+                }
+                if (!audioStream) {
+                    const micBtn = document.getElementById('micBtn');
+                    if (micBtn) micBtn.classList.add('off');
+                }
+                
+                const msg = videoStream && audioStream ? 'Connected with video and audio' :
+                           videoStream ? 'Connected with video only (no microphone)' :
+                           'Connected with audio only (no camera)';
+                showNotification(msg, 'info');
+            } else {
+                // No media at all - create placeholder
+                console.log('No media available, creating placeholder');
+                createPlaceholderStream();
+            }
+        }
         
         // Connect WebSocket
         connectWebSocket();
@@ -196,9 +367,56 @@ async function init() {
         startTimer();
         
     } catch (error) {
-        console.error('Error accessing media:', error);
-        alert('Could not access camera/microphone. Please check permissions.');
+        console.error('Error initializing meeting:', error);
+        showNotification('Failed to initialize meeting. Please refresh the page.', 'error');
     }
+}
+
+function createPlaceholderStream() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw a placeholder
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Camera Off', canvas.width / 2, canvas.height / 2);
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText('Grant camera permission to enable video', canvas.width / 2, canvas.height / 2 + 30);
+    
+    // Create stream from canvas
+    localStream = canvas.captureStream(1);
+    
+    // Add silent audio track
+    try {
+        const audioContext = new AudioContext();
+        const destination = audioContext.createMediaStreamDestination();
+        localStream.addTrack(destination.stream.getAudioTracks()[0]);
+    } catch (e) {
+        console.warn('Could not create audio context:', e);
+    }
+    
+    // Clone for local display
+    localDisplayStream = localStream.clone();
+    console.log('Created placeholder localDisplayStream');
+    
+    // Add placeholder video
+    addVideoElement(currentUserId, currentUsername, localDisplayStream, true);
+    localVideoUserId = currentUserId; // Mark this as the local video
+    
+    // Update UI to show camera/mic are off
+    isCameraOn = false;
+    isMicOn = false;
+    const camBtn = document.getElementById('camBtn');
+    const micBtn = document.getElementById('micBtn');
+    if (camBtn) camBtn.classList.add('off');
+    if (micBtn) micBtn.classList.add('off');
+    
+    showNotification('Camera/Microphone access denied. You can still join the meeting.', 'warning');
 }
 
 function connectWebSocket() {
@@ -384,7 +602,17 @@ async function handleAnswer(data) {
     
     const pc = peerConnections[data.from_user_id];
     if (pc) {
-        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        console.log('Peer connection state:', pc.signalingState);
+        
+        // Only set remote description if we're in the right state
+        if (pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            console.log('Remote description set successfully');
+        } else {
+            console.warn(`Cannot set remote description in state: ${pc.signalingState}`);
+        }
+    } else {
+        console.warn('No peer connection found for user:', data.from_user_id);
     }
 }
 
@@ -417,6 +645,13 @@ function createPeerConnection(userId) {
     // Handle incoming tracks
     pc.ontrack = (event) => {
         console.log('Received track from user:', userId);
+        
+        // Don't add video for our own tracks (shouldn't happen, but just in case)
+        if (userId === currentUserId) {
+            console.log('⚠ Ignoring track from self (userId matches currentUserId)');
+            return;
+        }
+        
         const remoteStream = event.streams[0];
         addVideoElement(userId, participants[userId] || 'User', remoteStream, false);
     };
@@ -432,23 +667,76 @@ function createPeerConnection(userId) {
     return pc;
 }
 function addVideoElement(userId, username, stream, isLocal) {
+    console.log(`=== addVideoElement called ===`);
+    console.log(`userId: ${userId} (type: ${typeof userId}), username: ${username}, isLocal: ${isLocal}`);
+    console.log(`localVideoUserId: ${localVideoUserId} (type: ${typeof localVideoUserId})`);
+    console.log(`userId === localVideoUserId: ${userId === localVideoUserId}`);
+    console.log(`userId == localVideoUserId: ${userId == localVideoUserId}`);
+    console.log(`stream:`, stream);
+    console.log(`stream.active:`, stream?.active);
+    console.log(`stream tracks:`, stream?.getTracks().map(t => `${t.kind}: ${t.enabled}, readyState: ${t.readyState}`));
+    
+    // CRITICAL CHECK: If this userId is the local video, and it already exists, NEVER touch it
+    const videoExists = document.getElementById(`video-${userId}`);
+    console.log(`Video element exists: ${!!videoExists}`);
+    
+    if (userId == localVideoUserId && videoExists) {
+        console.log('🛑 BLOCKED: Attempt to update local video container. Local video is sacred!');
+        return;
+    }
+    
     let videoContainer = document.getElementById(`video-${userId}`);
     
     if (!videoContainer) {
+        console.log(`Creating new video container for ${username}`);
         videoContainer = document.createElement('div');
         videoContainer.id = `video-${userId}`;
         videoContainer.className = 'video-box';
         videoContainer.dataset.userId = userId;
         
         const video = document.createElement('video');
+        video.id = `video-element-${userId}`;
         video.srcObject = stream;
         video.autoplay = true;
         video.playsInline = true;
-        video.muted = isLocal;
+        video.muted = isLocal; // Mute local video to prevent echo
+        
+        console.log(`Video element created with srcObject:`, video.srcObject);
         
         // Optimize video playback
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
+        
+        // For local video, mirror it
+        if (isLocal) {
+            video.style.transform = 'scaleX(-1)';
+        }
+        
+        // Force video to play
+        video.onloadedmetadata = () => {
+            console.log(`✓ Video metadata loaded for ${username}`);
+            console.log(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+            video.play().then(() => {
+                console.log(`✓ Video playing for ${username}`);
+            }).catch(err => {
+                console.error(`✗ Error playing video for ${username}:`, err);
+                // Try again after a short delay
+                setTimeout(() => {
+                    video.play().catch(e => console.error('Retry failed:', e));
+                }, 500);
+            });
+        };
+        
+        // Handle play errors
+        video.onerror = (e) => {
+            console.error(`✗ Video error for ${username}:`, e);
+        };
+        
+        // Monitor video state
+        video.onplay = () => console.log(`▶ Video started playing: ${username}`);
+        video.onpause = () => console.log(`⏸ Video paused: ${username}`);
+        video.onstalled = () => console.log(`⚠ Video stalled: ${username}`);
+        video.onwaiting = () => console.log(`⏳ Video waiting: ${username}`);
         
         const nameTag = document.createElement('div');
         nameTag.className = 'video-nametag';
@@ -457,16 +745,49 @@ function addVideoElement(userId, username, stream, isLocal) {
         videoContainer.appendChild(video);
         videoContainer.appendChild(nameTag);
         
-        document.getElementById('videoGridContainer').appendChild(videoContainer);
+        const gridContainer = document.getElementById('videoGridContainer');
+        console.log(`Appending to videoGridContainer:`, gridContainer);
+        gridContainer.appendChild(videoContainer);
+        
+        // Ensure video plays after adding to DOM
+        setTimeout(() => {
+            if (video.paused) {
+                console.log(`Video was paused for ${username}, attempting to play...`);
+                video.play().catch(err => console.error('Delayed play failed:', err));
+            }
+        }, 100);
+        
     } else {
+        console.log(`Video container already exists for ${username}`);
+        
+        // CRITICAL: Never update the local video's srcObject
+        // Check if this is the local video container by userId
+        if (userId === localVideoUserId) {
+            console.log('⚠ This is the LOCAL video container - NEVER update its srcObject!');
+            console.log('Local video should always show localDisplayStream');
+            return;
+        }
+        
         const video = videoContainer.querySelector('video');
-        video.srcObject = stream;
+        if (video) {
+            console.log(`Updating REMOTE video stream for ${username}`);
+            
+            video.srcObject = stream;
+            // Force play after changing stream
+            video.play().then(() => {
+                console.log(`Updated video playing for ${username}`);
+            }).catch(err => {
+                console.error(`Error playing updated video for ${username}:`, err);
+            });
+        }
     }
     
     // Use RAF for layout update
     requestAnimationFrame(() => {
         updateVideoLayout();
     });
+    
+    console.log(`=== addVideoElement completed ===`);
 }
 
 // Debounce function for performance
@@ -545,9 +866,17 @@ function updateParticipantsList() {
 
 function toggleMic() {
     isMicOn = !isMicOn;
+    
+    // Update both localStream and localDisplayStream
     localStream.getAudioTracks().forEach(track => {
         track.enabled = isMicOn;
     });
+    
+    if (localDisplayStream) {
+        localDisplayStream.getAudioTracks().forEach(track => {
+            track.enabled = isMicOn;
+        });
+    }
     
     const btn = document.getElementById('micBtn');
     btn.classList.toggle('off', !isMicOn);
@@ -566,9 +895,17 @@ function toggleMic() {
 
 function toggleCamera() {
     isCameraOn = !isCameraOn;
+    
+    // Update both localStream and localDisplayStream
     localStream.getVideoTracks().forEach(track => {
         track.enabled = isCameraOn;
     });
+    
+    if (localDisplayStream) {
+        localDisplayStream.getVideoTracks().forEach(track => {
+            track.enabled = isCameraOn;
+        });
+    }
     
     const btn = document.getElementById('camBtn');
     btn.classList.toggle('off', !isCameraOn);
@@ -637,11 +974,8 @@ async function toggleScreenShare() {
                 }
             });
             
-            // Update local video
-            const localVideo = document.querySelector(`#video-${currentUserId} video`);
-            if (localVideo) {
-                localVideo.srcObject = screenStream;
-            }
+            // DON'T update local video - keep it showing the camera
+            // Local video should always show localDisplayStream, not screenStream
             
             isScreenSharing = true;
             screenSharingUserId = currentUserId;
@@ -713,11 +1047,8 @@ function stopScreenShare() {
         }
     });
     
-    // Update local video
-    const localVideo = document.querySelector(`#video-${currentUserId} video`);
-    if (localVideo && localStream) {
-        localVideo.srcObject = localStream;
-    }
+    // DON'T update local video - it should always show localDisplayStream (camera)
+    // The local video element should never change its srcObject
     
     isScreenSharing = false;
     if (screenSharingUserId === currentUserId) {
@@ -1165,6 +1496,32 @@ window.addEventListener('beforeunload', () => {
     }
     if (ws) ws.close();
 });
+
+// Notification function
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideDown 0.3s ease-out;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideUp 0.3s ease-out';
+        setTimeout(() => notification.remove(), 300);
+    }, 4000);
+}
 
 // Initialize on load
 window.addEventListener('load', init);

@@ -1,2 +1,17 @@
 {
+  "css.validate": false,
+  "html.validate.styles": false,
+  "html.validate.scripts": false,
+  "[django-html]": {
+    "css.validate": false,
+    "html.validate.styles": false,
+    "html.validate.scripts": false
+  },
+  "files.associations": {
+    "**/*.html": "html",
+    "**/templates/**/*.html": "django-html"
+  },
+  "emmet.includeLanguages": {
+    "django-html": "html"
+}
 }

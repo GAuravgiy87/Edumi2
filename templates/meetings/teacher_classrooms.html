@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Classrooms - EduMi{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 30px auto; padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div>
+            <h2 style="color: #2c3e50; margin-bottom: 5px;">🏫 My Classrooms</h2>
+            <p style="color: #7f8c8d;">Manage your virtual classrooms and meetings</p>
+        </div>
+        <a href="{% url 'create_classroom' %}" 
+           style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
+            + Create New Classroom
+        </a>
+    </div>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div style="padding: 15px; margin-bottom: 20px; border-radius: 5px; background: {% if message.tags == 'error' %}#fee{% else %}#efe{% endif %}; border-left: 4px solid {% if message.tags == 'error' %}#e74c3c{% else %}#2ecc71{% endif %};">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if classrooms %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+            {% for classroom in classrooms %}
+                <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <h3 style="color: #2c3e50; margin-bottom: 5px;">{{ classroom.title }}</h3>
+                            <div style="display: inline-block; padding: 4px 12px; background: #e8f5e9; color: #2ecc71; border-radius: 15px; font-size: 12px; font-weight: 600; margin-bottom: 10px;">
+                                {{ classroom.class_code }}
+                            </div>
+                        </div>
+                        {% if classroom.has_active_meeting %}
+                            <span style="padding: 6px 12px; background: #fee; color: #e74c3c; border-radius: 15px; font-size: 11px; font-weight: 600; animation: pulse 2s infinite;">
+                                🔴 LIVE
+                            </span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if classroom.description %}
+                        <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 15px;">{{ classroom.description|truncatewords:15 }}</p>
+                    {% endif %}
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                        <div style="flex: 1; text-align: center;">
+                            <div style="font-size: 24px; font-weight: 700; color: #667eea;">{{ classroom.get_approved_students.count }}</div>
+                            <div style="font-size: 12px; color: #7f8c8d;">Students</div>
+                        </div>
+                        <div style="flex: 1; text-align: center;">
+                            <div style="font-size: 24px; font-weight: 700; color: #e74c3c;">{{ classroom.get_pending_requests.count }}</div>
+                            <div style="font-size: 12px; color: #7f8c8d;">Pending</div>
+                        </div>
+                        <div style="flex: 1; text-align: center;">
+                            <div style="font-size: 24px; font-weight: 700; color: #2ecc71;">{{ classroom.meetings.count }}</div>
+                            <div style="font-size: 12px; color: #7f8c8d;">Meetings</div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <a href="{% url 'classroom_detail' classroom.id %}" 
+                           style="flex: 1; padding: 10px; background: #667eea; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: 600;">
+                            Open Classroom
+                        </a>
+                        {% if classroom.has_active_meeting %}
+                            <a href="{% url 'join_meeting' classroom.get_active_meeting.meeting_code %}" 
+                               style="flex: 1; padding: 10px; background: #e74c3c; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: 600;">
+                                Join Live Meeting
+                            </a>
+                        {% endif %}
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #95a5a6;">
+                        Created {{ classroom.created_at|date:"M d, Y" }}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 10px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">🏫</div>
+            <h3 style="color: #2c3e50; margin-bottom: 10px;">No Classrooms Yet</h3>
+            <p style="color: #7f8c8d; margin-bottom: 30px;">Create your first classroom to start teaching online</p>
+            <a href="{% url 'create_classroom' %}" 
+               style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
+                Create Your First Classroom
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+</style>
+{% endblock %}

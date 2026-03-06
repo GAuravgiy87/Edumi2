@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated System Architecture - EduMi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: white;
+            overflow-x: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            color: white;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateX(-5px);
+        }
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+        }
+        .controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .controls button:hover {
+            background: #764ba2;
+            transform: scale(1.05);
+        }
+        .svg-container {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        svg {
+            max-width: 100%;
+            height: auto;
+            background: #16213e;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        
+        /* Animation classes */
+        .packet {
+            animation: movePacket 3s ease-in-out infinite;
+        }
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .glow {
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+        
+        @keyframes movePacket {
+            0%, 100% { opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        
+        .legend {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        .legend-color {
+            width: 30px;
+            height: 3px;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <a href="{% url 'admin_panel' %}" class="back-btn">← Back to Admin</a>
+    
+    <div class="header">
+        <h1>🏗️ EduMi System Architecture</h1>
+        <p>Live Animated Data Flow Visualization</p>
+    </div>
+    
+    <div class="controls">
+        <button onclick="toggleAnimation()">⏯️ Pause/Play</button>
+        <button onclick="resetAnimation()">🔄 Reset</button>
+        <button onclick="changeSpeed('slow')">🐢 Slow</button>
+        <button onclick="changeSpeed('fast')">🐇 Fast</button>
+    </div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #3498db;"></div>
+            <span>HTTP Request</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e74c3c;"></div>
+            <span>Video Stream</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #2ecc71;"></div>
+            <span>Database Query</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #9b59b6;"></div>
+            <span>WebSocket</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f39c12;"></div>
+            <span>WebRTC P2P</span>
+        </div>
+    </div>
+    
+    <div class="svg-container">
+        <svg id="architecture" width="1400" height="2200" viewBox="0 0 1400 2200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- Gradients -->
+                <linearGradient id="bg1" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:0.3" />
+                    <stop offset="100%" style="stop-color:#e74c3c;stop-opacity:0.1" />
+                </linearGradient>
+                <linearGradient id="bg2" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#f39c12;stop-opacity:0.3" />
+                    <stop offset="100%" style="stop-color:#f39c12;stop-opacity:0.1" />
+                </linearGradient>
+                <linearGradient id="bg3" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:0.3" />
+                    <stop offset="100%" style="stop-color:#2ecc71;stop-opacity:0.1" />
+                </linearGradient>
+                <linearGradient id="bg4" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:0.3" />
+                    <stop offset="100%" style="stop-color:#9b59b6;stop-opacity:0.1" />
+                </linearGradient>
+                <linearGradient id="bg5" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#34495e;stop-opacity:0.3" />
+                    <stop offset="100%" style="stop-color:#34495e;stop-opacity:0.1" />
+                </linearGradient>
+                
+                <!-- Glow filters -->
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
