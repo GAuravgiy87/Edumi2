@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'cameras',  # RTSP Camera management
     'mobile_cameras',  # Mobile Camera management (IP Webcam, DroidCam)
     'meetings',
+    'django_browser_reload',
 ]
 
 MIDDLEWARE = [
@@ -78,6 +79,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
 
 ROOT_URLCONF = 'school_project.urls'

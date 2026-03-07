@@ -2,28 +2,29 @@
 .welcome-container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: clamp(1rem, 3vw, 2.5rem);
 }
 
 .welcome-hero {
     background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-    border-radius: 20px;
-    padding: 4rem;
-    margin-bottom: 3rem;
+    border-radius: clamp(12px, 2vw, 24px);
+    padding: clamp(1.5rem, 5vw, 4rem);
+    margin-bottom: clamp(1.5rem, 4vw, 3rem);
     color: var(--white);
     box-shadow: var(--shadow-xl);
 }
 
 .welcome-hero h1 {
-    font-size: 3rem;
+    font-size: clamp(1.75rem, 5vw, 3rem);
     font-weight: 800;
     margin-bottom: 1rem;
+    line-height: 1.2;
 }
 
 .hero-subtitle {
-    font-size: 1.25rem;
+    font-size: clamp(1rem, 2vw, 1.25rem);
     opacity: 0.9;
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
 }
 
 .user-info-card {
@@ -129,23 +130,46 @@
 
 @media (max-width: 768px) {
     .welcome-hero {
-        padding: 2rem;
+        padding: 2rem 1.5rem;
     }
-    
-    .welcome-hero h1 {
-        font-size: 2rem;
-    }
-    
+
     .hero-subtitle {
-        font-size: 1.1rem;
+        margin-bottom: 2rem;
     }
-    
+
     .user-info-card {
         flex-direction: column;
         text-align: center;
+        padding: 1.5rem;
     }
-    
+
     .features-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Large Screens / TV */
+@media (min-width: 2000px) {
+    .welcome-container {
+        max-width: 2000px;
+        padding: 4rem;
+    }
+
+    .welcome-hero h1 {
+        font-size: 4rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.75rem;
+    }
+
+    .feature-card {
+        padding: 3rem;
+    }
+
+    .feature-icon {
+        width: 80px;
+        height: 80px;
+        font-size: 2.5rem;
     }
 }

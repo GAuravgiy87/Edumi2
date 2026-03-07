@@ -26,6 +26,7 @@ urlpatterns = [
     path('mobile-cameras/', include('mobile_cameras.urls')),
     path('meetings/', include('meetings.urls')),
     path('', include('accounts.urls')),
+    path("__reload__/", include("django_browser_reload.urls")),
 ]
 
 # Serve media files in development

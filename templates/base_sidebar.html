@@ -10,6 +10,8 @@
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/modern-design.css' %}?v={{ timestamp }}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}?v={{ timestamp }}">
+    <!-- Hotwired Turbo for seamless navigation (no full page reloads) -->
+    <script type="module" src="https://cdn.skypack.dev/@hotwired/turbo"></script>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -274,13 +276,28 @@
                         </span>
                         <input type="text" placeholder="Search..." onkeypress="handleSearch(event)">
                     </div>
-                    <a href="{% url 'notifications_list' %}" class="topbar-icon-btn notification-btn" id="notificationBtn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
-                        <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
-                    </a>
+                    <div class="notification-wrapper">
+                        <button type="button" class="topbar-icon-btn notification-btn" id="notificationBtn" onclick="toggleNotifications(event)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+                        </button>
+                        
+                        <div class="notification-dropdown" id="notificationDropdown">
+                            <div class="notification-dropdown-header">
+                                <h3>Notifications</h3>
+                                <button onclick="markAllNotificationsRead(event)" class="mark-all-read-btn">Mark all read</button>
+                            </div>
+                            <div class="notification-dropdown-list" id="notificationList">
+                                <div class="notification-loading">Loading...</div>
+                            </div>
+                            <div class="notification-dropdown-footer">
+                                <a href="{% url 'notifications_list' %}">View all notifications</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -296,17 +313,21 @@
         function openMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.add('mobile-open');
-            overlay.classList.add('active');
-            document.body.style.overflow = 'hidden';
+            if (sidebar && overlay) {
+                sidebar.classList.add('mobile-open');
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
         }
 
         function closeMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.remove('mobile-open');
-            overlay.classList.remove('active');
-            document.body.style.overflow = '';
+            if (sidebar && overlay) {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
         }
 
         // Close mobile sidebar on window resize
@@ -325,6 +346,123 @@
                 }
             }
         }
+
+        // Notification Dropdown Toggle
+        function toggleNotifications(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const dropdown = document.getElementById('notificationDropdown');
+            const isShowing = dropdown.classList.contains('show');
+            
+            if (!isShowing) {
+                dropdown.classList.add('show');
+                loadRecentNotifications();
+            } else {
+                dropdown.classList.remove('show');
+            }
+        }
+
+        // Load recent notifications via AJAX
+        function loadRecentNotifications() {
+            const list = document.getElementById('notificationList');
+            list.innerHTML = '<div class="notification-loading">Loading...</div>';
+            
+            fetch('/accounts/notifications/recent/')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('notificationBadge');
+                    // Update count while we're at it
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+
+                    if (data.notifications && data.notifications.length > 0) {
+                        list.innerHTML = data.notifications.map(n => `
+                            <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="handleNotificationClick(event, '${n.link || '#'}', ${n.id})">
+                                <div class="notification-item-content">
+                                    <h4 class="notification-item-title">${n.title}</h4>
+                                    <p class="notification-item-message">${n.message}</p>
+                                    <span class="notification-item-time">${n.created_at}</span>
+                                </div>
+                                ${n.is_read ? '' : '<span class="unread-dot"></span>'}
+                            </div>
+                        `).join('');
+                    } else {
+                        list.innerHTML = '<div class="notification-empty">No new notifications</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading notifications:', error);
+                    list.innerHTML = '<div class="notification-error">Failed to load notifications</div>';
+                });
+        }
+
+        function handleNotificationClick(event, link, id) {
+            if (event) event.stopPropagation();
+            
+            // Mark as read then navigate
+            fetch(`/accounts/notifications/mark-read/${id}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                }
+            }).finally(() => {
+                if (link && link !== '#') {
+                    window.location.href = link;
+                } else {
+                    loadRecentNotifications();
+                    updateNotificationCount();
+                }
+            });
+        }
+
+        function markAllNotificationsRead(event) {
+            if (event) event.stopPropagation();
+            fetch('/accounts/notifications/mark-all-read/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    loadRecentNotifications();
+                    updateNotificationCount();
+                }
+            })
+            .catch(error => console.error('Error marking all as read:', error));
+        }
+
+        // Helper to get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('notificationDropdown');
+            const btn = document.getElementById('notificationBtn');
+            if (dropdown && !dropdown.contains(event.target) && !btn.contains(event.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
 
         // Notification count update
         function updateNotificationCount() {
@@ -345,8 +483,8 @@
         // Update notification count on page load
         document.addEventListener('DOMContentLoaded', function() {
             updateNotificationCount();
-            // Poll for new notifications every 30 seconds
-            setInterval(updateNotificationCount, 30000);
+            // Poll for new notifications every 60 seconds
+            setInterval(updateNotificationCount, 60000);
         });
     </script>
     {% else %}
