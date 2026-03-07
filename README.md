@@ -25,8 +25,9 @@
 ---
 
 > 🎥 **Camera/Mic Not Working on IP Address?**  
-> See [QUICK_FIX.md](QUICK_FIX.md) or [MEETING_SETUP.md](MEETING_SETUP.md) for solutions!  
-> Run `run_https.bat` to enable HTTPS for WebRTC. 🚀
+> **Quick Fix:** Use ngrok (no certificate warnings!) - See [HOW_TO_RUN_NGROK.txt](HOW_TO_RUN_NGROK.txt)  
+> **Alternative:** Run `run_https.bat` for local HTTPS - See [QUICK_FIX.md](QUICK_FIX.md)  
+> WebRTC requires HTTPS on non-localhost addresses. 🚀
 
 ---
 
