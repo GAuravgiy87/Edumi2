@@ -130,6 +130,7 @@ class Notification(models.Model):
             notification_type='classroom_denied',
             title='Classroom Request Denied',
             message=f'Your request to join "{classroom.title}" was not approved',
+            link='/meetings/student-classrooms/',
             related_classroom_id=classroom.id
         )
     
@@ -141,6 +142,7 @@ class Notification(models.Model):
             notification_type='classroom_removed',
             title='Removed from Classroom',
             message=f'You have been removed from "{classroom.title}"',
+            link='/meetings/student-classrooms/',
             related_classroom_id=classroom.id
         )
     

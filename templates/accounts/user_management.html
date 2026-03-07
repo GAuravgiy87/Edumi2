@@ -3,6 +3,78 @@
 
 {% block page_title %}User Management{% endblock %}
 
+{% block extra_css %}
+<style>
+.search-container {
+    background: var(--white);
+    border-radius: clamp(10px, 1.5vw, 12px);
+    padding: clamp(1rem, 2vw, 1.25rem);
+    margin-bottom: clamp(1rem, 2vh, 1.5rem);
+    border: 1px solid var(--gray-200);
+}
+
+.search-box {
+    display: flex;
+    gap: clamp(0.75rem, 1.5vw, 1rem);
+    align-items: center;
+}
+
+.search-input-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+.search-input {
+    width: 100%;
+    padding: clamp(0.625rem, 1.2vh, 0.75rem) clamp(0.875rem, 1.8vw, 1rem) clamp(0.625rem, 1.2vh, 0.75rem) clamp(2.5rem, 5vw, 3rem);
+    border: 1px solid var(--gray-300);
+    border-radius: clamp(8px, 1.2vw, 10px);
+    font-size: clamp(0.875rem, 1.6vw, 0.95rem);
+    transition: all 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.search-icon {
+    position: absolute;
+    left: clamp(0.75rem, 1.5vw, 1rem);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400);
+}
+
+.search-icon svg {
+    width: clamp(16px, 2.5vw, 18px);
+    height: clamp(16px, 2.5vw, 18px);
+}
+
+.user-avatar-small {
+    width: clamp(32px, 5vw, 40px);
+    height: clamp(32px, 5vw, 40px);
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--gray-200);
+}
+
+.no-results {
+    text-align: center;
+    padding: clamp(2rem, 4vh, 3rem);
+    color: var(--gray-500);
+}
+
+.no-results svg {
+    width: clamp(48px, 8vw, 64px);
+    height: clamp(48px, 8vw, 64px);
+    margin-bottom: 1rem;
+    stroke: var(--gray-300);
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="admin-container">
     <div class="admin-header">
@@ -10,9 +82,28 @@
         <a href="{% url 'admin_panel' %}" class="btn-add-camera">← Back to Admin Panel</a>
     </div>
     
+    <!-- Search Box -->
+    <div class="search-container">
+        <div class="search-box">
+            <div class="search-input-wrapper">
+                <span class="search-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </span>
+                <input type="text" 
+                       id="userSearch" 
+                       class="search-input" 
+                       placeholder="Search by username, name, email, or type..."
+                       onkeyup="searchUsers()">
+            </div>
+        </div>
+    </div>
+    
     <div class="admin-section">
         <div class="users-table">
-            <table>
+            <table id="usersTable">
                 <thead>
                     <tr>
                         <th>Avatar</th>
@@ -25,23 +116,23 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="usersTableBody">
                     {% for user in users %}
-                    <tr>
+                    <tr class="user-row">
                         <td>
                             <img src="{{ user.userprofile.get_profile_picture_url }}" 
                                  alt="{{ user.username }}" 
                                  class="user-avatar-small"
                                  onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=50'">
                         </td>
-                        <td><strong>{{ user.username }}</strong></td>
-                        <td>{{ user.first_name }} {{ user.last_name }}</td>
-                        <td>{{ user.email|default:"—" }}</td>
+                        <td><strong class="searchable-username">{{ user.username }}</strong></td>
+                        <td class="searchable-name">{{ user.first_name }} {{ user.last_name }}</td>
+                        <td class="searchable-email">{{ user.email|default:"—" }}</td>
                         <td>
                             {% if user.userprofile %}
-                            <span class="badge badge-{{ user.userprofile.user_type }}">{{ user.userprofile.get_user_type_display }}</span>
+                            <span class="badge badge-{{ user.userprofile.user_type }} searchable-type">{{ user.userprofile.get_user_type_display }}</span>
                             {% else %}
-                            <span class="badge badge-admin">Admin</span>
+                            <span class="badge badge-admin searchable-type">Admin</span>
                             {% endif %}
                         </td>
                         <td>{{ user.date_joined|date:"M d, Y" }}</td>
@@ -61,7 +152,46 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <div id="noResults" class="no-results" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                <p>No users found matching your search.</p>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+function searchUsers() {
+    const searchInput = document.getElementById('userSearch').value.toLowerCase();
+    const rows = document.querySelectorAll('.user-row');
+    const noResults = document.getElementById('noResults');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const username = row.querySelector('.searchable-username').textContent.toLowerCase();
+        const name = row.querySelector('.searchable-name').textContent.toLowerCase();
+        const email = row.querySelector('.searchable-email').textContent.toLowerCase();
+        const type = row.querySelector('.searchable-type').textContent.toLowerCase();
+        
+        const searchText = username + ' ' + name + ' ' + email + ' ' + type;
+        
+        if (searchText.includes(searchInput)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Show/hide no results message
+    if (visibleCount === 0 && searchInput !== '') {
+        noResults.style.display = 'block';
+    } else {
+        noResults.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}
