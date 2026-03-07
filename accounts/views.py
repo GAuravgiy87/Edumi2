@@ -861,3 +861,9 @@ def send_message(request, conversation_id):
         })
     
     return redirect('conversation_detail', conversation_id=conversation_id)
+
+
+@login_required
+def settings_view(request):
+    """Settings page - Under Development"""
+    return render(request, 'accounts/settings.html')
