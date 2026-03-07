@@ -183,6 +183,45 @@ async function init() {
     console.log('User Agent:', navigator.userAgent);
     console.log('Platform:', navigator.platform);
     
+    // Check if we're on a secure context
+    const isSecureContext = window.isSecureContext;
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const protocol = window.location.protocol;
+    
+    console.log('Secure context:', isSecureContext);
+    console.log('Protocol:', protocol);
+    console.log('Hostname:', window.location.hostname);
+    
+    // Warn if not secure context and not localhost
+    if (!isSecureContext && !isLocalhost) {
+        console.error('Not a secure context - WebRTC requires HTTPS on non-localhost');
+        showNotification('⚠️ Camera/Mic require HTTPS. Please access via https:// or localhost', 'error');
+        
+        // Show persistent warning
+        const warningDiv = document.createElement('div');
+        warningDiv.style.cssText = `
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ef4444;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            max-width: 600px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        warningDiv.innerHTML = `
+            <strong>⚠️ HTTPS Required</strong><br>
+            Camera and microphone access require HTTPS when accessing via IP address.<br>
+            <small>Access via <strong>localhost</strong> or use <strong>HTTPS</strong>. See HTTPS_SETUP.md for instructions.</small>
+        `;
+        document.body.appendChild(warningDiv);
+    }
+    
     // Check if getUserMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         console.error('getUserMedia not supported');

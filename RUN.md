@@ -73,6 +73,33 @@ Once both services are running:
 | 🏠 **Main Application** | http://localhost:8000 | Login, meetings, dashboards |
 | 📹 **Camera Service API** | http://localhost:8001 | Camera streaming endpoints |
 
+### 🔒 HTTPS for WebRTC (Camera/Mic Access)
+
+**Important**: Meeting room features (camera, microphone, screen sharing) require HTTPS when accessing via IP address.
+
+| Access Method | Works with HTTP? | Notes |
+|---------------|------------------|-------|
+| `localhost` or `127.0.0.1` | ✅ Yes | No HTTPS needed |
+| IP address (e.g., `10.7.32.74`) | ❌ No | Requires HTTPS |
+
+**To enable HTTPS for IP access:**
+
+```bash
+# Quick start with HTTPS
+run_https.bat
+
+# Or manually
+python manage.py runserver_plus --cert-file cert 0.0.0.0:8000
+```
+
+Then access via:
+- This computer: `https://localhost:8000`
+- Other devices: `https://YOUR_IP:8000`
+
+⚠️ You'll see a security warning (self-signed certificate) - click "Advanced" → "Proceed anyway"
+
+📖 **See [MEETING_SETUP.md](MEETING_SETUP.md) for detailed HTTPS setup instructions**
+
 ---
 
 ## 🎬 First Time Setup

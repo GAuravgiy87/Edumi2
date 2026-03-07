@@ -22,6 +22,14 @@
 
 <img src="https://user-images.githubusercontent.com/74038190/212284100-561aa473-3905-4a80-b561-0d28506553ee.gif" width="700">
 
+---
+
+> 🎥 **Camera/Mic Not Working on IP Address?**  
+> See [QUICK_FIX.md](QUICK_FIX.md) or [MEETING_SETUP.md](MEETING_SETUP.md) for solutions!  
+> Run `run_https.bat` to enable HTTPS for WebRTC. 🚀
+
+---
+
 [Features](#-features) • [Quick Start](#-quick-start) • [Architecture](#-architecture) • [Documentation](#-documentation)
 
 </div>

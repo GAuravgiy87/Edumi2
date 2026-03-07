@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'mobile_cameras',  # Mobile Camera management (IP Webcam, DroidCam)
     'meetings',
     'django_browser_reload',
+    'django_extensions',  # For HTTPS development server
 ]
 
 MIDDLEWARE = [
