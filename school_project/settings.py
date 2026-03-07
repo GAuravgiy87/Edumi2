@@ -40,6 +40,9 @@ CSRF_TRUSTED_ORIGINS = [
     'https://127.0.0.1:8443',
     'https://10.17.2.47',
     'https://10.17.2.47:8443',
+    'https://*.ngrok.io',
+    'https://*.ngrok-free.app',
+    'https://*.ngrok-free.dev',
 ]
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
