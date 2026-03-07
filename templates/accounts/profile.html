@@ -1,5 +1,11 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}Profile{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v={{ timestamp }}">
+{% endblock %}
 
 {% block content %}
 <div class="profile-container">
@@ -12,7 +18,13 @@
     {% endif %}
     
     {% if is_own_profile %}
-    <form method="POST" enctype="multipart/form-data" id="profileForm" onsubmit="return confirmSave()">
+    <div style="background: #e8f4fd; border-left: 4px solid #667eea; padding: 12px 16px; margin-bottom: 16px; border-radius: 6px;">
+        <p style="margin: 0; color: #374151; font-size: 14px;">
+            💡 <strong>Tip:</strong> All profile fields are optional. Share as much or as little as you'd like!
+        </p>
+    </div>
+    
+    <form method="POST" enctype="multipart/form-data" id="profileForm">
         {% csrf_token %}
     {% endif %}
     
@@ -270,7 +282,7 @@
                         <div>
                             <p class="label">LinkedIn</p>
                             {% if is_own_profile %}
-                            <input type="url" name="linkedin" value="{{ profile.linkedin }}" placeholder="https://linkedin.com/in/username" class="editable-input">
+                            <input type="text" name="linkedin" value="{{ profile.linkedin }}" placeholder="https://linkedin.com/in/username" class="editable-input">
                             {% else %}
                             {% if profile.linkedin %}
                             <a href="{{ profile.linkedin }}" target="_blank" class="value">View Profile</a>
@@ -286,7 +298,7 @@
                         <div>
                             <p class="label">Twitter</p>
                             {% if is_own_profile %}
-                            <input type="url" name="twitter" value="{{ profile.twitter }}" placeholder="https://twitter.com/username" class="editable-input">
+                            <input type="text" name="twitter" value="{{ profile.twitter }}" placeholder="https://twitter.com/username" class="editable-input">
                             {% else %}
                             {% if profile.twitter %}
                             <a href="{{ profile.twitter }}" target="_blank" class="value">View Profile</a>
@@ -302,7 +314,7 @@
                         <div>
                             <p class="label">Website</p>
                             {% if is_own_profile %}
-                            <input type="url" name="website" value="{{ profile.website }}" placeholder="https://yourwebsite.com" class="editable-input">
+                            <input type="text" name="website" value="{{ profile.website }}" placeholder="https://yourwebsite.com" class="editable-input">
                             {% else %}
                             {% if profile.website %}
                             <a href="{{ profile.website }}" target="_blank" class="value">Visit Website</a>
@@ -456,21 +468,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (form) {
         const inputs = form.querySelectorAll('input, textarea');
         inputs.forEach(input => {
-            input.addEventListener('change', function() {
+            input.addEventListener('input', function() {
                 formChanged = true;
-                document.querySelector('.btn-save-profile').classList.add('has-changes');
+                const saveBtn = document.querySelector('.btn-save-profile');
+                if (saveBtn) {
+                    saveBtn.classList.add('has-changes');
+                }
             });
+        });
+        
+        // Reset formChanged when form is submitted
+        form.addEventListener('submit', function(e) {
+            console.log('Form is being submitted');
+            formChanged = false;
+            
+            // Show loading state on button
+            const saveBtn = document.querySelector('.btn-save-profile');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Saving...';
+            }
         });
     }
 });
-
-function confirmSave() {
-    if (!formChanged) {
-        alert('No changes detected. Make some changes before saving.');
-        return false;
-    }
-    return true;
-}
 
 function openAvatarModal() {
     document.getElementById('avatarModal').style.display = 'flex';
@@ -486,7 +506,10 @@ function selectAvatar(avatarUrl) {
     document.getElementById('avatarPreview').src = avatarUrl;
     document.getElementById('avatar_choice').value = avatarUrl;
     formChanged = true;
-    document.querySelector('.btn-save-profile').classList.add('has-changes');
+    const saveBtn = document.querySelector('.btn-save-profile');
+    if (saveBtn) {
+        saveBtn.classList.add('has-changes');
+    }
     closeAvatarModal();
 }
 
@@ -497,7 +520,10 @@ function previewAvatar(input) {
             document.getElementById('avatarPreview').src = e.target.result;
             document.getElementById('avatar_choice').value = '';
             formChanged = true;
-            document.querySelector('.btn-save-profile').classList.add('has-changes');
+            const saveBtn = document.querySelector('.btn-save-profile');
+            if (saveBtn) {
+                saveBtn.classList.add('has-changes');
+            }
             closeAvatarModal();
         };
         reader.readAsDataURL(input.files[0]);
@@ -522,12 +548,12 @@ window.onclick = function(event) {
     }
 }
 
-// Warn before leaving if there are unsaved changes
+// Only warn before leaving if there are actual unsaved changes
 window.addEventListener('beforeunload', function(e) {
     if (formChanged) {
         e.preventDefault();
-        e.returnValue = '';
-        return '';
+        e.returnValue = 'Changes you made may not be saved.';
+        return 'Changes you made may not be saved.';
     }
 });
 </script>

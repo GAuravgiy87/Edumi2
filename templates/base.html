@@ -12,7 +12,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" href="{% static 'css/modern-design.css' %}?v={{ timestamp }}">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}?v={{ timestamp }}">
     {% block extra_css %}{% endblock %}
 </head>
 
@@ -30,21 +31,18 @@
                 <a href="{% url 'user_management' %}">Users</a>
                 <a href="{% url 'admin_dashboard' %}">Cameras</a>
                 <a href="{% url 'teacher_meetings' %}">Meetings</a>
-                <a href="{% url 'directory' %}">Directory</a>
                 <a href="{% url 'inbox' %}">Inbox</a>
                 {% elif user.userprofile.user_type == 'teacher' %}
                 <a href="{% url 'teacher_dashboard' %}">Dashboard</a>
                 <a href="{% url 'teacher_classrooms' %}">Classrooms</a>
                 <a href="{% url 'live_monitor' %}">Cameras</a>
                 <a href="{% url 'teacher_meetings' %}">Meetings</a>
-                <a href="{% url 'directory' %}">Directory</a>
                 <a href="{% url 'inbox' %}">Inbox</a>
                 <a href="{% url 'create_meeting' %}">+ New Meeting</a>
                 {% elif user.userprofile.user_type == 'student' %}
                 <a href="{% url 'student_dashboard' %}">Dashboard</a>
                 <a href="{% url 'student_classrooms' %}">Classrooms</a>
                 <a href="{% url 'student_meetings' %}">Meetings</a>
-                <a href="{% url 'directory' %}">Directory</a>
                 <a href="{% url 'inbox' %}">Inbox</a>
                 {% endif %}
             </div>
@@ -53,8 +51,9 @@
                 <div class="nav-profile-dropdown">
                     <button class="nav-profile-btn" onclick="toggleProfileDropdown()">
                         <div class="profile-avatar-small">
-                            <img src="https://ui-avatars.com/api/?name={{ user.username }}&background=6366f1&color=fff&size=40"
-                                alt="{{ user.username }}">
+                            <img src="{% if user.userprofile %}{{ user.userprofile.get_profile_picture_url }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff{% endif %}"
+                                alt="{{ user.username }}"
+                                onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff'">
                         </div>
                         <span class="profile-name">{{ user.username }}</span>
                         <svg class="dropdown-arrow" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">

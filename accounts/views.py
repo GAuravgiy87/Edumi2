@@ -133,74 +133,88 @@ def profile_view(request, username=None):
     try:
         profile = profile_user.userprofile
     except UserProfile.DoesNotExist:
-        profile = None
+        # Create profile if it doesn't exist (for admin users)
+        if profile_user.is_superuser or profile_user.username == 'Admin':
+            profile = UserProfile.objects.create(user=profile_user, user_type='teacher')
+        else:
+            profile = None
     
     # Check if viewing own profile
     is_own_profile = request.user == profile_user
     
     # Handle form submission for own profile
-    if is_own_profile and request.method == 'POST' and profile:
-        # Update User model (allow empty values)
-        request.user.first_name = request.POST.get('first_name', '').strip()
-        request.user.last_name = request.POST.get('last_name', '').strip()
-        request.user.email = request.POST.get('email', '').strip()
-        request.user.save()
-        
-        # Update UserProfile (allow empty values)
-        profile.display_name = request.POST.get('display_name', '').strip()
-        profile.bio = request.POST.get('bio', '').strip()
-        profile.phone = request.POST.get('phone', '').strip()
-        profile.address = request.POST.get('address', '').strip()
-        
-        # Handle profile picture - check if avatar was selected or file uploaded
-        avatar_choice = request.POST.get('avatar_choice', '').strip()
-        if request.FILES.get('profile_picture'):
-            # File uploaded - save it and clear avatar URL
-            profile.profile_picture = request.FILES['profile_picture']
-            profile.avatar_url = None
-        elif avatar_choice:
-            # Avatar selected - save URL and clear uploaded picture
-            profile.avatar_url = avatar_choice
-            profile.profile_picture = None
-        
-        # Date of birth (optional)
-        dob = request.POST.get('date_of_birth', '').strip()
-        if dob:
-            profile.date_of_birth = dob
-        else:
-            profile.date_of_birth = None
-        
-        # Social links (optional)
-        profile.linkedin = request.POST.get('linkedin', '').strip()
-        profile.twitter = request.POST.get('twitter', '').strip()
-        profile.website = request.POST.get('website', '').strip()
-        
-        # Type-specific fields (optional)
-        if profile.user_type == 'student':
-            profile.student_id = request.POST.get('student_id', '').strip()
-            profile.grade = request.POST.get('grade', '').strip()
-            enrollment = request.POST.get('enrollment_date', '').strip()
-            if enrollment:
-                profile.enrollment_date = enrollment
+    if is_own_profile and request.method == 'POST':
+        try:
+            # Create profile if it doesn't exist
+            if not profile:
+                profile = UserProfile.objects.create(user=request.user, user_type='teacher')
+            
+            # Update User model (allow empty values)
+            request.user.first_name = request.POST.get('first_name', '').strip()
+            request.user.last_name = request.POST.get('last_name', '').strip()
+            request.user.email = request.POST.get('email', '').strip()
+            request.user.save()
+            
+            # Update UserProfile (allow empty values)
+            profile.display_name = request.POST.get('display_name', '').strip()
+            profile.bio = request.POST.get('bio', '').strip()
+            profile.phone = request.POST.get('phone', '').strip()
+            profile.address = request.POST.get('address', '').strip()
+            
+            # Handle profile picture - check if avatar was selected or file uploaded
+            avatar_choice = request.POST.get('avatar_choice', '').strip()
+            if request.FILES.get('profile_picture'):
+                # File uploaded - save it and clear avatar URL
+                profile.profile_picture = request.FILES['profile_picture']
+                profile.avatar_url = None
+            elif avatar_choice:
+                # Avatar selected - save URL and clear uploaded picture
+                profile.avatar_url = avatar_choice
+                profile.profile_picture = None
+            
+            # Date of birth (optional)
+            dob = request.POST.get('date_of_birth', '').strip()
+            if dob:
+                profile.date_of_birth = dob
             else:
-                profile.enrollment_date = None
-        elif profile.user_type == 'teacher':
-            profile.employee_id = request.POST.get('employee_id', '').strip()
-            profile.department = request.POST.get('department', '').strip()
-            profile.specialization = request.POST.get('specialization', '').strip()
-            join = request.POST.get('join_date', '').strip()
-            if join:
-                profile.join_date = join
-            else:
-                profile.join_date = None
+                profile.date_of_birth = None
+            
+            # Social links (optional)
+            profile.linkedin = request.POST.get('linkedin', '').strip()
+            profile.twitter = request.POST.get('twitter', '').strip()
+            profile.website = request.POST.get('website', '').strip()
+            
+            # Type-specific fields (optional)
+            if profile.user_type == 'student':
+                profile.student_id = request.POST.get('student_id', '').strip()
+                profile.grade = request.POST.get('grade', '').strip()
+                enrollment = request.POST.get('enrollment_date', '').strip()
+                if enrollment:
+                    profile.enrollment_date = enrollment
+                else:
+                    profile.enrollment_date = None
+            elif profile.user_type == 'teacher':
+                profile.employee_id = request.POST.get('employee_id', '').strip()
+                profile.department = request.POST.get('department', '').strip()
+                profile.specialization = request.POST.get('specialization', '').strip()
+                join = request.POST.get('join_date', '').strip()
+                if join:
+                    profile.join_date = join
+                else:
+                    profile.join_date = None
+            
+            profile.save()
+            
+            # Add success message
+            messages.success(request, 'Profile updated successfully!')
+            
+            # Redirect to prevent form resubmission
+            return redirect('profile_view', username=request.user.username)
         
-        profile.save()
-        
-        # Add success message
-        messages.success(request, 'Profile updated successfully!')
-        
-        # Redirect to prevent form resubmission
-        return redirect('profile_view', username=request.user.username)
+        except Exception as e:
+            # Add error message
+            messages.error(request, f'Error updating profile: {str(e)}')
+            print(f"Profile save error: {str(e)}")  # Debug print
     
     # Calculate profile completion
     completion = 0
@@ -721,7 +735,9 @@ from django.views.decorators.http import require_http_methods
 
 @login_required
 def inbox(request):
-    """View all conversations"""
+    """View all conversations with search"""
+    search_query = request.GET.get('q', '').strip()
+    
     conversations = request.user.conversations.all().prefetch_related('participants', 'messages')
     
     # Add unread count and last message to each conversation
@@ -730,8 +746,21 @@ def inbox(request):
         conv.last_msg = conv.get_last_message()
         conv.unread_count = conv.messages.filter(is_read=False).exclude(sender=request.user).count()
     
+    # Search for users if query provided
+    search_results = []
+    if search_query:
+        search_results = User.objects.filter(
+            models.Q(username__icontains=search_query) |
+            models.Q(first_name__icontains=search_query) |
+            models.Q(last_name__icontains=search_query) |
+            models.Q(email__icontains=search_query) |
+            models.Q(userprofile__display_name__icontains=search_query)
+        ).exclude(id=request.user.id).select_related('userprofile').distinct()[:10]
+    
     context = {
         'conversations': conversations,
+        'search_query': search_query,
+        'search_results': search_results,
     }
     
     return render(request, 'accounts/inbox.html', context)
@@ -813,6 +842,12 @@ def send_message(request, conversation_id):
     
     # Update conversation timestamp
     conversation.save()
+    
+    # Send notification to the other user
+    from .notification_utils import notify_new_message
+    other_user = conversation.get_other_user(request.user)
+    if other_user:
+        notify_new_message(request.user, other_user, conversation_id)
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({

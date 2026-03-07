@@ -139,6 +139,10 @@ def join_classroom_request(request):
             status='pending'
         )
         
+        # Send notification to teacher
+        from accounts.notification_utils import notify_classroom_join_request
+        notify_classroom_join_request(request.user, classroom)
+        
         messages.success(request, f'Join request submitted for "{classroom.title}". Waiting for teacher approval.')
         return redirect('student_classrooms')
     
@@ -182,6 +186,11 @@ def approve_join_request(request, membership_id):
     membership.approved_by = request.user
     membership.save()
     
+    # Send notification to student
+    from accounts.notification_utils import notify_classroom_request_approved, notify_student_joined_classroom
+    notify_classroom_request_approved(membership.student, membership.classroom, request.user)
+    notify_student_joined_classroom(membership.student, membership.classroom)
+    
     return JsonResponse({
         'status': 'success',
         'message': f'{membership.student.username} approved'
@@ -198,6 +207,11 @@ def deny_join_request(request, membership_id):
         return JsonResponse({'status': 'error', 'message': 'Permission denied'})
     
     membership.status = 'denied'
+    membership.save()
+    
+    # Send notification to student
+    from accounts.notification_utils import notify_classroom_request_denied
+    notify_classroom_request_denied(membership.student, membership.classroom)
     membership.save()
     
     return JsonResponse({
@@ -218,6 +232,10 @@ def remove_student(request, membership_id):
     
     membership.status = 'removed'
     membership.save()
+    
+    # Send notification to student
+    from accounts.notification_utils import notify_student_removed_from_classroom
+    notify_student_removed_from_classroom(membership.student, membership.classroom)
     
     return JsonResponse({
         'status': 'success',
@@ -307,6 +325,10 @@ def start_classroom_meeting(request, classroom_id):
             allow_chat=allow_chat,
             record_meeting=record_meeting
         )
+        
+        # Send notification to all approved students
+        from accounts.notification_utils import notify_meeting_started
+        notify_meeting_started(meeting, classroom)
         
         messages.success(request, 'Meeting started successfully!')
         return redirect('join_meeting', meeting_code=meeting.meeting_code)
@@ -404,6 +426,10 @@ def join_meeting(request, meeting_code):
     if meeting.teacher == request.user and meeting.status == 'scheduled':
         meeting.status = 'live'
         meeting.save()
+        
+        # Send notification to all participants that meeting has started
+        from accounts.notification_utils import notify_meeting_started
+        notify_meeting_started(meeting, meeting.classroom)
     
     return render(request, 'meetings/meeting_room.html', {
         'meeting': meeting,
@@ -488,4 +514,9 @@ def cancel_meeting(request, meeting_id):
     
     meeting.status = 'cancelled'
     meeting.save()
+    
+    # Send notification to all participants
+    from accounts.notification_utils import notify_meeting_cancelled
+    notify_meeting_cancelled(meeting, meeting.classroom)
+    
     return JsonResponse({'status': 'success'})

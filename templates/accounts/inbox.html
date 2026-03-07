@@ -1,96 +1,407 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}Messages{% endblock %}
 
 {% block title %}Inbox - EduMi{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1400px; margin: 30px auto; padding: 20px;">
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; padding: 30px; margin-bottom: 30px; color: white;">
-        <h1 style="margin-bottom: 10px;">💬 Inbox</h1>
-        <p style="opacity: 0.9;">Your conversations</p>
-    </div>
-    
-    <div style="background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-height: 600px;">
-        {% if conversations %}
-            <div style="display: flex; flex-direction: column;">
+<style>
+.inbox-container {
+    max-width: 100%;
+    margin: 0;
+    height: calc(100vh - 60px);
+    display: flex;
+    background: #fff;
+    overflow: hidden;
+}
+
+.inbox-sidebar {
+    width: 340px;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    background: #f9fafb;
+}
+
+.inbox-header {
+    padding: 16px;
+    background: #667eea;
+    color: white;
+}
+
+.inbox-header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 4px 0;
+}
+
+.inbox-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 13px;
+}
+
+.search-box {
+    padding: 12px;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 13px;
+    transition: all 0.2s;
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>') no-repeat 10px center;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.conversations-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.conversation-item {
+    padding: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    background: white;
+}
+
+.conversation-item:hover {
+    background: #f3f4f6;
+}
+
+.conversation-item.active {
+    background: #ede9fe;
+    border-left: 3px solid #667eea;
+}
+
+.avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar.online::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background: #10b981;
+    border: 2px solid white;
+    border-radius: 50%;
+}
+
+.conversation-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.conversation-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #111827;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.conversation-preview {
+    font-size: 12px;
+    color: #6b7280;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.conversation-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.conversation-time {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.unread-badge {
+    background: #667eea;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 18px;
+    text-align: center;
+}
+
+.search-results {
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5568d3;
+}
+
+.btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+.empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
+    text-align: center;
+    color: #9ca3af;
+}
+
+.empty-state-icon {
+    font-size: 60px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+}
+
+.empty-state h3 {
+    color: #6b7280;
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+
+.empty-state p {
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.inbox-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+}
+
+.select-conversation {
+    text-align: center;
+    color: #9ca3af;
+}
+
+.select-conversation-icon {
+    font-size: 80px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+.select-conversation h2 {
+    color: #6b7280;
+    font-size: 20px;
+    margin-bottom: 6px;
+}
+
+.select-conversation p {
+    color: #9ca3af;
+    font-size: 14px;
+}
+
+/* Scrollbar styling */
+.conversations-list::-webkit-scrollbar,
+.search-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+.conversations-list::-webkit-scrollbar-track,
+.search-results::-webkit-scrollbar-track {
+    background: #f3f4f6;
+}
+
+.conversations-list::-webkit-scrollbar-thumb,
+.search-results::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.conversations-list::-webkit-scrollbar-thumb:hover,
+.search-results::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+</style>
+
+<div class="inbox-container">
+    <!-- Sidebar -->
+    <div class="inbox-sidebar">
+        <!-- Header -->
+        <div class="inbox-header">
+            <h1>💬 Messages</h1>
+            <p>{{ conversations.count }} conversation{{ conversations.count|pluralize }}</p>
+        </div>
+        
+        <!-- Search -->
+        <div class="search-box">
+            <form action="{% url 'inbox' %}" method="GET">
+                <input type="text" name="q" value="{{ search_query }}" 
+                       class="search-input" placeholder="Search people...">
+            </form>
+        </div>
+        
+        <!-- Search Results -->
+        {% if search_query %}
+            <div class="search-results">
+                {% if search_results %}
+                    {% for user_result in search_results %}
+                        <div class="search-result-item">
+                        <div class="avatar">
+                            <img src="{{ user_result.userprofile.get_profile_picture_url }}" alt="{{ user_result.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ user_result.username }}&background=667eea&color=fff'">
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; font-size: 13px; color: #111827;">
+                                {{ user_result.userprofile.display_name|default:user_result.get_full_name|default:user_result.username }}
+                            </div>
+                            <div style="font-size: 11px; color: #6b7280;">
+                                @{{ user_result.username }}
+                                {% if user_result.userprofile.user_type == 'teacher' %}👨‍🏫{% else %}👨‍🎓{% endif %}
+                            </div>
+                        </div>
+                            <div class="search-actions">
+                                <a href="{% url 'profile_view' user_result.username %}" class="btn-sm btn-secondary">Profile</a>
+                                <a href="{% url 'start_conversation' user_result.username %}" class="btn-sm btn-primary">Message</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="padding: 20px; text-align: center; color: #9ca3af;">
+                        <p>No users found</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+        
+        <!-- Conversations -->
+        <div class="conversations-list">
+            {% if conversations %}
                 {% for conv in conversations %}
-                    <a href="{% url 'conversation_detail' conv.id %}" style="text-decoration: none; color: inherit; border-bottom: 1px solid #f0f0f0; transition: background 0.3s;">
-                        <div style="padding: 20px; display: flex; align-items: center; gap: 15px; position: relative;">
-                            <!-- Profile Picture -->
-                            <div style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; background: {% if conv.other_user.userprofile.user_type == 'teacher' %}#667eea{% else %}#2ecc71{% endif %}; flex-shrink: 0;">
-                                {% if conv.other_user.userprofile.profile_picture %}
-                                    <img src="{{ conv.other_user.userprofile.profile_picture.url }}" alt="{{ conv.other_user.username }}" style="width: 100%; height: 100%; object-fit: cover;">
-                                {% elif conv.other_user.userprofile.avatar_url %}
-                                    <img src="{{ conv.other_user.userprofile.avatar_url }}" alt="{{ conv.other_user.username }}" style="width: 100%; height: 100%; object-fit: cover;">
+                    <a href="{% url 'conversation_detail' conv.id %}" class="conversation-item">
+                        <div class="avatar {% if conv.other_user.is_active %}online{% endif %}">
+                            <img src="{{ conv.other_user.userprofile.get_profile_picture_url }}" alt="{{ conv.other_user.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ conv.other_user.username }}&background=667eea&color=fff'">
+                        </div>
+                        <div class="conversation-info">
+                            <div class="conversation-name">
+                                {{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}
+                                {% if conv.other_user.userprofile.user_type == 'teacher' %}
+                                    <span style="font-size: 12px;">👨‍🏫</span>
                                 {% else %}
-                                    <img src="https://ui-avatars.com/api/?name={{ conv.other_user.username }}&background={% if conv.other_user.userprofile.user_type == 'teacher' %}667eea{% else %}2ecc71{% endif %}&color=fff" alt="{{ conv.other_user.username }}" style="width: 100%; height: 100%;">
+                                    <span style="font-size: 12px;">👨‍🎓</span>
                                 {% endif %}
                             </div>
-                            
-                            <!-- Message Info -->
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 5px;">
-                                    <div style="font-weight: 600; color: #2c3e50; font-size: 16px;">
-                                        {{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}
-                                        {% if conv.other_user.userprofile.user_type == 'teacher' %}
-                                            <span style="font-size: 14px;">👨‍🏫</span>
-                                        {% else %}
-                                            <span style="font-size: 14px;">👨‍🎓</span>
-                                        {% endif %}
-                                    </div>
-                                    {% if conv.last_msg %}
-                                        <div style="font-size: 12px; color: #95a5a6;">
-                                            {{ conv.last_msg.created_at|timesince }} ago
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                
+                            <div class="conversation-preview">
                                 {% if conv.last_msg %}
-                                    <div style="font-size: 14px; color: #7f8c8d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                        {% if conv.last_msg.sender == user %}
-                                            <span style="color: #667eea;">You:</span>
-                                        {% endif %}
-                                        {% if conv.last_msg.image %}
-                                            📷 Photo
-                                        {% elif conv.last_msg.file %}
-                                            📎 File
-                                        {% else %}
-                                            {{ conv.last_msg.content|truncatewords:10 }}
-                                        {% endif %}
-                                    </div>
+                                    {% if conv.last_msg.sender == user %}<strong>You:</strong> {% endif %}
+                                    {% if conv.last_msg.image %}📷 Photo
+                                    {% elif conv.last_msg.file %}📎 File
+                                    {% else %}{{ conv.last_msg.content|truncatewords:8 }}
+                                    {% endif %}
                                 {% else %}
-                                    <div style="font-size: 14px; color: #95a5a6; font-style: italic;">
-                                        No messages yet
-                                    </div>
+                                    <em>No messages yet</em>
                                 {% endif %}
                             </div>
-                            
-                            <!-- Unread Badge -->
+                        </div>
+                        <div class="conversation-meta">
+                            {% if conv.last_msg %}
+                                <div class="conversation-time">{{ conv.last_msg.created_at|timesince|slice:":10" }}</div>
+                            {% endif %}
                             {% if conv.unread_count > 0 %}
-                                <div style="background: #e74c3c; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">
-                                    {{ conv.unread_count }}
-                                </div>
+                                <div class="unread-badge">{{ conv.unread_count }}</div>
                             {% endif %}
                         </div>
                     </a>
                 {% endfor %}
-            </div>
-        {% else %}
-            <div style="text-align: center; padding: 100px 20px; color: #95a5a6;">
-                <div style="font-size: 80px; margin-bottom: 20px;">💬</div>
-                <h3 style="color: #7f8c8d; margin-bottom: 10px;">No conversations yet</h3>
-                <p style="margin-bottom: 20px;">Start a conversation from the Directory</p>
-                <a href="{% url 'directory' %}" style="display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
-                    Go to Directory
-                </a>
-            </div>
-        {% endif %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">💬</div>
+                    <h3>No conversations yet</h3>
+                    <p>Search for someone to start chatting</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Main Area -->
+    <div class="inbox-main">
+        <div class="select-conversation">
+            <div class="select-conversation-icon">💬</div>
+            <h2>Select a conversation</h2>
+            <p>Choose a conversation from the sidebar to start messaging</p>
+        </div>
     </div>
 </div>
-
-<style>
-a:hover > div {
-    background: #f8f9fa !important;
-}
-</style>
 {% endblock %}

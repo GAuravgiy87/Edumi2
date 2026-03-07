@@ -1,5 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}Admin Panel{% endblock %}
 
 {% block content %}
 <div class="admin-container">
@@ -81,7 +83,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Username</th>
+                        <th>User</th>
                         <th>Full Name</th>
                         <th>Email</th>
                         <th>User Type</th>
@@ -92,7 +94,15 @@
                 <tbody>
                     {% for user in all_users %}
                         <tr>
-                            <td><a href="{% url 'profile_view' user.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ user.username }}</a></td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <img src="{% if user.userprofile %}{{ user.userprofile.get_profile_picture_url }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff{% endif %}" 
+                                         alt="{{ user.username }}" 
+                                         onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff'"
+                                         style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+                                    <a href="{% url 'profile_view' user.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ user.username }}</a>
+                                </div>
+                            </td>
                             <td>{{ user.get_full_name|default:"-" }}</td>
                             <td>{{ user.email|default:"-" }}</td>
                             <td>
@@ -129,7 +139,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Username</th>
+                        <th>Student</th>
                         <th>Full Name</th>
                         <th>Email</th>
                         <th>Student ID</th>
@@ -140,7 +150,15 @@
                 <tbody>
                     {% for student in students %}
                         <tr>
-                            <td><a href="{% url 'profile_view' student.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ student.username }}</a></td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <img src="{{ student.userprofile.get_profile_picture_url }}" 
+                                         alt="{{ student.username }}" 
+                                         onerror="this.src='https://ui-avatars.com/api/?name={{ student.username }}&background=10b981&color=fff'"
+                                         style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+                                    <a href="{% url 'profile_view' student.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ student.username }}</a>
+                                </div>
+                            </td>
                             <td>{{ student.get_full_name|default:"-" }}</td>
                             <td>{{ student.email|default:"-" }}</td>
                             <td>{{ student.userprofile.student_id|default:"-" }}</td>
@@ -163,7 +181,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Username</th>
+                        <th>Teacher</th>
                         <th>Full Name</th>
                         <th>Email</th>
                         <th>Employee ID</th>
@@ -174,7 +192,15 @@
                 <tbody>
                     {% for teacher in teachers %}
                         <tr>
-                            <td><a href="{% url 'profile_view' teacher.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ teacher.username }}</a></td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <img src="{{ teacher.userprofile.get_profile_picture_url }}" 
+                                         alt="{{ teacher.username }}" 
+                                         onerror="this.src='https://ui-avatars.com/api/?name={{ teacher.username }}&background=f59e0b&color=fff'"
+                                         style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+                                    <a href="{% url 'profile_view' teacher.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ teacher.username }}</a>
+                                </div>
+                            </td>
                             <td>{{ teacher.get_full_name|default:"-" }}</td>
                             <td>{{ teacher.email|default:"-" }}</td>
                             <td>{{ teacher.userprofile.employee_id|default:"-" }}</td>

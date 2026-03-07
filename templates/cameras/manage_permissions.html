@@ -1,5 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}Manage Permissions{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -24,7 +26,7 @@
                     {% for teacher in authorized_teachers %}
                     <div class="teacher-item authorized">
                         <div class="teacher-info">
-                            <img src="https://ui-avatars.com/api/?name={{ teacher.get_full_name|default:teacher.username|urlencode }}&background=10b981&color=fff&size=40" alt="{{ teacher.username }}">
+                            <img src="{{ teacher.userprofile.get_profile_picture_url }}" alt="{{ teacher.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ teacher.get_full_name|default:teacher.username|urlencode }}&background=10b981&color=fff&size=40'">
                             <div>
                                 <p class="teacher-name">{{ teacher.get_full_name|default:teacher.username }}</p>
                                 <p class="teacher-username">@{{ teacher.username }}</p>
@@ -60,7 +62,7 @@
                     {% for teacher in unauthorized_teachers %}
                     <div class="teacher-item">
                         <div class="teacher-info">
-                            <img src="https://ui-avatars.com/api/?name={{ teacher.get_full_name|default:teacher.username|urlencode }}&background=6366f1&color=fff&size=40" alt="{{ teacher.username }}">
+                            <img src="{{ teacher.userprofile.get_profile_picture_url }}" alt="{{ teacher.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ teacher.get_full_name|default:teacher.username|urlencode }}&background=6366f1&color=fff&size=40'">
                             <div>
                                 <p class="teacher-name">{{ teacher.get_full_name|default:teacher.username }}</p>
                                 <p class="teacher-username">@{{ teacher.username }}</p>

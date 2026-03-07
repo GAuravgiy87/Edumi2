@@ -59,3 +59,6 @@ class UserProfile(models.Model):
 
 # Import messaging models
 from .messaging_models import Conversation, Message
+
+# Import notification model
+from .notification_models import Notification

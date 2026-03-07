@@ -2,6 +2,7 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
 from . import admin_list_views
+from . import notification_views
 
 urlpatterns = [
     path('', views.login_view, name='login'),
@@ -23,6 +24,13 @@ urlpatterns = [
     path('user-management/', views.user_management, name='user_management'),
     path('delete-user/<int:user_id>/', views.delete_user, name='delete_user'),
     path('architecture/', views.architecture_view, name='architecture'),
+    
+    # Notification URLs
+    path('notifications/', notification_views.notifications_list, name='notifications_list'),
+    path('notifications/mark-read/<int:notification_id>/', notification_views.mark_notification_read, name='mark_notification_read'),
+    path('notifications/mark-all-read/', notification_views.mark_all_notifications_read, name='mark_all_notifications_read'),
+    path('notifications/unread-count/', notification_views.get_unread_count, name='get_unread_count'),
+    path('notifications/recent/', notification_views.get_recent_notifications, name='get_recent_notifications'),
     
     # Admin list views
     path('admin/users/', admin_list_views.admin_all_users, name='admin_all_users'),

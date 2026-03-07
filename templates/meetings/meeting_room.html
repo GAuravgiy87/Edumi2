@@ -58,7 +58,7 @@
                         <div class="participants-list" id="participantsList">
                             <div class="participant-item">
                                 <div class="participant-avatar">
-                                    <img src="https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff" alt="{{ user.username }}">
+                                    <img src="{{ user.userprofile.get_profile_picture_url }}" alt="{{ user.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff'">
                                 </div>
                                 <div class="participant-info">
                                     <div class="participant-name">{{ user.username }} (You)</div>

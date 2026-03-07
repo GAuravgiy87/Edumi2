@@ -1,11 +1,23 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}Edit Profile{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v={{ timestamp }}">
+{% endblock %}
 
 {% block content %}
 <div class="edit-profile-container">
     <div class="form-card-large">
         <h2>Edit Profile</h2>
         <p class="subtitle">Update your personal information</p>
+        
+        <div style="background: #e8f4fd; border-left: 4px solid #667eea; padding: 12px 16px; margin-bottom: 20px; border-radius: 6px;">
+            <p style="margin: 0; color: #374151; font-size: 14px;">
+                ℹ️ <strong>All fields are optional.</strong> Fill out only what you want to share. You can always update this later.
+            </p>
+        </div>
         
         <form method="POST" enctype="multipart/form-data">
             {% csrf_token %}
@@ -62,7 +74,7 @@
                 <input type="file" id="profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this)">
                 <small>Upload a profile picture (JPG, PNG, GIF - Max 5MB)</small>
                 <div class="profile-picture-preview">
-                    <img id="profile-preview-img" src="{% if profile.profile_picture %}{{ profile.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=200{% endif %}" alt="Profile Preview">
+                    <img id="profile-preview-img" src="{{ profile.get_profile_picture_url }}" alt="Profile Preview" onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=200'">
                 </div>
             </div>
             
@@ -129,17 +141,17 @@
             
             <div class="form-group">
                 <label for="linkedin">LinkedIn</label>
-                <input type="url" id="linkedin" name="linkedin" value="{{ profile.linkedin }}" placeholder="https://linkedin.com/in/username">
+                <input type="text" id="linkedin" name="linkedin" value="{{ profile.linkedin }}" placeholder="https://linkedin.com/in/username">
             </div>
             
             <div class="form-group">
                 <label for="twitter">Twitter</label>
-                <input type="url" id="twitter" name="twitter" value="{{ profile.twitter }}" placeholder="https://twitter.com/username">
+                <input type="text" id="twitter" name="twitter" value="{{ profile.twitter }}" placeholder="https://twitter.com/username">
             </div>
             
             <div class="form-group">
                 <label for="website">Website</label>
-                <input type="url" id="website" name="website" value="{{ profile.website }}" placeholder="https://yourwebsite.com">
+                <input type="text" id="website" name="website" value="{{ profile.website }}" placeholder="https://yourwebsite.com">
             </div>
             
             <div class="form-actions">

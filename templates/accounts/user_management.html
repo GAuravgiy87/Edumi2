@@ -1,5 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}User Management{% endblock %}
 
 {% block content %}
 <div class="admin-container">
@@ -27,9 +29,10 @@
                     {% for user in users %}
                     <tr>
                         <td>
-                            <img src="{% if user.userprofile %}{{ user.userprofile.profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=50{% endif %}" 
+                            <img src="{{ user.userprofile.get_profile_picture_url }}" 
                                  alt="{{ user.username }}" 
-                                 class="user-avatar-small">
+                                 class="user-avatar-small"
+                                 onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=50'">
                         </td>
                         <td><strong>{{ user.username }}</strong></td>
                         <td>{{ user.first_name }} {{ user.last_name }}</td>

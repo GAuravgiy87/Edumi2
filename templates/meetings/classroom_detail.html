@@ -1,5 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}{{ classroom.title }}{% endblock %}
 
 {% block title %}{{ classroom.title }} - EduMi{% endblock %}
 

@@ -1,0 +1,284 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Notifications{% endblock %}
+
+{% block extra_css %}
+<style>
+.notifications-container {
+    padding: clamp(1rem, 2vw, 1.5rem);
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.notifications-header {
+    background: var(--white);
+    border-radius: clamp(10px, 1.5vw, 12px);
+    padding: clamp(1rem, 2vw, 1.25rem) clamp(1.25rem, 2.5vw, 1.5rem);
+    margin-bottom: clamp(1rem, 2vh, 1.5rem);
+    border: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: clamp(0.75rem, 1.5vw, 1rem);
+}
+
+.notifications-header h1 {
+    font-size: clamp(1.125rem, 2.5vw, 1.375rem);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.btn-mark-all-read {
+    padding: clamp(0.5rem, 1vh, 0.625rem) clamp(0.875rem, 1.8vw, 1rem);
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+    border-radius: clamp(6px, 1vw, 8px);
+    font-size: clamp(0.75rem, 1.3vw, 0.8rem);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-mark-all-read:hover {
+    background: var(--gray-200);
+}
+
+.notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.75rem, 1.5vh, 1rem);
+}
+
+.notification-item {
+    background: var(--white);
+    border-radius: clamp(10px, 1.5vw, 12px);
+    padding: clamp(1rem, 2vw, 1.25rem);
+    border: 1px solid var(--gray-200);
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+}
+
+.notification-item.unread {
+    background: rgba(102, 126, 234, 0.05);
+    border-color: rgba(102, 126, 234, 0.2);
+}
+
+.notification-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.notification-header {
+    display: flex;
+    align-items: flex-start;
+    gap: clamp(0.75rem, 1.5vw, 1rem);
+    margin-bottom: clamp(0.5rem, 1vh, 0.625rem);
+}
+
+.notification-icon {
+    width: clamp(36px, 6vw, 40px);
+    height: clamp(36px, 6vw, 40px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notification-icon svg {
+    width: clamp(18px, 3vw, 20px);
+    height: clamp(18px, 3vw, 20px);
+    stroke: white;
+}
+
+.notification-icon.message {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.notification-icon.meeting {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.notification-icon.classroom {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.notification-icon.system {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    font-size: clamp(0.875rem, 1.6vw, 0.95rem);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: clamp(0.25rem, 0.5vh, 0.375rem);
+}
+
+.notification-message {
+    font-size: clamp(0.8rem, 1.4vw, 0.85rem);
+    color: var(--gray-600);
+    line-height: 1.5;
+}
+
+.notification-time {
+    font-size: clamp(0.7rem, 1.2vw, 0.75rem);
+    color: var(--gray-500);
+    margin-top: clamp(0.375rem, 0.8vh, 0.5rem);
+}
+
+.unread-badge {
+    position: absolute;
+    top: clamp(0.75rem, 1.5vh, 1rem);
+    right: clamp(0.75rem, 1.5vw, 1rem);
+    width: clamp(8px, 1.2vw, 10px);
+    height: clamp(8px, 1.2vw, 10px);
+    background: #667eea;
+    border-radius: 50%;
+}
+
+.empty-state {
+    background: var(--white);
+    border-radius: clamp(12px, 2vw, 16px);
+    padding: clamp(2rem, 5vh, 4rem) clamp(1.5rem, 3vw, 2rem);
+    text-align: center;
+    border: 2px dashed var(--gray-300);
+}
+
+.empty-state-icon {
+    width: clamp(60px, 10vw, 80px);
+    height: clamp(60px, 10vw, 80px);
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto clamp(1rem, 2vh, 1.5rem);
+}
+
+.empty-state-icon svg {
+    width: clamp(30px, 5vw, 40px);
+    height: clamp(30px, 5vw, 40px);
+    stroke: var(--gray-400);
+}
+
+.empty-state h3 {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+}
+
+.empty-state p {
+    font-size: clamp(0.875rem, 1.6vw, 0.95rem);
+    color: var(--gray-600);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="notifications-container">
+    <div class="notifications-header">
+        <h1>Notifications {% if unread_count > 0 %}<span style="color: #667eea;">({{ unread_count }})</span>{% endif %}</h1>
+        {% if notifications %}
+        <button onclick="markAllAsRead()" class="btn-mark-all-read">Mark All as Read</button>
+        {% endif %}
+    </div>
+    
+    {% if notifications %}
+    <div class="notifications-list">
+        {% for notification in notifications %}
+        <div class="notification-item {% if not notification.is_read %}unread{% endif %}" 
+             onclick="handleNotificationClick({{ notification.id }}, '{{ notification.link|default:'' }}')">
+            {% if not notification.is_read %}
+            <span class="unread-badge"></span>
+            {% endif %}
+            
+            <div class="notification-header">
+                <div class="notification-icon {% if 'message' in notification.notification_type %}message{% elif 'meeting' in notification.notification_type %}meeting{% elif 'classroom' in notification.notification_type %}classroom{% else %}system{% endif %}">
+                    {% if 'message' in notification.notification_type %}
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    {% elif 'meeting' in notification.notification_type %}
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                        <polyline points="17 2 12 7 7 2"></polyline>
+                    </svg>
+                    {% elif 'classroom' in notification.notification_type %}
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    {% else %}
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    {% endif %}
+                </div>
+                
+                <div class="notification-content">
+                    <div class="notification-title">{{ notification.title }}</div>
+                    <div class="notification-message">{{ notification.message }}</div>
+                    <div class="notification-time">{{ notification.created_at|timesince }} ago</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+        </div>
+        <h3>No notifications</h3>
+        <p>You're all caught up! Check back later for updates.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function handleNotificationClick(notificationId, link) {
+    // Mark as read
+    fetch(`/accounts/notifications/mark-read/${notificationId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    }).then(() => {
+        // Navigate to link if exists
+        if (link) {
+            window.location.href = link;
+        } else {
+            // Just reload to update UI
+            location.reload();
+        }
+    });
+}
+
+function markAllAsRead() {
+    fetch('/accounts/notifications/mark-all-read/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    }).then(() => {
+        location.reload();
+    });
+}
+</script>
+{% endblock %}

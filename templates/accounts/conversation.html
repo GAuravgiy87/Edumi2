@@ -1,30 +1,363 @@
-{% extends 'base.html' %}
+{% extends 'base_sidebar.html' %}
 {% load static %}
+
+{% block page_title %}Chat{% endblock %}
 
 {% block title %}Chat with {{ other_user.username }} - EduMi{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1000px; margin: 30px auto; padding: 20px;">
-    <div style="background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); height: 700px; display: flex; flex-direction: column;">
+<style>
+.chat-container {
+    max-width: 100%;
+    margin: 0;
+    height: calc(100vh - 60px);
+    display: flex;
+    background: #fff;
+    overflow: hidden;
+}
+
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+}
+
+.chat-header {
+    padding: 12px 20px;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.back-btn {
+    color: #667eea;
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: 600;
+    transition: transform 0.2s;
+}
+
+.back-btn:hover {
+    transform: translateX(-3px);
+}
+
+.chat-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.chat-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.chat-avatar.online::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background: #10b981;
+    border: 2px solid white;
+    border-radius: 50%;
+}
+
+.chat-user-info {
+    flex: 1;
+}
+
+.chat-user-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #111827;
+    margin-bottom: 0;
+}
+
+.chat-user-meta {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.profile-btn {
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.profile-btn:hover {
+    background: #5568d3;
+}
+
+.messages-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.message-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.message-wrapper.sent {
+    justify-content: flex-end;
+}
+
+.message-wrapper.received {
+    justify-content: flex-start;
+}
+
+.message-bubble {
+    max-width: 60%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    position: relative;
+}
+
+.message-wrapper.sent .message-bubble {
+    background: #667eea;
+    color: white;
+    border-bottom-right-radius: 3px;
+}
+
+.message-wrapper.received .message-bubble {
+    background: white;
+    color: #111827;
+    border-bottom-left-radius: 3px;
+}
+
+.message-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+
+.message-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.message-wrapper.sent .message-file {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.message-wrapper.received .message-file {
+    background: #f3f4f6;
+    color: #667eea;
+}
+
+.message-content {
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    line-height: 1.4;
+    font-size: 14px;
+}
+
+.message-time {
+    font-size: 10px;
+    margin-top: 4px;
+    opacity: 0.7;
+    text-align: right;
+}
+
+.empty-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+}
+
+.empty-chat-icon {
+    font-size: 60px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+}
+
+.empty-chat h3 {
+    color: #6b7280;
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+
+.message-input-area {
+    padding: 12px 16px;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+}
+
+.message-form {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.input-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.message-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    transition: all 0.2s;
+    max-height: 100px;
+}
+
+.message-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.attachment-buttons {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.attachment-label {
+    cursor: pointer;
+    padding: 6px 10px;
+    background: #f3f4f6;
+    border-radius: 6px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+    color: #374151;
+    font-weight: 500;
+}
+
+.attachment-label:hover {
+    background: #e5e7eb;
+}
+
+.attachment-label input {
+    display: none;
+}
+
+.file-name {
+    font-size: 11px;
+    color: #6b7280;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.send-btn {
+    padding: 10px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    align-self: stretch;
+}
+
+.send-btn:hover {
+    background: #5568d3;
+}
+
+.send-btn:active {
+    transform: scale(0.98);
+}
+
+/* Scrollbar styling */
+.messages-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.messages-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.messages-area::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+}
+
+.messages-area::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .message-bubble {
+        max-width: 80%;
+    }
+    
+    .profile-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    .chat-header {
+        padding: 10px 12px;
+    }
+    
+    .messages-area {
+        padding: 12px;
+    }
+}
+</style>
+
+<div class="chat-container">
+    <div class="chat-main">
         <!-- Chat Header -->
-        <div style="padding: 20px; border-bottom: 2px solid #f0f0f0; display: flex; align-items: center; gap: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px 10px 0 0; color: white;">
-            <a href="{% url 'inbox' %}" style="color: white; text-decoration: none; font-size: 24px;">←</a>
+        <div class="chat-header">
+            <a href="{% url 'inbox' %}" class="back-btn">←</a>
             
-            <div style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; background: white;">
-                {% if other_user.userprofile.profile_picture %}
-                    <img src="{{ other_user.userprofile.profile_picture.url }}" alt="{{ other_user.username }}" style="width: 100%; height: 100%; object-fit: cover;">
-                {% elif other_user.userprofile.avatar_url %}
-                    <img src="{{ other_user.userprofile.avatar_url }}" alt="{{ other_user.username }}" style="width: 100%; height: 100%; object-fit: cover;">
-                {% else %}
-                    <img src="https://ui-avatars.com/api/?name={{ other_user.username }}&background={% if other_user.userprofile.user_type == 'teacher' %}667eea{% else %}2ecc71{% endif %}&color=fff" alt="{{ other_user.username }}" style="width: 100%; height: 100%;">
-                {% endif %}
+            <div class="chat-avatar {% if other_user.is_active %}online{% endif %}">
+                <img src="{{ other_user.userprofile.get_profile_picture_url }}" alt="{{ other_user.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ other_user.username }}&background=667eea&color=fff'">
             </div>
             
-            <div style="flex: 1;">
-                <div style="font-weight: 600; font-size: 18px;">
+            <div class="chat-user-info">
+                <div class="chat-user-name">
                     {{ other_user.userprofile.display_name|default:other_user.get_full_name|default:other_user.username }}
                 </div>
-                <div style="font-size: 14px; opacity: 0.9;">
+                <div class="chat-user-meta">
                     @{{ other_user.username }}
                     {% if other_user.userprofile.user_type == 'teacher' %}
                         • Teacher 👨‍🏫
@@ -34,72 +367,74 @@
                 </div>
             </div>
             
-            <a href="{% url 'profile_view' other_user.username %}" style="padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
+            <a href="{% url 'profile_view' other_user.username %}" class="profile-btn">
                 View Profile
             </a>
         </div>
         
         <!-- Messages Area -->
-        <div id="messagesContainer" style="flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa;">
-            {% for message in messages %}
-                <div style="margin-bottom: 15px; display: flex; {% if message.sender == user %}justify-content: flex-end;{% else %}justify-content: flex-start;{% endif %}">
-                    <div style="max-width: 70%; {% if message.sender == user %}background: #667eea; color: white;{% else %}background: white; color: #2c3e50;{% endif %} padding: 12px 16px; border-radius: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        {% if message.image %}
-                            <img src="{{ message.image.url }}" alt="Image" style="max-width: 100%; border-radius: 8px; margin-bottom: 8px;">
-                        {% endif %}
-                        
-                        {% if message.file %}
-                            <a href="{{ message.file.url }}" download style="display: flex; align-items: center; gap: 8px; {% if message.sender == user %}color: white;{% else %}color: #667eea;{% endif %} text-decoration: none; margin-bottom: 8px;">
-                                <span style="font-size: 20px;">📎</span>
-                                <span>{{ message.file.name|slice:"12:" }}</span>
-                            </a>
-                        {% endif %}
-                        
-                        {% if message.content %}
-                            <div style="word-wrap: break-word; white-space: pre-wrap;">{{ message.content }}</div>
-                        {% endif %}
-                        
-                        <div style="font-size: 11px; margin-top: 5px; opacity: 0.7; text-align: right;">
-                            {{ message.created_at|date:"g:i A" }}
+        <div class="messages-area" id="messagesContainer">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="message-wrapper {% if message.sender == user %}sent{% else %}received{% endif %}">
+                        <div class="message-bubble">
+                            {% if message.image %}
+                                <img src="{{ message.image.url }}" alt="Image" class="message-image">
+                            {% endif %}
+                            
+                            {% if message.file %}
+                                <a href="{{ message.file.url }}" download class="message-file">
+                                    <span style="font-size: 20px;">📎</span>
+                                    <span>{{ message.file.name|slice:"12:" }}</span>
+                                </a>
+                            {% endif %}
+                            
+                            {% if message.content %}
+                                <div class="message-content">{{ message.content }}</div>
+                            {% endif %}
+                            
+                            <div class="message-time">
+                                {{ message.created_at|date:"g:i A" }}
+                            </div>
                         </div>
                     </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-chat">
+                    <div class="empty-chat-icon">💬</div>
+                    <h3>No messages yet</h3>
+                    <p>Start the conversation!</p>
                 </div>
-            {% empty %}
-                <div style="text-align: center; padding: 60px 20px; color: #95a5a6;">
-                    <div style="font-size: 64px; margin-bottom: 20px;">💬</div>
-                    <p>No messages yet. Start the conversation!</p>
-                </div>
-            {% endfor %}
+            {% endif %}
         </div>
         
         <!-- Message Input -->
-        <div style="padding: 20px; border-top: 2px solid #f0f0f0; background: white; border-radius: 0 0 10px 10px;">
-            <form id="messageForm" method="POST" action="{% url 'send_message' conversation.id %}" enctype="multipart/form-data" style="display: flex; gap: 10px; align-items: end;">
+        <div class="message-input-area">
+            <form id="messageForm" method="POST" action="{% url 'send_message' conversation.id %}" enctype="multipart/form-data" class="message-form">
                 {% csrf_token %}
                 
-                <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                <div class="input-wrapper">
                     <textarea name="content" id="messageInput" placeholder="Type a message..." 
-                              style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; resize: none; font-family: inherit;"
-                              rows="2"></textarea>
+                              class="message-textarea" rows="2"></textarea>
                     
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <label style="cursor: pointer; padding: 8px 15px; background: #f0f0f0; border-radius: 5px; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                    <div class="attachment-buttons">
+                        <label class="attachment-label">
                             <span>📷</span>
                             <span>Image</span>
-                            <input type="file" name="image" id="imageInput" accept="image/*" style="display: none;" onchange="showFileName(this, 'imageLabel')">
+                            <input type="file" name="image" id="imageInput" accept="image/*" onchange="showFileName(this, 'imageLabel')">
                         </label>
-                        <span id="imageLabel" style="font-size: 12px; color: #7f8c8d;"></span>
+                        <span id="imageLabel" class="file-name"></span>
                         
-                        <label style="cursor: pointer; padding: 8px 15px; background: #f0f0f0; border-radius: 5px; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                        <label class="attachment-label">
                             <span>📎</span>
                             <span>File</span>
-                            <input type="file" name="file" id="fileInput" style="display: none;" onchange="showFileName(this, 'fileLabel')">
+                            <input type="file" name="file" id="fileInput" onchange="showFileName(this, 'fileLabel')">
                         </label>
-                        <span id="fileLabel" style="font-size: 12px; color: #7f8c8d;"></span>
+                        <span id="fileLabel" class="file-name"></span>
                     </div>
                 </div>
                 
-                <button type="submit" style="padding: 15px 30px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 16px; align-self: stretch;">
+                <button type="submit" class="send-btn">
                     Send
                 </button>
             </form>
@@ -135,27 +470,7 @@ document.getElementById('messageInput').addEventListener('keydown', function(e) 
 // Auto-resize textarea
 document.getElementById('messageInput').addEventListener('input', function() {
     this.style.height = 'auto';
-    this.style.height = (this.scrollHeight) + 'px';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
 });
 </script>
-
-<style>
-#messagesContainer::-webkit-scrollbar {
-    width: 8px;
-}
-
-#messagesContainer::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-#messagesContainer::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 10px;
-}
-
-#messagesContainer::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-</style>
 {% endblock %}

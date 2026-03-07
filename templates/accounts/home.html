@@ -10,11 +10,7 @@
             
             <div class="user-info-card">
                 <div class="user-avatar">
-                    {% if user.userprofile.profile_picture %}
-                    <img src="{{ user.userprofile.profile_picture }}" alt="{{ user.username }}">
-                    {% else %}
-                    <img src="https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=100" alt="{{ user.username }}">
-                    {% endif %}
+                    <img src="{{ user.userprofile.get_profile_picture_url }}" alt="{{ user.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=100'">
                 </div>
                 <div class="user-details">
                     <h2>{{ user.get_full_name|default:user.username }}</h2>
