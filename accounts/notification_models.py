@@ -56,7 +56,7 @@ class Notification(models.Model):
             notification_type='message',
             title=f'New message from {sender.get_full_name() or sender.username}',
             message=f'{sender.get_full_name() or sender.username} sent you a message',
-            link=f'/accounts/conversation/{conversation_id}/',
+            link=f'/accounts/inbox/{conversation_id}/',
             related_user=sender
         )
     
