@@ -218,22 +218,47 @@
 
 .message-form {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: flex-end;
+}
+
+.emoji-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.emoji-btn:hover {
+    background: #f3f4f6;
+}
+
+.emoji-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: #6b7280;
 }
 
 .input-wrapper {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
 }
 
 .message-textarea {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #e0e0e0;
-    border-radius: 8px;
+    border-radius: 20px;
     font-size: 14px;
     font-family: inherit;
     resize: none;
@@ -248,52 +273,53 @@
 
 .attachment-buttons {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     align-items: center;
 }
 
-.attachment-label {
+.attachment-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
     cursor: pointer;
-    padding: 6px 10px;
-    background: #f3f4f6;
-    border-radius: 6px;
-    font-size: 12px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
     transition: all 0.2s;
-    color: #374151;
-    font-weight: 500;
+    flex-shrink: 0;
 }
 
-.attachment-label:hover {
-    background: #e5e7eb;
+.attachment-btn:hover {
+    background: #f3f4f6;
 }
 
-.attachment-label input {
+.attachment-btn svg {
+    width: 22px;
+    height: 22px;
+    stroke: #6b7280;
+}
+
+.attachment-btn input {
     display: none;
 }
 
-.file-name {
-    font-size: 11px;
-    color: #6b7280;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .send-btn {
-    padding: 10px 20px;
+    width: 40px;
+    height: 40px;
     background: #667eea;
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 50%;
     font-weight: 600;
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s;
-    align-self: stretch;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .send-btn:hover {
@@ -301,7 +327,54 @@
 }
 
 .send-btn:active {
-    transform: scale(0.98);
+    transform: scale(0.95);
+}
+
+.send-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: white;
+}
+
+/* Emoji Picker */
+.emoji-picker {
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: none;
+    z-index: 1000;
+    width: 280px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.emoji-picker.active {
+    display: block;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+}
+
+.emoji-item {
+    font-size: 24px;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.emoji-item:hover {
+    background: #f3f4f6;
+    transform: scale(1.2);
 }
 
 /* Scrollbar styling */
@@ -413,29 +486,50 @@
             <form id="messageForm" method="POST" action="{% url 'send_message' conversation.id %}" enctype="multipart/form-data" class="message-form">
                 {% csrf_token %}
                 
+                <!-- Emoji Button -->
+                <button type="button" class="emoji-btn" id="emojiBtn" onclick="toggleEmojiPicker()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="9" cy="9" r="1" fill="currentColor"/>
+                        <circle cx="15" cy="9" r="1" fill="currentColor"/>
+                    </svg>
+                    
+                    <!-- Emoji Picker -->
+                    <div class="emoji-picker" id="emojiPicker" onclick="event.stopPropagation()">
+                        <div class="emoji-grid" id="emojiGrid"></div>
+                    </div>
+                </button>
+                
                 <div class="input-wrapper">
                     <textarea name="content" id="messageInput" placeholder="Type a message..." 
-                              class="message-textarea" rows="2"></textarea>
-                    
-                    <div class="attachment-buttons">
-                        <label class="attachment-label">
-                            <span>📷</span>
-                            <span>Image</span>
-                            <input type="file" name="image" id="imageInput" accept="image/*" onchange="showFileName(this, 'imageLabel')">
-                        </label>
-                        <span id="imageLabel" class="file-name"></span>
-                        
-                        <label class="attachment-label">
-                            <span>📎</span>
-                            <span>File</span>
-                            <input type="file" name="file" id="fileInput" onchange="showFileName(this, 'fileLabel')">
-                        </label>
-                        <span id="fileLabel" class="file-name"></span>
-                    </div>
+                              class="message-textarea" rows="1"></textarea>
                 </div>
                 
-                <button type="submit" class="send-btn">
-                    Send
+                <!-- Attachment Buttons -->
+                <div class="attachment-buttons">
+                    <label class="attachment-btn" title="Attach Image">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        <input type="file" name="image" id="imageInput" accept="image/*">
+                    </label>
+                    
+                    <label class="attachment-btn" title="Attach File">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        </svg>
+                        <input type="file" name="file" id="fileInput">
+                    </label>
+                </div>
+                
+                <button type="submit" class="send-btn" title="Send">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <line x1="22" y1="2" x2="11" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor"></polygon>
+                    </svg>
                 </button>
             </form>
         </div>
@@ -443,21 +537,50 @@
 </div>
 
 <script>
+// Emoji list
+const emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊','💋','💌','💘','💝','💖','💗','💓','💞','💕','💟','❣️','💔','❤️','🧡','💛','💚','💙','💜','🤎','🖤','🤍','💯','💢','💥','💫','💦','💨','🕳️','💣','💬','👁️‍🗨️','🗨️','🗯️','💭','💤','👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄'];
+
+// Populate emoji picker
+const emojiGrid = document.getElementById('emojiGrid');
+emojis.forEach(emoji => {
+    const span = document.createElement('span');
+    span.className = 'emoji-item';
+    span.textContent = emoji;
+    span.onclick = () => insertEmoji(emoji);
+    emojiGrid.appendChild(span);
+});
+
+// Toggle emoji picker
+function toggleEmojiPicker() {
+    const picker = document.getElementById('emojiPicker');
+    picker.classList.toggle('active');
+}
+
+// Close emoji picker when clicking outside
+document.addEventListener('click', function(e) {
+    const picker = document.getElementById('emojiPicker');
+    const btn = document.getElementById('emojiBtn');
+    if (!btn.contains(e.target)) {
+        picker.classList.remove('active');
+    }
+});
+
+// Insert emoji into textarea
+function insertEmoji(emoji) {
+    const textarea = document.getElementById('messageInput');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + emoji + text.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+    textarea.focus();
+}
+
 // Scroll to bottom on load
 window.addEventListener('load', function() {
     const container = document.getElementById('messagesContainer');
     container.scrollTop = container.scrollHeight;
 });
-
-// Show selected file name
-function showFileName(input, labelId) {
-    const label = document.getElementById(labelId);
-    if (input.files && input.files[0]) {
-        label.textContent = input.files[0].name;
-    } else {
-        label.textContent = '';
-    }
-}
 
 // Handle Enter key to send (Shift+Enter for new line)
 document.getElementById('messageInput').addEventListener('keydown', function(e) {
@@ -470,7 +593,7 @@ document.getElementById('messageInput').addEventListener('keydown', function(e) 
 // Auto-resize textarea
 document.getElementById('messageInput').addEventListener('input', function() {
     this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
 });
 </script>
 {% endblock %}
