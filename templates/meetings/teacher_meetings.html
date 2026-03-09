@@ -109,6 +109,99 @@
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
+/* Meeting Actions Buttons - Force Override */
+.meeting-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: clamp(0.5rem, 1vw, 0.75rem) !important;
+    margin-top: clamp(0.75rem, 1.5vh, 1rem) !important;
+}
+
+.meeting-actions .btn-view,
+.meeting-actions a.btn-view,
+a.btn-view {
+    flex: 1 !important;
+    min-width: clamp(100px, 20vw, 140px) !important;
+    padding: clamp(0.625rem, 1.2vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem) !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    text-align: center !important;
+    border-radius: clamp(8px, 1.2vw, 10px) !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    font-size: clamp(0.8rem, 1.4vw, 0.875rem) !important;
+    transition: all 0.2s !important;
+    border: none !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(0.375rem, 0.8vw, 0.5rem) !important;
+    white-space: nowrap !important;
+}
+
+.meeting-actions .btn-view:hover,
+.meeting-actions a.btn-view:hover,
+a.btn-view:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
+}
+
+.meeting-actions .btn-delete,
+.meeting-actions button.btn-delete,
+button.btn-delete {
+    padding: clamp(0.625rem, 1.2vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem) !important;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: clamp(8px, 1.2vw, 10px) !important;
+    font-weight: 600 !important;
+    font-size: clamp(0.8rem, 1.4vw, 0.875rem) !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(0.375rem, 0.8vw, 0.5rem) !important;
+    white-space: nowrap !important;
+}
+
+.meeting-actions .btn-delete:hover,
+.meeting-actions button.btn-delete:hover,
+button.btn-delete:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4) !important;
+}
+
+.meeting-actions .btn-cancel,
+.meeting-actions button.btn-cancel,
+button.btn-cancel {
+    padding: clamp(0.625rem, 1.2vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem) !important;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: clamp(8px, 1.2vw, 10px) !important;
+    font-weight: 600 !important;
+    font-size: clamp(0.8rem, 1.4vw, 0.875rem) !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(0.375rem, 0.8vw, 0.5rem) !important;
+    white-space: nowrap !important;
+}
+
+.meeting-actions .btn-cancel:hover,
+.meeting-actions button.btn-cancel:hover,
+button.btn-cancel:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4) !important;
+}
+
 @media (max-width: 640px) {
     .meetings-header {
         flex-direction: column;
@@ -118,6 +211,16 @@
     .btn-schedule {
         width: 100%;
         justify-content: center;
+    }
+    
+    .meeting-actions {
+        flex-direction: column;
+    }
+    
+    .btn-view,
+    .btn-delete,
+    .btn-cancel {
+        width: 100% !important;
     }
 }
 </style>
