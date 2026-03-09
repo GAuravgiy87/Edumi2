@@ -117,57 +117,96 @@
 .video-grid-container {
     flex: 1;
     display: flex;
-    padding: clamp(8px, 1.5vw, 20px);
+    padding: clamp(8px, 1.5vw, 16px);
     overflow: hidden;
     position: relative;
-    transition: margin-right 0.3s ease;
 }
 
-/* Single participant - centered */
-.video-grid-container.single-view {
-    justify-content: center;
-    align-items: center;
-    padding: clamp(16px, 3vw, 40px);
-}
-
-.video-grid-container.single-view .video-box {
-    width: 100%;
-    height: 100%;
-    max-width: min(90vw, 1600px);
-    max-height: 85vh;
-}
-
-/* Grid view - responsive */
+/* Normal Grid View - No Screen Share */
 .video-grid-container.grid-view {
     display: grid;
-    gap: clamp(6px, 1vw, 12px);
+    gap: clamp(8px, 1.2vw, 12px);
+    padding: clamp(8px, 1.5vw, 16px);
     align-content: center;
     justify-content: center;
-    padding: clamp(12px, 2vw, 24px);
+}
+
+/* Dynamic grid based on participant count - Google Meet style */
+.video-grid-container.grid-view.count-1 {
+    grid-template-columns: 1fr;
+    max-width: 800px;
+    margin: 0 auto;
 }
 
 .video-grid-container.grid-view.count-2 {
-    grid-template-columns: repeat(auto-fit, minmax(clamp(300px, 40vw, 600px), 1fr));
+    grid-template-columns: repeat(2, 1fr);
 }
 
 .video-grid-container.grid-view.count-3,
 .video-grid-container.grid-view.count-4 {
-    grid-template-columns: repeat(auto-fit, minmax(clamp(280px, 35vw, 500px), 1fr));
+    grid-template-columns: repeat(2, 1fr);
 }
 
 .video-grid-container.grid-view.count-5,
 .video-grid-container.grid-view.count-6 {
-    grid-template-columns: repeat(auto-fit, minmax(clamp(250px, 30vw, 450px), 1fr));
+    grid-template-columns: repeat(3, 1fr);
 }
 
 .video-grid-container.grid-view.count-7,
 .video-grid-container.grid-view.count-8,
 .video-grid-container.grid-view.count-9 {
-    grid-template-columns: repeat(auto-fit, minmax(clamp(220px, 28vw, 400px), 1fr));
+    grid-template-columns: repeat(3, 1fr);
 }
 
-.video-grid-container.grid-view.count-10 {
-    grid-template-columns: repeat(auto-fit, minmax(clamp(200px, 25vw, 350px), 1fr));
+.video-grid-container.grid-view.count-10,
+.video-grid-container.grid-view.count-11,
+.video-grid-container.grid-view.count-12 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+/* Screen Share View - Large screen + sidebar (Google Meet style) */
+.video-grid-container.screen-share-view {
+    display: flex;
+    gap: clamp(8px, 1.2vw, 12px);
+    padding: clamp(8px, 1.5vw, 16px);
+}
+
+.screen-share-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    border-radius: clamp(8px, 1.2vw, 12px);
+    overflow: hidden;
+    min-width: 0;
+}
+
+.screen-share-sidebar {
+    width: clamp(180px, 20vw, 280px);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(8px, 1.2vw, 12px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.screen-share-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.screen-share-sidebar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.screen-share-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.screen-share-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .video-box {
@@ -185,9 +224,24 @@
     transform: scale(1.02);
 }
 
-.video-box.screen-share {
+/* Screen share video box - full size in main area */
+.video-box.screen-share-active {
+    aspect-ratio: auto;
+    width: 100%;
+    height: 100%;
     border: 3px solid #6366f1;
     box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+}
+
+/* Sidebar video boxes - smaller */
+.screen-share-sidebar .video-box {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.screen-share-sidebar .video-box:hover {
+    transform: scale(1.05);
 }
 
 .video-box video {
@@ -196,7 +250,7 @@
     object-fit: cover;
 }
 
-.video-box.screen-share video {
+.video-box.screen-share-active video {
     object-fit: contain;
     background: #000;
 }
@@ -591,6 +645,29 @@
     
     .video-grid-container.grid-view {
         grid-template-columns: 1fr !important;
+    }
+    
+    /* Mobile screen share layout - stack vertically */
+    .video-grid-container.screen-share-view {
+        flex-direction: column;
+    }
+    
+    .screen-share-main {
+        height: 60vh;
+        width: 100%;
+    }
+    
+    .screen-share-sidebar {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 8px;
+    }
+    
+    .screen-share-sidebar .video-box {
+        min-width: 150px;
+        width: 150px;
     }
     
     .meet-controls {

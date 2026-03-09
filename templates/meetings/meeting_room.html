@@ -539,11 +539,11 @@ function connectWebSocket() {
 async function handleUserJoined(data) {
     console.log('User joined:', data.username);
     
-    // Add to participants list
+    // Add to participants list FIRST
     addParticipant(data.user_id, data.username);
     
-    // Create peer connection and send offer
-    const pc = createPeerConnection(data.user_id);
+    // Create peer connection and send offer (pass username)
+    const pc = createPeerConnection(data.user_id, data.username);
     
     // Add local stream tracks with optimized parameters
     localStream.getTracks().forEach(track => {
@@ -621,7 +621,10 @@ function handleUserLeft(data) {
 async function handleOffer(data) {
     console.log('Received offer from:', data.from_username);
     
-    const pc = createPeerConnection(data.from_user_id);
+    // Add to participants list FIRST
+    addParticipant(data.from_user_id, data.from_username);
+    
+    const pc = createPeerConnection(data.from_user_id, data.from_username);
     
     // Add local stream tracks with optimized parameters
     localStream.getTracks().forEach(track => {
@@ -669,9 +672,6 @@ async function handleOffer(data) {
         answer: answer,
         to_user_id: data.from_user_id
     }));
-    
-    // Add to participants
-    addParticipant(data.from_user_id, data.from_username);
 }
 
 async function handleAnswer(data) {
@@ -704,7 +704,7 @@ async function handleIceCandidate(data) {
     }
 }
 
-function createPeerConnection(userId) {
+function createPeerConnection(userId, username) {
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnections[userId] = pc;
     
@@ -745,7 +745,9 @@ function createPeerConnection(userId) {
             track.contentHint = 'speech'; // Optimize for speech
         }
         
-        addVideoElement(userId, participants[userId] || 'User', remoteStream, false);
+        // Use username from participants (should be there now) or passed parameter
+        const displayName = participants[userId] || username || 'User';
+        addVideoElement(userId, displayName, remoteStream, false);
     };
     
     pc.onconnectionstatechange = () => {
@@ -921,24 +923,71 @@ function updateVideoLayout() {
     const container = document.getElementById('videoGridContainer');
     if (!container) return;
     
-    const videoBoxes = container.querySelectorAll('.video-box');
+    const videoBoxes = Array.from(container.querySelectorAll('.video-box'));
     const count = videoBoxes.length;
     
     // Remove all layout classes
     container.className = 'video-grid-container';
+    videoBoxes.forEach(box => {
+        box.classList.remove('screen-share-active');
+    });
     
-    // Simple layout based on participant count
-    if (count === 1) {
-        container.classList.add('single-view');
-    } else {
-        container.classList.add('grid-view', `count-${Math.min(count, 10)}`);
-    }
-    
-    // Mark screen sharing video if active
+    // Check if screen sharing is active
     if (screenSharingUserId) {
         const screenShareBox = document.getElementById(`video-${screenSharingUserId}`);
+        
         if (screenShareBox) {
-            screenShareBox.classList.add('screen-share');
+            // SCREEN SHARE MODE - Google Meet style
+            container.classList.add('screen-share-view');
+            
+            // Create main area for screen share
+            let mainArea = container.querySelector('.screen-share-main');
+            if (!mainArea) {
+                mainArea = document.createElement('div');
+                mainArea.className = 'screen-share-main';
+                container.appendChild(mainArea);
+            }
+            
+            // Create sidebar for other participants
+            let sidebar = container.querySelector('.screen-share-sidebar');
+            if (!sidebar) {
+                sidebar = document.createElement('div');
+                sidebar.className = 'screen-share-sidebar';
+                container.appendChild(sidebar);
+            }
+            
+            // Move screen share to main area
+            if (screenShareBox.parentElement !== mainArea) {
+                mainArea.appendChild(screenShareBox);
+                screenShareBox.classList.add('screen-share-active');
+            }
+            
+            // Move all other videos to sidebar
+            videoBoxes.forEach(box => {
+                if (box.id !== `video-${screenSharingUserId}` && box.parentElement !== sidebar) {
+                    sidebar.appendChild(box);
+                }
+            });
+        }
+    } else {
+        // NORMAL GRID MODE - No screen sharing
+        container.classList.add('grid-view', `count-${Math.min(count, 12)}`);
+        
+        // Remove screen share containers if they exist
+        const mainArea = container.querySelector('.screen-share-main');
+        const sidebar = container.querySelector('.screen-share-sidebar');
+        
+        if (mainArea || sidebar) {
+            // Move all videos back to main container
+            videoBoxes.forEach(box => {
+                if (box.parentElement !== container) {
+                    container.appendChild(box);
+                }
+            });
+            
+            // Remove screen share containers
+            if (mainArea) mainArea.remove();
+            if (sidebar) sidebar.remove();
         }
     }
 }
