@@ -549,14 +549,25 @@ async function handleUserJoined(data) {
     localStream.getTracks().forEach(track => {
         const sender = pc.addTrack(track, localStream);
         
-        // Set initial encoding parameters for low latency
+        // Set aggressive encoding parameters for low latency
         if (track.kind === 'video') {
             const params = sender.getParameters();
             if (!params.encodings) {
                 params.encodings = [{}];
             }
-            params.encodings[0].maxBitrate = 500000; // 500 Kbps for camera
-            params.encodings[0].maxFramerate = 15;
+            params.encodings[0].maxBitrate = 3000000; // 3 Mbps
+            params.encodings[0].maxFramerate = 60;
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
+            sender.setParameters(params);
+        } else if (track.kind === 'audio') {
+            const params = sender.getParameters();
+            if (!params.encodings) {
+                params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = 510000; // 510 Kbps
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
             sender.setParameters(params);
         }
     });
@@ -564,8 +575,15 @@ async function handleUserJoined(data) {
     // Create offer with low latency settings
     const offer = await pc.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: true
+        offerToReceiveVideo: true,
+        voiceActivityDetection: false
     });
+    
+    // Simplified SDP modifications for low latency (compatible)
+    offer.sdp = offer.sdp
+        .replace(/(a=fmtp:\d+ .*)/g, '$1;x-google-min-bitrate=2000;x-google-max-bitrate=5000')
+        .replace(/(m=video .*\r\n)/g, '$1a=x-google-min-playout-delay:0\r\na=x-google-max-playout-delay:0\r\n')
+        .replace(/(m=audio .*\r\n)/g, '$1a=ptime:20\r\n');
     
     await pc.setLocalDescription(offer);
     
@@ -609,21 +627,41 @@ async function handleOffer(data) {
     localStream.getTracks().forEach(track => {
         const sender = pc.addTrack(track, localStream);
         
-        // Set initial encoding parameters for low latency
+        // Set EXTREME encoding parameters for ULTRA-LOW latency
         if (track.kind === 'video') {
             const params = sender.getParameters();
             if (!params.encodings) {
                 params.encodings = [{}];
             }
-            params.encodings[0].maxBitrate = 500000; // 500 Kbps for camera
-            params.encodings[0].maxFramerate = 15;
+            params.encodings[0].maxBitrate = 3000000; // 3 Mbps
+            params.encodings[0].maxFramerate = 60;
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
+            sender.setParameters(params);
+        } else if (track.kind === 'audio') {
+            const params = sender.getParameters();
+            if (!params.encodings) {
+                params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = 510000; // 510 Kbps
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
             sender.setParameters(params);
         }
     });
     
     await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
     
-    const answer = await pc.createAnswer();
+    const answer = await pc.createAnswer({
+        voiceActivityDetection: false
+    });
+    
+    // Simplified SDP modifications for low latency (compatible)
+    answer.sdp = answer.sdp
+        .replace(/(a=fmtp:\d+ .*)/g, '$1;x-google-min-bitrate=2000;x-google-max-bitrate=5000')
+        .replace(/(m=video .*\r\n)/g, '$1a=x-google-min-playout-delay:0\r\na=x-google-max-playout-delay:0\r\n')
+        .replace(/(m=audio .*\r\n)/g, '$1a=ptime:20\r\n');
+    
     await pc.setLocalDescription(answer);
     
     ws.send(JSON.stringify({
@@ -670,7 +708,13 @@ function createPeerConnection(userId) {
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnections[userId] = pc;
     
-    // Handle ICE candidates
+    // EXTREME LOW-LATENCY: Set sctp parameters for data channel
+    pc.sctp = {
+        maxMessageSize: 256 * 1024,
+        maxChannels: 65535
+    };
+    
+    // Handle ICE candidates - send immediately
     pc.onicecandidate = (event) => {
         if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
@@ -681,23 +725,54 @@ function createPeerConnection(userId) {
         }
     };
     
-    // Handle incoming tracks
+    // Handle incoming tracks with ZERO buffering
     pc.ontrack = (event) => {
         console.log('Received track from user:', userId);
         
-        // Don't add video for our own tracks (shouldn't happen, but just in case)
+        // Don't add video for our own tracks
         if (userId === currentUserId) {
-            console.log('⚠ Ignoring track from self (userId matches currentUserId)');
+            console.log('⚠ Ignoring track from self');
             return;
         }
         
         const remoteStream = event.streams[0];
+        
+        // EXTREME: Set track constraints for minimum latency
+        const track = event.track;
+        if (track.kind === 'video') {
+            track.contentHint = 'motion'; // Optimize for motion/video
+        } else if (track.kind === 'audio') {
+            track.contentHint = 'speech'; // Optimize for speech
+        }
+        
         addVideoElement(userId, participants[userId] || 'User', remoteStream, false);
     };
     
     pc.onconnectionstatechange = () => {
         console.log('Connection state:', pc.connectionState);
-        if (pc.connectionState === 'failed') {
+        if (pc.connectionState === 'connected') {
+            // EXTREME: Once connected, optimize all senders
+            pc.getSenders().forEach(sender => {
+                if (sender.track) {
+                    const params = sender.getParameters();
+                    if (!params.encodings) params.encodings = [{}];
+                    
+                    // Force minimum latency
+                    params.encodings[0].priority = 'high';
+                    params.encodings[0].networkPriority = 'high';
+                    
+                    if (sender.track.kind === 'video') {
+                        params.encodings[0].maxBitrate = 3000000;
+                        params.encodings[0].scaleResolutionDownBy = 1; // No downscaling
+                    } else if (sender.track.kind === 'audio') {
+                        params.encodings[0].maxBitrate = 510000;
+                        params.encodings[0].dtx = false; // Disable discontinuous transmission
+                    }
+                    
+                    sender.setParameters(params).catch(e => console.log('Param update:', e));
+                }
+            });
+        } else if (pc.connectionState === 'failed') {
             console.error('Connection failed, attempting restart');
             pc.restartIce();
         }
