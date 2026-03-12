@@ -8,7 +8,7 @@ from cameras.models import Camera
 
 def check_admin(user):
     """Check if user is admin"""
-    return user.username == 'Admin' or user.is_superuser
+    return user.is_superuser
 
 @login_required
 def admin_all_users(request):

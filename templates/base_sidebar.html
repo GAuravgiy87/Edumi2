@@ -35,7 +35,7 @@
                 <div class="sidebar-user-info">
                     <div class="sidebar-user-name">{{ user.userprofile.get_display_name|default:user.username }}</div>
                     <div class="sidebar-user-role">
-                        {% if user.is_superuser or user.username == 'Admin' %}
+                        {% if user.is_superuser %}
                             Administrator
                         {% elif user.userprofile.user_type == 'teacher' %}
                             Teacher
@@ -48,7 +48,7 @@
 
             <!-- Sidebar Navigation -->
             <nav class="sidebar-nav">
-                {% if user.is_superuser or user.username == 'Admin' %}
+                {% if user.is_superuser %}
                     <!-- Admin Navigation -->
                     <div class="sidebar-nav-section">
                         <div class="sidebar-nav-title">Dashboard</div>

@@ -29,7 +29,7 @@
                     <img src="{% static 'logo.svg' %}" alt="EduMi" class="nav-logo">
                 </a>
 
-                {% if user.username == 'Admin' or user.is_superuser %}
+                {% if user.is_superuser %}
                 <a href="{% url 'admin_panel' %}">Admin Panel</a>
                 <a href="{% url 'user_management' %}">Users</a>
                 <a href="{% url 'admin_dashboard' %}">Cameras</a>

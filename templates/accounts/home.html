@@ -15,7 +15,7 @@
                 <div class="user-details">
                     <h2>{{ user.get_full_name|default:user.username }}</h2>
                     <p class="user-type">
-                        {% if user.username == 'Admin' %}
+                        {% if user.is_superuser %}
                         <span class="badge badge-admin">Administrator</span>
                         {% else %}
                         <span class="badge badge-{{ user.userprofile.user_type }}">{{ user.userprofile.get_user_type_display }}</span>
@@ -27,7 +27,7 @@
     </div>
     
     <div class="features-grid">
-        {% if user.username == 'Admin' or user.is_superuser %}
+        {% if user.is_superuser %}
         <a href="{% url 'admin_panel' %}" class="feature-card">
             <div class="feature-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                 <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2M23 12h-6m-6 0H1m18.2-5.2l-4.2 4.2m0 6l4.2 4.2"></path></svg></span>

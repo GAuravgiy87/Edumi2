@@ -11,7 +11,7 @@ logger = logging.getLogger('mobile_cameras')
 def is_admin(user):
     """Check if user is admin"""
     if user.is_authenticated:
-        if user.username == 'Admin' or user.username == 'admin' or user.is_superuser:
+        if user.is_superuser:
             return True
     return False
 

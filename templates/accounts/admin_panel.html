@@ -106,7 +106,7 @@
                             <td>{{ user.get_full_name|default:"-" }}</td>
                             <td>{{ user.email|default:"-" }}</td>
                             <td>
-                                {% if user.username == 'Admin' or user.is_superuser %}
+                                {% if user.is_superuser %}
                                     <span class="badge badge-admin">Admin</span>
                                 {% elif user.userprofile.user_type == 'teacher' %}
                                     <span class="badge badge-teacher">Teacher</span>

@@ -61,7 +61,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
         <h2>No Mobile Cameras Available</h2>
         <p>There are no active mobile cameras to display.</p>
-        {% if user.username == 'Admin' or user.is_superuser %}
+        {% if user.is_superuser %}
         <a href="{% url 'mobile_cameras:add' %}" class="btn-add">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Add Mobile Camera

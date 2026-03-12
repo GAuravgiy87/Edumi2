@@ -128,7 +128,6 @@ python manage.py migrate
 
 # Create admin user (optional)
 python setup_admin.py
-# Default credentials: admin / admin123
 
 # Create test users (optional)
 python setup_test_users.py
@@ -601,19 +600,6 @@ lsof -ti:8000 | xargs kill -9  # Linux/Mac
 | ngrok Dashboard | `http://localhost:4040` |
 | HTTPS (local) | `https://localhost:8000` |
 | HTTPS (ngrok) | `https://your-url.ngrok-free.dev` |
-
-</details>
-
-<details>
-<summary><b>Default Credentials</b></summary>
-
-**Admin User** (after running `setup_admin.py`):
-- Username: `admin`
-- Password: `admin123`
-
-**Test Users** (after running `setup_test_users.py`):
-- Teachers: `teacher1`, `teacher2` (password: `teacher123`)
-- Students: `student1`, `student2` (password: `student123`)
 
 </details>
 

@@ -12,7 +12,7 @@ from cameras.models import Camera
 def login_view(request):
     if request.user.is_authenticated:
         # Check if admin user
-        if request.user.username == 'Admin' or request.user.is_superuser:
+        if request.user.is_superuser:
             return redirect('admin_panel')
         # Check user type
         if hasattr(request.user, 'userprofile'):
@@ -29,7 +29,7 @@ def login_view(request):
         if user is not None:
             login(request, user)
             # Redirect based on user type
-            if username == 'Admin' or user.is_superuser:
+            if user.is_superuser:
                 return redirect('admin_panel')
             if hasattr(user, 'userprofile'):
                 if user.userprofile.user_type == 'teacher':
@@ -134,7 +134,7 @@ def profile_view(request, username=None):
         profile = profile_user.userprofile
     except UserProfile.DoesNotExist:
         # Create profile if it doesn't exist (for admin users)
-        if profile_user.is_superuser or profile_user.username == 'Admin':
+        if profile_user.is_superuser:
             profile = UserProfile.objects.create(user=profile_user, user_type='teacher')
         else:
             profile = None
@@ -231,7 +231,7 @@ def profile_view(request, username=None):
     
     # Get user statistics
     stats = {}
-    if profile_user.is_superuser or profile_user.username == 'Admin':
+    if profile_user.is_superuser:
         # Admin statistics
         stats['total_users'] = User.objects.count()
         stats['total_meetings'] = Meeting.objects.count()
@@ -314,7 +314,7 @@ def edit_profile(request):
 @login_required
 def admin_panel(request):
     # Check if user is admin
-    if request.user.username != 'Admin' and not request.user.is_superuser:
+    if not request.user.is_superuser:
         return redirect('login')
     
     # Get all statistics (exclude classroom meetings from general counts)
@@ -362,7 +362,7 @@ def admin_panel(request):
 @login_required
 def user_management(request):
     # Check if user is admin
-    if request.user.username != 'Admin' and not request.user.is_superuser:
+    if not request.user.is_superuser:
         return redirect('login')
     
     users = User.objects.all().order_by('-date_joined')
@@ -372,12 +372,12 @@ def user_management(request):
 @login_required
 def delete_user(request, user_id):
     # Check if user is admin
-    if request.user.username != 'Admin' and not request.user.is_superuser:
+    if not request.user.is_superuser:
         return redirect('login')
     
     if request.method == 'POST':
         user = get_object_or_404(User, id=user_id)
-        if user.username != 'Admin':  # Prevent deleting admin
+        if not user.is_superuser:  # Prevent deleting admin users
             user.delete()
     
     return redirect('user_management')
@@ -387,7 +387,7 @@ def delete_user(request, user_id):
 def architecture_view(request):
     """Display system architecture visualization"""
     # Check if user is admin
-    if request.user.username != 'Admin' and not request.user.is_superuser:
+    if not request.user.is_superuser:
         return redirect('login')
     
     # HTML page with both architecture diagrams

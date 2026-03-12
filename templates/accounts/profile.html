@@ -28,7 +28,7 @@
         {% csrf_token %}
     {% endif %}
     
-    <div class="profile-header" data-role="{% if profile_user.is_superuser or profile_user.username == 'Admin' %}admin{% elif profile %}{{ profile.user_type }}{% endif %}">
+    <div class="profile-header" data-role="{% if profile_user.is_superuser %}admin{% elif profile %}{{ profile.user_type }}{% endif %}">
         <div class="profile-cover"></div>
         <div class="profile-info-section">
             <div class="profile-avatar">
@@ -55,7 +55,7 @@
                 <h1>{{ profile.get_display_name }}</h1>
                 {% endif %}
                 <p class="profile-username">@{{ profile_user.username }}</p>
-                {% if profile_user.is_superuser or profile_user.username == 'Admin' %}
+                {% if profile_user.is_superuser %}
                 <span class="profile-badge badge-admin">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
                     Administrator

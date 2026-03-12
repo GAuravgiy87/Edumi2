@@ -371,7 +371,7 @@ def create_meeting(request):
 @login_required
 def teacher_meetings(request):
     # Allow admin to view all non-classroom meetings
-    if request.user.username == 'Admin' or request.user.is_superuser:
+    if request.user.is_superuser:
         meetings = Meeting.objects.filter(classroom__isnull=True)
     elif hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher':
         meetings = Meeting.objects.filter(teacher=request.user, classroom__isnull=True)
@@ -380,7 +380,7 @@ def teacher_meetings(request):
     
     return render(request, 'meetings/teacher_meetings.html', {
         'meetings': meetings,
-        'is_admin': request.user.username == 'Admin' or request.user.is_superuser
+        'is_admin': request.user.is_superuser
     })
 
 @login_required
