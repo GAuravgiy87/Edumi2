@@ -540,18 +540,24 @@ async function handleUserJoined(data) {
         }
     });
     
-    // Create offer with low latency settings
+    // Create offer with ultra-low latency settings
     const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
         voiceActivityDetection: false
     });
     
-    // Simplified SDP modifications for low latency (compatible)
+    // EXTREME SDP OPTIMIZATION for zero latency & lip-sync
     offer.sdp = offer.sdp
-        .replace(/(a=fmtp:\d+ .*)/g, '$1;x-google-min-bitrate=2000;x-google-max-bitrate=5000')
+        .replace('a=fmtp:111', 'a=fmtp:111 minptime=10;useinbandfec=1;maxaveragebitrate=510000;stereo=1;cbr=1')
         .replace(/(m=video .*\r\n)/g, '$1a=x-google-min-playout-delay:0\r\na=x-google-max-playout-delay:0\r\n')
-        .replace(/(m=audio .*\r\n)/g, '$1a=ptime:20\r\n');
+        .replace(/(m=audio .*\r\n)/g, '$1a=ptime:10\r\n') // Reduce ptime to 10ms
+        .replace(/(a=fmtp:\d+ .*)/g, '$1;x-google-min-bitrate=500;x-google-max-bitrate=5000'); // Consistent bitrate
+    
+    // Prefer H.264 constrained baseline for lowest possible latency if available
+    if (offer.sdp.indexOf('42e01f') !== -1) {
+        offer.sdp = offer.sdp.replace(/(m=video 9 [^\r\n]*)/, '$1 107'); // Reorder for H.264 preference
+    }
     
     await pc.setLocalDescription(offer);
     
@@ -627,11 +633,12 @@ async function handleOffer(data) {
         voiceActivityDetection: false
     });
     
-    // Simplified SDP modifications for low latency (compatible)
+    // EXTREME SDP OPTIMIZATION for zero latency & lip-sync
     answer.sdp = answer.sdp
-        .replace(/(a=fmtp:\d+ .*)/g, '$1;x-google-min-bitrate=2000;x-google-max-bitrate=5000')
+        .replace('a=fmtp:111', 'a=fmtp:111 minptime=10;useinbandfec=1;maxaveragebitrate=510000;stereo=1;cbr=1')
         .replace(/(m=video .*\r\n)/g, '$1a=x-google-min-playout-delay:0\r\na=x-google-max-playout-delay:0\r\n')
-        .replace(/(m=audio .*\r\n)/g, '$1a=ptime:20\r\n');
+        .replace(/(m=audio .*\r\n)/g, '$1a=ptime:10\r\n')
+        .replace(/(a=fmtp:\d+ .*)/g, '$1;x-google-min-bitrate=500;x-google-max-bitrate=5000');
     
     await pc.setLocalDescription(answer);
     
@@ -716,9 +723,13 @@ function createPeerConnection(userId, username) {
             setupAudioActivityDetection(remoteStream, userId);
         }
         
+        // Group tracks into one stream for browser-level lip-sync
+        const syncStream = new MediaStream();
+        remoteStream.getTracks().forEach(t => syncStream.addTrack(t));
+        
         // Use username from participants (should be there now) or passed parameter
         const displayName = participants[userId] || username || 'User';
-        addVideoElement(userId, displayName, remoteStream, false);
+        addVideoElement(userId, displayName, syncStream, false);
     };
     
     pc.onconnectionstatechange = () => {
