@@ -1,64 +1,27 @@
-# Common ignores
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# SQLite database
 db.sqlite3
 
-# Database
-*.sqlite3
-
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Django
-*.log
-local_settings.py
-staticfiles/
+# Media files
 media/
 
-# Environment variables
+# Static collected files
+staticfiles/
+
+# Virtual environment
+venv/
+env/
+
+# VSCode
+.vscode/
+
+# Python environment
 .env
-.env.local
 
-# Credentials
-ADMIN_CREDENTIALS.txt
-
-# Coverage
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-
-# Testing
-.pytest_cache/
-.tox/
+# Logs
+*.log
