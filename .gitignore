@@ -1,13 +1,11 @@
-# Database
-*.sqlite3
+# Common ignores
+__pycache__/
+*.pyc
 db.sqlite3
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+# Database
+*.sqlite3
+
 build/
 develop-eggs/
 dist/
