@@ -99,6 +99,28 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                     'timestamp': data.get('timestamp')
                 }
             )
+        
+        elif message_type == 'screen_share_started':
+            # Broadcast screen share started
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'screen_share_started',
+                    'user_id': self.user.id,
+                    'username': self.user.username
+                }
+            )
+        
+        elif message_type == 'screen_share_stopped':
+            # Broadcast screen share stopped
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'screen_share_stopped',
+                    'user_id': self.user.id,
+                    'username': self.user.username
+                }
+            )
     
     async def user_joined(self, event):
         await self.send(text_data=json.dumps({
@@ -150,4 +172,18 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             'username': event['username'],
             'user_id': event['user_id'],
             'timestamp': event.get('timestamp')
+        }))
+    
+    async def screen_share_started(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'screen_share_started',
+            'user_id': event['user_id'],
+            'username': event['username']
+        }))
+    
+    async def screen_share_stopped(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'screen_share_stopped',
+            'user_id': event['user_id'],
+            'username': event['username']
         }))

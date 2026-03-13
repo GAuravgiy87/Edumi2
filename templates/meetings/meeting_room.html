@@ -30,7 +30,8 @@
         <!-- Video Grid -->
         <div class="meet-main">
             <div class="video-grid-container" id="videoGridContainer">
-                <!-- Local video will be added here -->
+                <div id="mainVideoArea" class="main-video-area"></div>
+                <div id="sidebarVideoArea" class="sidebar-video-area"></div>
             </div>
             
             <!-- Sidebar -->
@@ -158,7 +159,6 @@ const rtcConfig = {
 
 // State
 let localStream = null;
-let localDisplayStream = null; // Separate stream for local display
 let screenStream = null;
 let peerConnections = {};
 let participants = {};
@@ -279,35 +279,9 @@ async function init() {
                 console.log('Video track settings:', localStream.getVideoTracks()[0].getSettings());
             }
             
-            // Clone the stream for local display to prevent it from being affected by peer connections
-            localDisplayStream = localStream.clone();
-            
-            console.log('=== ABOUT TO ADD LOCAL VIDEO ===');
-            console.log('currentUserId:', currentUserId);
-            console.log('currentUsername:', currentUsername);
-            console.log('localDisplayStream:', localDisplayStream);
-            console.log('localDisplayStream.active:', localDisplayStream.active);
-            console.log('localDisplayStream tracks:', localDisplayStream.getTracks());
-            
-            // Add event listeners to keep tracks alive
-            localDisplayStream.getTracks().forEach(track => {
-                track.addEventListener('ended', () => {
-                    console.warn('Local display track ended:', track.kind);
-                    // Try to re-clone from original stream if still available
-                    if (localStream && localStream.active) {
-                        const newTrack = localStream.getTracks().find(t => t.kind === track.kind);
-                        if (newTrack) {
-                            localDisplayStream.removeTrack(track);
-                            localDisplayStream.addTrack(newTrack.clone());
-                            console.log('Restored local display track:', track.kind);
-                        }
-                    }
-                });
-            });
-            
-            // Add local video using the cloned stream
-            addVideoElement(currentUserId, currentUsername, localDisplayStream, true);
-            localVideoUserId = currentUserId; // Mark this as the local video
+            // Add local video using the stream directly
+            addVideoElement(currentUserId, currentUsername, localStream, true);
+            localVideoUserId = currentUserId; 
             console.log('=== LOCAL VIDEO ADDED ===');
             
         } catch (mediaError) {
@@ -371,12 +345,8 @@ async function init() {
                 
                 console.log('Created combined stream:', localStream);
                 
-                // Clone for local display
-                localDisplayStream = localStream.clone();
-                console.log('Created localDisplayStream clone');
-                
-                addVideoElement(currentUserId, currentUsername, localDisplayStream, true);
-                localVideoUserId = currentUserId; // Mark this as the local video
+                addVideoElement(currentUserId, currentUsername, localStream, true);
+                localVideoUserId = currentUserId;
                 
                 // Update UI
                 if (!videoStream) {
@@ -439,13 +409,9 @@ function createPlaceholderStream() {
         console.warn('Could not create audio context:', e);
     }
     
-    // Clone for local display
-    localDisplayStream = localStream.clone();
-    console.log('Created placeholder localDisplayStream');
-    
     // Add placeholder video
-    addVideoElement(currentUserId, currentUsername, localDisplayStream, true);
-    localVideoUserId = currentUserId; // Mark this as the local video
+    addVideoElement(currentUserId, currentUsername, localStream, true);
+    localVideoUserId = currentUserId;
     
     // Update UI to show camera/mic are off
     isCameraOn = false;
@@ -470,7 +436,7 @@ function connectWebSocket() {
         
         switch(data.type) {
             case 'user_joined':
-                if (data.user_id !== currentUserId) {
+                if (String(data.user_id) !== String(currentUserId)) {
                     await handleUserJoined(data);
                 }
                 break;
@@ -480,7 +446,7 @@ function connectWebSocket() {
                 break;
             
             case 'offer':
-                if (data.from_user_id !== currentUserId) {
+                if (String(data.from_user_id) !== String(currentUserId)) {
                     await handleOffer(data);
                 }
                 break;
@@ -490,7 +456,7 @@ function connectWebSocket() {
                 break;
             
             case 'ice_candidate':
-                if (data.from_user_id !== currentUserId) {
+                if (String(data.from_user_id) !== String(currentUserId)) {
                     await handleIceCandidate(data);
                 }
                 break;
@@ -500,9 +466,10 @@ function connectWebSocket() {
                 break;
             
             case 'screen_share_started':
-                if (data.user_id !== currentUserId) {
+                if (String(data.user_id) !== String(currentUserId)) {
                     screenSharingUserId = data.user_id;
                     updateVideoLayout();
+                    showNotification(`${data.username} started sharing their screen`, 'info');
                 }
                 break;
             
@@ -510,6 +477,7 @@ function connectWebSocket() {
                 if (data.user_id === screenSharingUserId) {
                     screenSharingUserId = null;
                     updateVideoLayout();
+                    showNotification(`${data.username} stopped sharing their screen`, 'info');
                 }
                 break;
             
@@ -743,6 +711,9 @@ function createPeerConnection(userId, username) {
             track.contentHint = 'motion'; // Optimize for motion/video
         } else if (track.kind === 'audio') {
             track.contentHint = 'speech'; // Optimize for speech
+            
+            // Set up audio activity detection for remote streams
+            setupAudioActivityDetection(remoteStream, userId);
         }
         
         // Use username from participants (should be there now) or passed parameter
@@ -782,131 +753,167 @@ function createPeerConnection(userId, username) {
     
     return pc;
 }
+
+// Audio activity detection
+function setupAudioActivityDetection(stream, userId) {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(stream);
+        
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+        source.connect(analyser);
+        
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        let speakingTimeout = null;
+        
+        function checkAudioLevel() {
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate average volume
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+            
+            const videoBox = document.getElementById(`video-${userId}`);
+            if (videoBox) {
+                if (average > 15) { // Threshold for speaking detection
+                    videoBox.classList.add('speaking');
+                    
+                    // Clear existing timeout
+                    if (speakingTimeout) {
+                        clearTimeout(speakingTimeout);
+                    }
+                    
+                    // Set timeout to remove speaking class
+                    speakingTimeout = setTimeout(() => {
+                        videoBox.classList.remove('speaking');
+                    }, 500);
+                }
+            }
+            
+            // Continue monitoring if connection is still active
+            if (peerConnections[userId] && peerConnections[userId].connectionState === 'connected') {
+                requestAnimationFrame(checkAudioLevel);
+            }
+        }
+        
+        checkAudioLevel();
+    } catch (error) {
+        console.warn('Audio activity detection not available:', error);
+    }
+}
 function addVideoElement(userId, username, stream, isLocal) {
     console.log(`=== addVideoElement called ===`);
     console.log(`userId: ${userId} (type: ${typeof userId}), username: ${username}, isLocal: ${isLocal}`);
     console.log(`localVideoUserId: ${localVideoUserId} (type: ${typeof localVideoUserId})`);
-    console.log(`userId === localVideoUserId: ${userId === localVideoUserId}`);
-    console.log(`userId == localVideoUserId: ${userId == localVideoUserId}`);
     console.log(`stream:`, stream);
     console.log(`stream.active:`, stream?.active);
-    console.log(`stream tracks:`, stream?.getTracks().map(t => `${t.kind}: ${t.enabled}, readyState: ${t.readyState}`));
     
-    // CRITICAL CHECK: If this userId is the local video, and it already exists, NEVER touch it
-    const videoExists = document.getElementById(`video-${userId}`);
-    console.log(`Video element exists: ${!!videoExists}`);
-    
-    if (userId == localVideoUserId && videoExists) {
-        console.log('🛑 BLOCKED: Attempt to update local video container. Local video is sacred!');
-        return;
-    }
-    
+    // If this userId is local, we still want to move it to grid/sidebar later, but we skip container creation if it exists.
     let videoContainer = document.getElementById(`video-${userId}`);
     
     if (!videoContainer) {
         console.log(`Creating new video container for ${username}`);
+        
+        // Create container with optimized structure
         videoContainer = document.createElement('div');
         videoContainer.id = `video-${userId}`;
         videoContainer.className = 'video-box';
         videoContainer.dataset.userId = userId;
         
+        // Create video element with optimized settings
         const video = document.createElement('video');
         video.id = `video-element-${userId}`;
-        video.srcObject = stream;
         video.autoplay = true;
         video.playsInline = true;
         video.muted = isLocal; // Mute local video to prevent echo
         
-        console.log(`Video element created with srcObject:`, video.srcObject);
-        
-        // Optimize video playback
+        // Optimize video playback for performance
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
+        video.preload = 'none'; // Don't preload to save bandwidth
         
         // For local video, mirror it
         if (isLocal) {
             video.style.transform = 'scaleX(-1)';
         }
         
-        // Force video to play
-        video.onloadedmetadata = () => {
-            console.log(`✓ Video metadata loaded for ${username}`);
-            console.log(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
-            video.play().then(() => {
-                console.log(`✓ Video playing for ${username}`);
-            }).catch(err => {
-                console.error(`✗ Error playing video for ${username}:`, err);
-                // Try again after a short delay
-                setTimeout(() => {
-                    video.play().catch(e => console.error('Retry failed:', e));
-                }, 500);
-            });
-        };
-        
-        // Handle play errors
-        video.onerror = (e) => {
-            console.error(`✗ Video error for ${username}:`, e);
-        };
-        
-        // Monitor video state
-        video.onplay = () => console.log(`▶ Video started playing: ${username}`);
-        video.onpause = () => console.log(`⏸ Video paused: ${username}`);
-        video.onstalled = () => console.log(`⚠ Video stalled: ${username}`);
-        video.onwaiting = () => console.log(`⏳ Video waiting: ${username}`);
-        
+        // Create name tag
         const nameTag = document.createElement('div');
         nameTag.className = 'video-nametag';
         nameTag.textContent = isLocal ? 'You' : username;
         
+        // Assemble container
         videoContainer.appendChild(video);
         videoContainer.appendChild(nameTag);
         
-        const gridContainer = document.getElementById('videoGridContainer');
-        console.log(`Appending to videoGridContainer:`, gridContainer);
-        gridContainer.appendChild(videoContainer);
+        // Add to sidebar by default
+        const sidebar = document.getElementById('sidebarVideoArea');
+        sidebar.appendChild(videoContainer);
         
-        // Ensure video plays after adding to DOM
-        setTimeout(() => {
-            if (video.paused) {
-                console.log(`Video was paused for ${username}, attempting to play...`);
-                video.play().catch(err => console.error('Delayed play failed:', err));
-            }
-        }, 100);
+        // Set up muted indicator for local video
+        if (isLocal) {
+            updateMutedIndicator(videoContainer, !isMicOn);
+        }
+        
+        // Set stream and handle loading
+        video.srcObject = stream;
+        
+        // Optimized event handlers
+        video.onloadedmetadata = () => {
+            console.log(`✓ Video metadata loaded for ${username}`);
+            video.play().then(() => {
+                console.log(`✓ Video playing for ${username}`);
+            }).catch(err => {
+                console.error(`✗ Error playing video for ${username}:`, err);
+                // Retry once after delay
+                setTimeout(() => {
+                    video.play().catch(e => console.error('Retry failed:', e));
+                }, 100);
+            });
+        };
+        
+        // Minimal error handling
+        video.onerror = (e) => {
+            console.error(`✗ Video error for ${username}:`, e);
+        };
         
     } else {
         console.log(`Video container already exists for ${username}`);
         
-        // CRITICAL: Never update the local video's srcObject
-        // Check if this is the local video container by userId
-        if (userId === localVideoUserId) {
-            console.log('⚠ This is the LOCAL video container - NEVER update its srcObject!');
-            console.log('Local video should always show localDisplayStream');
-            return;
-        }
-        
+        // Update stream if changed (except for local camera preview handled separately)
         const video = videoContainer.querySelector('video');
-        if (video) {
-            console.log(`Updating REMOTE video stream for ${username}`);
-            
+        if (video && video.srcObject !== stream) {
+            console.log(`Updating video stream for ${username}`);
             video.srcObject = stream;
-            // Force play after changing stream
-            video.play().then(() => {
-                console.log(`Updated video playing for ${username}`);
-            }).catch(err => {
+            
+            video.play().catch(err => {
                 console.error(`Error playing updated video for ${username}:`, err);
             });
         }
     }
     
-    // Use RAF for layout update
+    // Use RAF for layout update to prevent blocking
     requestAnimationFrame(() => {
-        updateVideoLayout();
+        debouncedUpdateLayout();
     });
     
     console.log(`=== addVideoElement completed ===`);
 }
 
-// Debounce function for performance
+function updateMutedIndicator(videoContainer, isMuted) {
+    if (isMuted) {
+        videoContainer.classList.add('muted');
+    } else {
+        videoContainer.classList.remove('muted');
+    }
+}
+
+// Optimized debounce function for performance
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -919,80 +926,216 @@ function debounce(func, wait) {
     };
 }
 
+// Optimized updateVideoLayout function
 function updateVideoLayout() {
     const container = document.getElementById('videoGridContainer');
-    if (!container) return;
+    const mainArea = document.getElementById('mainVideoArea');
+    const sidebar = document.getElementById('sidebarVideoArea');
     
-    const videoBoxes = Array.from(container.querySelectorAll('.video-box'));
+    if (!container || !mainArea || !sidebar) return;
+    
+    const videoBoxes = Array.from(document.querySelectorAll('.video-box'));
     const count = videoBoxes.length;
     
-    // Remove all layout classes
-    container.className = 'video-grid-container';
-    videoBoxes.forEach(box => {
-        box.classList.remove('screen-share-active');
-    });
-    
-    // Check if screen sharing is active
-    if (screenSharingUserId) {
-        const screenShareBox = document.getElementById(`video-${screenSharingUserId}`);
+    requestAnimationFrame(() => {
+        // Reset classes
+        container.className = 'video-grid-container';
+        videoBoxes.forEach(box => box.classList.remove('main-presents'));
+
+        // Logic: If there's a screen share, that person goes to mainArea.
+        // If not, and there's more than one person, we can pick the "active" person for mainArea.
+        // For now, let's treat screenShare as the trigger for Sidebar View as requested.
         
-        if (screenShareBox) {
-            // SCREEN SHARE MODE - Google Meet style
-            container.classList.add('screen-share-view');
+                // Convert screenSharingUserId to string for reliable comparison
+        const activeScreenShareId = screenSharingUserId ? String(screenSharingUserId) : null;
+        let highlightUserId = activeScreenShareId;
+        
+        // If no screen share but multiple people, maybe someone is speaking? 
+        // We have 'speaking' class managed by checkAudioLevel.
+        if (!highlightUserId && count > 1) {
+            const speaker = videoBoxes.find(box => box.classList.contains('speaking'));
+            if (speaker) {
+                highlightUserId = String(speaker.dataset.userId);
+            } else {
+                // Default to first remote user if exists
+                const firstRemote = videoBoxes.find(box => String(box.dataset.userId) !== String(currentUserId));
+                if (firstRemote) highlightUserId = String(firstRemote.dataset.userId);
+            }
+        }
+
+        if (highlightUserId) {
+            container.classList.add('sidebar-view');
             
-            // Create main area for screen share
-            let mainArea = container.querySelector('.screen-share-main');
-            if (!mainArea) {
-                mainArea = document.createElement('div');
-                mainArea.className = 'screen-share-main';
-                container.appendChild(mainArea);
+            // SPECIAL CASE: If I am the presenter, I want to see my screen in main and cam in sidebar
+            if (activeScreenShareId === String(currentUserId)) {
+                // Ensure the main box shows the SCREEN share
+                const localBox = document.getElementById(`video-${currentUserId}`);
+                if (localBox) {
+                    const video = localBox.querySelector('video');
+                    if (video) {
+                        if (video.srcObject !== screenStream && screenStream) {
+                            console.log("Forcing local screen preview in main area");
+                            video.srcObject = screenStream;
+                            video.style.transform = 'none';
+                            video.muted = true;
+                        }
+                        video.play().catch(e => console.warn('Local screen preview play error:', e));
+                    }
+                    if (localBox.parentElement !== mainArea) {
+                        mainArea.appendChild(localBox);
+                    }
+                    localBox.classList.add('main-presents');
+                }
+
+                // Ensure a separate CAMERA preview exists in the sidebar ONLY if camera is on
+                let camPreview = document.getElementById(`video-${currentUserId}-camera`);
+                if (isCameraOn) {
+                    if (!camPreview) {
+                        camPreview = document.createElement('div');
+                        camPreview.id = `video-${currentUserId}-camera`;
+                        camPreview.className = 'video-box local-cam-preview';
+                        camPreview.innerHTML = `
+                            <video autoplay playsinline muted style="transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover;"></video>
+                            <div class="video-nametag">You (Camera)</div>
+                        `;
+                        sidebar.appendChild(camPreview);
+                        const v = camPreview.querySelector('video');
+                        v.srcObject = localStream;
+                        v.play().catch(e => console.warn('Local cam preview play error:', e));
+                    } else if (camPreview.parentElement !== sidebar) {
+                        sidebar.appendChild(camPreview);
+                        camPreview.querySelector('video')?.play().catch(e => {});
+                    }
+                } else if (camPreview) {
+                    camPreview.remove();
+                }
+            } else {
+                // Presenter or speaker goes to main
+                const highlightBox = document.getElementById(`video-${highlightUserId}`);
+                if (highlightBox) {
+                    if (highlightBox.parentElement !== mainArea) {
+                        mainArea.appendChild(highlightBox);
+                    }
+                    highlightBox.classList.add('main-presents');
+                    
+                    const v = highlightBox.querySelector('video');
+                    if (v) v.play().catch(e => console.warn('Main video resumed playback:', e));
+                }
+                
+                // Cleanup local cam preview if it exists and I'm not presenting
+                const oldCam = document.getElementById(`video-${currentUserId}-camera`);
+                if (oldCam) oldCam.remove();
             }
             
-            // Create sidebar for other participants
-            let sidebar = container.querySelector('.screen-share-sidebar');
-            if (!sidebar) {
-                sidebar = document.createElement('div');
-                sidebar.className = 'screen-share-sidebar';
-                container.appendChild(sidebar);
-            }
-            
-            // Move screen share to main area
-            if (screenShareBox.parentElement !== mainArea) {
-                mainArea.appendChild(screenShareBox);
-                screenShareBox.classList.add('screen-share-active');
-            }
-            
-            // Move all other videos to sidebar
+            // Move others to sidebar explicitly
             videoBoxes.forEach(box => {
-                if (box.id !== `video-${screenSharingUserId}` && box.parentElement !== sidebar) {
+                const boxUserId = String(box.dataset.userId);
+                if (boxUserId !== String(highlightUserId) && !box.id.includes('-camera')) {
+                    if (box.parentElement !== sidebar) {
+                        sidebar.appendChild(box);
+                    }
+                    const v = box.querySelector('video');
+                    if (v) v.play().catch(e => {});
+                }
+            });
+            
+            // Add indicator if it's screen share
+            if (activeScreenShareId) {
+                addScreenShareIndicator(mainArea, activeScreenShareId);
+            } else {
+                const existingInd = mainArea.querySelector('.screen-share-indicator');
+                if (existingInd) existingInd.remove();
+            }
+        } else {
+            // Grid View
+            container.classList.add('grid-view', `count-${Math.min(count, 25)}`);
+            
+            // If I was presenting, reset my local video container to show camera again
+            const localBox = document.getElementById(`video-${currentUserId}`);
+            if (localBox && !activeScreenShareId) {
+                const video = localBox.querySelector('video');
+                if (video && video.srcObject !== localStream) {
+                    video.srcObject = localStream;
+                    video.style.transform = 'scaleX(-1)';
+                }
+                if (video) video.play().catch(e => {});
+                
+                const oldCam = document.getElementById(`video-${currentUserId}-camera`);
+                if (oldCam) oldCam.remove();
+            }
+
+            videoBoxes.forEach(box => {
+                if (box.parentElement !== sidebar) {
                     sidebar.appendChild(box);
                 }
-            });
-        }
-    } else {
-        // NORMAL GRID MODE - No screen sharing
-        container.classList.add('grid-view', `count-${Math.min(count, 12)}`);
-        
-        // Remove screen share containers if they exist
-        const mainArea = container.querySelector('.screen-share-main');
-        const sidebar = container.querySelector('.screen-share-sidebar');
-        
-        if (mainArea || sidebar) {
-            // Move all videos back to main container
-            videoBoxes.forEach(box => {
-                if (box.parentElement !== container) {
-                    container.appendChild(box);
-                }
+                const v = box.querySelector('video');
+                if (v) v.play().catch(e => {});
             });
             
-            // Remove screen share containers
-            if (mainArea) mainArea.remove();
-            if (sidebar) sidebar.remove();
+            mainArea.innerHTML = '';
         }
+        
+        updateParticipantCount(count);
+    });
+}
+
+function addScreenShareIndicator(mainArea, userId) {
+    // Remove existing indicator
+    const existingIndicator = mainArea.querySelector('.screen-share-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    // Add new indicator
+    const indicator = document.createElement('div');
+    indicator.className = 'screen-share-indicator';
+    indicator.innerHTML = `
+        <div class="screen-share-label">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span>${String(userId) === String(currentUserId) ? 'You are' : participants[userId] || 'Someone is'} presenting</span>
+        </div>
+    `;
+    
+    // Style the indicator
+    indicator.style.cssText = `
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(99, 102, 241, 0.9);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 10;
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    `;
+    
+    indicator.querySelector('svg').style.cssText = `
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+    `;
+    
+    mainArea.appendChild(indicator);
+}
+
+function updateParticipantCount(count) {
+    const countElement = document.getElementById('participantCount');
+    if (countElement) {
+        countElement.textContent = count;
     }
 }
 
-// Debounced version for frequent calls
+// Debounced version for frequent calls - reduces lag significantly
 const debouncedUpdateLayout = debounce(updateVideoLayout, 50);
 
 function addParticipant(userId, username) {
@@ -1030,19 +1173,18 @@ function updateParticipantsList() {
 function toggleMic() {
     isMicOn = !isMicOn;
     
-    // Update both localStream and localDisplayStream
     localStream.getAudioTracks().forEach(track => {
         track.enabled = isMicOn;
     });
     
-    if (localDisplayStream) {
-        localDisplayStream.getAudioTracks().forEach(track => {
-            track.enabled = isMicOn;
-        });
-    }
-    
     const btn = document.getElementById('micBtn');
     btn.classList.toggle('off', !isMicOn);
+    
+    // Update muted indicator on local video
+    const localVideoContainer = document.getElementById(`video-${currentUserId}`);
+    if (localVideoContainer) {
+        updateMutedIndicator(localVideoContainer, !isMicOn);
+    }
     
     // Update button icon
     const micOnIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>';
@@ -1059,16 +1201,9 @@ function toggleMic() {
 function toggleCamera() {
     isCameraOn = !isCameraOn;
     
-    // Update both localStream and localDisplayStream
     localStream.getVideoTracks().forEach(track => {
         track.enabled = isCameraOn;
     });
-    
-    if (localDisplayStream) {
-        localDisplayStream.getVideoTracks().forEach(track => {
-            track.enabled = isCameraOn;
-        });
-    }
     
     const btn = document.getElementById('camBtn');
     btn.classList.toggle('off', !isCameraOn);
@@ -1087,7 +1222,7 @@ function toggleCamera() {
 
 async function toggleScreenShare() {
     // Check if someone else is already sharing
-    if (!isScreenSharing && screenSharingUserId && screenSharingUserId !== currentUserId) {
+    if (!isScreenSharing && screenSharingUserId && String(screenSharingUserId) !== String(currentUserId)) {
         alert('Someone else is already sharing their screen. Only one person can share at a time.');
         return;
     }
@@ -1137,11 +1272,14 @@ async function toggleScreenShare() {
                 }
             });
             
-            // DON'T update local video - keep it showing the camera
-            // Local video should always show localDisplayStream, not screenStream
+            // The local video element is updated in updateVideoLayout() to show the screen share
+            // when the user is sharing their screen.
             
             isScreenSharing = true;
             screenSharingUserId = currentUserId;
+            
+            // Trigger layout update immediately for better confirmation
+            updateVideoLayout();
             
             const screenBtn = document.getElementById('screenBtn');
             if (screenBtn) {
@@ -1210,13 +1348,15 @@ function stopScreenShare() {
         }
     });
     
-    // DON'T update local video - it should always show localDisplayStream (camera)
-    // The local video element should never change its srcObject
+    // The local video element is updated back to camera in updateVideoLayout()
     
     isScreenSharing = false;
     if (screenSharingUserId === currentUserId) {
         screenSharingUserId = null;
     }
+    
+    // Trigger layout update
+    updateVideoLayout();
     
     const screenBtn = document.getElementById('screenBtn');
     if (screenBtn) {

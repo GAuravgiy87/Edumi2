@@ -14,5 +14,10 @@
   "emmet.includeLanguages": {
     "django-html": "html"
 },
-"html.autoClosingTags": false
+  "html.autoClosingTags": false,
+  "python.defaultInterpreterPath": "C:\\Users\\hsraa\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+  "python.analysis.extraPaths": [
+    "C:\\Users\\hsraa\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages"
+  ],
+  "python.analysis.diagnosticMode": "workspace"
 }

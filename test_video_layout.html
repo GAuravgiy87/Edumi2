@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Layout Test</title>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a1a;
+            font-family: 'Inter', sans-serif;
+            color: white;
+        }
+        
+        .test-container {
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 40px;
+        }
+        
+        .test-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #6366f1;
+        }
+        
+        .test-grid {
+            display: grid;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .test-video {
+            background: #333;
+            border-radius: 8px;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+        
+        .test-video.speaking {
+            border-color: #10b981;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .test-video.muted::after {
+            content: '🔇';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 14px;
+        }
+        
+        .screen-share-demo {
+            display: flex;
+            gap: 10px;
+            height: 300px;
+        }
+        
+        .main-screen {
+            flex: 1;
+            background: #000;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #6366f1;
+            font-size: 18px;
+            color: #6366f1;
+        }
+        
+        .sidebar-videos {
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+        
+        .sidebar-video {
+            background: #333;
+            border-radius: 6px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn:hover {
+            background: #4f46e5;
+        }
+        
+        /* Grid layouts */
+        .grid-1 { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+        .grid-5, .grid-6 { grid-template-columns: repeat(3, 1fr); }
+        .grid-7, .grid-8, .grid-9 { grid-template-columns: repeat(3, 1fr); }
+        .grid-10, .grid-11, .grid-12 { grid-template-columns: repeat(4, 1fr); }
+        .grid-13, .grid-14, .grid-15, .grid-16 { grid-template-columns: repeat(4, 1fr); }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Enhanced Video Meeting Layout Test</h1>
+        
+        <div class="test-section">
+            <div class="test-title">Dynamic Grid Layouts (Google Meet Style)</div>
+            
+            <div class="test-title" style="font-size: 14px; color: #999;">1 Participant</div>
+            <div class="test-grid grid-1">
+                <div class="test-video">You</div>
+            </div>
+            
+            <div class="test-title" style="font-size: 14px; color: #999;">2 Participants</div>
+            <div class="test-grid grid-2">
+                <div class="test-video">You</div>
+                <div class="test-video speaking">Alice (Speaking)</div>
+            </div>
+            
+            <div class="test-title" style="font-size: 14px; color: #999;">4 Participants</div>
+            <div class="test-grid grid-4">
+                <div class="test-video muted">You (Muted)</div>
+                <div class="test-video">Alice</div>
+                <div class="test-video speaking">Bob (Speaking)</div>
+                <div class="test-video">Charlie</div>
+            </div>
+            
+            <div class="test-title" style="font-size: 14px; color: #999;">9 Participants</div>
+            <div class="test-grid grid-9">
+                <div class="test-video muted">You (Muted)</div>
+                <div class="test-video">Alice</div>
+                <div class="test-video speaking">Bob (Speaking)</div>
+                <div class="test-video">Charlie</div>
+                <div class="test-video">Diana</div>
+                <div class="test-video">Eve</div>
+                <div class="test-video">Frank</div>
+                <div class="test-video">Grace</div>
+                <div class="test-video">Henry</div>
+            </div>
+            
+            <div class="test-title" style="font-size: 14px; color: #999;">16 Participants</div>
+            <div class="test-grid grid-16">
+                <div class="test-video muted">You</div>
+                <div class="test-video">Alice</div>
+                <div class="test-video speaking">Bob</div>
+                <div class="test-video">Charlie</div>
+                <div class="test-video">Diana</div>
+                <div class="test-video">Eve</div>
+                <div class="test-video">Frank</div>
+                <div class="test-video">Grace</div>
+                <div class="test-video">Henry</div>
+                <div class="test-video">Ivy</div>
+                <div class="test-video">Jack</div>
+                <div class="test-video">Kate</div>
+                <div class="test-video">Liam</div>
+                <div class="test-video">Mia</div>
+                <div class="test-video">Noah</div>
+                <div class="test-video">Olivia</div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">Screen Share Layout (Large Screen + Sidebar)</div>
+            <div class="screen-share-demo">
+                <div class="main-screen">
+                    📺 Alice's Screen Share<br>
+                    <small style="color: #999;">Large presentation area</small>
+                </div>
+                <div class="sidebar-videos">
+                    <div class="sidebar-video">You</div>
+                    <div class="sidebar-video">Bob</div>
+                    <div class="sidebar-video">Charlie</div>
+                    <div class="sidebar-video">Diana</div>
+                    <div class="sidebar-video">Eve</div>
+                    <div class="sidebar-video">Frank</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">Key Features Demonstrated</div>
+            <ul style="color: #ccc; line-height: 1.6;">
+                <li><strong>Dynamic Sizing:</strong> Videos automatically get smaller as more people join</li>
+                <li><strong>Screen Share Mode:</strong> Large screen with small participant videos on the side</li>
+                <li><strong>Speaking Indicators:</strong> Green border and glow when someone is speaking</li>
+                <li><strong>Muted Indicators:</strong> Red microphone icon when someone is muted</li>
+                <li><strong>Responsive Design:</strong> Works on desktop, tablet, and mobile</li>
+                <li><strong>Smooth Transitions:</strong> Animated layout changes</li>
+                <li><strong>Optimized Performance:</strong> Efficient rendering for many participants</li>
+            </ul>
+        </div>
+        
+        <div class="controls">
+            <button class="btn" onclick="simulateSpeaking()">Simulate Speaking</button>
+            <button class="btn" onclick="simulateMute()">Toggle Mute</button>
+            <button class="btn" onclick="simulateScreenShare()">Toggle Screen Share</button>
+        </div>
+    </div>
+    
+    <script>
+        let isSpeaking = false;
+        let isMuted = false;
+        let isScreenSharing = false;
+        
+        function simulateSpeaking() {
+            const speakingElements = document.querySelectorAll('.speaking');
+            speakingElements.forEach(el => el.classList.remove('speaking'));
+            
+            if (!isSpeaking) {
+                const randomVideo = document.querySelector('.test-video:nth-child(' + (Math.floor(Math.random() * 4) + 1) + ')');
+                if (randomVideo) {
+                    randomVideo.classList.add('speaking');
+                }
+            }
+            isSpeaking = !isSpeaking;
+        }
+        
+        function simulateMute() {
+            const youVideo = document.querySelector('.test-video');
+            if (youVideo) {
+                youVideo.classList.toggle('muted');
+            }
+            isMuted = !isMuted;
+        }
+        
+        function simulateScreenShare() {
+            const screenShareDemo = document.querySelector('.screen-share-demo');
+            const testGrids = document.querySelectorAll('.test-grid');
+            
+            if (!isScreenSharing) {
+                screenShareDemo.style.display = 'flex';
+                testGrids.forEach(grid => grid.style.display = 'none');
+            } else {
+                screenShareDemo.style.display = 'none';
+                testGrids.forEach(grid => grid.style.display = 'grid');
+            }
+            isScreenSharing = !isScreenSharing;
+        }
+        
+        // Auto-demo
+        setInterval(() => {
+            if (Math.random() > 0.7) {
+                simulateSpeaking();
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
