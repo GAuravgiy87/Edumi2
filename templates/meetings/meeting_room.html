@@ -977,25 +977,35 @@ function updateVideoLayout() {
         if (highlightUserId) {
             container.classList.add('sidebar-view');
             
-            // SPECIAL CASE: If I am the presenter, I want to see my screen in main and cam in sidebar
+            // SPECIAL CASE: If I am the presenter, show DASHBOARD in main and cam in sidebar
             if (activeScreenShareId === String(currentUserId)) {
-                // Ensure the main box shows the SCREEN share
-                const localBox = document.getElementById(`video-${currentUserId}`);
-                if (localBox) {
-                    const video = localBox.querySelector('video');
-                    if (video) {
-                        if (video.srcObject !== screenStream && screenStream) {
-                            console.log("Forcing local screen preview in main area");
-                            video.srcObject = screenStream;
-                            video.style.transform = 'none';
-                            video.muted = true;
-                        }
-                        video.play().catch(e => console.warn('Local screen preview play error:', e));
-                    }
-                    if (localBox.parentElement !== mainArea) {
-                        mainArea.appendChild(localBox);
-                    }
-                    localBox.classList.add('main-presents');
+                // Clear main area and add dashboard instead of mirrored video
+                mainArea.innerHTML = `
+                    <div class="presenter-dashboard">
+                        <div class="presenter-dashboard-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                        </div>
+                        <h2>You're presenting to everyone</h2>
+                        <p>To see what you're sharing, you can check the preview below or look at your original window.</p>
+                        
+                        <div class="presenter-preview">
+                            <video id="pres-preview-video" autoplay playsinline muted></video>
+                        </div>
+
+                        <button class="stop-present-btn" onclick="stopScreenShare()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                            Stop Presenting
+                        </button>
+                    </div>
+                `;
+                
+                const previewVideo = document.getElementById('pres-preview-video');
+                if (previewVideo && screenStream) {
+                    previewVideo.srcObject = screenStream;
                 }
 
                 // Ensure a separate CAMERA preview exists in the sidebar ONLY if camera is on
@@ -1646,16 +1656,16 @@ function showRecordingNotification(message) {
 }
 
 function toggleSidebar() {
-    const sidebar = document.getElementById('meetSidebar');
-    const isVisible = sidebar.style.display !== 'none';
-    sidebar.style.display = isVisible ? 'none' : 'flex';
+    const sidebarPanel = document.getElementById('meetSidebar');
+    const isVisible = sidebarPanel.style.display !== 'none';
+    sidebarPanel.style.display = isVisible ? 'none' : 'flex';
     
-    // Adjust main container when sidebar opens/closes
-    const mainContainer = document.getElementById('videoGridContainer');
+    // Use modern class-based layout shifting for better performance
+    const mainWrapper = document.querySelector('.meet-main');
     if (!isVisible) {
-        mainContainer.style.marginRight = '360px';
+        mainWrapper.classList.add('sidebar-open');
     } else {
-        mainContainer.style.marginRight = '0';
+        mainWrapper.classList.remove('sidebar-open');
     }
     
     if (!isVisible && document.getElementById('chatPanel').classList.contains('active')) {
@@ -1671,8 +1681,7 @@ function openSidebar(tab) {
     // If sidebar is closed, open it
     if (!isVisible) {
         sidebar.style.display = 'flex';
-        const mainContainer = document.getElementById('videoGridContainer');
-        mainContainer.style.marginRight = '360px';
+        document.querySelector('.meet-main').classList.add('sidebar-open');
     }
     
     // Switch to the requested tab
