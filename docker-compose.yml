@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${DB_NAME:-edumi}
+      - POSTGRES_USER=${DB_USER:-edumi_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-edumi_pass}
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    command: daphne -b 0.0.0.0 -p 8000 school_project.asgi:application
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=1
+      - DB_NAME=${DB_NAME:-edumi}
+      - DB_USER=${DB_USER:-edumi_user}
+      - DB_PASSWORD=${DB_PASSWORD:-edumi_pass}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./staticfiles:/app/static
+      - ./media:/app/media
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
