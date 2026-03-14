@@ -1,11 +1,11 @@
 # Python cache
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 
 # SQLite database
 db.sqlite3
+db.sqlite3-journal
 
 # Media files
 media/
@@ -16,6 +16,8 @@ staticfiles/
 # Virtual environment
 venv/
 env/
+.venv/
+ENV/
 
 # VSCode
 .vscode/
@@ -25,3 +27,7 @@ env/
 
 # Logs
 *.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
