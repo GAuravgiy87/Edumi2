@@ -152,6 +152,19 @@
                         </a>
                     </div>
 
+                    <div class="sidebar-nav-section">
+                        <div class="sidebar-nav-title">Attendance</div>
+                        <a href="{% url 'teacher_classrooms' %}" class="sidebar-nav-item {% if 'attendance' in request.path %}active{% endif %}">
+                            <span class="sidebar-nav-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <path d="M9 11l3 3L22 4"></path>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                </svg>
+                            </span>
+                            <span class="sidebar-nav-text">Attendance</span>
+                        </a>
+                    </div>
+
                 {% elif user.userprofile.user_type == 'student' %}
                     <!-- Student Navigation -->
                     <div class="sidebar-nav-section">
@@ -200,6 +213,31 @@
                             <span class="sidebar-nav-text">Join Classroom</span>
                         </a>
                     </div>
+
+                    <div class="sidebar-nav-section">
+                        <div class="sidebar-nav-title">Attendance</div>
+                        <a href="{% url 'my_attendance' %}" class="sidebar-nav-item {% if 'attendance' in request.path %}active{% endif %}">
+                            <span class="sidebar-nav-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <path d="M9 11l3 3L22 4"></path>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                </svg>
+                            </span>
+                            <span class="sidebar-nav-text">My Attendance</span>
+                        </a>
+                        <a href="{% url 'face_setup' %}" class="sidebar-nav-item {% if 'face' in request.path %}active{% endif %}">
+                            <span class="sidebar-nav-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                                </svg>
+                            </span>
+                            <span class="sidebar-nav-text">Face Setup</span>
+                            {% if not request.user.face_profile %}<span style="background:#ef4444;color:#fff;font-size:.65rem;padding:2px 6px;border-radius:8px;margin-left:4px;">!</span>{% endif %}
+                        </a>
+                    </div>
                 {% endif %}
 
                 <!-- Common Navigation -->
@@ -241,7 +279,7 @@
 
             <!-- Sidebar Footer -->
             <div class="sidebar-footer">
-                <a href="{% url 'logout' %}" class="sidebar-footer-item logout">
+                <a href="#" class="sidebar-footer-item logout" onclick="event.preventDefault();document.getElementById('logout-form-sidebar').submit();">
                     <span class="sidebar-nav-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -251,6 +289,7 @@
                     </span>
                     <span class="sidebar-nav-text">Logout</span>
                 </a>
+                <form id="logout-form-sidebar" method="post" action="{% url 'logout' %}" style="display:none;">{% csrf_token %}</form>
             </div>
         </aside>
 
@@ -329,6 +368,179 @@
             <div class="content-area">
                 {% block content %}{% endblock %}
             </div>
+
+            <!-- Welcome popup for new users -->
+            {% if request.session.show_welcome %}
+            <style>
+                #welcome-overlay {
+                    position: fixed; inset: 0; z-index: 9999;
+                    display: flex; align-items: center; justify-content: center;
+                    background: rgba(10, 10, 30, 0.7);
+                    backdrop-filter: blur(6px);
+                    animation: overlayIn .4s ease forwards;
+                }
+                @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+                #welcome-card {
+                    position: relative;
+                    background: var(--bg-card, #fff);
+                    border-radius: 28px;
+                    max-width: 460px;
+                    width: 92%;
+                    overflow: hidden;
+                    box-shadow: 0 32px 80px rgba(102,126,234,0.35), 0 8px 24px rgba(0,0,0,0.15);
+                    animation: cardPop .5s cubic-bezier(.34,1.56,.64,1) forwards;
+                }
+                @keyframes cardPop {
+                    from { transform: scale(0.6) translateY(40px); opacity: 0; }
+                    to   { transform: scale(1) translateY(0); opacity: 1; }
+                }
+                .wc-header {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 36px 40px 28px;
+                    text-align: center;
+                    position: relative;
+                    overflow: hidden;
+                }
+                .wc-header::before {
+                    content: '';
+                    position: absolute; inset: 0;
+                    background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 60%),
+                                radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06) 0%, transparent 50%);
+                }
+                .wc-icon {
+                    display: flex; align-items: center; justify-content: center;
+                    width: 72px; height: 72px;
+                    background: rgba(255,255,255,0.18);
+                    border-radius: 50%;
+                    margin: 0 auto 16px;
+                    position: relative;
+                    animation: iconFloat 3s ease-in-out infinite;
+                    box-shadow: 0 0 0 12px rgba(255,255,255,0.07);
+                }
+                .wc-icon svg { width: 38px; height: 38px; }
+                @keyframes iconFloat {
+                    0%, 100% { transform: translateY(0); }
+                    50%       { transform: translateY(-7px); }
+                }
+                .wc-header h2 {
+                    margin: 0; font-size: 1.85rem; font-weight: 800;
+                    color: #fff; font-family: Inter, sans-serif;
+                    letter-spacing: -0.5px; position: relative;
+                }
+                .wc-header p {
+                    margin: 6px 0 0; color: rgba(255,255,255,0.8);
+                    font-size: 0.95rem; position: relative;
+                }
+                .wc-close {
+                    position: absolute; top: 14px; right: 16px;
+                    background: rgba(255,255,255,0.18); border: none; color: #fff;
+                    width: 30px; height: 30px; border-radius: 50%;
+                    cursor: pointer; display: flex; align-items: center; justify-content: center;
+                    transition: background .2s; z-index: 1;
+                }
+                .wc-close:hover { background: rgba(255,255,255,0.32); }
+                .wc-close svg { width: 14px; height: 14px; }
+                .wc-body { padding: 28px 36px 32px; text-align: center; }
+                .wc-features { display: flex; gap: 10px; margin-bottom: 26px; }
+                .wc-feature {
+                    flex: 1; background: rgba(102,126,234,0.07);
+                    border: 1px solid rgba(102,126,234,0.15);
+                    border-radius: 14px; padding: 16px 8px;
+                    font-size: 0.78rem; color: var(--text-muted, #555);
+                    font-family: Inter, sans-serif; transition: transform .2s;
+                }
+                .wc-feature:hover { transform: translateY(-2px); }
+                .wc-feature-icon {
+                    width: 36px; height: 36px;
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    border-radius: 10px; display: flex;
+                    align-items: center; justify-content: center;
+                    margin: 0 auto 8px;
+                }
+                .wc-feature-icon svg { width: 18px; height: 18px; }
+                .wc-feature strong { display: block; color: var(--text-main, #1a1a2e); font-size: 0.82rem; margin-bottom: 2px; }
+                .wc-btn {
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    color: #fff; border: none; padding: 14px 44px;
+                    border-radius: 50px; font-size: 1rem; font-weight: 700;
+                    cursor: pointer; font-family: Inter, sans-serif;
+                    box-shadow: 0 8px 24px rgba(102,126,234,0.45);
+                    transition: transform .15s, box-shadow .15s;
+                    display: inline-flex; align-items: center; gap: 8px;
+                }
+                .wc-btn svg { width: 18px; height: 18px; }
+                .wc-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(102,126,234,0.55); }
+                .wc-btn:active { transform: translateY(0); }
+                #welcome-card.closing { animation: cardOut .3s ease forwards; }
+                #welcome-overlay.closing { animation: overlayOut .35s ease forwards; }
+                @keyframes cardOut { to { transform: scale(0.85) translateY(20px); opacity: 0; } }
+                @keyframes overlayOut { to { opacity: 0; } }
+            </style>
+            <div id="welcome-overlay">
+                <div id="welcome-card">
+                    <div class="wc-header">
+                        <button class="wc-close" onclick="closeWelcome()" aria-label="Close">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                        <div class="wc-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                                <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                            </svg>
+                        </div>
+                        <h2>Welcome to Edumi!</h2>
+                        <p>Your account is ready. Let's get started.</p>
+                    </div>
+                    <div class="wc-body">
+                        <div class="wc-features">
+                            <div class="wc-feature">
+                                <div class="wc-feature-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                        <polyline points="9 22 9 12 15 12 15 22"/>
+                                    </svg>
+                                </div>
+                                <strong>Classrooms</strong>
+                                Join or create
+                            </div>
+                            <div class="wc-feature">
+                                <div class="wc-feature-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="23 7 16 12 23 17 23 7"/>
+                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                                    </svg>
+                                </div>
+                                <strong>Meetings</strong>
+                                Live sessions
+                            </div>
+                            <div class="wc-feature">
+                                <div class="wc-feature-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                </div>
+                                <strong>Messaging</strong>
+                                Stay connected
+                            </div>
+                        </div>
+                        <button class="wc-btn" onclick="closeWelcome()">
+                            Let's go
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <script>
+                function closeWelcome() {
+                    const overlay = document.getElementById('welcome-overlay');
+                    const card = document.getElementById('welcome-card');
+                    card.classList.add('closing');
+                    overlay.classList.add('closing');
+                    setTimeout(() => overlay.remove(), 350);
+                    fetch('/accounts/dismiss-welcome/', {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}});
+                }
+            </script>
+            {% endif %}
         </main>
     </div>
 

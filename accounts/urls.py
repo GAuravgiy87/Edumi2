@@ -6,7 +6,9 @@ from . import notification_views
 
 urlpatterns = [
     path('', views.login_view, name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('accounts/dismiss-welcome/', views.dismiss_welcome, name='dismiss_welcome'),
+    path('accounts/save-emoji-avatar/', views.save_emoji_avatar, name='save_emoji_avatar'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
     path('register/', views.register, name='register'),
     path('home/', views.home, name='home'),
     path('teacher-dashboard/', views.teacher_dashboard, name='teacher_dashboard'),

@@ -2,13 +2,19 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.auth import views as auth_views
+
+# Override admin logout to redirect to login page
+admin.site.logout_template = None
 
 urlpatterns = [
+    path('admin/logout/', auth_views.LogoutView.as_view(next_page='/'), name='admin-logout'),
     path('admin/', admin.site.urls),
     path('', include('accounts.urls')),
     path('cameras/', include('cameras.urls')),
     path('mobile-cameras/', include('mobile_cameras.urls')),
     path('meetings/', include('meetings.urls')),
+    path('attendance/', include('attendance.urls')),
     path("__reload__/", include("django_browser_reload.urls")),
 ]
 

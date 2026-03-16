@@ -129,7 +129,8 @@
     data-meeting-code="{{ meeting.meeting_code }}"
     data-user-id="{{ user.id }}"
     data-username="{{ user.username }}"
-    data-is-host="{% if is_host %}true{% else %}false{% endif %}">
+    data-is-host="{% if is_host %}true{% else %}false{% endif %}"
+    data-avatar="{{ user.userprofile.get_profile_picture_url }}">
 </script>
 
 <script>
@@ -140,6 +141,7 @@ const meetingCode = scriptTag.dataset.meetingCode;
 const currentUserId = scriptTag.dataset.userId;
 const currentUsername = scriptTag.dataset.username;
 const isHost = scriptTag.dataset.isHost === 'true';
+const userAvatarUrl = scriptTag.dataset.avatar || '';
 
 // WebSocket connection
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -386,16 +388,56 @@ function createPlaceholderStream() {
     canvas.width = 640;
     canvas.height = 480;
     const ctx = canvas.getContext('2d');
-    
-    // Draw a placeholder
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '24px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Camera Off', canvas.width / 2, canvas.height / 2);
-    ctx.font = '14px Inter, sans-serif';
-    ctx.fillText('Grant camera permission to enable video', canvas.width / 2, canvas.height / 2 + 30);
+
+    function drawPlaceholder(img) {
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+        if (img) {
+            // Draw circular avatar
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy - 20, 110, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(img, cx - 110, cy - 130, 220, 220);
+            ctx.restore();
+            // Subtle ring
+            ctx.beginPath();
+            ctx.arc(cx, cy - 20, 112, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(102,126,234,0.6)';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        } else {
+            // Fallback initials circle
+            ctx.beginPath();
+            ctx.arc(cx, cy - 20, 80, 0, Math.PI * 2);
+            ctx.fillStyle = '#667eea';
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 56px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(currentUsername.charAt(0).toUpperCase(), cx, cy - 20);
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = '18px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(currentUsername, cx, cy + 120);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.font = '14px Inter, sans-serif';
+        ctx.fillText('Camera off', cx, cy + 145);
+    }
+
+    if (userAvatarUrl && !userAvatarUrl.includes('ui-avatars.com')) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => drawPlaceholder(img);
+        img.onerror = () => drawPlaceholder(null);
+        img.src = userAvatarUrl;
+    } else {
+        drawPlaceholder(null);
+    }
     
     // Create stream from canvas
     localStream = canvas.captureStream(1);
@@ -1849,5 +1891,174 @@ function showNotification(message, type = 'info') {
 // Initialize on load
 window.addEventListener('load', init);
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  FACE ATTENDANCE MODULE (students only)                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<style>
+#face-att-badge {
+    position: fixed; bottom: 90px; right: 20px; z-index: 1000;
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-radius: 24px;
+    font-size: .8rem; font-weight: 600; color: #fff;
+    backdrop-filter: blur(12px); box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    transition: all .3s ease; cursor: default; max-width: 260px;
+    background: rgba(30,30,60,.85); border: 1px solid rgba(255,255,255,.1);
+}
+#face-att-badge.state-active    { border-color: rgba(102,126,234,.5); }
+#face-att-badge.state-progress  { border-color: rgba(245,158,11,.5); background: rgba(40,30,10,.85); }
+#face-att-badge.state-success   { border-color: rgba(16,185,129,.5); background: rgba(5,40,25,.85); }
+#face-att-badge.state-warning   { border-color: rgba(239,68,68,.4); background: rgba(40,10,10,.85); }
+#face-att-badge.state-noprofile { border-color: rgba(239,68,68,.4); background: rgba(40,10,10,.85); }
+#face-att-badge .fa-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: #667eea; animation: fa-pulse 1.5s ease-in-out infinite;
+}
+#face-att-badge.state-success .fa-dot  { background: #10b981; animation: none; }
+#face-att-badge.state-warning .fa-dot  { background: #ef4444; }
+#face-att-badge.state-noprofile .fa-dot { background: #ef4444; animation: none; }
+#face-att-badge.state-progress .fa-dot { background: #f59e0b; }
+@keyframes fa-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+#face-att-progress {
+    height: 3px; border-radius: 2px;
+    background: linear-gradient(90deg, #667eea, #10b981);
+    transition: width .4s ease; display: block; margin-top: 4px; min-width: 0;
+}
+</style>
+
+{% if not is_host %}
+<!-- Face Attendance Badge (students only) -->
+<div id="face-att-badge" class="state-active">
+    <div class="fa-dot"></div>
+    <div>
+        <div id="face-att-text">🔍 Initializing face recognition…</div>
+        <div id="face-att-prog-wrap" style="display:none; margin-top:4px;">
+            <div style="background:rgba(255,255,255,.1); border-radius:2px; height:3px; overflow:hidden;">
+                <div id="face-att-progress" style="width:0%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ── Config ─────────────────────────────────────────────────
+    const MEETING_CODE = meetingCode;  // already defined above
+    let ws           = null;
+    let captureTimer = null;
+    let captureInterval = 15000;  // default; updated from server
+    let verifiedSec  = 0;
+    let requiredSec  = 30;        // default
+    let marked       = false;
+
+    const badge     = document.getElementById('face-att-badge');
+    const badgeText = document.getElementById('face-att-text');
+    const prog      = document.getElementById('face-att-progress');
+    const progWrap  = document.getElementById('face-att-prog-wrap');
+
+    // ── Connect ────────────────────────────────────────────────
+    function connect() {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${window.location.host}/ws/attendance/${MEETING_CODE}/`);
+
+        ws.onopen    = () => console.log('[FaceAtt] WS connected');
+        ws.onmessage = e => handleMessage(JSON.parse(e.data));
+        ws.onclose   = () => { stopCapture(); setStatus('active', '🔄 Reconnecting…'); setTimeout(connect, 5000); };
+        ws.onerror   = err => console.warn('[FaceAtt] WS error', err);
+    }
+
+    // ── Message handler ────────────────────────────────────────
+    function handleMessage(data) {
+        switch (data.type) {
+            case 'connected':
+                captureInterval = (data.interval || 15) * 1000;
+                if (data.has_profile) {
+                    setStatus('active', '🔍 Face recognition active');
+                    startCapture();
+                } else {
+                    setStatus('noprofile', '⚠ No face profile — <a href="/attendance/face/setup/" style="color:#f87171;">Register now</a>');
+                }
+                break;
+
+            case 'no_profile':
+                setStatus('noprofile', '⚠ No face profile — <a href="/attendance/face/setup/" style="color:#f87171;">Register now</a>');
+                stopCapture();
+                break;
+
+            case 'verification_progress':
+                verifiedSec = data.verified_seconds  || 0;
+                requiredSec = data.required_seconds  || 30;
+                const pct = Math.min(100, Math.round(verifiedSec / requiredSec * 100));
+                setStatus('progress', `🔍 Verifying… ${pct}%`);
+                progWrap.style.display = 'block';
+                prog.style.width = pct + '%';
+                break;
+
+            case 'attendance_marked':
+                setStatus('success', '✅ Attendance recorded!');
+                progWrap.style.display = 'none';
+                stopCapture();
+                // Auto-hide after 8 seconds
+                setTimeout(() => { if (badge) badge.style.opacity = '0'; }, 8000);
+                break;
+
+            case 'verification_failed':
+                setStatus('warning', `⚠ ${data.message || 'Face not recognized'}`);
+                // Revert to active after 3s
+                setTimeout(() => { if (!marked) setStatus('active', '🔍 Face recognition active'); }, 3000);
+                break;
+        }
+    }
+
+    // ── Capture frame ──────────────────────────────────────────
+    const canvas = document.createElement('canvas');
+
+    function captureAndSend() {
+        if (marked || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+        const video = document.getElementById('localVideo') ||
+                      document.querySelector('video[data-local="true"]') ||
+                      document.querySelector('video');
+        if (!video || video.readyState < 2) return;
+
+        canvas.width  = 320;
+        canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        // Flip back (un-mirror) so recognition sees un-mirrored face
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -320, 0, 320, 240);
+        ctx.restore();
+
+        const b64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+        ws.send(JSON.stringify({ type: 'frame', frame: b64 }));
+    }
+
+    function startCapture() {
+        if (captureTimer) return;
+        // First attempt after 3s (let video stabilise)
+        setTimeout(captureAndSend, 3000);
+        captureTimer = setInterval(captureAndSend, captureInterval);
+    }
+
+    function stopCapture() {
+        if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
+    }
+
+    // ── UI helpers ─────────────────────────────────────────────
+    function setStatus(state, html) {
+        badge.className = 'state-' + state;
+        badgeText.innerHTML = html;
+    }
+
+    // ── Wait for meeting to initialise before connecting ───────
+    // meeting room sets localStream via init() on window load
+    window.addEventListener('load', () => setTimeout(connect, 2000));
+})();
+</script>
+{% endif %}
+<!-- END FACE ATTENDANCE MODULE -->
+
 </body>
 </html>

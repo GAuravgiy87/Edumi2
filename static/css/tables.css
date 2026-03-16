@@ -1,10 +1,10 @@
 /* Table Styles */
 .users-table,
 .admin-section {
-    background: var(--white);
+    background: var(--bg-card);
     border-radius: 12px;
     overflow: hidden;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
     margin-bottom: 2rem;
 }
 
@@ -15,10 +15,10 @@
 .admin-section h2 {
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .users-table table {
@@ -27,14 +27,14 @@
 }
 
 .users-table thead {
-    background: var(--gray-50);
+    background: var(--hover-bg);
 }
 
 .users-table th {
     padding: 1rem;
     text-align: left;
     font-weight: 600;
-    color: var(--gray-700);
+    color: var(--text-muted);
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -42,8 +42,8 @@
 
 .users-table td {
     padding: 1rem;
-    border-top: 1px solid var(--gray-200);
-    color: var(--gray-900);
+    border-top: 1px solid var(--border-color);
+    color: var(--text-main);
 }
 
 .users-table tbody tr {
@@ -51,7 +51,7 @@
 }
 
 .users-table tbody tr:hover {
-    background: var(--gray-50);
+    background: var(--hover-bg);
 }
 
 .user-avatar-small {

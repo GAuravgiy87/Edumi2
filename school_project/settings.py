@@ -12,9 +12,13 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
 
 
 # Quick-start development settings - unsuitable for production
@@ -72,6 +76,7 @@ INSTALLED_APPS = [
     'cameras',  # RTSP Camera management
     'mobile_cameras',  # Mobile Camera management (IP Webcam, DroidCam)
     'meetings',
+    'attendance',  # Face Recognition Attendance System
     'django_browser_reload',
     'django_extensions',  # For HTTPS development server
     'compressor',
@@ -185,6 +190,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 LOGIN_URL = 'login'
+LOGOUT_REDIRECT_URL = '/'
 LOGIN_REDIRECT_URL = 'student_dashboard'
 
 # Default primary key field type
@@ -229,3 +235,13 @@ CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+# ─── Face Recognition Attendance ────────────────────────────────────────────
+# Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>
+FACE_ENCRYPTION_KEY = os.environ.get('FACE_ENCRYPTION_KEY', '')
+# L2 distance threshold: 0 = identical, 1 = completely different
+# 0.50 is stricter than the face_recognition default of 0.60
+FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.50'))
+# Cumulative verified seconds before attendance is recorded
+FACE_PRESENCE_DURATION = int(os.environ.get('FACE_PRESENCE_DURATION', '30'))

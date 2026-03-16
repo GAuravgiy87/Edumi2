@@ -89,7 +89,7 @@
 }
 
 .feature-card {
-    background: var(--white);
+    background: var(--bg-card);
     border-radius: 16px;
     padding: 2rem;
     text-decoration: none;

@@ -1,0 +1,397 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Face Registration — EduMi{% endblock %}
+{% block page_title %}Face Registration{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Page Layout ─────────────────────────────────────────── */
+.face-setup-page { max-width: 780px; margin: 0 auto; padding: 0 8px 48px; }
+
+/* ── Status Banner ───────────────────────────────────────── */
+.face-status-banner {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 24px; border-radius: 16px; margin-bottom: 28px;
+    backdrop-filter: blur(10px);
+}
+.face-status-banner.registered {
+    background: linear-gradient(135deg, rgba(16,185,129,.12), rgba(5,150,105,.08));
+    border: 1px solid rgba(16,185,129,.35);
+}
+.face-status-banner.unregistered {
+    background: linear-gradient(135deg, rgba(245,158,11,.12), rgba(217,119,6,.08));
+    border: 1px solid rgba(245,158,11,.35);
+}
+.face-status-banner .banner-icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.registered .banner-icon { background: rgba(16,185,129,.2); }
+.unregistered .banner-icon { background: rgba(245,158,11,.2); }
+.banner-icon svg { width: 24px; height: 24px; }
+.banner-text h3 { margin: 0 0 4px; font-size: 1rem; font-weight: 700; }
+.banner-text p  { margin: 0; font-size: .875rem; opacity: .75; }
+.registered .banner-text h3  { color: #10b981; }
+.unregistered .banner-text h3 { color: #f59e0b; }
+
+/* ── Card ────────────────────────────────────────────────── */
+.face-card {
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, rgba(0,0,0,.08));
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+.face-card-header {
+    padding: 24px 28px 0;
+    border-bottom: 1px solid var(--border-color, rgba(0,0,0,.06));
+}
+
+/* ── Tabs ────────────────────────────────────────────────── */
+.face-tabs { display: flex; gap: 4px; padding: 4px; background: rgba(0,0,0,.04); border-radius: 12px; width: fit-content; margin-bottom: 24px; }
+.face-tab {
+    padding: 10px 22px; border-radius: 10px; border: none;
+    cursor: pointer; font-size: .875rem; font-weight: 600;
+    transition: all .2s; background: transparent; color: var(--text-muted, #666);
+    display: flex; align-items: center; gap: 7px;
+}
+.face-tab.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff; box-shadow: 0 4px 12px rgba(102,126,234,.4);
+}
+.face-tab svg { width: 16px; height: 16px; }
+
+/* ── Tab Panels ──────────────────────────────────────────── */
+.face-panel { display: none; padding: 28px; }
+.face-panel.active { display: block; }
+
+/* ── Upload Zone ─────────────────────────────────────────── */
+.upload-zone {
+    border: 2px dashed rgba(102,126,234,.4);
+    border-radius: 16px; padding: 48px 24px;
+    text-align: center; cursor: pointer;
+    transition: all .2s; background: rgba(102,126,234,.03);
+    position: relative;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+    border-color: #667eea; background: rgba(102,126,234,.08);
+}
+.upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+.upload-icon {
+    width: 64px; height: 64px; background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 18px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;
+}
+.upload-icon svg { width: 32px; height: 32px; }
+.upload-zone h3 { margin: 0 0 6px; font-size: 1.05rem; font-weight: 700; }
+.upload-zone p  { margin: 0; font-size: .85rem; opacity: .6; }
+.upload-preview { max-width: 220px; max-height: 220px; border-radius: 12px; object-fit: cover; margin: 16px auto 0; display: none; }
+
+/* ── Camera Capture ──────────────────────────────────────── */
+.camera-container { position: relative; border-radius: 16px; overflow: hidden; background: #0a0a1e; aspect-ratio: 4/3; }
+#cameraFeed { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
+#captureCanvas { display: none; }
+.camera-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,.5) 100%);
+    pointer-events: none;
+}
+.face-guide-circle {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -55%);
+    width: 160px; height: 160px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.5); pointer-events: none;
+    animation: pulse-ring 2s ease-in-out infinite;
+}
+.face-guide-circle.verified { border-color: #10b981; box-shadow: 0 0 0 6px rgba(16,185,129,.2); animation: none; }
+@keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,.2); }
+    50%       { box-shadow: 0 0 0 12px rgba(255,255,255,0); }
+}
+.camera-status {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.6); backdrop-filter: blur(8px);
+    color: #fff; font-size: .8rem; padding: 6px 16px; border-radius: 20px; white-space: nowrap;
+}
+.camera-placeholder {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: rgba(255,255,255,.5);
+}
+.camera-placeholder svg { width: 48px; height: 48px; margin-bottom: 12px; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff; border: none; padding: 12px 28px; border-radius: 12px;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+    transition: all .2s; box-shadow: 0 4px 14px rgba(102,126,234,.4);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,.5); }
+.btn-primary:disabled { opacity: .5; transform: none; cursor: not-allowed; }
+.btn-secondary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(102,126,234,.1); color: #667eea;
+    border: 1px solid rgba(102,126,234,.3); padding: 12px 24px;
+    border-radius: 12px; font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .2s;
+}
+.btn-secondary:hover { background: rgba(102,126,234,.2); }
+.btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+
+/* ── Quality Bar ─────────────────────────────────────────── */
+.quality-bar-wrap { margin-top: 16px; display: none; }
+.quality-bar-wrap label { font-size: .8rem; font-weight: 600; margin-bottom: 6px; display: block; }
+.quality-bar { height: 8px; background: rgba(0,0,0,.1); border-radius: 4px; overflow: hidden; }
+.quality-fill { height: 100%; border-radius: 4px; transition: width .4s, background .4s; }
+
+/* ── Tips ────────────────────────────────────────────────── */
+.tips-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 24px; }
+.tip-card {
+    background: rgba(102,126,234,.05); border: 1px solid rgba(102,126,234,.12);
+    border-radius: 12px; padding: 14px; text-align: center;
+}
+.tip-card .tip-icon { font-size: 1.6rem; margin-bottom: 6px; }
+.tip-card p { margin: 0; font-size: .78rem; opacity: .75; line-height: 1.4; }
+
+/* ── Result Toast ────────────────────────────────────────── */
+#captureResult {
+    margin-top: 12px; padding: 12px 18px; border-radius: 10px;
+    font-size: .875rem; font-weight: 600; display: none; text-align: center;
+}
+#captureResult.success { background: rgba(16,185,129,.15); color: #10b981; border: 1px solid rgba(16,185,129,.3); }
+#captureResult.error   { background: rgba(239,68,68,.12); color: #ef4444; border: 1px solid rgba(239,68,68,.25); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="face-setup-page">
+
+    <!-- Status Banner -->
+    {% if has_profile %}
+    <div class="face-status-banner registered">
+        <div class="banner-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+        </div>
+        <div class="banner-text">
+            <h3>Face Registered ✓</h3>
+            <p>Your face profile is active. Attendance will be automatically tracked during classes.
+               {% if profile %}Quality score: {{ profile.face_quality_score|floatformat:2 }} / 1.00{% endif %}</p>
+        </div>
+    </div>
+    {% else %}
+    <div class="face-status-banner unregistered">
+        <div class="banner-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+        </div>
+        <div class="banner-text">
+            <h3>Face Not Registered</h3>
+            <p>Register your face to enable automatic attendance tracking during online classes.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main Card -->
+    <div class="face-card">
+        <div class="face-card-header">
+            <!-- Tabs -->
+            <div class="face-tabs">
+                <button class="face-tab active" id="tabUpload" onclick="switchTab('upload')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Upload Photo
+                </button>
+                <button class="face-tab" id="tabCamera" onclick="switchTab('camera')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Camera Capture
+                </button>
+            </div>
+        </div>
+
+        <!-- Upload Panel -->
+        <div class="face-panel active" id="panelUpload">
+            <form id="uploadForm" method="post" action="{% url 'upload_face_photo' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" name="photo" id="photoInput" accept="image/jpeg,image/png,image/webp" onchange="previewImage(this)">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <h3>Drop your photo here</h3>
+                    <p>JPEG, PNG, or WebP · Max 10 MB · One clear, front-facing face</p>
+                    <img id="previewImg" class="upload-preview" alt="Preview">
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn-primary" id="uploadBtn" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                        Register Face
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('photoInput').click()">
+                        Choose File
+                    </button>
+                </div>
+            </form>
+
+            {% if messages %}
+            {% for message in messages %}
+            <div class="face-panel-message {{ message.tags }}" style="margin-top:16px; padding:12px 16px; border-radius:10px;
+                background:{% if 'error' in message.tags %}rgba(239,68,68,.12){% else %}rgba(16,185,129,.12){% endif %};
+                color:{% if 'error' in message.tags %}#ef4444{% else %}#10b981{% endif %};">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Camera Panel -->
+        <div class="face-panel" id="panelCamera">
+            <div class="camera-container" id="cameraContainer">
+                <video id="cameraFeed" muted playsinline autoplay></video>
+                <canvas id="captureCanvas"></canvas>
+                <div class="camera-overlay"></div>
+                <div class="face-guide-circle" id="faceGuide"></div>
+                <div class="camera-status" id="cameraStatus">Click "Start Camera" to begin</div>
+                <div class="camera-placeholder" id="cameraPlaceholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <p>Camera not active</p>
+                </div>
+            </div>
+            <div id="captureResult"></div>
+            <div class="btn-group">
+                <button class="btn-primary" id="startCamBtn" onclick="startCamera()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Start Camera
+                </button>
+                <button class="btn-secondary" id="captureBtn" onclick="capturePhoto()" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                    Capture & Register
+                </button>
+                <button class="btn-secondary" id="stopCamBtn" onclick="stopCamera()" style="display:none;">Stop Camera</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tips -->
+    <div class="tips-grid" style="margin-top:24px;">
+        <div class="tip-card"><div class="tip-icon">💡</div><p>Use good front lighting — avoid strong backlight</p></div>
+        <div class="tip-card"><div class="tip-icon">😐</div><p>Look directly into the camera with a neutral expression</p></div>
+        <div class="tip-card"><div class="tip-icon">🚫</div><p>Remove sunglasses, hats, or heavy face coverings</p></div>
+        <div class="tip-card"><div class="tip-icon">🔒</div><p>Your photo is never stored — only a numerical representation</p></div>
+    </div>
+</div>
+
+<script>
+// ── Tab switcher ───────────────────────────────────────────
+function switchTab(tab) {
+    document.querySelectorAll('.face-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.face-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+    document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+}
+
+// ── Upload preview ─────────────────────────────────────────
+function previewImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const preview = document.getElementById('previewImg');
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    document.getElementById('uploadBtn').disabled = false;
+}
+
+// Drag & drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const input = document.getElementById('photoInput');
+        const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files;
+        previewImage(input);
+    }
+});
+
+// ── Camera logic ────────────────────────────────────────────
+let cameraStream = null;
+
+async function startCamera() {
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: {ideal:640}, height: {ideal:480} } });
+        const video = document.getElementById('cameraFeed');
+        video.srcObject = cameraStream;
+        video.style.display = 'block';
+        document.getElementById('cameraPlaceholder').style.display = 'none';
+        document.getElementById('cameraStatus').textContent = 'Position your face inside the circle';
+        document.getElementById('startCamBtn').style.display = 'none';
+        document.getElementById('captureBtn').style.display = 'inline-flex';
+        document.getElementById('stopCamBtn').style.display = 'inline-flex';
+    } catch(e) {
+        showCaptureResult('error', '⚠ Camera access denied. Please allow camera access in your browser settings.');
+    }
+}
+
+function stopCamera() {
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+    document.getElementById('cameraFeed').style.display = 'none';
+    document.getElementById('cameraPlaceholder').style.display = 'flex';
+    document.getElementById('cameraStatus').textContent = 'Click "Start Camera" to begin';
+    document.getElementById('startCamBtn').style.display = 'inline-flex';
+    document.getElementById('captureBtn').style.display = 'none';
+    document.getElementById('stopCamBtn').style.display = 'none';
+}
+
+async function capturePhoto() {
+    const video = document.getElementById('cameraFeed');
+    const canvas = document.getElementById('captureCanvas');
+    canvas.width = 640; canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(-1, 1); ctx.drawImage(video, -640, 0, 640, 480); // un-mirror
+    ctx.scale(-1, 1);
+
+    const frameB64 = canvas.toDataURL('image/jpeg', 0.92);
+
+    const captureBtn = document.getElementById('captureBtn');
+    captureBtn.disabled = true;
+    captureBtn.textContent = 'Processing…';
+
+    try {
+        const resp = await fetch("{% url 'capture_face_photo' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify({ frame_b64: frameB64 }),
+        });
+        const data = await resp.json();
+        if (data.status === 'success') {
+            document.getElementById('faceGuide').classList.add('verified');
+            document.getElementById('cameraStatus').textContent = '✅ Registered!';
+            showCaptureResult('success', data.message);
+            stopCamera();
+            setTimeout(() => location.reload(), 1800);
+        } else {
+            showCaptureResult('error', data.message);
+        }
+    } catch(e) {
+        showCaptureResult('error', 'Network error. Please try again.');
+    } finally {
+        captureBtn.disabled = false;
+        captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg> Capture & Register';
+    }
+}
+
+function showCaptureResult(type, msg) {
+    const el = document.getElementById('captureResult');
+    el.className = type; el.textContent = msg; el.style.display = 'block';
+}
+
+function getCsrf() {
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return c ? c.split('=')[1] : '';
+}
+</script>
+{% endblock %}

@@ -1,7 +1,7 @@
 /* Navigation Styles */
 nav {
-    background: var(--white);
-    border-bottom: 1px solid var(--gray-200);
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -65,8 +65,8 @@ nav a:hover {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--white);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     padding: 6px 12px;
     border-radius: var(--radius);
     cursor: pointer;
@@ -113,8 +113,8 @@ nav a:hover {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    background: var(--white);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
     min-width: 220px;
@@ -230,4 +230,32 @@ nav a:hover {
     .nav-profile-btn {
         padding: 6px;
     }
+}
+
+/* Dark Mode */
+body.dark-mode nav {
+    background: rgba(30, 41, 59, 0.98);
+    border-bottom-color: #334155;
+}
+
+body.dark-mode .nav-profile-btn {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+body.dark-mode .nav-profile-btn:hover {
+    background: #334155;
+}
+
+body.dark-mode .profile-dropdown-menu {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+body.dark-mode .dropdown-divider {
+    background: #334155;
+}
+
+body.dark-mode .dropdown-item:hover {
+    background: #334155;
 }

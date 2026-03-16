@@ -6,11 +6,11 @@
 }
 
 .dashboard-header {
-    background: var(--white);
+    background: var(--bg-card);
     border-radius: var(--radius-lg);
     padding: 16px 20px;
     margin-bottom: 16px;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -19,7 +19,7 @@
 .dashboard-header h1 {
     font-size: 20px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
 }
 
 .dashboard-grid {
@@ -30,10 +30,10 @@
 }
 
 .stat-card {
-    background: var(--white);
+    background: var(--bg-card);
     border-radius: var(--radius);
     padding: 16px;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
     transition: all 0.2s;
     display: flex;
     align-items: center;
@@ -71,14 +71,14 @@
 }
 
 .stat-info h3 {
-    color: var(--gray-600);
+    color: var(--text-muted);
     font-size: 12px;
     font-weight: 600;
     margin-bottom: 4px;
 }
 
 .stat-number {
-    color: var(--gray-900);
+    color: var(--text-main);
     font-size: 24px;
     font-weight: 700;
 }
@@ -91,35 +91,35 @@
 }
 
 .content-section {
-    background: var(--white);
+    background: var(--bg-card);
     padding: 16px;
     border-radius: var(--radius-lg);
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
 }
 
 .content-section h2 {
     font-size: 16px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin-bottom: 12px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .quick-actions {
-    background: var(--white);
+    background: var(--bg-card);
     padding: 16px;
     border-radius: var(--radius-lg);
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
 }
 
 .quick-actions h2 {
     font-size: 16px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin-bottom: 12px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .action-buttons {
@@ -130,8 +130,8 @@
 
 .action-btn {
     padding: 16px;
-    background: var(--white);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     cursor: pointer;
     transition: all 0.2s;
@@ -147,6 +147,7 @@
     border-color: var(--primary);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    background: var(--hover-bg);
 }
 
 .action-btn span {
@@ -159,7 +160,7 @@
 }
 
 .action-btn p {
-    color: var(--gray-900);
+    color: var(--text-main);
     font-weight: 600;
     font-size: 13px;
     margin: 0;
@@ -168,7 +169,7 @@
 .btn-small {
     padding: 8px 14px;
     background: var(--primary);
-    color: var(--white);
+    color: #fff;
     border: none;
     border-radius: var(--radius);
     font-weight: 600;
@@ -185,7 +186,7 @@
 .btn-add-camera,
 .btn-primary {
     background: var(--primary);
-    color: var(--white);
+    color: #fff;
     padding: 10px 16px;
     border-radius: var(--radius);
     text-decoration: none;
@@ -217,14 +218,14 @@
     align-items: center;
     gap: 12px;
     padding: 12px;
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    background: var(--hover-bg);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius);
     transition: all 0.2s;
 }
 
 .course-item:hover {
-    background: var(--white);
+    background: var(--bg-card);
     border-color: var(--primary);
     box-shadow: var(--shadow);
 }
@@ -248,12 +249,12 @@
 .course-details h3 {
     font-size: 14px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin-bottom: 4px;
 }
 
 .course-details > p {
-    color: var(--gray-600);
+    color: var(--text-muted);
     font-size: 12px;
     margin-bottom: 8px;
 }
@@ -261,7 +262,7 @@
 .progress-bar {
     width: 100%;
     height: 6px;
-    background: var(--gray-200);
+    background: var(--border-color);
     border-radius: 3px;
     overflow: hidden;
     margin-bottom: 4px;
@@ -275,7 +276,7 @@
 }
 
 .progress-text {
-    color: var(--gray-600);
+    color: var(--text-muted);
     font-size: 11px;
     font-weight: 600;
     margin: 0;
@@ -290,14 +291,14 @@
 
 .assignment-item {
     padding: 12px;
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    background: var(--hover-bg);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius);
     transition: all 0.2s;
 }
 
 .assignment-item:hover {
-    background: var(--white);
+    background: var(--bg-card);
     box-shadow: var(--shadow);
 }
 
@@ -316,12 +317,12 @@
 .assignment-header h3 {
     font-size: 14px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin: 0;
 }
 
 .assignment-item > p {
-    color: var(--gray-600);
+    color: var(--text-muted);
     font-size: 12px;
     margin-bottom: 8px;
 }
@@ -371,13 +372,13 @@
     align-items: flex-start;
     gap: 10px;
     padding: 10px;
-    background: var(--gray-50);
+    background: var(--hover-bg);
     border-radius: var(--radius);
     transition: all 0.2s;
 }
 
 .activity-item:hover {
-    background: var(--white);
+    background: var(--bg-card);
     box-shadow: var(--shadow-sm);
 }
 
@@ -403,12 +404,12 @@
 }
 
 .activity-details p:first-child {
-    color: var(--gray-900);
+    color: var(--text-main);
     margin-bottom: 2px;
 }
 
 .activity-time {
-    color: var(--gray-500);
+    color: var(--text-muted);
     font-size: 11px;
 }
 
@@ -478,7 +479,7 @@
     gap: 10px;
 }
 
-.progress-bar {
+.completion-banner .progress-bar {
     flex: 1;
     height: 8px;
     background: rgba(255, 255, 255, 0.2);
@@ -486,7 +487,7 @@
     overflow: hidden;
 }
 
-.progress-fill {
+.completion-banner .progress-fill {
     height: 100%;
     background: #fff;
     border-radius: 4px;
@@ -526,5 +527,5 @@
     height: 120px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid var(--gray-200);
+    border: 2px solid var(--border-color);
 }

@@ -23,6 +23,10 @@
     --border-color: var(--gray-200);
     --sidebar-bg: #ffffff;
     --topbar-bg: #ffffff;
+    --input-bg: #ffffff;
+    --hover-bg: var(--gray-100);
+    --notification-unread-bg: #f5f3ff;
+    --notification-header-bg: var(--gray-50);
 }
 
 body.dark-mode {
@@ -34,12 +38,18 @@ body.dark-mode {
     --gray-50: #0f172a;
     --gray-100: #1e293b;
     --gray-200: #334155;
+    --gray-300: #475569;
+    --gray-500: #94a3b8;
     --gray-700: #cbd5e1;
     --gray-900: #f1f5f9;
     --sidebar-bg: #1e293b;
     --topbar-bg: #1e293b;
     --shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    --input-bg: #0f172a;
+    --hover-bg: #334155;
+    --notification-unread-bg: #2d2a4a;
+    --notification-header-bg: #162032;
 }
 
 * {
@@ -155,10 +165,10 @@ body {
 .quick-actions,
 .admin-section,
 .content-section {
-    background: #fff;
+    background: var(--bg-card);
     padding: 14px 16px;
     border-radius: var(--radius);
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
     margin-bottom: 12px;
 }
 
@@ -167,10 +177,10 @@ body {
 .content-section h2 {
     font-size: 15px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin: 0 0 12px 0;
     padding-bottom: 10px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
 }
 
 /* Action Buttons */
@@ -182,8 +192,8 @@ body {
 
 .action-btn {
     padding: 14px 10px;
-    background: #fff;
-    border: 1px solid var(--gray-200);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius);
     cursor: pointer;
     transition: all 0.2s;
@@ -208,7 +218,7 @@ body {
 }
 
 .action-btn p {
-    color: var(--gray-900);
+    color: var(--text-main);
     font-weight: 600;
     font-size: 12px;
     margin: 0;
@@ -358,7 +368,7 @@ body {
 
 /* Detail Sections */
 .detail-section {
-    background: white;
+    background: var(--bg-card);
     border-radius: var(--radius);
     margin-bottom: 12px;
     box-shadow: var(--shadow-lg);
@@ -392,10 +402,10 @@ body {
 }
 
 .meeting-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: var(--radius);
     padding: 14px;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
     transition: all 0.2s;
 }
 

@@ -4,6 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.db import models
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from .forms import RegisterForm
 from .models import UserProfile
 from meetings.models import Meeting
@@ -58,6 +60,7 @@ def register(request):
                 user = User.objects.create_user(username=username, password=password1)
                 UserProfile.objects.create(user=user, user_type=user_type)
                 login(request, user)
+                request.session['show_welcome'] = True
                 if user_type == 'teacher':
                     return redirect('teacher_dashboard')
                 elif user_type == 'student':
@@ -884,3 +887,26 @@ def error_404(request, exception):
 
 def error_500(request):
     return render(request, '500.html', status=500)
+
+
+@require_POST
+def dismiss_welcome(request):
+    request.session.pop('show_welcome', None)
+    return JsonResponse({'ok': True})
+
+
+@require_POST
+@login_required
+def save_emoji_avatar(request):
+    import base64, uuid, os
+    from django.core.files.base import ContentFile
+    data_url = request.POST.get('data_url', '')
+    if not data_url.startswith('data:image/png;base64,'):
+        return JsonResponse({'ok': False, 'error': 'Invalid data'}, status=400)
+    img_data = base64.b64decode(data_url.split(',')[1])
+    profile = request.user.userprofile
+    filename = f"emoji_{request.user.id}_{uuid.uuid4().hex[:8]}.png"
+    profile.profile_picture.save(filename, ContentFile(img_data), save=True)
+    profile.avatar_url = ''
+    profile.save()
+    return JsonResponse({'ok': True, 'url': profile.profile_picture.url})

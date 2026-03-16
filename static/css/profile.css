@@ -1,10 +1,4 @@
 /* Profile Styles - Compact & Professional */
-:root {
-    --white: #ffffff;
-    --gray-600: #4b5563;
-    --radius-lg: 12px;
-}
-
 .profile-container {
     max-width: 100%;
     margin: 0;
@@ -12,11 +6,11 @@
 }
 
 .profile-header {
-    background: var(--white);
+    background: var(--bg-card);
     border-radius: var(--radius-lg);
     overflow: hidden;
     margin-bottom: 16px;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
 }
 
 .profile-cover {
@@ -48,7 +42,7 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    border: 3px solid var(--white);
+    border: 3px solid var(--bg-card);
     overflow: hidden;
     margin-top: -40px;
     box-shadow: var(--shadow);
@@ -69,7 +63,7 @@
     width: 28px;
     height: 28px;
     background: var(--primary);
-    border: 2px solid var(--white);
+    border: 2px solid var(--bg-card);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -102,15 +96,15 @@
 .profile-details h1 {
     font-size: 20px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin-bottom: 4px;
 }
 
 .editable-title {
     font-size: 20px;
     font-weight: 700;
-    color: var(--gray-900);
-    border: 1px solid var(--gray-200);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius);
     padding: 6px 10px;
     width: 100%;
@@ -118,7 +112,7 @@
 }
 
 .profile-username {
-    color: var(--gray-600);
+    color: var(--text-muted);
     font-size: 14px;
     margin-bottom: 8px;
 }
@@ -195,8 +189,8 @@
 }
 
 .profile-card {
-    background: var(--white);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: 16px;
 }
@@ -204,14 +198,14 @@
 .profile-card h2 {
     font-size: 16px;
     font-weight: 700;
-    color: var(--gray-900);
+    color: var(--text-main);
     margin-bottom: 12px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .profile-bio {
-    color: var(--gray-700);
+    color: var(--text-muted);
     font-size: 14px;
     line-height: 1.6;
 }
@@ -219,7 +213,7 @@
 .editable-textarea {
     width: 100%;
     padding: 10px;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius);
     font-size: 14px;
     font-family: inherit;
@@ -237,7 +231,7 @@
     display: flex;
     gap: 10px;
     padding: 10px;
-    background: var(--gray-50);
+    background: var(--hover-bg);
     border-radius: var(--radius);
 }
 
@@ -265,14 +259,14 @@
 .info-item .label {
     font-size: 11px;
     font-weight: 600;
-    color: var(--gray-600);
+    color: var(--text-muted);
     text-transform: uppercase;
     margin-bottom: 4px;
 }
 
 .info-item .value {
     font-size: 14px;
-    color: var(--gray-900);
+    color: var(--text-main);
     font-weight: 500;
 }
 
@@ -288,13 +282,13 @@
 .editable-input {
     width: 100%;
     padding: 6px 8px;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     font-size: 14px;
 }
 
 .empty-text {
-    color: var(--gray-500);
+    color: var(--text-muted);
     font-size: 14px;
     font-style: italic;
 }
@@ -321,7 +315,7 @@
 
 .circle-bg {
     fill: none;
-    stroke: var(--gray-200);
+    stroke: var(--border-color);
     stroke-width: 3;
 }
 
@@ -334,7 +328,7 @@
 }
 
 .percentage {
-    fill: var(--gray-900);
+    fill: var(--text-main);
     font-size: 10px;
     font-weight: 700;
     transform: rotate(90deg);
@@ -343,7 +337,7 @@
 
 .completion-hint {
     font-size: 12px;
-    color: var(--gray-600);
+    color: var(--text-muted);
 }
 
 .completion-success {
@@ -361,7 +355,7 @@
 .stat-item {
     text-align: center;
     padding: 12px;
-    background: var(--gray-50);
+    background: var(--hover-bg);
     border-radius: var(--radius);
 }
 
@@ -376,14 +370,14 @@
 .stat-label {
     display: block;
     font-size: 12px;
-    color: var(--gray-600);
+    color: var(--text-muted);
     font-weight: 600;
 }
 
 .member-since {
     font-size: 16px;
     font-weight: 600;
-    color: var(--gray-900);
+    color: var(--text-main);
     text-align: center;
 }
 
@@ -403,7 +397,7 @@
 }
 
 .avatar-modal-content {
-    background: white;
+    background: var(--bg-card);
     border-radius: var(--radius-lg);
     max-width: 600px;
     width: 100%;
@@ -413,7 +407,7 @@
 
 .avatar-modal-header {
     padding: 16px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -429,7 +423,7 @@
     background: none;
     border: none;
     font-size: 28px;
-    color: var(--gray-500);
+    color: var(--text-muted);
     cursor: pointer;
     line-height: 1;
     padding: 0;
@@ -438,7 +432,7 @@
 }
 
 .modal-close:hover {
-    color: var(--gray-900);
+    color: var(--text-main);
 }
 
 .avatar-modal-body {
@@ -448,7 +442,7 @@
 .avatar-modal-body h3 {
     font-size: 14px;
     font-weight: 600;
-    color: var(--gray-700);
+    color: var(--text-muted);
     margin-bottom: 12px;
 }
 
@@ -464,7 +458,7 @@
     border-radius: var(--radius);
     overflow: hidden;
     cursor: pointer;
-    border: 2px solid var(--gray-200);
+    border: 2px solid var(--border-color);
     transition: all 0.2s;
 }
 
@@ -497,13 +491,13 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: var(--gray-200);
+    background: var(--border-color);
 }
 
 .avatar-divider span {
-    background: white;
+    background: var(--bg-card);
     padding: 0 12px;
-    color: var(--gray-500);
+    color: var(--text-muted);
     font-size: 12px;
     font-weight: 600;
     position: relative;
@@ -540,7 +534,7 @@
 .upload-hint {
     margin-top: 8px;
     font-size: 12px;
-    color: var(--gray-500);
+    color: var(--text-muted);
 }
 
 .alert-success {
