@@ -10,3 +10,13 @@ django-cors-headers==4.3.1
 django-extensions==3.2.3
 werkzeug==3.0.1
 pyOpenSSL==24.0.0
+django-compressor==4.4
+celery==5.3.6
+redis==5.0.1
+django-redis==5.4.0
+django-browser-reload==1.21.0
+django-otp==1.2.4
+django-two-factor-auth==1.15.5
+qrcode==7.4.2
+django-phonenumber-field==7.2.0
+phonenumbers==8.13.26

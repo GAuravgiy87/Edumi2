@@ -107,9 +107,46 @@ class MeetingParticipant(models.Model):
     joined_at = models.DateTimeField(null=True, blank=True)
     left_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=False)
+    total_duration_seconds = models.IntegerField(default=0)
     
     class Meta:
         unique_together = ['meeting', 'user']
     
     def __str__(self):
         return f"{self.user.username} in {self.meeting.title}"
+
+    def get_duration_formatted(self):
+        minutes = self.total_duration_seconds // 60
+        seconds = self.total_duration_seconds % 60
+        return f"{minutes}m {seconds}s"
+
+class MeetingAttendanceLog(models.Model):
+    """Logs every entry and exit for detailed attendance reporting"""
+    EVENT_CHOICES = [
+        ('join', 'Joined'),
+        ('leave', 'Left'),
+    ]
+    participant = models.ForeignKey(MeetingParticipant, on_delete=models.CASCADE, related_name='attendance_logs')
+    event_type = models.CharField(max_length=10, choices=EVENT_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+class MeetingChat(models.Model):
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='chats')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"{self.user.username}: {self.message[:20]}"
+
+class MeetingSummary(models.Model):
+    meeting = models.OneToOneField(Meeting, on_delete=models.CASCADE, related_name='summary')
+    summary_text = models.TextField()
+    key_points = models.JSONField(default=list)  # Storing as list of strings
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Summary for {self.meeting.title}"

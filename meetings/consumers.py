@@ -2,7 +2,8 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
-from .models import Meeting, MeetingParticipant
+from django.utils import timezone
+from .models import Meeting, MeetingParticipant, MeetingAttendanceLog, MeetingChat
 
 class MeetingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -16,6 +17,9 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         
+        # Record join in database
+        await self.record_join()
+
         await self.accept()
         
         # Notify others that user joined
@@ -44,6 +48,9 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        
+        # Record leave in database
+        await self.record_leave()
     
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -88,6 +95,9 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             )
         
         elif message_type == 'chat':
+            # Save to database
+            await self.save_chat_message(data['message'])
+            
             # Broadcast chat message
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -187,3 +197,60 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             'user_id': event['user_id'],
             'username': event['username']
         }))
+
+    @database_sync_to_async
+    def record_join(self):
+        try:
+            meeting = Meeting.objects.get(meeting_code=self.meeting_code)
+            participant, created = MeetingParticipant.objects.get_or_create(
+                meeting=meeting,
+                user=self.user
+            )
+            participant.joined_at = timezone.now()
+            participant.is_active = True
+            participant.save()
+            
+            MeetingAttendanceLog.objects.create(
+                participant=participant,
+                event_type='join'
+            )
+        except Exception as e:
+            print(f"Error recording join: {e}")
+
+    @database_sync_to_async
+    def record_leave(self):
+        try:
+            meeting = Meeting.objects.get(meeting_code=self.meeting_code)
+            participant = MeetingParticipant.objects.get(
+                meeting=meeting,
+                user=self.user
+            )
+            now = timezone.now()
+            
+            # Calculate duration since last join
+            last_join = participant.attendance_logs.filter(event_type='join').last()
+            if last_join:
+                duration = (now - last_join.timestamp).total_seconds()
+                participant.total_duration_seconds += int(duration)
+            
+            participant.left_at = now
+            participant.is_active = False
+            participant.save()
+            
+            MeetingAttendanceLog.objects.create(
+                participant=participant,
+                event_type='leave'
+            )
+        except Exception as e:
+            print(f"Error recording leave: {e}")
+    @database_sync_to_async
+    def save_chat_message(self, message):
+        try:
+            meeting = Meeting.objects.get(meeting_code=self.meeting_code)
+            MeetingChat.objects.create(
+                meeting=meeting,
+                user=self.user,
+                message=message
+            )
+        except Exception as e:
+            print(f"Error saving chat message: {e}")

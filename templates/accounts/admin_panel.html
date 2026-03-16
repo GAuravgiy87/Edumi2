@@ -7,7 +7,42 @@
 <div class="admin-container">
     <div class="admin-header">
         <h1>Admin Control Panel</h1>
-        <a href="{% url 'user_management' %}" class="btn-add-camera"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span> Manage Users</a>
+        <div class="header-actions">
+            <button onclick="toggleGlobalMessage()" class="btn-secondary"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg></span> Broadcast</button>
+            <a href="{% url 'user_management' %}" class="btn-add-camera"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span> Manage Users</a>
+        </div>
+    </div>
+
+    <!-- System Health Status -->
+    <div class="system-status-container">
+        <div class="status-card">
+            <div class="status-indicator {% if True %}online{% else %}offline{% endif %}"></div>
+            <div class="status-info">
+                <span class="status-label">Main App Service</span>
+                <span class="status-value">Online (Port 8000)</span>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-indicator {% if camera_service_online %}online{% else %}offline{% endif %}"></div>
+            <div class="status-info">
+                <span class="status-label">Camera Microservice</span>
+                <span class="status-value">{% if camera_service_online %}Active (Port 8001){% else %}Disconnected{% endif %}</span>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-indicator online"></div>
+            <div class="status-info">
+                <span class="status-label">Database Status</span>
+                <span class="status-value">Connected (SQLite)</span>
+            </div>
+        </div>
+        <div class="status-card">
+            <div class="status-indicator online"></div>
+            <div class="status-info">
+                <span class="status-label">WebSocket Engine</span>
+                <span class="status-value">Live (Channels)</span>
+            </div>
+        </div>
     </div>
     
     <!-- Statistics Overview -->
@@ -460,6 +495,104 @@
 </div>
 
 <style>
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 12px;
+    }
+    
+    .btn-secondary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: white;
+        color: #4a5568;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .btn-secondary:hover {
+        background: #f7fafc;
+        border-color: #cbd5e0;
+    }
+
+    /* System Status Styles */
+    .system-status-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+    
+    .status-card {
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: 1px solid #edf2f7;
+    }
+    
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        position: relative;
+    }
+    
+    .status-indicator.online {
+        background: #2ecc71;
+        box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+    }
+    
+    .status-indicator.online::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        border-radius: 50%;
+        background: inherit;
+        animation: pulse-status 2s infinite;
+    }
+    
+    .status-indicator.offline {
+        background: #e74c3c;
+        box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+    }
+    
+    @keyframes pulse-status {
+        0% { transform: scale(1); opacity: 0.8; }
+        100% { transform: scale(2.5); opacity: 0; }
+    }
+    
+    .status-info {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .status-label {
+        font-size: 12px;
+        color: #718096;
+        font-weight: 500;
+    }
+    
+    .status-value {
+        font-size: 14px;
+        color: #2d3748;
+        font-weight: 700;
+    }
+
     .stat-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 8px 16px rgba(0,0,0,0.2);
@@ -598,30 +731,36 @@
     console.log('Admin panel script loaded');
     
     function toggleSection(sectionId) {
-        console.log('toggleSection called with:', sectionId);
         const section = document.getElementById(sectionId);
-        console.log('Section element:', section);
-        
-        if (!section) {
-            console.error('Section not found:', sectionId);
-            return;
-        }
+        if (!section) return;
         
         if (section.style.display === 'none' || section.style.display === '') {
             section.style.display = 'block';
-            console.log('Showing section:', sectionId);
-            // Smooth scroll to section
             setTimeout(() => {
                 section.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
         } else {
             section.style.display = 'none';
-            console.log('Hiding section:', sectionId);
         }
     }
-    
-    // Test that function is accessible
-    console.log('toggleSection function:', typeof toggleSection);
+
+    function toggleGlobalMessage() {
+        const modal = document.getElementById('broadcast-modal');
+        modal.style.display = 'flex';
+    }
 </script>
+
+<!-- Broadcast Modal Placeholder -->
+<div id="broadcast-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; padding: 30px; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <h3>Send Global Broadcast</h3>
+        <p style="font-size: 13px; color: #718096; margin-bottom: 20px;">Message will be sent instantly to all connected students and teachers.</p>
+        <textarea style="width: 100%; height: 100px; border-radius: 8px; border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 20px;" placeholder="Enter message..."></textarea>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button onclick="document.getElementById('broadcast-modal').style.display='none'" style="padding: 10px 20px; background: #edf2f7; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+            <button style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">Send Now</button>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

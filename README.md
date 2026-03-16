@@ -472,43 +472,18 @@ edumi/
 ├── 📱 accounts/              # User authentication & profiles
 ├── 📹 cameras/               # Camera management UI
 ├── 🎥 camera_service/        # Dedicated streaming microservice
-│   ├── camera_api/           # API endpoints
-│   ├── camera_service/       # Service settings
-│   └── requirements.txt      # Service dependencies
 ├── 🤝 meetings/              # Video conferencing logic
-│   ├── consumers.py          # WebSocket consumers
-│   ├── routing.py            # WebSocket routing
-│   └── models.py             # Meeting models
 ├── 📄 pages/                 # Static pages
 ├── 🎨 static/                # CSS, JavaScript, assets
-│   ├── css/
-│   │   ├── meeting-room.css  # Google Meet-style UI
-│   │   └── ...
-│   └── js/
 ├── 📝 templates/             # HTML templates
-│   ├── meetings/
-│   │   └── meeting_room.html # Main meeting interface
-│   └── ...
 ├── ⚙️ school_project/        # Main Django settings
 ├── 📚 docs/                  # Documentation
-│   ├── NETWORK_ACCESS.md     # Network setup guide
-│   ├── APP_STATUS_REPORT.md  # Status reports
-│   └── UPDATE.md             # Complete changelog
-├── 🧪 tests/                 # Test scripts
-│   ├── test_*.py             # Various test files
-│   └── check_*.py            # Status check scripts
-├── 🛠️ utils/                 # Utility scripts
-│   ├── setup_*.py            # Setup scripts
-│   └── fix_*.py              # Fix scripts
-├── 🚀 Startup Scripts/
-│   ├── start_services.bat    # Windows startup
-│   ├── start_services.sh     # Linux/Mac startup
-│   ├── start_network.bat     # Network access startup
-│   └── allow_firewall.bat    # Firewall configuration
+│   ├── camera/               # Camera setup guides
+│   └── scripts/              # Utility scripts (HTTPS setup)
+├── 🐳 Dockerfile/docker-compose.yml # Containerization
 ├── .gitignore
 ├── requirements.txt
 ├── README.md                 # Main documentation
-├── RUN.md                    # Running instructions
 └── manage.py
 ```
 
@@ -799,6 +774,21 @@ This project is licensed under the MIT License.
 </table>
 
 </div>
+
+---
+
+## 🛠️ Maintenance & Recent Fixes
+- **Parse Errors Resolved**: Fixed corrupted files containing null bytes that were causing Django startup failures.
+- **Linter Optimization**: Standardized `.vscode/settings.json` and `pyrightconfig.json` with relative paths for perfect cross-platform module discovery.
+- **UI & CSS Polishing**: Fixed template parsing issues in meeting actions and added standard `line-clamp` properties for better browser compatibility.
+- **Repository Hygiene**: Removed redundant scripts (`RUN.md`, `setup.py`, etc.) and consolidated documentation into the `docs/` folder.
+
+## 💡 Recommendations for Next Steps
+1. **PostgreSQL Migration**: While SQLite is great for dev, switching to PostgreSQL is recommended for a multi-user school environment.
+2. **Environment Security**: Ensure all sensitive data (Secret Keys, API tokens) are strictly managed via the `.env` file.
+3. **Interactive Whiteboard**: Consider adding a shared canvas/whiteboard feature for better collaborative teaching.
+4. **Recording Support**: Implementing server-side recording using FFmpeg for saving class sessions.
+5. **Enhanced Permissions**: Fine-tune classroom join requests and teacher-moderation features.
 
 ---
 

@@ -26,6 +26,7 @@ class CameraStreamer:
         self.thread: Optional[threading.Thread] = None
         self.lock = threading.Lock()
         self.last_access = time.time()
+        self.last_frame: Optional[np.ndarray] = None  # Store raw frame for adaptive encoding
         self.connection_attempts = 0
         self.max_reconnect_attempts = 5
         self.reconnect_delay = 2
@@ -83,21 +84,18 @@ class CameraStreamer:
             try:
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
-                    # Aggressive resize for performance
-                    frame = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_NEAREST)
+                    with self.lock:
+                        self.last_frame = frame.copy()
                     
-                    # Lower quality encoding
-                    ret, jpeg = cv2.imencode('.jpg', frame, [
-                        cv2.IMWRITE_JPEG_QUALITY, 60,
-                        cv2.IMWRITE_JPEG_OPTIMIZE, 1
-                    ])
+                    # Store a default 'med' frame as fallback
+                    frame_med = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_NEAREST)
+                    ret_med, jpeg = cv2.imencode('.jpg', frame_med, [cv2.IMWRITE_JPEG_QUALITY, 60])
                     
-                    if ret:
+                    if ret_med:
                         with self.lock:
                             self.frame = jpeg.tobytes()
                     
-                    # Lower frame rate
-                    time.sleep(0.05)  # ~20 FPS
+                    time.sleep(0.01)  # High capture rate, streaming will skip
                 else:
                     if self.cap is not None:
                         self.cap.release()
@@ -112,6 +110,33 @@ class CameraStreamer:
         
         if self.cap is not None:
             self.cap.release()
+
+    def get_frame(self):
+        self.last_access = time.time()
+        with self.lock:
+            return self.frame
+
+    def get_adaptive_frame(self, quality_level='med'):
+        """Encodes frame based on requested quality level"""
+        self.last_access = time.time()
+        with self.lock:
+            if self.last_frame is None:
+                return self.frame
+            frame = self.last_frame.copy()
+
+        configs = {
+            'high': {'res': (1280, 720), 'quality': 85},
+            'med': {'res': (640, 360), 'quality': 60},
+            'low': {'res': (480, 270), 'quality': 30}
+        }
+        config = configs.get(quality_level, configs['med'])
+        
+        try:
+            frame = cv2.resize(frame, config['res'], interpolation=cv2.INTER_NEAREST)
+            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, config['quality']])
+            return jpeg.tobytes() if ret else self.frame
+        except Exception:
+            return self.frame
 
     def get_frame(self):
         self.last_access = time.time()
@@ -149,28 +174,27 @@ def list_cameras(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 def camera_feed(request, camera_id):
-    """Stream camera feed with aggressive optimization"""
+    """Stream camera feed with adaptive bitrate support"""
+    quality = request.GET.get('q', 'med')
+    
     try:
         camera = Camera.objects.get(id=camera_id)
         streamer = camera_manager.get_streamer(camera.id, camera.rtsp_url)
         
         def generate_frames():
-            frame_count = 0
+            # Throttle based on quality
+            throttles = {'high': 0.033, 'med': 0.05, 'low': 0.1}
+            delay = throttles.get(quality, 0.05)
+            
             try:
                 while True:
-                    frame = streamer.get_frame()
+                    frame = streamer.get_adaptive_frame(quality)
                     if frame:
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n'
                                b'Content-Length: ' + str(len(frame)).encode() + b'\r\n'
                                b'\r\n' + frame + b'\r\n')
-                        
-                        # Skip frames for better performance
-                        frame_count += 1
-                        if frame_count % 3 == 0:  # Send every 3rd frame
-                            time.sleep(0.05)
-                        else:
-                            time.sleep(0.001)
+                        time.sleep(delay)
                     else:
                         time.sleep(0.1)
             except GeneratorExit:
@@ -181,8 +205,6 @@ def camera_feed(request, camera_id):
             content_type='multipart/x-mixed-replace; boundary=frame'
         )
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
         response['X-Accel-Buffering'] = 'no'
         return response
     except Camera.DoesNotExist:
@@ -224,6 +246,7 @@ class MobileCameraStreamer:
         self.thread: Optional[threading.Thread] = None
         self.lock = threading.Lock()
         self.last_access = time.time()
+        self.last_frame: Optional[np.ndarray] = None
 
     def start(self):
         if not self.running:
@@ -265,20 +288,20 @@ class MobileCameraStreamer:
                             bytes_data = bytes_data[b+2:]
                             
                             try:
-                                # Decode and resize
+                                # Decode
                                 img = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
                                 if img is not None:
-                                    # Resize for efficient streaming
-                                    img = cv2.resize(img, (640, 360), interpolation=cv2.INTER_NEAREST)
-                                    ret, jpeg = cv2.imencode('.jpg', img, [
-                                        cv2.IMWRITE_JPEG_QUALITY, 60,
-                                        cv2.IMWRITE_JPEG_OPTIMIZE, 1
-                                    ])
+                                    with self.lock:
+                                        self.last_frame = img.copy()
+                                        
+                                    # Fallback med frame
+                                    img_med = cv2.resize(img, (640, 360), interpolation=cv2.INTER_NEAREST)
+                                    ret, jpeg = cv2.imencode('.jpg', img_med, [cv2.IMWRITE_JPEG_QUALITY, 60])
                                     if ret:
                                         with self.lock:
                                             self.frame = jpeg.tobytes()
                             except Exception as e:
-                                logger.error(f"Error processing frame: {e}")
+                                logger.error(f"Error processing mobile frame: {e}")
                                 continue
                 else:
                     logger.error(f"HTTP {response.status_code} from mobile camera {self.mobile_camera_id}")
@@ -291,6 +314,28 @@ class MobileCameraStreamer:
     def get_frame(self):
         self.last_access = time.time()
         with self.lock:
+            return self.frame
+
+    def get_adaptive_frame(self, quality_level='med'):
+        """Encodes mobile frame based on requested quality level"""
+        self.last_access = time.time()
+        with self.lock:
+            if self.last_frame is None:
+                return self.frame
+            frame = self.last_frame.copy()
+
+        configs = {
+            'high': {'res': (1280, 720), 'quality': 85},
+            'med': {'res': (640, 360), 'quality': 60},
+            'low': {'res': (480, 270), 'quality': 30}
+        }
+        config = configs.get(quality_level, configs['med'])
+        
+        try:
+            frame = cv2.resize(frame, config['res'], interpolation=cv2.INTER_NEAREST)
+            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, config['quality']])
+            return jpeg.tobytes() if ret else self.frame
+        except Exception:
             return self.frame
 
 
@@ -319,13 +364,12 @@ mobile_camera_manager = MobileCameraManager()
 
 
 def mobile_camera_feed(request, mobile_camera_id):
-    """Stream mobile camera feed"""
+    """Stream mobile camera feed with adaptive bitrate support"""
     from mobile_cameras.models import MobileCamera
+    quality = request.GET.get('q', 'med')
     
     try:
         mobile_camera = MobileCamera.objects.get(id=mobile_camera_id)
-        
-        # Check if camera is active (not paused)
         if not mobile_camera.is_active:
             return JsonResponse({'error': 'Camera is paused'}, status=503)
         
@@ -333,33 +377,28 @@ def mobile_camera_feed(request, mobile_camera_id):
         streamer = mobile_camera_manager.get_streamer(mobile_camera.id, stream_url)
         
         def generate_frames():
-            frame_count = 0
+            throttles = {'high': 0.033, 'med': 0.05, 'low': 0.1}
+            delay = throttles.get(quality, 0.05)
+            
             try:
                 while True:
-                    frame = streamer.get_frame()
+                    frame = streamer.get_adaptive_frame(quality)
                     if frame:
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n'
                                b'Content-Length: ' + str(len(frame)).encode() + b'\r\n'
                                b'\r\n' + frame + b'\r\n')
-                        
-                        frame_count += 1
-                        if frame_count % 2 == 0:  # Send every 2nd frame
-                            time.sleep(0.05)
-                        else:
-                            time.sleep(0.001)
+                        time.sleep(delay)
                     else:
                         time.sleep(0.1)
             except GeneratorExit:
-                logger.info(f"Client disconnected from mobile camera {mobile_camera_id}")
+                logger.info(f"Disconnected from mobile camera {mobile_camera_id}")
 
         response = StreamingHttpResponse(
             generate_frames(),
             content_type='multipart/x-mixed-replace; boundary=frame'
         )
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
         response['X-Accel-Buffering'] = 'no'
         return response
     except Exception as e:

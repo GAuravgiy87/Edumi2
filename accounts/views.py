@@ -339,6 +339,16 @@ def admin_panel(request):
     all_cameras = Camera.objects.all().order_by('-created_at')
     recent_users = User.objects.all().select_related('userprofile').order_by('-date_joined')[:10]
     
+    # Check Camera Service Status
+    import requests
+    camera_service_online = False
+    try:
+        response = requests.get("http://127.0.0.1:8001/api/cameras/", timeout=1)
+        if response.status_code == 200:
+            camera_service_online = True
+    except:
+        camera_service_online = False
+
     context = {
         'total_users': total_users,
         'total_students': total_students,
@@ -346,6 +356,7 @@ def admin_panel(request):
         'total_meetings': total_meetings,
         'live_meetings_count': live_meetings_count,
         'total_cameras': total_cameras,
+        'camera_service_online': camera_service_online,
         
         # Detailed lists
         'all_users': all_users,
@@ -867,3 +878,9 @@ def send_message(request, conversation_id):
 def settings_view(request):
     """Settings page - Under Development"""
     return render(request, 'accounts/settings.html')
+
+def error_404(request, exception):
+    return render(request, '404.html', status=404)
+
+def error_500(request):
+    return render(request, '500.html', status=500)

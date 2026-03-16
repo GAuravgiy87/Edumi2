@@ -5,7 +5,17 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password, check_password
-from .models import Meeting, MeetingParticipant, Classroom, ClassroomMembership
+from meetings.models import Meeting, MeetingParticipant, Classroom, ClassroomMembership, MeetingAttendanceLog, MeetingChat, MeetingSummary
+from meetings.tasks import generate_meeting_summary
+from accounts.notification_utils import (
+    notify_classroom_join_request, 
+    notify_classroom_request_approved, 
+    notify_student_joined_classroom,
+    notify_classroom_request_denied,
+    notify_student_removed_from_classroom,
+    notify_meeting_started,
+    notify_meeting_cancelled
+)
 import random
 import string
 
@@ -140,7 +150,6 @@ def join_classroom_request(request):
         )
         
         # Send notification to teacher
-        from accounts.notification_utils import notify_classroom_join_request
         notify_classroom_join_request(request.user, classroom)
         
         messages.success(request, f'Join request submitted for "{classroom.title}". Waiting for teacher approval.')
@@ -187,7 +196,6 @@ def approve_join_request(request, membership_id):
     membership.save()
     
     # Send notification to student
-    from accounts.notification_utils import notify_classroom_request_approved, notify_student_joined_classroom
     notify_classroom_request_approved(membership.student, membership.classroom, request.user)
     notify_student_joined_classroom(membership.student, membership.classroom)
     
@@ -210,7 +218,6 @@ def deny_join_request(request, membership_id):
     membership.save()
     
     # Send notification to student
-    from accounts.notification_utils import notify_classroom_request_denied
     notify_classroom_request_denied(membership.student, membership.classroom)
     membership.save()
     
@@ -219,7 +226,6 @@ def deny_join_request(request, membership_id):
         'message': f'{membership.student.username} denied'
     })
 
-@login_required
 @login_required
 @require_http_methods(["POST"])
 def remove_student(request, membership_id):
@@ -234,7 +240,6 @@ def remove_student(request, membership_id):
     membership.save()
     
     # Send notification to student
-    from accounts.notification_utils import notify_student_removed_from_classroom
     notify_student_removed_from_classroom(membership.student, membership.classroom)
     
     return JsonResponse({
@@ -327,7 +332,6 @@ def start_classroom_meeting(request, classroom_id):
         )
         
         # Send notification to all approved students
-        from accounts.notification_utils import notify_meeting_started
         notify_meeting_started(meeting, classroom)
         
         messages.success(request, 'Meeting started successfully!')
@@ -428,12 +432,58 @@ def join_meeting(request, meeting_code):
         meeting.save()
         
         # Send notification to all participants that meeting has started
-        from accounts.notification_utils import notify_meeting_started
         notify_meeting_started(meeting, meeting.classroom)
     
     return render(request, 'meetings/meeting_room.html', {
         'meeting': meeting,
         'is_host': meeting.teacher == request.user
+    })
+
+@login_required
+def meeting_attendance(request, meeting_code):
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # Check permission (Teacher of meeting or Superuser)
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return render(request, 'error.html', {'message': 'You do not have permission to view attendance for this meeting'})
+    
+    participants = meeting.participants.all().select_related('user').prefetch_related('attendance_logs')
+    
+    # Prepare logs for each participant
+    logs = []
+    for p in participants:
+        participant_logs = p.attendance_logs.order_by('timestamp')
+        logs.append({
+            'participant': p,
+            'logs': participant_logs
+        })
+    
+    return render(request, 'meetings/attendance_report.html', {
+        'meeting': meeting,
+        'participants': participants,
+        'logs': logs
+    })
+
+@login_required
+def meeting_summary(request, meeting_code):
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # Check permissions (Teacher or Participant)
+    is_teacher = meeting.teacher == request.user
+    is_admin = request.user.is_superuser
+    
+    if not (is_teacher or is_admin):
+        # Even students might want to see the summary of a meeting they attended
+        if not MeetingParticipant.objects.filter(meeting=meeting, user=request.user).exists():
+            messages.error(request, 'You do not have permission to view this summary')
+            return redirect('student_meetings')
+
+    # Try to get existing summary
+    summary = MeetingSummary.objects.filter(meeting=meeting).first()
+    
+    return render(request, 'meetings/meeting_summary.html', {
+        'meeting': meeting,
+        'summary': summary
     })
 
 @login_required
@@ -454,6 +504,9 @@ def end_meeting(request, meeting_id):
         is_active=False,
         left_at=timezone.now()
     )
+    
+    # Trigger AI Summary Generation (Background Task)
+    generate_meeting_summary.delay(meeting.id)
     
     # Redirect to classroom if meeting was in a classroom
     if meeting.classroom:
@@ -516,7 +569,41 @@ def cancel_meeting(request, meeting_id):
     meeting.save()
     
     # Send notification to all participants
-    from accounts.notification_utils import notify_meeting_cancelled
     notify_meeting_cancelled(meeting, meeting.classroom)
     
     return JsonResponse({'status': 'success'})
+
+@login_required
+def meeting_attendance(request, meeting_code):
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # Check permission (Teacher of meeting or Superuser)
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return render(request, 'error.html', {'message': 'You do not have permission to view attendance for this meeting'})
+    
+    participants = meeting.participants.all().select_related('user').prefetch_related('attendance_logs')
+    
+    context = {
+        'meeting': meeting,
+        'participants': participants,
+    }
+    
+    return render(request, 'meetings/attendance_report.html', context)
+
+@login_required
+def meeting_summary(request, meeting_code):
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # Check if user was a participant or is the teacher
+    is_participant = MeetingParticipant.objects.filter(meeting=meeting, user=request.user).exists()
+    if not is_participant and meeting.teacher != request.user and not request.user.is_superuser:
+        messages.error(request, "You don't have permission to view this summary.")
+        return redirect('home')
+
+    summary = MeetingSummary.objects.filter(meeting=meeting).first()
+    
+    return render(request, 'meetings/meeting_summary.html', {
+        'meeting': meeting,
+        'summary': summary
+    })
+

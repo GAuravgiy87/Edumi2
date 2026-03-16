@@ -8,11 +8,16 @@
     <meta http-equiv="Expires" content="0">
     <title>{% block title %}EduMi - Educational Management System{% endblock %}</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/modern-design.css' %}?v={{ timestamp }}">
-    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}?v={{ timestamp }}">
+    {% load compress %}
+    
+    {% compress css %}
+    <link rel="stylesheet" href="{% static 'css/modern-design.css' %}">
+    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
+    {% block extra_css %}{% endblock %}
+    {% endcompress %}
+
     <!-- Hotwired Turbo for seamless navigation (no full page reloads) -->
     <script type="module" src="https://cdn.skypack.dev/@hotwired/turbo"></script>
-    {% block extra_css %}{% endblock %}
 </head>
 <body>
     {% if user.is_authenticated %}
@@ -276,6 +281,25 @@
                         </span>
                         <input type="text" placeholder="Search..." onkeypress="handleSearch(event)">
                     </div>
+                    
+                    <!-- Theme Toggle -->
+                    <button type="button" class="topbar-icon-btn theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+                        <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                        <svg id="sunIcon" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                    </button>
+
                     <div class="notification-wrapper">
                         <button type="button" class="topbar-icon-btn notification-btn" id="notificationBtn" onclick="toggleNotifications(event)">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -308,6 +332,7 @@
         </main>
     </div>
 
+    {% compress js %}
     <script>
         // Mobile Sidebar
         function openMobileSidebar() {
@@ -482,11 +507,38 @@
 
         // Update notification count on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Apply saved theme
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                updateThemeIcons(true);
+            }
+
             updateNotificationCount();
             // Poll for new notifications every 60 seconds
             setInterval(updateNotificationCount, 60000);
         });
+
+        // Theme Toggle Logic
+        function toggleTheme() {
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeIcons(isDark);
+        }
+
+        function updateThemeIcons(isDark) {
+            const sunIcon = document.getElementById('sunIcon');
+            const moonIcon = document.getElementById('moonIcon');
+            if (isDark) {
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            } else {
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            }
+        }
     </script>
+    {% endcompress %}
     {% else %}
     <!-- Not authenticated - redirect to login -->
     <script>window.location.href = "{% url 'login' %}";</script>

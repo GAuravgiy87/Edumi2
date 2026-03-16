@@ -25,4 +25,6 @@ urlpatterns = [
     path('participants/<int:meeting_id>/', views.get_participants, name='get_participants'),
     path('delete/<int:meeting_id>/', views.delete_meeting, name='delete_meeting'),
     path('cancel/<int:meeting_id>/', views.cancel_meeting, name='cancel_meeting'),
+    path('attendance/<str:meeting_code>/', views.meeting_attendance, name='meeting_attendance'),
+    path('summary/<str:meeting_code>/', views.meeting_summary, name='meeting_summary'),
 ]

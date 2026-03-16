@@ -53,6 +53,14 @@
                 <span class="label">Stream URL:</span>
                 <span class="value url">{{ mobile_camera.get_stream_url }}</span>
             </div>
+            <div class="info-item">
+                <span class="label">Adaptive Quality:</span>
+                <select id="quality-picker" onchange="changeQuality()" style="padding: 0.5rem; border-radius: 6px; border: 1px solid #ddd; font-weight: 600;">
+                    <option value="low">Low (Power Saving)</option>
+                    <option value="med" selected>Medium (Standard)</option>
+                    <option value="high">High (Maximum HD)</option>
+                </select>
+            </div>
         </div>
     </div>
 </div>
@@ -188,4 +196,13 @@
     }
 }
 </style>
+
+<script>
+function changeQuality() {
+    const quality = document.getElementById('quality-picker').value;
+    const img = document.querySelector('.camera-feed');
+    const baseUrl = 'http://localhost:8001/api/mobile-cameras/{{ mobile_camera.id }}/feed/';
+    img.src = `${baseUrl}?q=${quality}&t=${new Date().getTime()}`;
+}
+</script>
 {% endblock %}

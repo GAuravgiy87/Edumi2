@@ -326,6 +326,30 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Security Section -->
+            <div class="profile-card">
+                <h2>Security</h2>
+                <div class="security-grid">
+                    <div class="security-item">
+                        <div class="security-info">
+                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+                            <div>
+                                <p class="label">Two-Factor Authentication (2FA)</p>
+                                <p class="value">
+                                    {% if user.otp_device_summary %}
+                                        <span style="color: #28a745; font-weight: 700;">● Enabled</span>
+                                    {% else %}
+                                        <span style="color: #dc3545; font-weight: 700;">● Disabled</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="security-action">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="profile-sidebar">
@@ -583,6 +607,48 @@ window.addEventListener('beforeunload', function(e) {
 .btn-save-profile.has-changes {
     background: #31a24c;
     animation: pulse 2s infinite;
+}
+
+.security-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.security-info {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-security {
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    background: #6c757d;
+    color: white;
+}
+
+.btn-enable-2fa {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.badge-2fa {
+    background: #e8f5e9;
+    color: #2e7d32;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 8px;
 }
 
 @keyframes pulse {

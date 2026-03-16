@@ -39,6 +39,17 @@
                 <span class="value status-active" id="camera-status">● Connecting...</span>
             </div>
             
+            <div class="detail-item">
+                <span class="label">Stream Quality:</span>
+                <div class="quality-selector">
+                    <select id="quality-picker" onchange="changeQuality()">
+                        <option value="low">Low (360p - Saving Data)</option>
+                        <option value="med" selected>Medium (480p - Balanced)</option>
+                        <option value="high">High (720p - HD Video)</option>
+                    </select>
+                </div>
+            </div>
+            
             <div class="troubleshooting">
                 <h4>Troubleshooting</h4>
                 <ul>
@@ -181,6 +192,23 @@ setTimeout(() => {
         handleImageError();
     }
 }, 10000);
+// Quality Control
+function changeQuality() {
+    const picker = document.getElementById('quality-picker');
+    const quality = picker.value;
+    const img = document.getElementById('camera-stream');
+    const baseUrl = '{% url "camera_feed" camera.id %}';
+    const timestamp = new Date().getTime();
+    
+    // Update image source with quality param and cache buster
+    img.src = `${baseUrl}?q=${quality}&t=${timestamp}`;
+    
+    const statusMsg = document.getElementById('status-message');
+    statusMsg.textContent = `Quality changed to ${quality.toUpperCase()}`;
+    statusMsg.className = 'status-message info';
+    statusMsg.style.display = 'block';
+    setTimeout(() => statusMsg.style.display = 'none', 3000);
+}
 </script>
 
 <style>
@@ -376,6 +404,28 @@ setTimeout(() => {
 
 .status-inactive {
     color: #dc3545 !important;
+}
+
+.quality-selector {
+    margin-top: 0.5rem;
+}
+
+.quality-selector select {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quality-selector select:focus {
+    outline: none;
+    border-color: #764ba2;
+    box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
 }
 
 .troubleshooting {
