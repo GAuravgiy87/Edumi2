@@ -25,17 +25,42 @@ load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-@j!l-9t=qs!b&lkynb=zq$-h3f9d(_nm!hvctk$9ij()0kaja%')
+# For development: use environment variable or fallback to dev key
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-dev-key-not-for-production-12345')
+
+# Warn if using default dev key
+if SECRET_KEY == 'django-dev-key-not-for-production-12345':
+    import warnings
+    warnings.warn(
+        "Using default development SECRET_KEY. "
+        "Set SECRET_KEY environment variable for production!",
+        RuntimeWarning
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,10.17.2.47,*').split(',')
+# Production detection
+IS_PRODUCTION = not DEBUG
 
-# Disable SSL redirect for development (enable in production)
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split(',')
+
+# Security settings - different for dev/prod
+if IS_PRODUCTION:
+    # Production security settings
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+else:
+    # Development - relaxed security
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
+
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = [
@@ -43,21 +68,23 @@ CSRF_TRUSTED_ORIGINS = [
     'https://localhost:8443',
     'https://127.0.0.1',
     'https://127.0.0.1:8443',
-    'https://10.17.2.47',
-    'https://10.17.2.47:8443',
-    'https://*.ngrok.io',
-    'https://*.ngrok-free.app',
-    'https://*.ngrok-free.dev',
 ]
-if not DEBUG:
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-else:
-    SECURE_HSTS_SECONDS = 0
 
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Additional security headers
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+
+# Production security settings (enable when DEBUG=False)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 
 # Application definition
@@ -99,7 +126,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
+        'APP_DIRS': False,  # Disabled when using cached loader
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -107,6 +134,12 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'accounts.context_processors.timestamp',
+            ],
+            'loaders': [
+                ('django.template.loaders.cached.Loader', [
+                    'django.template.loaders.filesystem.Loader',
+                    'django.template.loaders.app_directories.Loader',
+                ]),
             ],
         },
     },
@@ -132,6 +165,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        # Performance optimizations for SQLite
+        'OPTIONS': {
+            'timeout': 20,
+            'check_same_thread': False,
+        }
     }
 }
 
@@ -180,10 +218,18 @@ STATICFILES_FINDERS = [
     'compressor.finders.CompressorFinder',
 ]
 
-COMPRESS_ENABLED = False
+COMPRESS_ENABLED = True
+COMPRESS_OFFLINE = False  # Set to True in production after running compress
 COMPRESS_URL = '/static/'
 COMPRESS_STORAGE = 'compressor.storage.CompressorFileStorage'
 COMPRESS_ROOT = STATIC_ROOT
+COMPRESS_CSS_FILTERS = [
+    'compressor.filters.css_default.CssAbsoluteFilter',
+    'compressor.filters.cssmin.rCSSMinFilter',
+]
+COMPRESS_JS_FILTERS = [
+    'compressor.filters.jsmin.JSMinFilter',
+]
 
 # Media files (uploaded by users)
 MEDIA_URL = '/media/'
@@ -197,6 +243,31 @@ LOGIN_REDIRECT_URL = 'student_dashboard'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ─── Performance Optimizations ─────────────────────────────────────────────
+# Session optimization - use cached_db for better performance
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+SESSION_CACHE_ALIAS = 'default'
+
+# Cache configuration (simple in-memory cache for development)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+            'CULL_FREQUENCY': 3,
+        }
+    }
+}
+
+# Additional performance settings
+CONN_MAX_AGE = 600  # Keep database connections open for 10 minutes
+
+# Disable debug toolbar if installed (it slows down requests)
+DEBUG_TOOLBAR_CONFIG = {
+    'SHOW_TOOLBAR_CALLBACK': lambda request: False,
+}
 
 # Logging configuration
 LOGGING = {
@@ -231,6 +302,9 @@ LOGGING = {
 # Celery Configuration Options
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+
+# Camera Service Configuration
+CAMERA_SERVICE_URL = os.environ.get('CAMERA_SERVICE_URL', 'http://127.0.0.1:8001')
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

@@ -18,5 +18,7 @@
                 "./meetings"
             ]
         }
-    ]
+    ],
+    "reportAttributeAccessIssue": false,
+    "reportGeneralTypeIssues": false
 }

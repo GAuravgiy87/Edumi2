@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.db import models
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator
 from .forms import RegisterForm
 from .models import UserProfile
 from meetings.models import Meeting
@@ -344,9 +345,11 @@ def admin_panel(request):
     
     # Check Camera Service Status
     import requests
+    from django.conf import settings
     camera_service_online = False
     try:
-        response = requests.get("http://127.0.0.1:8001/api/cameras/", timeout=1)
+        camera_service_url = f"{settings.CAMERA_SERVICE_URL}/api/cameras/"
+        response = requests.get(camera_service_url, timeout=1)
         if response.status_code == 200:
             camera_service_online = True
     except:
@@ -381,7 +384,12 @@ def user_management(request):
     
     users = User.objects.all().order_by('-date_joined')
     
-    return render(request, 'accounts/user_management.html', {'users': users})
+    # Pagination
+    paginator = Paginator(users, 20)  # 20 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'accounts/user_management.html', {'users': page_obj, 'page_obj': page_obj})
 
 @login_required
 def delete_user(request, user_id):
@@ -746,13 +754,20 @@ def search_users(request):
 from .messaging_models import Conversation, Message
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.decorators import ratelimit
 
 @login_required
 def inbox(request):
     """View all conversations with search"""
+    from django.core.paginator import Paginator
     search_query = request.GET.get('q', '').strip()
     
     conversations = request.user.conversations.all().prefetch_related('participants', 'messages')
+    
+    # Pagination
+    paginator = Paginator(conversations, 10)  # 10 conversations per page
+    page_number = request.GET.get('page')
+    conversations_page = paginator.get_page(page_number)
     
     # Add unread count and last message to each conversation
     for conv in conversations:
@@ -772,9 +787,10 @@ def inbox(request):
         ).exclude(id=request.user.id).select_related('userprofile').distinct()[:10]
     
     context = {
-        'conversations': conversations,
+        'conversations': conversations_page,
         'search_query': search_query,
         'search_results': search_results,
+        'page_obj': conversations_page,
     }
     
     return render(request, 'accounts/inbox.html', context)
@@ -829,6 +845,7 @@ def start_conversation(request, username):
     return redirect('conversation_detail', conversation_id=conversation.id)
 
 @login_required
+@ratelimit(key='user', rate='30/m', method='POST')
 @require_http_methods(["POST"])
 def send_message(request, conversation_id):
     """Send a message in a conversation"""

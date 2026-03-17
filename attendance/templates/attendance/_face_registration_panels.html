@@ -1,0 +1,58 @@
+<!-- Upload Panel -->
+<div class="face-panel active" id="panelUpload">
+    <form id="uploadForm" method="post" action="{% url 'upload_face_photo' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="upload-zone" id="uploadZone">
+            <input type="file" name="photo" id="photoInput" accept="image/jpeg,image/png,image/webp" onchange="previewImage(this)">
+            <div class="upload-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <h3>Drop your photo here</h3>
+            <p>JPEG, PNG, or WebP · Max 10 MB · One clear, front-facing face</p>
+            <img id="previewImg" class="upload-preview" alt="Preview">
+        </div>
+        <div class="btn-group">
+            <button type="submit" class="btn-primary" id="uploadBtn" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                Register Face
+            </button>
+            <button type="button" class="btn-secondary" onclick="document.getElementById('photoInput').click()">Choose File</button>
+        </div>
+    </form>
+    {% if messages %}
+    {% for message in messages %}
+    <div style="margin-top:16px;padding:12px 16px;border-radius:10px;
+        background:{% if 'error' in message.tags %}rgba(239,68,68,.12){% else %}rgba(16,185,129,.12){% endif %};
+        color:{% if 'error' in message.tags %}#ef4444{% else %}#10b981{% endif %};">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+
+<!-- Camera Panel -->
+<div class="face-panel" id="panelCamera">
+    <div class="camera-container" id="cameraContainer">
+        <video id="cameraFeed" muted playsinline autoplay></video>
+        <canvas id="captureCanvas"></canvas>
+        <div class="camera-overlay"></div>
+        <div class="face-guide-circle" id="faceGuide"></div>
+        <div class="camera-status" id="cameraStatus">Click "Start Camera" to begin</div>
+        <div class="camera-placeholder" id="cameraPlaceholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <p>Camera not active</p>
+        </div>
+    </div>
+    <div id="captureResult"></div>
+    <div class="btn-group">
+        <button class="btn-primary" id="startCamBtn" onclick="startCamera()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Start Camera
+        </button>
+        <button class="btn-secondary" id="captureBtn" onclick="capturePhoto()" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            Capture & Register
+        </button>
+        <button class="btn-secondary" id="stopCamBtn" onclick="stopCamera()" style="display:none;">Stop Camera</button>
+    </div>
+</div>

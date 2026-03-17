@@ -145,6 +145,39 @@
 .quality-bar { height: 8px; background: rgba(0,0,0,.1); border-radius: 4px; overflow: hidden; }
 .quality-fill { height: 100%; border-radius: 4px; transition: width .4s, background .4s; }
 
+/* ── Low Light Warning ───────────────────────────────────── */
+.low-light-warning {
+    background: linear-gradient(135deg, rgba(245,158,11,.15), rgba(217,119,6,.08));
+    border: 1px solid rgba(245,158,11,.4);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-top: 12px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+}
+.low-light-warning.visible { display: flex; }
+.low-light-warning .icon {
+    font-size: 1.5rem;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.low-light-warning .text {
+    flex: 1;
+}
+.low-light-warning .text strong {
+    color: #f59e0b;
+    font-size: .9rem;
+}
+.low-light-warning .text p {
+    margin: 2px 0 0;
+    font-size: .8rem;
+    color: #666;
+}
+
 /* ── Tips ────────────────────────────────────────────────── */
 .tips-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 24px; }
 .tip-card {
@@ -195,10 +228,55 @@
     </div>
     {% endif %}
 
-    <!-- Main Card -->
+    {% if is_locked %}
+    <!-- LOCKED: face already registered, no approved unlock -->
+    <div class="face-card" style="padding:32px 28px;">
+        <div style="text-align:center;padding:16px 0 24px;">
+            <div style="font-size:48px;margin-bottom:12px;">🔒</div>
+            <h2 style="margin:0 0 8px;font-size:18px;">Face Registration Locked</h2>
+            <p style="color:#888;margin:0 0 24px;font-size:14px;">
+                Your face is already registered. To change it, send a request to the admin explaining why.
+            </p>
+        </div>
+
+        {% if pending_request %}
+        <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:16px 20px;text-align:center;">
+            <div style="font-weight:700;color:#856404;margin-bottom:4px;">⏳ Request Pending</div>
+            <div style="font-size:13px;color:#856404;">Your request "<strong>{{ pending_request.subject }}</strong>" is under review. You'll be notified once the admin responds.</div>
+        </div>
+        {% else %}
+        <!-- Request form -->
+        <div id="requestFormWrap">
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-weight:600;font-size:14px;margin-bottom:6px;">Subject</label>
+                <input type="text" id="resetSubject" placeholder="e.g. My face changed after surgery"
+                    style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block;font-weight:600;font-size:14px;margin-bottom:6px;">Describe why you need to re-register</label>
+                <textarea id="resetReason" rows="5" placeholder="Please explain in detail why you need to update your face registration..."
+                    style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>
+                <div style="font-size:12px;color:#888;margin-top:4px;">Minimum 20 characters required.</div>
+            </div>
+            <div id="resetMsg" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:14px;font-weight:600;"></div>
+            <button class="btn-primary" onclick="submitResetRequest()" id="resetSubmitBtn" style="width:100%;justify-content:center;">
+                📨 Send Request to Admin
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    {% elif approved_request %}
+    <!-- UNLOCKED: admin approved, show registration form with notice -->
+    <div style="background:#d4edda;border:1px solid #28a745;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:24px;">🔓</span>
+        <div>
+            <div style="font-weight:700;color:#155724;">Re-registration Unlocked</div>
+            <div style="font-size:13px;color:#155724;">Admin approved your request. Register your new face below. It will lock again after you submit.</div>
+        </div>
+    </div>
     <div class="face-card">
         <div class="face-card-header">
-            <!-- Tabs -->
             <div class="face-tabs">
                 <button class="face-tab active" id="tabUpload" onclick="switchTab('upload')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -210,72 +288,38 @@
                 </button>
             </div>
         </div>
-
-        <!-- Upload Panel -->
-        <div class="face-panel active" id="panelUpload">
-            <form id="uploadForm" method="post" action="{% url 'upload_face_photo' %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="upload-zone" id="uploadZone">
-                    <input type="file" name="photo" id="photoInput" accept="image/jpeg,image/png,image/webp" onchange="previewImage(this)">
-                    <div class="upload-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    </div>
-                    <h3>Drop your photo here</h3>
-                    <p>JPEG, PNG, or WebP · Max 10 MB · One clear, front-facing face</p>
-                    <img id="previewImg" class="upload-preview" alt="Preview">
-                </div>
-
-                <div class="btn-group">
-                    <button type="submit" class="btn-primary" id="uploadBtn" disabled>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                        Register Face
-                    </button>
-                    <button type="button" class="btn-secondary" onclick="document.getElementById('photoInput').click()">
-                        Choose File
-                    </button>
-                </div>
-            </form>
-
-            {% if messages %}
-            {% for message in messages %}
-            <div class="face-panel-message {{ message.tags }}" style="margin-top:16px; padding:12px 16px; border-radius:10px;
-                background:{% if 'error' in message.tags %}rgba(239,68,68,.12){% else %}rgba(16,185,129,.12){% endif %};
-                color:{% if 'error' in message.tags %}#ef4444{% else %}#10b981{% endif %};">
-                {{ message }}
-            </div>
-            {% endfor %}
-            {% endif %}
-        </div>
-
-        <!-- Camera Panel -->
-        <div class="face-panel" id="panelCamera">
-            <div class="camera-container" id="cameraContainer">
-                <video id="cameraFeed" muted playsinline autoplay></video>
-                <canvas id="captureCanvas"></canvas>
-                <div class="camera-overlay"></div>
-                <div class="face-guide-circle" id="faceGuide"></div>
-                <div class="camera-status" id="cameraStatus">Click "Start Camera" to begin</div>
-                <div class="camera-placeholder" id="cameraPlaceholder">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    <p>Camera not active</p>
-                </div>
-            </div>
-            <div id="captureResult"></div>
-            <div class="btn-group">
-                <button class="btn-primary" id="startCamBtn" onclick="startCamera()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    Start Camera
-                </button>
-                <button class="btn-secondary" id="captureBtn" onclick="capturePhoto()" style="display:none;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-                    Capture & Register
-                </button>
-                <button class="btn-secondary" id="stopCamBtn" onclick="stopCamera()" style="display:none;">Stop Camera</button>
-            </div>
-        </div>
+        {% include "attendance/_face_registration_panels.html" %}
     </div>
 
-    <!-- Tips -->
+    {% else %}
+    <!-- NOT registered yet — show normal registration form -->
+    <div class="face-card">
+        <div class="face-card-header">
+            <div class="face-tabs">
+                <button class="face-tab active" id="tabUpload" onclick="switchTab('upload')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Upload Photo
+                </button>
+                <button class="face-tab" id="tabCamera" onclick="switchTab('camera')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Camera Capture
+                </button>
+            </div>
+        </div>
+        {% include "attendance/_face_registration_panels.html" %}
+    </div>
+    {% endif %}
+
+    <!-- Low Light Warning -->
+<div id="lowLightWarning" class="low-light-warning">
+    <div class="icon">💡</div>
+    <div class="text">
+        <strong>Low Light Detected</strong>
+        <p>Please move to a brighter area or turn on more lights for better face detection.</p>
+    </div>
+</div>
+
+<!-- Tips -->
     <div class="tips-grid" style="margin-top:24px;">
         <div class="tip-card"><div class="tip-icon">💡</div><p>Use good front lighting — avoid strong backlight</p></div>
         <div class="tip-card"><div class="tip-icon">😐</div><p>Look directly into the camera with a neutral expression</p></div>
@@ -320,6 +364,8 @@ zone.addEventListener('drop', e => {
 // ── Camera logic ────────────────────────────────────────────
 let cameraStream = null;
 
+let lightingCheckInterval = null;
+
 async function startCamera() {
     try {
         cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: {ideal:640}, height: {ideal:480} } });
@@ -331,9 +377,52 @@ async function startCamera() {
         document.getElementById('startCamBtn').style.display = 'none';
         document.getElementById('captureBtn').style.display = 'inline-flex';
         document.getElementById('stopCamBtn').style.display = 'inline-flex';
+        
+        // Start low-light detection
+        startLightingCheck(video);
     } catch(e) {
         showCaptureResult('error', '⚠ Camera access denied. Please allow camera access in your browser settings.');
     }
+}
+
+// Real-time low-light detection
+function startLightingCheck(video) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 48;
+    const ctx = canvas.getContext('2d');
+    
+    lightingCheckInterval = setInterval(() => {
+        if (video.paused || video.ended) return;
+        
+        ctx.drawImage(video, 0, 0, 64, 48);
+        const frameData = ctx.getImageData(0, 0, 64, 48).data;
+        
+        // Calculate average brightness
+        let totalBrightness = 0;
+        for (let i = 0; i < frameData.length; i += 4) {
+            // Convert RGB to perceived brightness
+            const brightness = (frameData[i] * 0.299 + frameData[i+1] * 0.587 + frameData[i+2] * 0.114);
+            totalBrightness += brightness;
+        }
+        const avgBrightness = totalBrightness / (frameData.length / 4);
+        
+        // Show/hide low light warning
+        const warning = document.getElementById('lowLightWarning');
+        if (avgBrightness < 60) {
+            warning.classList.add('visible');
+        } else {
+            warning.classList.remove('visible');
+        }
+    }, 1000); // Check every second
+}
+
+function stopLightingCheck() {
+    if (lightingCheckInterval) {
+        clearInterval(lightingCheckInterval);
+        lightingCheckInterval = null;
+    }
+    document.getElementById('lowLightWarning').classList.remove('visible');
 }
 
 function stopCamera() {
@@ -344,6 +433,7 @@ function stopCamera() {
     document.getElementById('startCamBtn').style.display = 'inline-flex';
     document.getElementById('captureBtn').style.display = 'none';
     document.getElementById('stopCamBtn').style.display = 'none';
+    stopLightingCheck(); // Stop the lighting check interval
 }
 
 async function capturePhoto() {
@@ -392,6 +482,66 @@ function showCaptureResult(type, msg) {
 function getCsrf() {
     const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
     return c ? c.split('=')[1] : '';
+}
+
+async function submitResetRequest() {
+    const subject = document.getElementById('resetSubject').value.trim();
+    const reason  = document.getElementById('resetReason').value.trim();
+    const msgEl   = document.getElementById('resetMsg');
+    const btn     = document.getElementById('resetSubmitBtn');
+
+    if (!subject || !reason) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(239,68,68,.12)';
+        msgEl.style.color = '#ef4444';
+        msgEl.textContent = 'Please fill in both subject and reason.';
+        return;
+    }
+    if (reason.length < 20) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(239,68,68,.12)';
+        msgEl.style.color = '#ef4444';
+        msgEl.textContent = 'Reason must be at least 20 characters.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    const fd = new FormData();
+    fd.append('subject', subject);
+    fd.append('reason', reason);
+
+    try {
+        const resp = await fetch("{% url 'request_face_reset' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrf() },
+            body: fd,
+        });
+        const data = await resp.json();
+        msgEl.style.display = 'block';
+        if (data.status === 'success') {
+            msgEl.style.background = 'rgba(16,185,129,.12)';
+            msgEl.style.color = '#10b981';
+            msgEl.textContent = data.message;
+            document.getElementById('requestFormWrap').innerHTML =
+                '<div style="text-align:center;padding:20px;color:#856404;background:#fff3cd;border-radius:10px;">' +
+                '⏳ Request submitted. You will be notified once the admin reviews it.</div>';
+        } else {
+            msgEl.style.background = 'rgba(239,68,68,.12)';
+            msgEl.style.color = '#ef4444';
+            msgEl.textContent = data.message;
+            btn.disabled = false;
+            btn.textContent = '📨 Send Request to Admin';
+        }
+    } catch(e) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(239,68,68,.12)';
+        msgEl.style.color = '#ef4444';
+        msgEl.textContent = 'Network error. Please try again.';
+        btn.disabled = false;
+        btn.textContent = '📨 Send Request to Admin';
+    }
 }
 </script>
 {% endblock %}

@@ -1775,14 +1775,21 @@ function handleChatMessage(data) {
     const chatMessages = document.getElementById('chatMessages');
     const isOwn = data.user_id === currentUserId;
     
+    // Escape HTML to prevent XSS attacks
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+    
     const messageEl = document.createElement('div');
     messageEl.className = `chat-msg ${isOwn ? 'own' : ''}`;
     messageEl.innerHTML = `
         <div class="chat-msg-header">
-            <strong>${data.username}</strong>
+            <strong>${escapeHtml(data.username)}</strong>
             <span class="chat-msg-time">${new Date(data.timestamp).toLocaleTimeString()}</span>
         </div>
-        <div class="chat-msg-text">${data.message}</div>
+        <div class="chat-msg-text">${escapeHtml(data.message)}</div>
     `;
     
     chatMessages.appendChild(messageEl);

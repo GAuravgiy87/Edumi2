@@ -30,6 +30,11 @@ urlpatterns = [
     # ── Admin: Face Photos ───────────────────────────────────────
     path('admin/face-photos/', views.admin_face_photos, name='admin_face_photos'),
 
+    # ── Face Reset Requests ──────────────────────────────────────
+    path('face/reset/request/',                    views.request_face_reset,           name='request_face_reset'),
+    path('admin/face-reset-requests/',             views.admin_face_reset_requests,    name='admin_face_reset_requests'),
+    path('admin/face-reset-requests/<int:request_id>/review/', views.review_face_reset_request, name='review_face_reset_request'),
+
     # ── Engagement Reports ───────────────────────────────────────
     path('engagement-report/<int:meeting_id>/', views.engagement_report_view, name='engagement_report'),
 ]

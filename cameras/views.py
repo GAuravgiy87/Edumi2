@@ -378,8 +378,9 @@ def camera_feed(request, camera_id):
     
     def generate_frames():
         """Proxy frames from camera service"""
+        from django.conf import settings
         try:
-            camera_service_url = f'http://localhost:8001/api/cameras/{camera_id}/feed/'
+            camera_service_url = f'{settings.CAMERA_SERVICE_URL}/api/cameras/{camera_id}/feed/'
             logger.info(f"Proxying camera {camera_id} from {camera_service_url}")
             
             response = requests.get(camera_service_url, stream=True, timeout=None)
@@ -455,9 +456,10 @@ def live_monitor(request):
     
     # Check if camera service is running
     import requests
+    from django.conf import settings
     camera_service_running = False
     try:
-        response = requests.get('http://localhost:8001/api/cameras/', timeout=2)
+        response = requests.get(f'{settings.CAMERA_SERVICE_URL}/api/cameras/', timeout=2)
         camera_service_running = response.status_code == 200
     except:
         pass
