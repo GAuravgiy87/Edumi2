@@ -7,12 +7,19 @@ from .models import (
 
 @admin.register(StudentFaceProfile)
 class StudentFaceProfileAdmin(admin.ModelAdmin):
-    list_display  = ('student', 'is_active', 'face_quality_score', 'created_at', 'last_verified_at')
+    list_display  = ('student', 'is_active', 'face_quality_score', 'face_photo', 'created_at', 'last_verified_at')
     list_filter   = ('is_active',)
     search_fields = ('student__username', 'student__email')
     readonly_fields = ('face_embedding_encrypted', 'embedding_checksum',
-                       'created_at', 'updated_at', 'last_verified_at')
-    # Never allow deletion of embeddings via admin without audit reason
+                       'created_at', 'updated_at', 'last_verified_at', 'face_photo_preview')
+
+    def face_photo_preview(self, obj):
+        if obj.face_photo:
+            from django.utils.html import format_html
+            return format_html('<img src="{}" style="max-height:200px;border-radius:8px;">', obj.face_photo.url)
+        return "No photo"
+    face_photo_preview.short_description = "Face Photo"
+
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
 

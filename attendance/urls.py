@@ -26,4 +26,10 @@ urlpatterns = [
 
     # ── API ─────────────────────────────────────────────────────
     path('api/check-schedule/<str:meeting_code>/', views.check_schedule_api, name='check_schedule_api'),
+
+    # ── Admin: Face Photos ───────────────────────────────────────
+    path('admin/face-photos/', views.admin_face_photos, name='admin_face_photos'),
+
+    # ── Engagement Reports ───────────────────────────────────────
+    path('engagement-report/<int:meeting_id>/', views.engagement_report_view, name='engagement_report'),
 ]

@@ -13,6 +13,7 @@
     {% compress css %}
     <link rel="stylesheet" href="{% static 'css/modern-design.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
     {% block extra_css %}{% endblock %}
     {% endcompress %}
 
@@ -100,6 +101,15 @@
                                 </svg>
                             </span>
                             <span class="sidebar-nav-text">Cameras</span>
+                        </a>
+                        <a href="{% url 'admin_face_photos' %}" class="sidebar-nav-item {% if '/attendance/admin/face-photos/' in request.path %}active{% endif %}">
+                            <span class="sidebar-nav-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                            </span>
+                            <span class="sidebar-nav-text">Face Photos</span>
                         </a>
                     </div>
 

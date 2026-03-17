@@ -1,0 +1,149 @@
+{% extends "base_sidebar.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="er-wrap">
+  <div class="er-header">
+    <div class="er-header-inner">
+      <h1>📊 Engagement Report</h1>
+      <p class="er-subtitle">{{ meeting.title }} &mdash; {{ meeting.scheduled_time|date:"M d, Y" }}</p>
+    </div>
+    {% if report %}
+    <div class="er-score-badge">
+      <span class="er-score-num">{{ report.class_engagement_score }}%</span>
+      <span class="er-score-label">Class Score</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not report %}
+  <div class="er-empty">
+    <div class="er-empty-icon">📭</div>
+    <p>No engagement data available for this meeting.</p>
+    <p style="font-size:14px;color:#888;">Data is collected during live meetings with face tracking enabled.</p>
+  </div>
+  {% else %}
+
+  <!-- Summary cards -->
+  <div class="er-summary-row">
+    <div class="er-stat-card">
+      <div class="er-stat-num">{{ report.student_data|length }}</div>
+      <div class="er-stat-label">Students Tracked</div>
+    </div>
+    <div class="er-stat-card">
+      <div class="er-stat-num">{{ report.class_engagement_score }}%</div>
+      <div class="er-stat-label">Avg Engagement</div>
+    </div>
+    <div class="er-stat-card">
+      <div class="er-stat-num">{{ meeting.duration_minutes }}m</div>
+      <div class="er-stat-label">Meeting Duration</div>
+    </div>
+  </div>
+
+  <!-- Per-student cards -->
+  <div class="er-students">
+    {% for s in report.student_data %}
+    <div class="er-card">
+      <div class="er-card-header">
+        <div class="er-avatar">{{ s.name|slice:":1"|upper }}</div>
+        <div class="er-card-info">
+          <div class="er-name">{{ s.name }}</div>
+          <div class="er-username">@{{ s.username }}</div>
+        </div>
+        <div class="er-card-score" data-score="{{ s.engagement_score }}">
+          {{ s.engagement_score }}%
+        </div>
+      </div>
+
+      <div class="bar-wrap">
+        <label><span>Engagement</span><span>{{ s.engagement_score }}%</span></label>
+        <div class="bar">
+          <div class="bar-fill engagement-bar" data-pct="{{ s.engagement_score }}"></div>
+        </div>
+      </div>
+
+      <div class="bar-wrap">
+        <label><span>Face Visible</span><span>{{ s.presence_pct }}%</span></label>
+        <div class="bar">
+          <div class="bar-fill presence-bar" data-pct="{{ s.presence_pct }}"></div>
+        </div>
+      </div>
+
+      <span class="ebadge e-{{ s.dominant_emotion }}">
+        {% if s.dominant_emotion == 'focused' %}🎯 Focused
+        {% elif s.dominant_emotion == 'happy' %}😊 Happy
+        {% elif s.dominant_emotion == 'confused' %}😕 Confused
+        {% elif s.dominant_emotion == 'distracted' %}😶 Distracted
+        {% else %}❓ Unknown{% endif %}
+      </span>
+
+      <div class="er-meta">
+        <span>📸 {{ s.total_snapshots }} snapshots</span>
+        <span>🎯 {{ s.avg_confidence }} conf</span>
+      </div>
+    </div>
+    {% empty %}
+    <div class="er-empty"><p>No student data recorded.</p></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.er-wrap { max-width:1100px; margin:0 auto; padding:24px 16px; }
+.er-header { background:linear-gradient(135deg,#667eea,#764ba2); border-radius:12px; padding:28px 32px; color:#fff; display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+.er-header h1 { margin:0 0 4px; font-size:24px; }
+.er-subtitle { margin:0; opacity:.85; font-size:15px; }
+.er-score-badge { text-align:center; background:rgba(255,255,255,.2); border-radius:12px; padding:16px 24px; }
+.er-score-num { display:block; font-size:36px; font-weight:700; }
+.er-score-label { font-size:13px; opacity:.85; }
+.er-summary-row { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+.er-stat-card { flex:1; min-width:140px; background:#fff; border-radius:10px; padding:20px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.er-stat-num { font-size:28px; font-weight:700; color:#667eea; }
+.er-stat-label { font-size:13px; color:#888; margin-top:4px; }
+.er-students { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.er-card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.er-card-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.er-avatar { width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; flex-shrink:0; }
+.er-card-info { flex:1; }
+.er-name { font-weight:600; font-size:15px; }
+.er-username { font-size:12px; color:#888; }
+.er-card-score { font-size:20px; font-weight:700; }
+.bar-wrap { margin-bottom:12px; }
+.bar-wrap label { display:flex; justify-content:space-between; font-size:13px; color:#555; margin-bottom:4px; }
+.bar { background:#f0f0f0; border-radius:4px; height:8px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:4px; width:0; transition:width .6s ease; }
+.ebadge { display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; margin:8px 0; background:#e8f4fd; color:#2980b9; }
+.e-focused { background:#d4edda; color:#155724; }
+.e-happy { background:#fff3cd; color:#856404; }
+.e-confused { background:#fde8d8; color:#c0392b; }
+.e-distracted { background:#f8d7da; color:#721c24; }
+.er-meta { display:flex; gap:12px; font-size:12px; color:#888; margin-top:8px; }
+.er-empty { text-align:center; padding:60px 20px; color:#888; }
+.er-empty-icon { font-size:48px; margin-bottom:12px; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Set engagement bar widths and colors from data-pct
+  document.querySelectorAll('.engagement-bar').forEach(function(el) {
+    var pct = parseFloat(el.dataset.pct) || 0;
+    el.style.width = pct + '%';
+    el.style.background = pct >= 70 ? '#27ae60' : pct >= 40 ? '#f39c12' : '#e74c3c';
+  });
+
+  // Set presence bar widths
+  document.querySelectorAll('.presence-bar').forEach(function(el) {
+    var pct = parseFloat(el.dataset.pct) || 0;
+    el.style.width = pct + '%';
+    el.style.background = '#667eea';
+  });
+
+  // Color the score badge
+  document.querySelectorAll('.er-card-score').forEach(function(el) {
+    var score = parseFloat(el.dataset.score) || 0;
+    el.style.color = score >= 70 ? '#27ae60' : score >= 40 ? '#f39c12' : '#e74c3c';
+  });
+});
+</script>
+{% endblock %}

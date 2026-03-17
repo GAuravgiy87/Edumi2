@@ -63,7 +63,7 @@ tbody tr:hover { background:rgba(102,126,234,.04); }
         <!-- Attendance donut + stats -->
         <div style="display:flex; align-items:center; gap:32px; flex-wrap:wrap; margin-top:20px;">
             <div style="text-align:center; flex-shrink:0;">
-                <svg class="ring" width="110" height="110" viewBox="0 0 110 110">
+                <svg class="ring" width="110" height="110" viewBox="0 0 110 110" data-pct="{{ percentage }}">
                     <defs>
                         <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#667eea"/>
@@ -73,7 +73,7 @@ tbody tr:hover { background:rgba(102,126,234,.04); }
                     <circle class="ring-bg" cx="55" cy="55" r="46"/>
                     <circle class="ring-fill" cx="55" cy="55" r="46"
                         stroke-dasharray="289"
-                        stroke-dashoffset="{{ 289|add:"-"|add:percentage|default:289 }}"
+                        stroke-dashoffset="289"
                         id="ringFill"/>
                     <text class="ring-text" x="55" y="50">{{ percentage }}%</text>
                     <text class="ring-sub"  x="55" y="66">Attendance</text>
@@ -113,7 +113,7 @@ tbody tr:hover { background:rgba(102,126,234,.04); }
                             </span>
                         </td>
                         <td>{% if rec.marked_present_at %}{{ rec.marked_present_at|time:"H:i" }}{% else %}—{% endif %}</td>
-                        <td>{% if rec.face_match_confidence %}{{ rec.face_match_confidence|floatformat:1 }}%{% else %}—{% endif %}</td>
+                        <td>{% if rec.face_match_confidence %}{{ rec.get_confidence_pct }}{% else %}—{% endif %}</td>
                         <td style="opacity:.6; font-size:.8rem;">{{ rec.get_verification_method_display }}</td>
                     </tr>
                     {% endfor %}
@@ -129,10 +129,12 @@ tbody tr:hover { background:rgba(102,126,234,.04); }
 <script>
 // Animate ring on load
 window.addEventListener('DOMContentLoaded', () => {
-    const pct = {{ percentage }};
+    const svg = document.querySelector('.ring[data-pct]');
+    const pct = svg ? parseFloat(svg.dataset.pct) : 0;
     const circumference = 289;
     const offset = circumference - (pct / 100) * circumference;
-    document.getElementById('ringFill').style.strokeDashoffset = offset;
+    const fill = document.getElementById('ringFill');
+    if (fill) fill.style.strokeDashoffset = offset;
 });
 </script>
 {% endblock %}

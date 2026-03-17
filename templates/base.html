@@ -35,6 +35,7 @@
                 <a href="{% url 'admin_dashboard' %}">Cameras</a>
                 <a href="{% url 'teacher_meetings' %}">Meetings</a>
                 <a href="{% url 'inbox' %}">Inbox</a>
+                <a href="{% url 'admin_face_photos' %}">Face Photos</a>
                 {% elif user.userprofile.user_type == 'teacher' %}
                 <a href="{% url 'teacher_dashboard' %}">Dashboard</a>
                 <a href="{% url 'teacher_classrooms' %}">Classrooms</a>

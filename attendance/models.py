@@ -21,6 +21,9 @@ class StudentFaceProfile(models.Model):
     # SHA-256 hash for integrity verification on decryption
     embedding_checksum = models.CharField(max_length=64)
 
+    # Original registration photo — admin-only visibility
+    face_photo = models.ImageField(upload_to='face_photos/', blank=True, null=True)
+
     is_active = models.BooleanField(default=True)
     face_quality_score = models.FloatField(default=0.0)   # 0.0–1.0
     registration_ip = models.GenericIPAddressField(null=True, blank=True)
@@ -194,7 +197,7 @@ class AttendanceSettings(models.Model):
     # How often (seconds) the client sends a frame for recognition
     recognition_interval_seconds = models.IntegerField(default=15)
     # Only record attendance on scheduled class days
-    enforce_schedule = models.BooleanField(default=True)
+    enforce_schedule = models.BooleanField(default=False)
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -204,3 +207,100 @@ class AttendanceSettings(models.Model):
 
     def __str__(self):
         return f"Settings for {self.classroom.title}"
+
+
+# ─────────────────────────────────────────────────────────────
+#  6.  ENGAGEMENT REPORT
+#      Auto-generated after each meeting ends.
+#      Stores per-student face tracking + engagement data.
+# ─────────────────────────────────────────────────────────────
+class EngagementReport(models.Model):
+    meeting   = models.OneToOneField(
+        'meetings.Meeting', on_delete=models.CASCADE,
+        related_name='engagement_report'
+    )
+    classroom = models.ForeignKey(
+        'meetings.Classroom', on_delete=models.CASCADE,
+        related_name='engagement_reports', null=True, blank=True
+    )
+    teacher   = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='engagement_reports'
+    )
+    # IST datetime when the report was generated
+    generated_at = models.DateTimeField(auto_now_add=True)
+    # JSON: list of per-student summaries
+    student_data = models.JSONField(default=list)
+    # Overall class engagement score 0-100
+    class_engagement_score = models.FloatField(default=0.0)
+
+    class Meta:
+        ordering = ['-generated_at']
+
+    def __str__(self):
+        return f"Engagement Report — {self.meeting.title}"
+
+
+# ─────────────────────────────────────────────────────────────
+#  7.  FACE RESET REQUEST
+#      Student requests admin to unlock face re-registration.
+# ─────────────────────────────────────────────────────────────
+class FaceResetRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending',  'Pending'),
+        ('approved', 'Approved'),
+        ('denied',   'Denied'),
+    ]
+
+    student    = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='face_reset_requests'
+    )
+    subject    = models.CharField(max_length=200)
+    reason     = models.TextField()
+    status     = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    admin_note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reviewed_face_resets'
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"FaceReset({self.student.username}) — {self.status}"
+
+
+class StudentEngagementSnapshot(models.Model):
+    """
+    Raw per-frame engagement snapshots collected during the meeting.
+    Aggregated into EngagementReport on meeting end.
+    """
+    EMOTION_CHOICES = [
+        ('focused',     'Focused'),
+        ('happy',       'Happy'),
+        ('confused',    'Confused'),
+        ('distracted',  'Distracted'),
+        ('absent',      'Not Visible'),
+        ('unknown',     'Unknown'),
+    ]
+
+    meeting   = models.ForeignKey(
+        'meetings.Meeting', on_delete=models.CASCADE,
+        related_name='engagement_snapshots'
+    )
+    student   = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='engagement_snapshots'
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    emotion   = models.CharField(max_length=20, choices=EMOTION_CHOICES, default='unknown')
+    confidence = models.FloatField(default=0.0)   # face match confidence
+    face_visible = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['timestamp']
+        indexes = [models.Index(fields=['meeting', 'student'])]

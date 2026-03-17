@@ -53,6 +53,7 @@ class ClassroomMembership(models.Model):
         ('approved', 'Approved'),
         ('denied', 'Denied'),
         ('removed', 'Removed'),
+        ('left', 'Left'),
     ]
     
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='memberships')

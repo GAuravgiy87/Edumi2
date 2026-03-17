@@ -1,4 +1,3 @@
-import cv2
 import threading
 import time
 import logging
@@ -41,6 +40,7 @@ def can_view_camera(user, camera):
 
 def test_rtsp_paths(ip, port, username, password):
     """Test common RTSP paths to find the working one"""
+    import cv2
     common_paths = [
         '/live',
         '/stream',
@@ -245,6 +245,7 @@ class CameraStreamer:
 
     def _connect_camera(self):
         """Attempt to connect to the camera"""
+        import cv2
         try:
             cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
             cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
@@ -288,6 +289,7 @@ class CameraStreamer:
 
             # Read frame from camera
             try:
+                import cv2
                 ret, frame = self.cap.read()
                 
                 if ret and frame is not None:
@@ -480,6 +482,7 @@ def view_camera(request, camera_id):
 @login_required
 def test_camera(request, camera_id):
     """Test camera connection"""
+    import cv2
     camera = get_object_or_404(Camera, id=camera_id)
     
     try:

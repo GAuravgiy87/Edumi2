@@ -87,6 +87,12 @@ def classroom_detail(request, classroom_id):
         pending_requests = classroom.get_pending_requests()
         approved_students = classroom.get_approved_memberships()
         meetings = classroom.meetings.all().order_by('-created_at')
+        # Annotate each meeting with face attendance counts
+        from attendance.models import AttendanceRecord
+        for m in meetings:
+            recs = AttendanceRecord.objects.filter(meeting=m)
+            m.att_present = recs.filter(status__in=['present', 'late']).count()
+            m.att_total   = approved_students.count()
     else:
         pending_requests = None
         approved_students = None
@@ -507,6 +513,13 @@ def end_meeting(request, meeting_id):
     
     # Trigger AI Summary Generation (Background Task)
     generate_meeting_summary.delay(meeting.id)
+
+    # Generate face engagement report (sync — fast, uses existing snapshots)
+    try:
+        from attendance.engagement_service import generate_engagement_report
+        generate_engagement_report(meeting.id)
+    except Exception as _e:
+        pass  # Don't block meeting end if report fails
     
     # Redirect to classroom if meeting was in a classroom
     if meeting.classroom:
@@ -573,37 +586,5 @@ def cancel_meeting(request, meeting_id):
     
     return JsonResponse({'status': 'success'})
 
-@login_required
-def meeting_attendance(request, meeting_code):
-    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
-    
-    # Check permission (Teacher of meeting or Superuser)
-    if meeting.teacher != request.user and not request.user.is_superuser:
-        return render(request, 'error.html', {'message': 'You do not have permission to view attendance for this meeting'})
-    
-    participants = meeting.participants.all().select_related('user').prefetch_related('attendance_logs')
-    
-    context = {
-        'meeting': meeting,
-        'participants': participants,
-    }
-    
-    return render(request, 'meetings/attendance_report.html', context)
 
-@login_required
-def meeting_summary(request, meeting_code):
-    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
-    
-    # Check if user was a participant or is the teacher
-    is_participant = MeetingParticipant.objects.filter(meeting=meeting, user=request.user).exists()
-    if not is_participant and meeting.teacher != request.user and not request.user.is_superuser:
-        messages.error(request, "You don't have permission to view this summary.")
-        return redirect('home')
-
-    summary = MeetingSummary.objects.filter(meeting=meeting).first()
-    
-    return render(request, 'meetings/meeting_summary.html', {
-        'meeting': meeting,
-        'summary': summary
-    })
 

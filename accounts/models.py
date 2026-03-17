@@ -57,6 +57,23 @@ class UserProfile(models.Model):
         return f"https://ui-avatars.com/api/?name={self.user.username}&background=1877f2&color=fff&size=200"
 
 
+class StudentPhoto(models.Model):
+    """
+    Admin-only photo uploaded by a student.
+    Visible in the frontend upload form but the image itself is hidden from everyone except admins.
+    """
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='student_photos')
+    photo = models.ImageField(upload_to='student_photos/')
+    caption = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"{self.student.username} — {self.uploaded_at:%Y-%m-%d}"
+
+
 # Import messaging models
 from .messaging_models import Conversation, Message
 

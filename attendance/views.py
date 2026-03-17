@@ -25,7 +25,7 @@ from .models import (
     FaceRecognitionLog, AttendanceSettings
 )
 from .forms import FacePhotoForm
-from .face_service import FaceService
+from .face_service import FaceService, get_face_service
 
 logger = logging.getLogger('attendance')
 
@@ -58,21 +58,22 @@ def upload_face_photo(request):
         return redirect('face_setup')
 
     photo = form.cleaned_data['photo']
-    image_bytes = photo.read()      # read into memory — never written to disk
+    photo.seek(0)                   # reset pointer — Django may have read it during validation
+    image_bytes = photo.read()
 
-    svc = FaceService()
-    result = svc.extract_embedding(image_bytes)
+    svc = get_face_service()
+    result = svc.extract_embedding(image_bytes)  # live=False (default) — skip variance check for uploads
 
     if result['status'] != 'success':
         messages.error(request, f"Face detection failed: {result['message']}")
         return redirect('face_setup')
 
-    if result['quality'] < 0.15:
-        messages.error(request, "Photo quality is too low. Please use a clearer, closer photo.")
-        return redirect('face_setup')
-
     # Encrypt and save
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
+
+    # Save the actual photo file for admin review
+    from django.core.files.base import ContentFile
+    photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
 
     StudentFaceProfile.objects.update_or_create(
         student=request.user,
@@ -82,6 +83,7 @@ def upload_face_photo(request):
             'face_quality_score':       result['quality'],
             'is_active':                True,
             'registration_ip':          _get_client_ip(request),
+            'face_photo':               photo_file,
         }
     )
 
@@ -107,16 +109,18 @@ def capture_face_photo(request):
     except Exception as exc:
         return JsonResponse({'status': 'error', 'message': f'Invalid frame data: {exc}'}, status=400)
 
-    svc    = FaceService()
-    result = svc.extract_embedding(image_bytes)
+    svc    = get_face_service()
+    result = svc.extract_embedding(image_bytes)  # live=False (default) — skip variance check for captures
 
     if result['status'] != 'success':
         return JsonResponse({'status': 'error', 'message': result['message']})
 
-    if result['quality'] < 0.15:
-        return JsonResponse({'status': 'error', 'message': 'Image quality too low. Move closer and ensure good lighting.'})
-
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
+
+    # Save the captured frame as the face photo for admin review
+    from django.core.files.base import ContentFile
+    photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
+
     StudentFaceProfile.objects.update_or_create(
         student=request.user,
         defaults={
@@ -125,6 +129,7 @@ def capture_face_photo(request):
             'face_quality_score':       result['quality'],
             'is_active':                True,
             'registration_ip':          _get_client_ip(request),
+            'face_photo':               photo_file,
         }
     )
 
@@ -312,7 +317,7 @@ def daily_report(request, classroom_id):
             'record':     rec,
             'status':     rec.status if rec else 'absent',
             'time_in':    rec.marked_present_at if rec else None,
-            'confidence': rec.face_match_confidence if rec else 0,
+            'confidence': round(rec.face_match_confidence * 100, 1) if rec else 0,
             'method':     rec.verification_method if rec else '—',
         })
 
@@ -364,17 +369,32 @@ def student_report(request, classroom_id, student_id):
 @login_required
 def classroom_attendance_overview(request, classroom_id):
     """Teacher dashboard: all students with overall attendance %."""
+    from django.db.models import Count, Q
     classroom   = get_object_or_404(Classroom, id=classroom_id, teacher=request.user)
     memberships = classroom.get_approved_memberships()
 
+    total_meetings = Meeting.objects.filter(classroom=classroom, status='ended').count()
+
+    # Single query: aggregate attendance per student
+    att_map = {
+        r['student_id']: r
+        for r in AttendanceRecord.objects.filter(classroom=classroom)
+            .values('student_id')
+            .annotate(
+                total=Count('id'),
+                present=Count('id', filter=Q(status__in=['present', 'late']))
+            )
+    }
+
     rows = []
     for m in memberships:
-        records = AttendanceRecord.objects.filter(
-            classroom=classroom, student=m.student
-        )
-        total   = records.count()
-        present = records.filter(status__in=['present', 'late']).count()
-        face_registered = hasattr(m.student, 'face_profile') and m.student.face_profile.is_active
+        agg = att_map.get(m.student_id, {'total': 0, 'present': 0})
+        total   = agg['total']
+        present = agg['present']
+        try:
+            face_registered = m.student.face_profile.is_active
+        except Exception:
+            face_registered = False
 
         rows.append({
             'student':         m.student,
@@ -387,15 +407,18 @@ def classroom_attendance_overview(request, classroom_id):
 
     rows.sort(key=lambda x: x['percentage'])
 
+    face_registered_count = sum(1 for r in rows if r['face_registered'])
     settings_obj, _ = AttendanceSettings.objects.get_or_create(classroom=classroom)
     schedules        = ClassSchedule.objects.filter(classroom=classroom, is_active=True)
 
     ctx = {
-        'classroom':    classroom,
-        'rows':         rows,
-        'att_settings': settings_obj,
-        'schedules':    schedules,
-        'page_title':   f'Attendance — {classroom.title}',
+        'classroom':             classroom,
+        'rows':                  rows,
+        'att_settings':          settings_obj,
+        'schedules':             schedules,
+        'total_meetings':        total_meetings,
+        'face_registered_count': face_registered_count,
+        'page_title':            f'Attendance — {classroom.title}',
     }
     return render(request, 'attendance/classroom_overview.html', ctx)
 
@@ -537,6 +560,60 @@ def check_schedule_api(request, meeting_code):
         'message':   'Class is scheduled today.' if scheduled else 'No class scheduled today — attendance not recorded.',
         'interval':  settings_obj.recognition_interval_seconds,
     })
+
+
+# ══════════════════════════════════════════════════════════════
+#  TEACHER: ENGAGEMENT REPORT
+# ══════════════════════════════════════════════════════════════
+
+@login_required
+def engagement_report_view(request, meeting_id):
+    """Teacher views the engagement report for a completed meeting."""
+    from meetings.models import Meeting
+    from .models import EngagementReport
+
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied.")
+
+    report = EngagementReport.objects.filter(meeting=meeting).first()
+
+    # If report doesn't exist yet, generate it now
+    if not report and meeting.status == 'ended':
+        from .engagement_service import generate_engagement_report
+        generate_engagement_report(meeting.id)
+        report = EngagementReport.objects.filter(meeting=meeting).first()
+
+    ctx = {
+        'meeting':    meeting,
+        'report':     report,
+        'page_title': f'Engagement Report — {meeting.title}',
+    }
+    return render(request, 'attendance/engagement_report.html', ctx)
+
+
+# ══════════════════════════════════════════════════════════════
+#  ADMIN: STUDENT FACE PHOTOS
+# ══════════════════════════════════════════════════════════════
+
+@login_required
+def admin_face_photos(request):
+    """Admin-only view of all student face registration photos."""
+    if not request.user.is_superuser:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied.")
+
+    profiles = StudentFaceProfile.objects.filter(
+        is_active=True, face_photo__isnull=False
+    ).exclude(face_photo='').select_related('student', 'student__userprofile').order_by('-updated_at')
+
+    ctx = {
+        'profiles':   profiles,
+        'page_title': 'Student Face Photos',
+    }
+    return render(request, 'attendance/admin_face_photos.html', ctx)
 
 
 # ══════════════════════════════════════════════════════════════

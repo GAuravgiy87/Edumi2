@@ -1,0 +1,80 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Student Face Photos — Admin{% endblock %}
+{% block page_title %}Student Face Photos{% endblock %}
+
+{% block extra_css %}
+<style>
+.photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 8px 0 48px;
+}
+.photo-card {
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, rgba(0,0,0,.08));
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    transition: transform .2s;
+}
+.photo-card:hover { transform: translateY(-3px); }
+.photo-card img {
+    width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block;
+}
+.photo-card-info {
+    padding: 12px 14px;
+}
+.photo-card-info strong { display: block; font-size: .9rem; margin-bottom: 2px; }
+.photo-card-info span { font-size: .75rem; opacity: .55; }
+.quality-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 5px; vertical-align: middle;
+}
+.empty-state {
+    text-align: center; padding: 80px 24px; opacity: .45;
+}
+.admin-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(239,68,68,.1); color: #ef4444;
+    border: 1px solid rgba(239,68,68,.25);
+    padding: 6px 14px; border-radius: 20px; font-size: .8rem; font-weight: 700;
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    Admin Only — Not visible to students or teachers
+</div>
+
+{% if profiles %}
+<p style="opacity:.55; font-size:.875rem; margin-bottom:20px;">{{ profiles|length }} registered student{{ profiles|length|pluralize }} with face photos.</p>
+<div class="photos-grid">
+    {% for p in profiles %}
+    <div class="photo-card">
+        <img src="{{ p.face_photo.url }}" alt="{{ p.student.username }}"
+             onerror="this.style.display='none'">
+        <div class="photo-card-info">
+            <strong>{{ p.student.get_full_name|default:p.student.username }}</strong>
+            <span>@{{ p.student.username }}</span><br>
+            <span>
+                <span class="quality-dot" style="background:{% if p.face_quality_score >= 0.5 %}#10b981{% elif p.face_quality_score >= 0.2 %}#f59e0b{% else %}#ef4444{% endif %}"></span>
+                Quality: {{ p.face_quality_score|floatformat:2 }}
+            </span><br>
+            <span>{{ p.updated_at|date:"M d, Y H:i" }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" style="margin-bottom:12px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    <p>No face photos registered yet.</p>
+</div>
+{% endif %}
+{% endblock %}

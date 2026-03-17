@@ -130,6 +130,7 @@ def parse_camera_url(url):
     }
 
 
+@login_required
 def add_mobile_camera(request):
     """Add a new mobile camera"""
     if not is_admin(request.user):

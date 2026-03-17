@@ -2060,5 +2060,196 @@ window.addEventListener('load', init);
 {% endif %}
 <!-- END FACE ATTENDANCE MODULE -->
 
+{% if is_host %}
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  FACE TRACKING MODULE (teacher only)                        -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<style>
+#ft-toggle-btn {
+    position: fixed; bottom: 90px; right: 20px; z-index: 1001;
+    padding: 10px 18px; border-radius: 24px; border: none; cursor: pointer;
+    font-size: .8rem; font-weight: 600; color: #fff;
+    background: rgba(102,126,234,.85); backdrop-filter: blur(12px);
+    box-shadow: 0 4px 20px rgba(0,0,0,.3); transition: all .3s ease;
+    display: flex; align-items: center; gap: 7px;
+}
+#ft-toggle-btn.active { background: rgba(16,185,129,.85); }
+#ft-toggle-btn.active::before { content: ''; width:8px; height:8px; border-radius:50%; background:#fff; animation:fa-pulse 1.2s infinite; }
+
+/* Canvas overlay sits on top of each video-box */
+.ft-canvas-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 10;
+}
+.video-box { position: relative; }
+
+/* Emotion badge under name tag */
+.ft-emotion-badge {
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.65); color: #fff; font-size: .7rem; font-weight: 600;
+    padding: 2px 8px; border-radius: 10px; white-space: nowrap; z-index: 11;
+    pointer-events: none; backdrop-filter: blur(4px);
+}
+</style>
+
+<button id="ft-toggle-btn" onclick="toggleFaceTracking()" title="Toggle face tracking">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+    Face Tracking
+</button>
+
+<script>
+(function () {
+    const FT_INTERVAL_MS = 5000;   // capture every 5 s
+    let ftEnabled   = false;
+    let ftWs        = null;
+    let ftTimer     = null;
+    const ftCanvas  = document.createElement('canvas');
+
+    // ── Toggle ─────────────────────────────────────────────────
+    window.toggleFaceTracking = function () {
+        if (!ftEnabled) {
+            ftEnabled = true;
+            document.getElementById('ft-toggle-btn').classList.add('active');
+            document.getElementById('ft-toggle-btn').innerHTML =
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Tracking ON';
+            connectFT();
+        } else {
+            ftEnabled = false;
+            document.getElementById('ft-toggle-btn').classList.remove('active');
+            document.getElementById('ft-toggle-btn').innerHTML =
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Face Tracking';
+            stopFT();
+        }
+    };
+
+    // ── WebSocket ──────────────────────────────────────────────
+    function connectFT() {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ftWs = new WebSocket(`${proto}//${window.location.host}/ws/face-tracking/${meetingCode}/`);
+        ftWs.onopen    = () => { console.log('[FT] connected'); startFTCapture(); };
+        ftWs.onmessage = e => handleFTMessage(JSON.parse(e.data));
+        ftWs.onclose   = () => { if (ftEnabled) setTimeout(connectFT, 4000); };
+        ftWs.onerror   = err => console.warn('[FT] error', err);
+    }
+
+    function stopFT() {
+        if (ftTimer) { clearInterval(ftTimer); ftTimer = null; }
+        if (ftWs)    { ftWs.close(); ftWs = null; }
+        // Remove all overlays
+        document.querySelectorAll('.ft-canvas-overlay').forEach(c => c.remove());
+        document.querySelectorAll('.ft-emotion-badge').forEach(b => b.remove());
+    }
+
+    // ── Capture & send bulk frame ──────────────────────────────
+    function startFTCapture() {
+        if (ftTimer) return;
+        ftTimer = setInterval(captureAllStudents, FT_INTERVAL_MS);
+        setTimeout(captureAllStudents, 1000);
+    }
+
+    function captureAllStudents() {
+        if (!ftWs || ftWs.readyState !== WebSocket.OPEN) return;
+
+        const frames = {};
+        document.querySelectorAll('.video-box').forEach(box => {
+            const uid = box.dataset.userId;
+            if (!uid || String(uid) === String(currentUserId)) return;  // skip teacher's own video
+
+            const video = box.querySelector('video');
+            if (!video || video.readyState < 2) return;
+
+            ftCanvas.width  = 320;
+            ftCanvas.height = 240;
+            const ctx = ftCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, 320, 240);
+            frames[uid] = ftCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+        });
+
+        if (Object.keys(frames).length === 0) return;
+
+        ftWs.send(JSON.stringify({ type: 'bulk_frame', frames }));
+    }
+
+    // ── Handle results ─────────────────────────────────────────
+    function handleFTMessage(data) {
+        if (data.type === 'bulk_tracking_result') {
+            Object.entries(data.results).forEach(([uid, res]) => {
+                drawOverlay(uid, res);
+            });
+        } else if (data.type === 'tracking_result') {
+            drawOverlay(data.student_id, data);
+        }
+    }
+
+    // ── Draw bounding boxes + labels on canvas overlay ─────────
+    function drawOverlay(uid, res) {
+        const box = document.getElementById(`video-${uid}`);
+        if (!box) return;
+
+        // Ensure canvas overlay exists
+        let canvas = box.querySelector('.ft-canvas-overlay');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.className = 'ft-canvas-overlay';
+            box.appendChild(canvas);
+        }
+        canvas.width  = box.offsetWidth  || 320;
+        canvas.height = box.offsetHeight || 240;
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!res.face_visible || !res.faces || res.faces.length === 0) {
+            updateEmotionBadge(box, null);
+            return;
+        }
+
+        res.faces.forEach(face => {
+            const x = face.box.x * canvas.width;
+            const y = face.box.y * canvas.height;
+            const w = face.box.w * canvas.width;
+            const h = face.box.h * canvas.height;
+
+            // Green box
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth   = 2;
+            ctx.strokeRect(x, y, w, h);
+
+            // Name label background
+            const label = face.name !== 'Unknown'
+                ? `${face.name} (${Math.round(face.confidence * 100)}%)`
+                : 'Unknown';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            const tw = ctx.measureText(label).width;
+            ctx.fillStyle = 'rgba(34,197,94,.85)';
+            ctx.fillRect(x, y - 20, tw + 10, 20);
+
+            // Name text
+            ctx.fillStyle = '#fff';
+            ctx.fillText(label, x + 5, y - 5);
+        });
+
+        // Emotion badge (dominant)
+        updateEmotionBadge(box, res.emotion_label || null);
+    }
+
+    function updateEmotionBadge(box, label) {
+        let badge = box.querySelector('.ft-emotion-badge');
+        if (!label) {
+            if (badge) badge.remove();
+            return;
+        }
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'ft-emotion-badge';
+            box.appendChild(badge);
+        }
+        badge.textContent = label;
+    }
+})();
+</script>
+{% endif %}
+<!-- END FACE TRACKING MODULE -->
+
 </body>
 </html>

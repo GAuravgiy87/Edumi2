@@ -92,12 +92,8 @@ tbody tr:hover { background:rgba(102,126,234,.04); }
     <!-- Summary cards -->
     <div class="cards-grid">
         <div class="mini-card"><div class="mv blue">{{ rows|length }}</div><div class="ml">Students</div></div>
-        {% with rows|length as total %}
-        <div class="mini-card">
-            <div class="mv green">{{ rows|dictsortreversed:"percentage"|first }}</div>
-            <div class="ml">Face Registered</div>
-        </div>
-        {% endwith %}
+        <div class="mini-card"><div class="mv green">{{ face_registered_count }}</div><div class="ml">Face Registered</div></div>
+        <div class="mini-card"><div class="mv amber">{{ total_meetings }}</div><div class="ml">Meetings Held</div></div>
     </div>
 
     <!-- Students table -->

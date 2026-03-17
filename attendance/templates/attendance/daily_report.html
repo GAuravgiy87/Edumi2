@@ -132,8 +132,8 @@ tbody tr:hover { background: rgba(102,126,234,.04); }
                         <td>{% if row.time_in %}{{ row.time_in|time:"H:i" }}{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
                         <td>
                             {% if row.confidence %}
-                            <div class="conf-bar"><div class="conf-fill" style="width:{{ row.confidence|floatformat:0 }}%"></div></div>
-                            {{ row.confidence|floatformat:1 }}%
+                            <div class="conf-bar"><div class="conf-fill" style="width:{{ row.confidence }}%"></div></div>
+                            {{ row.confidence }}%
                             {% else %}<span style="opacity:.4;">—</span>{% endif %}
                         </td>
                         <td style="opacity:.65; font-size:.8rem;">{{ row.method|default:"—" }}</td>

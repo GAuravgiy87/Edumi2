@@ -3,22 +3,25 @@ WebSocket consumer for real-time face-recognition attendance.
 
 Route: ws/attendance/<meeting_code>/
 
-Flow:
-  1. Student connects → consumer fetches their encrypted face embedding.
-  2. Browser sends periodic base64 JPEG frames (canvas snapshot of localVideo).
-  3. Consumer decodes frame → FaceService → compare against stored embedding.
-  4. After enough verified seconds → AttendanceRecord saved as 'present'.
-  5. No images or frames are ever persisted.
+  - Rolling vote buffer: requires N consecutive matches before counting a verified interval
+  - Passes previous frame to FaceService for motion-based liveness (anti-spoofing)
+  - Per-classroom confidence threshold respected
+  - Late detection uses meeting.created_at (actual live start) not scheduled_time
+  - Uses module-level FaceService singleton to avoid re-instantiating Fernet per frame
 """
 import json
 import base64
 import logging
+from collections import deque
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
 
 logger = logging.getLogger('attendance.consumers')
+
+# How many consecutive frame matches needed before counting a verified interval
+CONSECUTIVE_MATCHES_REQUIRED = 2
 
 
 class FaceAttendanceConsumer(AsyncWebsocketConsumer):
@@ -31,32 +34,35 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        # Load settings & cached embedding bytes
-        self.att_settings    = await self.get_settings()
-        self.encrypted_emb   = await self.get_encrypted_embedding()
-        self.verified_seconds = 0
+        self.att_settings      = await self.get_settings()
+        self.encrypted_emb     = await self.get_encrypted_embedding()
+        self.verified_seconds  = 0
         self.attendance_marked = False
-        self.join_time = timezone.now()
+        self.join_time         = timezone.now()
+
+        # Rolling vote buffer — track last N frame results
+        self._vote_buffer = deque(maxlen=CONSECUTIVE_MATCHES_REQUIRED)
+        # Keep last raw frame bytes for motion liveness check
+        self._prev_frame  = None
 
         await self.accept()
         await self.send(json.dumps({
-            'type':     'connected',
-            'interval': self.att_settings.get('interval', 15),
-            'message':  'Face recognition active – your camera is being verified.',
+            'type':        'connected',
+            'interval':    self.att_settings.get('interval', 15),
+            'message':     'Face recognition active.',
             'has_profile': self.encrypted_emb is not None,
         }))
 
         if self.encrypted_emb is None:
             await self.send(json.dumps({
                 'type':    'no_profile',
-                'message': '⚠ No face profile found. Please register your face in Settings.',
+                'message': 'No face profile found. Please register your face in Settings.',
             }))
 
     async def disconnect(self, close_code):
-        pass  # No channel-groups used; nothing to clean up.
+        pass
 
     async def receive(self, text_data):
-        """Receive a base64-encoded JPEG frame from the browser."""
         if self.attendance_marked or self.encrypted_emb is None:
             return
 
@@ -80,12 +86,25 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
         # Run CPU-bound recognition in thread pool
         result = await database_sync_to_async(self._run_recognition)(frame_bytes)
 
-        # Log the attempt (no images stored)
+        # Store frame for next liveness check
+        self._prev_frame = frame_bytes
+
+        # Log the attempt
         await self._log_attempt(result['event'], result['confidence'])
 
         if result['match']:
-            interval = self.att_settings.get('interval', 15)
-            self.verified_seconds += interval
+            self._vote_buffer.append(True)
+            # Only count the interval when we have a full buffer of consecutive matches
+            consecutive = (
+                len(self._vote_buffer) == CONSECUTIVE_MATCHES_REQUIRED
+                and all(self._vote_buffer)
+            )
+
+            if consecutive:
+                interval = self.att_settings.get('interval', 15)
+                self.verified_seconds += interval
+                self._vote_buffer.clear()
+
             threshold = self.att_settings.get('presence_duration', 30)
 
             if self.verified_seconds >= threshold:
@@ -95,7 +114,7 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
                     'type':       'attendance_marked',
                     'status':     'present',
                     'confidence': result['confidence'],
-                    'message':    '✅ Attendance recorded successfully!',
+                    'message':    'Attendance recorded successfully.',
                 }))
             else:
                 await self.send(json.dumps({
@@ -103,9 +122,13 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
                     'confidence':       result['confidence'],
                     'verified_seconds': self.verified_seconds,
                     'required_seconds': threshold,
-                    'message':          f"🔍 Verified {self.verified_seconds}s / {threshold}s",
+                    'consecutive':      sum(1 for v in self._vote_buffer if v),
+                    'consecutive_req':  CONSECUTIVE_MATCHES_REQUIRED,
+                    'message':          f'Verified {self.verified_seconds}s / {threshold}s',
                 }))
         else:
+            # Any failed frame resets the streak
+            self._vote_buffer.clear()
             await self.send(json.dumps({
                 'type':       'verification_failed',
                 'event':      result.get('event', 'match_failed'),
@@ -113,22 +136,26 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
                 'message':    result.get('message', 'Face not recognized.'),
             }))
 
-    # ── Sync helpers (run in thread pool) ──────────────────────────
+    # ── Sync helpers ─────────────────────────────────────────────
 
     def _run_recognition(self, frame_bytes: bytes) -> dict:
-        from .face_service import FaceService
-        svc = FaceService()
-        return svc.compare_frame_to_stored(frame_bytes, self.encrypted_emb)
+        from .face_service import get_face_service
+        svc       = get_face_service()
+        threshold = self.att_settings.get('confidence_threshold', 0.55)
+        return svc.compare_frame_to_stored(
+            frame_bytes,
+            self.encrypted_emb,
+            threshold=threshold,
+            prev_frame_bytes=self._prev_frame,
+        )
 
-    # ── Async DB helpers ────────────────────────────────────────────
+    # ── Async DB helpers ──────────────────────────────────────────
 
     @database_sync_to_async
     def get_encrypted_embedding(self):
         from .models import StudentFaceProfile
         try:
-            profile = StudentFaceProfile.objects.get(
-                student=self.user, is_active=True
-            )
+            profile = StudentFaceProfile.objects.get(student=self.user, is_active=True)
             return bytes(profile.face_embedding_encrypted)
         except StudentFaceProfile.DoesNotExist:
             return None
@@ -137,19 +164,22 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
     def get_settings(self) -> dict:
         from meetings.models import Meeting
         from .models import AttendanceSettings
-        defaults = {'interval': 15, 'presence_duration': 30, 'late_threshold': 10,
-                    'enabled': True, 'confidence_threshold': 0.55}
+        defaults = {
+            'interval': 15, 'presence_duration': 30, 'late_threshold': 10,
+            'enabled': True, 'confidence_threshold': 0.55,
+        }
         try:
-            meeting  = Meeting.objects.select_related('classroom').get(
+            meeting = Meeting.objects.select_related('classroom').get(
                 meeting_code=self.meeting_code
             )
             s, _ = AttendanceSettings.objects.get_or_create(classroom=meeting.classroom)
             return {
-                'interval':            s.recognition_interval_seconds,
-                'presence_duration':   s.presence_duration_seconds,
-                'late_threshold':      s.late_threshold_minutes,
-                'enabled':             s.face_recognition_enabled,
+                'interval':             s.recognition_interval_seconds,
+                'presence_duration':    s.presence_duration_seconds,
+                'late_threshold':       s.late_threshold_minutes,
+                'enabled':              s.face_recognition_enabled,
                 'confidence_threshold': s.confidence_threshold,
+                'meeting_started_at':   meeting.created_at,
             }
         except Exception:
             return defaults
@@ -158,17 +188,20 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
     def _mark_present(self, confidence: float):
         from meetings.models import Meeting
         from .models import AttendanceRecord
-        now = timezone.now()
-
-        # Determine if student is late
-        meeting_start = self.join_time  # approximate
+        now            = timezone.now()
         late_threshold = self.att_settings.get('late_threshold', 10)
+
         try:
             meeting = Meeting.objects.select_related('classroom').get(
                 meeting_code=self.meeting_code
             )
-            minutes_late = (now - meeting.scheduled_time).total_seconds() / 60
-            status = 'late' if minutes_late > late_threshold else 'present'
+            # Use created_at as the actual meeting start time (when teacher started it)
+            # scheduled_time is set at creation and may be in the past
+            meeting_start = self.att_settings.get('meeting_started_at') or meeting.created_at
+            minutes_since_start = max(
+                0, (self.join_time - meeting_start).total_seconds() / 60
+            )
+            status = 'late' if minutes_since_start > late_threshold else 'present'
         except Exception:
             meeting = None
             status  = 'present'
@@ -178,20 +211,17 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
                 student=self.user,
                 meeting=meeting,
                 defaults={
-                    'classroom':            meeting.classroom,
-                    'date':                 now.date(),
-                    'status':               status,
+                    'classroom':             meeting.classroom,
+                    'date':                  now.date(),
+                    'status':                status,
                     'face_match_confidence': confidence,
                     'face_verified_at':      now,
                     'marked_present_at':     now,
                     'verification_method':   'face_recognition',
                 }
             )
-            # Update last_verified_at on the face profile
             from .models import StudentFaceProfile
-            StudentFaceProfile.objects.filter(student=self.user).update(
-                last_verified_at=now
-            )
+            StudentFaceProfile.objects.filter(student=self.user).update(last_verified_at=now)
 
     @database_sync_to_async
     def _log_attempt(self, event_type: str, confidence: float):
