@@ -14,7 +14,6 @@ The server:
 import json
 import base64
 import logging
-import asyncio
 from collections import defaultdict
 
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -37,21 +36,10 @@ EMOTION_LABELS = {
 
 
 class FaceTrackingConsumer(AsyncWebsocketConsumer):
-    # Performance: Skip every Nth frame to reduce CPU load (process 1 in 3)
-    FRAME_SKIP = 2
-    # Performance: Resize large frames for faster processing
-    MAX_FRAME_WIDTH = 640
-    MAX_FRAME_HEIGHT = 480
-    # Performance: Cache embeddings to avoid DB hits
-    _embeddings_cache = {}
-    _cache_timestamp = {}
-    CACHE_TTL = 30  # seconds
 
     async def connect(self):
         self.user         = self.scope['user']
         self.meeting_code = self.scope['url_route']['kwargs']['meeting_code']
-        self._skip_counter = defaultdict(int)  # per student frame skip counter
-        self._last_result = {}  # Cache last result per student
 
         if not self.user.is_authenticated:
             await self.close()
@@ -91,19 +79,6 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
             frame_b64  = data.get('frame', '')
             if not frame_b64:
                 return
-            
-            # Performance: Frame skipping - process 1 in every (FRAME_SKIP+1) frames
-            self._skip_counter[student_id] += 1
-            if self._skip_counter[student_id] % (self.FRAME_SKIP + 1) != 0:
-                # Return cached result if available
-                if student_id in self._last_result:
-                    await self.send(json.dumps({
-                        'type':       'tracking_result',
-                        'student_id': student_id,
-                        **self._last_result[student_id],
-                    }))
-                return
-            
             try:
                 frame_bytes = base64.b64decode(frame_b64)
             except Exception:
@@ -112,21 +87,17 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
             result = await database_sync_to_async(self._process_frame)(
                 frame_bytes, student_id
             )
-            
-            # Cache result for skipped frames
-            self._last_result[student_id] = result
 
-            # Optionally save snapshot (async fire-and-forget)
+            # Optionally save snapshot
             if result.get('matched_user_id'):
                 self._frame_count[result['matched_user_id']] += 1
                 if self._frame_count[result['matched_user_id']] % SNAPSHOT_SAVE_INTERVAL == 0:
-                    # Don't await - fire and forget for performance
-                    asyncio.create_task(self._save_snapshot_async(
+                    await self._save_snapshot(
                         result['matched_user_id'],
                         result.get('emotion', 'unknown'),
                         result.get('confidence', 0.0),
                         result.get('face_visible', True),
-                    ))
+                    )
 
             await self.send(json.dumps({
                 'type':       'tracking_result',
@@ -166,8 +137,7 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
 
     def _process_frame(self, frame_bytes: bytes, hint_student_id=None) -> dict:
         """
-        Detect faces, match to DB, estimate emotion with low-light enhancement.
-        Optimized for performance with frame resizing.
+        Detect faces, match to DB, estimate emotion.
         Returns overlay data for the client.
         """
         try:
@@ -175,32 +145,12 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
             import numpy as np
             from PIL import Image
             import io
-            import cv2
 
             pil_img = Image.open(io.BytesIO(frame_bytes)).convert('RGB')
-            
-            # Performance: Resize large frames for faster processing
-            original_size = pil_img.size
-            if original_size[0] > self.MAX_FRAME_WIDTH or original_size[1] > self.MAX_FRAME_HEIGHT:
-                pil_img.thumbnail((self.MAX_FRAME_WIDTH, self.MAX_FRAME_HEIGHT), Image.Resampling.LANCZOS)
-            
             np_img  = np.array(pil_img)
             h, w    = np_img.shape[:2]
 
-            # Check lighting conditions
-            lighting_info = self._estimate_lighting(np_img)
-            
-            # Try detection on original first
             face_locations = face_recognition.face_locations(np_img, model='hog')
-            
-            # If no faces and low light, try enhancement
-            if not face_locations and lighting_info['is_low_light']:
-                enhanced_img = self._enhance_low_light(np_img)
-                if not np.array_equal(enhanced_img, np_img):
-                    face_locations = face_recognition.face_locations(enhanced_img, model='hog')
-                    if face_locations:
-                        logger.debug(f"Face detected after low-light enhancement for student {hint_student_id}")
-                        np_img = enhanced_img  # Use enhanced for encoding
 
             if not face_locations:
                 return {
@@ -211,7 +161,6 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
                     'matched_user_id': None,
                     'matched_name':    'Unknown',
                     'confidence':      0.0,
-                    'lighting_info':   lighting_info,
                 }
 
             # Encode all detected faces
@@ -441,67 +390,3 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
             )
         except Exception as exc:
             logger.debug(f'Snapshot save failed: {exc}')
-
-    async def _save_snapshot_async(self, user_id: int, emotion: str, confidence: float, face_visible: bool):
-        """Fire-and-forget snapshot save for better performance."""
-        try:
-            await self._save_snapshot(user_id, emotion, confidence, face_visible)
-        except Exception as exc:
-            logger.debug(f'Async snapshot save failed: {exc}')
-
-    # ── Low-light enhancement helpers ────────────────────────────
-
-    def _estimate_lighting(self, np_img: 'np.ndarray') -> dict:
-        """Estimate lighting quality of the image."""
-        import numpy as np
-        import cv2
-        
-        if len(np_img.shape) == 3:
-            gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
-        else:
-            gray = np_img
-        
-        brightness = float(np.mean(gray))
-        contrast = float(np.std(gray))
-        
-        return {
-            'brightness': brightness,
-            'contrast': contrast,
-            'is_low_light': brightness < 60,  # Threshold for low light
-        }
-
-    def _enhance_low_light(self, np_img: 'np.ndarray') -> 'np.ndarray':
-        """Apply CLAHE and gamma correction for low-light enhancement."""
-        import numpy as np
-        import cv2
-        
-        if len(np_img.shape) == 3:
-            # Convert to LAB color space
-            lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
-            l, a, b = cv2.split(lab)
-            
-            # Apply CLAHE
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            l_enhanced = clahe.apply(l)
-            
-            # Apply gamma correction (brighten)
-            inv_gamma = 1.0 / 0.6
-            table = np.array([
-                ((i / 255.0) ** inv_gamma) * 255
-                for i in np.arange(0, 256)
-            ]).astype("uint8")
-            l_enhanced = cv2.LUT(l_enhanced, table)
-            
-            # Merge back
-            lab_enhanced = cv2.merge([l_enhanced, a, b])
-            return cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2RGB)
-        else:
-            # Grayscale
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            enhanced = clahe.apply(np_img)
-            inv_gamma = 1.0 / 0.6
-            table = np.array([
-                ((i / 255.0) ** inv_gamma) * 255
-                for i in np.arange(0, 256)
-            ]).astype("uint8")
-            return cv2.LUT(enhanced, table)

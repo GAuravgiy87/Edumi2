@@ -17,9 +17,7 @@ from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.contrib.auth.models import User
-from django.db.models import Count, Q, Prefetch
-from django.core.cache import cache
-from django.views.decorators.cache import cache_page
+from django.db.models import Count, Q
 
 from meetings.models import Classroom, Meeting
 from .models import (
@@ -37,26 +35,13 @@ logger = logging.getLogger('attendance')
 # ══════════════════════════════════════════════════════════════
 
 @login_required
-@cache_page(60)  # Cache for 1 minute
 def face_setup(request):
     """Landing page for face registration — tabs: upload / camera capture."""
-    from .models import FaceResetRequest
     profile = getattr(request.user, 'face_profile', None)
-
-    # Determine lock state
-    is_registered = profile is not None and profile.is_active
-    pending_request  = FaceResetRequest.objects.filter(student=request.user, status='pending').first()
-    approved_request = FaceResetRequest.objects.filter(student=request.user, status='approved').first()
-    # Locked = registered AND no approved unlock
-    is_locked = is_registered and approved_request is None
-
     ctx = {
-        'has_profile':        is_registered,
-        'profile':            profile,
-        'is_locked':          is_locked,
-        'pending_request':    pending_request,
-        'approved_request':   approved_request,
-        'page_title':         'Face Registration',
+        'has_profile': profile is not None and profile.is_active,
+        'profile':     profile,
+        'page_title':  'Face Registration',
     }
     return render(request, 'attendance/face_setup.html', ctx)
 
@@ -101,10 +86,6 @@ def upload_face_photo(request):
             'face_photo':               photo_file,
         }
     )
-
-    # Close any approved reset request — face is now re-registered, lock again
-    from .models import FaceResetRequest
-    FaceResetRequest.objects.filter(student=request.user, status='approved').update(status='denied')
 
     messages.success(request, "✅ Face registered successfully! Attendance will now be tracked automatically.")
     return redirect('face_setup')
@@ -151,10 +132,6 @@ def capture_face_photo(request):
             'face_photo':               photo_file,
         }
     )
-
-    # Close any approved reset request — face is now re-registered, lock again
-    from .models import FaceResetRequest
-    FaceResetRequest.objects.filter(student=request.user, status='approved').update(status='denied')
 
     return JsonResponse({
         'status':  'success',
@@ -615,114 +592,6 @@ def engagement_report_view(request, meeting_id):
         'page_title': f'Engagement Report — {meeting.title}',
     }
     return render(request, 'attendance/engagement_report.html', ctx)
-
-
-# ══════════════════════════════════════════════════════════════
-#  STUDENT: FACE RESET REQUEST
-# ══════════════════════════════════════════════════════════════
-
-@login_required
-@require_POST
-def request_face_reset(request):
-    """Student submits a request to re-register their face."""
-    from .models import FaceResetRequest
-
-    # Block if there's already a pending request
-    if FaceResetRequest.objects.filter(student=request.user, status='pending').exists():
-        return JsonResponse({'status': 'error', 'message': 'You already have a pending request.'})
-
-    subject = request.POST.get('subject', '').strip()
-    reason  = request.POST.get('reason', '').strip()
-
-    if not subject or not reason:
-        return JsonResponse({'status': 'error', 'message': 'Subject and reason are required.'})
-
-    if len(reason) < 20:
-        return JsonResponse({'status': 'error', 'message': 'Please provide a more detailed reason (at least 20 characters).'})
-
-    req = FaceResetRequest.objects.create(
-        student=request.user,
-        subject=subject,
-        reason=reason,
-    )
-
-    # Notify all superusers
-    from accounts.notification_models import Notification
-    from django.contrib.auth.models import User as AuthUser
-    admins = AuthUser.objects.filter(is_superuser=True)
-    for admin in admins:
-        Notification.objects.create(
-            recipient=admin,
-            notification_type='system',
-            title=f'Face Reset Request — {request.user.get_full_name() or request.user.username}',
-            message=f'Subject: {subject}',
-            link='/attendance/admin/face-reset-requests/',
-            related_user=request.user,
-        )
-
-    return JsonResponse({'status': 'success', 'message': 'Request submitted. You will be notified once reviewed.'})
-
-
-@login_required
-def admin_face_reset_requests(request):
-    """Admin view: list all face reset requests."""
-    if not request.user.is_superuser:
-        from django.http import HttpResponseForbidden
-        return HttpResponseForbidden("Access denied.")
-
-    from .models import FaceResetRequest
-    requests_qs = FaceResetRequest.objects.select_related('student', 'reviewed_by').all()
-
-    ctx = {
-        'requests':   requests_qs,
-        'page_title': 'Face Reset Requests',
-    }
-    return render(request, 'attendance/admin_face_reset_requests.html', ctx)
-
-
-@login_required
-@require_POST
-def review_face_reset_request(request, request_id):
-    """Admin approves or denies a face reset request."""
-    if not request.user.is_superuser:
-        return JsonResponse({'status': 'forbidden'}, status=403)
-
-    from .models import FaceResetRequest
-    from accounts.notification_models import Notification
-    from django.utils import timezone
-
-    req = get_object_or_404(FaceResetRequest, id=request_id)
-    action     = request.POST.get('action')   # 'approve' or 'deny'
-    admin_note = request.POST.get('admin_note', '').strip()
-
-    if action not in ('approve', 'deny'):
-        return JsonResponse({'status': 'error', 'message': 'Invalid action.'})
-
-    req.status      = 'approved' if action == 'approve' else 'denied'
-    req.admin_note  = admin_note
-    req.reviewed_by = request.user
-    req.reviewed_at = timezone.now()
-    req.save()
-
-    # Notify the student
-    if action == 'approve':
-        Notification.objects.create(
-            recipient=req.student,
-            notification_type='system',
-            title='Face Re-registration Approved',
-            message='Your request to re-register your face has been approved. You can now update your face profile.',
-            link='/attendance/face/setup/',
-        )
-    else:
-        Notification.objects.create(
-            recipient=req.student,
-            notification_type='system',
-            title='Face Re-registration Request Denied',
-            message=f'Your request was not approved.{" Reason: " + admin_note if admin_note else ""}',
-            link='/attendance/face/setup/',
-        )
-
-    return JsonResponse({'status': 'success', 'new_status': req.status})
 
 
 # ══════════════════════════════════════════════════════════════

@@ -225,6 +225,7 @@ def deny_join_request(request, membership_id):
     
     # Send notification to student
     notify_classroom_request_denied(membership.student, membership.classroom)
+    membership.save()
     
     return JsonResponse({
         'status': 'success',

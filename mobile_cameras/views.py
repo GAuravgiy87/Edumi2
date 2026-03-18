@@ -214,9 +214,8 @@ def mobile_camera_feed(request, mobile_camera_id):
     
     def generate_frames():
         """Proxy frames from camera service"""
-        from django.conf import settings
         try:
-            camera_service_url = f'{settings.CAMERA_SERVICE_URL}/api/mobile-cameras/{mobile_camera_id}/feed/'
+            camera_service_url = f'http://localhost:8001/api/mobile-cameras/{mobile_camera_id}/feed/'
             response = requests.get(camera_service_url, stream=True, timeout=30)
             
             for chunk in response.iter_content(chunk_size=1024):

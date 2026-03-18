@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
 <!-- htmlhint-disable -->
@@ -109,8 +109,14 @@
                                         </div>
                                     </div>
                                     <div style="display: flex; gap: 5px;">
-                                        <button class="btn-approve" data-action="approve" data-id="{{ membership.id }}">&#10003; Approve</button>
-                                        <button class="btn-deny" data-action="deny" data-id="{{ membership.id }}">&#10007; Deny</button>
+                                        <button onclick="approveRequest({{ membership.id }})" 
+                                                style="flex: 1; padding: 8px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                                            ✓ Approve
+                                        </button>
+                                        <button onclick="denyRequest({{ membership.id }})" 
+                                                style="flex: 1; padding: 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                                            ✗ Deny
+                                        </button>
                                     </div>
                                 </div>
                             {% endfor %}
