@@ -1,4 +1,4 @@
-{% extends 'base_sidebar.html' %}
+% extends 'base_sidebar.html' %}
 {% load static %}
 {% load camera_extras %}
 
@@ -33,6 +33,7 @@
                 </p>
             </div>
             <div class="camera-actions">
+                <button class="btn-test" onclick="testCamera({{ camera.id }})">🧪 Test</button>
                 <a href="{% url 'view_camera' camera.id %}" class="btn-view">View Feed</a>
                 <a href="{% url 'manage_permissions' camera.id %}" class="btn-permissions">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
@@ -48,6 +49,7 @@
                 </p>
             </div>
             {% endif %}
+            <div id="test-result-{{ camera.id }}" class="test-result" style="display:none;"></div>
         </div>
         {% empty %}
         <div class="no-cameras">
@@ -56,6 +58,40 @@
         {% endfor %}
     </div>
 </div>
+
+<script>
+function testCamera(cameraId) {
+    const resultDiv = document.getElementById('test-result-' + cameraId);
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<span style="color: #6c757d;">Testing connection...</span>';
+    
+    fetch('/cameras/test-camera/' + cameraId + '/')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Test result:', data);
+            
+            if (data.overall_status === 'success') {
+                let msg = '✓ Working via ' + data.working_methods.join(', ');
+                if (data.results) {
+                    const successResult = data.results.find(r => r.status === 'success');
+                    if (successResult && successResult.frame_size) {
+                        msg += ' (' + successResult.frame_size + ')';
+                    }
+                }
+                resultDiv.innerHTML = '<span style="color: #28a745; font-weight: 600;">' + msg + '</span>';
+            } else if (data.status === 'success') {
+                resultDiv.innerHTML = '<span style="color: #28a745; font-weight: 600;">✓ ' + (data.message || 'Connected') + '</span>';
+            } else {
+                let msg = '✗ ' + (data.message || 'Failed');
+                if (data.hint) msg += ' <br><small style="color:#856404;">💡 ' + data.hint + '</small>';
+                resultDiv.innerHTML = '<span style="color: #dc3545;">' + msg + '</span>';
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<span style="color: #dc3545;">✗ Camera service not running on port 8001</span>';
+        });
+}
+</script>
 
 <style>
 .admin-container {
@@ -160,9 +196,9 @@
     flex-wrap: wrap;
 }
 
-.btn-view, .btn-delete, .btn-permissions {
+.btn-view, .btn-delete, .btn-permissions, .btn-test {
     flex: 1;
-    min-width: 100px;
+    min-width: 80px;
     padding: 0.6rem;
     text-align: center;
     border-radius: 6px;
@@ -173,6 +209,19 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-test {
+    background: #17a2b8;
+    color: white;
+}
+
+.btn-test:hover {
+    background: #138496;
+    transform: translateY(-1px);
 }
 
 .btn-view {
@@ -238,6 +287,14 @@
     border-radius: 12px;
     color: #6c757d;
     border: 1px solid #e9ecef;
+}
+
+.test-result {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.85rem;
 }
 </style>
 {% endblock %}

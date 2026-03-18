@@ -1,0 +1,450 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Head Count Logs{% endblock %}
+
+{% block content %}
+<div class="logs-container">
+    <div class="page-header">
+        <h1>📋 Head Count Logs</h1>
+        <div class="header-actions">
+            <a href="{% url 'head_count_dashboard' %}" class="btn btn-secondary">← Dashboard</a>
+            <a href="{% url 'export_head_count_csv' %}?{{ request.GET.urlencode }}" class="btn btn-primary">📥 Export CSV</a>
+        </div>
+    </div>
+
+    <!-- Statistics Summary -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-value">{{ stats.total_records|default:0 }}</div>
+            <div class="stat-label">Total Records</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value">{{ stats.avg_head_count|floatformat:1|default:0 }}</div>
+            <div class="stat-label">Avg Head Count</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📈</div>
+            <div class="stat-value">{{ stats.max_head_count|default:0 }}</div>
+            <div class="stat-label">Max Count</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📉</div>
+            <div class="stat-value">{{ stats.min_head_count|default:0 }}</div>
+            <div class="stat-label">Min Count</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section">
+        <h3>🔍 Filter Logs</h3>
+        <form method="GET" class="filter-form">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Camera Type:</label>
+                    <select name="camera_type">
+                        <option value="">All Types</option>
+                        <option value="rtsp" {% if filter_params.camera_type == 'rtsp' %}selected{% endif %}>RTSP Camera</option>
+                        <option value="mobile" {% if filter_params.camera_type == 'mobile' %}selected{% endif %}>Mobile Camera</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Classroom:</label>
+                    <select name="classroom">
+                        <option value="">All Classrooms</option>
+                        {% for classroom in classrooms %}
+                        <option value="{{ classroom.id }}" {% if filter_params.classroom == classroom.id|stringformat:"s" %}selected{% endif %}>
+                            {{ classroom.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Hour:</label>
+                    <select name="hour">
+                        <option value="">All Hours</option>
+                        {% for h in "01234567891011121314151617181920212223"|make_list %}
+                        <option value="{{ h }}" {% if filter_params.hour == h %}selected{% endif %}>{{ h }}:00</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Date From:</label>
+                    <input type="date" name="date_from" value="{{ filter_params.date_from|default:'' }}">
+                </div>
+                <div class="filter-group">
+                    <label>Date To:</label>
+                    <input type="date" name="date_to" value="{{ filter_params.date_to|default:'' }}">
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    <a href="{% url 'head_count_logs' %}" class="btn btn-secondary">Clear</a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="logs-table-section">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date & Time</th>
+                    <th>Camera</th>
+                    <th>Type</th>
+                    <th>Classroom</th>
+                    <th>Head Count</th>
+                    <th>Confidence</th>
+                    <th>Snapshot</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>
+                        <strong>{{ log.date|date:"d M Y" }}</strong><br>
+                        <span class="time">{{ log.timestamp|date:"H:i:s" }}</span>
+                    </td>
+                    <td>{{ log.camera_name }}</td>
+                    <td><span class="type-badge {{ log.camera_type }}">{{ log.get_camera_type_display }}</span></td>
+                    <td>{{ log.classroom.title|default:"-" }}</td>
+                    <td><strong class="count">{{ log.head_count }}</strong></td>
+                    <td>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: {{ log.confidence_score|floatformat:0 }}%"></div>
+                        </div>
+                        <span>{{ log.confidence_score|floatformat:2 }}</span>
+                    </td>
+                    <td>
+                        {% if log.snapshot %}
+                        <a href="{{ log.snapshot.url }}" target="_blank" class="snapshot-link">
+                            <img src="{{ log.snapshot.url }}" alt="Snapshot" class="snapshot-thumb">
+                        </a>
+                        {% else %}
+                        <span class="no-snapshot">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'head_count_log_detail' log.id %}" class="btn btn-sm btn-secondary">View</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="no-data">
+                        <p>No head count logs found. Start a head counting session to generate logs.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Time-wise Chart -->
+    {% if hour_stats %}
+    <div class="chart-section">
+        <h3>📊 Hourly Distribution</h3>
+        <div class="bar-chart">
+            {% for stat in hour_stats %}
+            <div class="bar-item">
+                <div class="bar-label">{{ stat.hour }}:00</div>
+                <div class="bar-container">
+                    <div class="bar" style="height: {% widthratio stat.avg_count stats.max_avg_count 100 %}%;"></div>
+                </div>
+                <div class="bar-value">{{ stat.avg_count|floatformat:1 }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .logs-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 25px 30px;
+        border-radius: 15px;
+        color: white;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2d3436;
+    }
+
+    .stat-label {
+        color: #636e72;
+        font-size: 0.9rem;
+    }
+
+    .filter-section {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .filter-section h3 {
+        margin: 0 0 20px;
+        color: #2d3436;
+    }
+
+    .filter-form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .filter-row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .filter-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        color: #2d3436;
+    }
+
+    .filter-group select, .filter-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #dfe6e9;
+        border-radius: 6px;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+    }
+
+    .logs-table-section {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .data-table th, .data-table td {
+        padding: 15px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .data-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #2d3436;
+    }
+
+    .data-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .time {
+        color: #636e72;
+        font-size: 0.9rem;
+    }
+
+    .type-badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+    }
+
+    .type-badge.rtsp {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .type-badge.mobile {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    .count {
+        font-size: 1.2rem;
+        color: #00b894;
+    }
+
+    .confidence-bar {
+        width: 60px;
+        height: 8px;
+        background: #dfe6e9;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 5px;
+    }
+
+    .confidence-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #00b894, #55efc4);
+    }
+
+    .snapshot-thumb {
+        width: 60px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .snapshot-link:hover .snapshot-thumb {
+        transform: scale(1.1);
+    }
+
+    .no-snapshot {
+        color: #b2bec3;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s;
+    }
+
+    .btn-sm {
+        padding: 5px 12px;
+        font-size: 0.8rem;
+    }
+
+    .btn-primary {
+        background: #0984e3;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #636e72;
+        color: white;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #636e72;
+    }
+
+    .chart-section {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .chart-section h3 {
+        margin: 0 0 20px;
+    }
+
+    .bar-chart {
+        display: flex;
+        align-items: flex-end;
+        height: 200px;
+        gap: 10px;
+        padding: 20px 0;
+    }
+
+    .bar-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .bar-label {
+        font-size: 0.75rem;
+        color: #636e72;
+        margin-bottom: 5px;
+    }
+
+    .bar-container {
+        width: 100%;
+        height: 150px;
+        background: #f0f0f0;
+        border-radius: 4px 4px 0 0;
+        display: flex;
+        align-items: flex-end;
+    }
+
+    .bar {
+        width: 100%;
+        background: linear-gradient(180deg, #667eea, #764ba2);
+        border-radius: 4px 4px 0 0;
+        min-height: 5px;
+    }
+
+    .bar-value {
+        font-size: 0.8rem;
+        margin-top: 5px;
+        color: #2d3436;
+    }
+</style>
+{% endblock %}

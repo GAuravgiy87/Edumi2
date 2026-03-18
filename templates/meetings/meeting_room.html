@@ -1927,8 +1927,8 @@ window.addEventListener('load', init);
 }
 </style>
 
-{% if not is_host %}
-<!-- Face Attendance Badge (students only) -->
+{% if not is_host and not user.is_superuser %}
+<!-- Face Attendance Badge (students only, admins exempt) -->
 <div id="face-att-badge" class="state-active">
     <div class="fa-dot"></div>
     <div>

@@ -1,0 +1,341 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Head Count Reports{% endblock %}
+
+{% block content %}
+<div class="report-container">
+    <div class="page-header">
+        <h1>📈 Head Count Reports</h1>
+        <div class="header-actions">
+            <a href="{% url 'head_count_dashboard' %}" class="btn btn-secondary">← Dashboard</a>
+            <a href="{% url 'head_count_logs' %}" class="btn btn-secondary">📋 Logs</a>
+        </div>
+    </div>
+
+    <!-- Report Type Selector -->
+    <div class="report-types">
+        <a href="?report_type=daily&{{ request.GET.urlencode }}" class="report-type-btn {% if report_type == 'daily' %}active{% endif %}">
+            📅 Daily Summary
+        </a>
+        <a href="?report_type=class_wise&{{ request.GET.urlencode }}" class="report-type-btn {% if report_type == 'class_wise' %}active{% endif %}">
+            🏫 Class-wise
+        </a>
+        <a href="?report_type=day_wise&{{ request.GET.urlencode }}" class="report-type-btn {% if report_type == 'day_wise' %}active{% endif %}">
+            📊 Day-wise
+        </a>
+        <a href="?report_type=time_wise&{{ request.GET.urlencode }}" class="report-type-btn {% if report_type == 'time_wise' %}active{% endif %}">
+            ⏰ Time-wise
+        </a>
+        <a href="?report_type=camera_wise&{{ request.GET.urlencode }}" class="report-type-btn {% if report_type == 'camera_wise' %}active{% endif %}">
+            📹 Camera-wise
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section">
+        <form method="GET" class="filter-form">
+            <input type="hidden" name="report_type" value="{{ report_type }}">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Classroom:</label>
+                    <select name="classroom">
+                        <option value="">All Classrooms</option>
+                        {% for classroom in classrooms %}
+                        <option value="{{ classroom.id }}" {% if filter_params.classroom == classroom.id|stringformat:"s" %}selected{% endif %}>
+                            {{ classroom.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Date From:</label>
+                    <input type="date" name="date_from" value="{{ filter_params.date_from|default:'' }}">
+                </div>
+                <div class="filter-group">
+                    <label>Date To:</label>
+                    <input type="date" name="date_to" value="{{ filter_params.date_to|default:'' }}">
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Apply</button>
+                    <a href="{% url 'head_count_report' %}?report_type={{ report_type }}" class="btn btn-secondary">Clear</a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Report Data -->
+    <div class="report-content">
+        {% if report_data %}
+        <table class="data-table">
+            <thead>
+                {% if report_type == 'class_wise' %}
+                <tr>
+                    <th>Classroom</th>
+                    <th>Total Records</th>
+                    <th>Avg Head Count</th>
+                    <th>Max Count</th>
+                    <th>Min Count</th>
+                </tr>
+                {% elif report_type == 'day_wise' %}
+                <tr>
+                    <th>Date</th>
+                    <th>Total Records</th>
+                    <th>Avg Head Count</th>
+                    <th>Max Count</th>
+                    <th>Min Count</th>
+                </tr>
+                {% elif report_type == 'time_wise' %}
+                <tr>
+                    <th>Hour</th>
+                    <th>Total Records</th>
+                    <th>Avg Head Count</th>
+                    <th>Max Count</th>
+                </tr>
+                {% elif report_type == 'camera_wise' %}
+                <tr>
+                    <th>Camera</th>
+                    <th>Type</th>
+                    <th>Total Records</th>
+                    <th>Avg Head Count</th>
+                    <th>Max Count</th>
+                </tr>
+                {% else %}
+                <tr>
+                    <th>Date</th>
+                    <th>Total Records</th>
+                    <th>Avg Head Count</th>
+                    <th>Max Count</th>
+                    <th>Min Count</th>
+                </tr>
+                {% endif %}
+            </thead>
+            <tbody>
+                {% for row in report_data %}
+                <tr>
+                    {% if report_type == 'class_wise' %}
+                    <td>{{ row.classroom__title|default:"No Classroom" }}</td>
+                    <td>{{ row.total_records }}</td>
+                    <td><strong>{{ row.avg_head_count|floatformat:1 }}</strong></td>
+                    <td>{{ row.max_head_count }}</td>
+                    <td>{{ row.min_head_count }}</td>
+                    {% elif report_type == 'day_wise' %}
+                    <td><strong>{{ row.date|date:"d M Y" }}</strong></td>
+                    <td>{{ row.total_records }}</td>
+                    <td><strong>{{ row.avg_head_count|floatformat:1 }}</strong></td>
+                    <td>{{ row.max_head_count }}</td>
+                    <td>{{ row.min_head_count }}</td>
+                    {% elif report_type == 'time_wise' %}
+                    <td><strong>{{ row.hour }}:00 - {{ row.hour|add:1 }}:00</strong></td>
+                    <td>{{ row.total_records }}</td>
+                    <td><strong>{{ row.avg_head_count|floatformat:1 }}</strong></td>
+                    <td>{{ row.max_head_count }}</td>
+                    {% elif report_type == 'camera_wise' %}
+                    <td>{{ row.camera_name }}</td>
+                    <td><span class="type-badge">{{ row.camera_type|upper }}</span></td>
+                    <td>{{ row.total_records }}</td>
+                    <td><strong>{{ row.avg_head_count|floatformat:1 }}</strong></td>
+                    <td>{{ row.max_head_count }}</td>
+                    {% else %}
+                    <td><strong>{{ row.date|date:"d M Y" }}</strong></td>
+                    <td>{{ row.total_records }}</td>
+                    <td><strong>{{ row.avg_head_count|floatformat:1 }}</strong></td>
+                    <td>{{ row.max_head_count }}</td>
+                    <td>{{ row.min_head_count }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="no-data">
+            <p>No data available for the selected filters.</p>
+            <p>Start head counting sessions to generate report data.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Export Options -->
+    {% if report_data %}
+    <div class="export-section">
+        <a href="{% url 'export_head_count_csv' %}?{{ request.GET.urlencode }}" class="btn btn-primary">
+            📥 Export to CSV
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .report-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 25px 30px;
+        border-radius: 15px;
+        color: white;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .report-types {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .report-type-btn {
+        padding: 12px 20px;
+        background: white;
+        border: 2px solid #dfe6e9;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #2d3436;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .report-type-btn:hover {
+        border-color: #0984e3;
+        color: #0984e3;
+    }
+
+    .report-type-btn.active {
+        background: #0984e3;
+        border-color: #0984e3;
+        color: white;
+    }
+
+    .filter-section {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .filter-form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .filter-row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .filter-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .filter-group select, .filter-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #dfe6e9;
+        border-radius: 6px;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .report-content {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .data-table th, .data-table td {
+        padding: 15px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .data-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+    }
+
+    .data-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .type-badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #0984e3;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #636e72;
+        color: white;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 60px;
+        color: #636e72;
+    }
+
+    .export-section {
+        text-align: center;
+        padding: 20px;
+    }
+</style>
+{% endblock %}

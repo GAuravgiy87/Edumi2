@@ -547,7 +547,7 @@
                     card.classList.add('closing');
                     overlay.classList.add('closing');
                     setTimeout(() => overlay.remove(), 350);
-                    fetch('/accounts/dismiss-welcome/', {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}});
+                    fetch('/dismiss-welcome/', {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}});
                 }
             </script>
             {% endif %}
@@ -589,7 +589,7 @@
             if (event.key === 'Enter') {
                 const query = event.target.value.trim();
                 if (query) {
-                    window.location.href = `/accounts/search/?q=${encodeURIComponent(query)}`;
+                    window.location.href = `/search/?q=${encodeURIComponent(query)}`;
                 }
             }
         }
@@ -616,7 +616,7 @@
             const list = document.getElementById('notificationList');
             list.innerHTML = '<div class="notification-loading">Loading...</div>';
             
-            fetch('/accounts/notifications/recent/')
+            fetch('/notifications/recent/')
                 .then(response => response.json())
                 .then(data => {
                     const badge = document.getElementById('notificationBadge');
@@ -653,7 +653,7 @@
             if (event) event.stopPropagation();
             
             // Mark as read then navigate
-            fetch(`/accounts/notifications/mark-read/${id}/`, {
+            fetch(`/notifications/mark-read/${id}/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -670,7 +670,7 @@
 
         function markAllNotificationsRead(event) {
             if (event) event.stopPropagation();
-            fetch('/accounts/notifications/mark-all-read/', {
+            fetch('/notifications/mark-all-read/', {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -713,7 +713,7 @@
 
         // Notification count update
         function updateNotificationCount() {
-            fetch('/accounts/notifications/unread-count/')
+            fetch('/notifications/unread-count/')
                 .then(response => response.json())
                 .then(data => {
                     const badge = document.getElementById('notificationBadge');

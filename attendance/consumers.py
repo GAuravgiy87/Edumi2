@@ -34,6 +34,18 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
+        # Skip face attendance for admins/superusers
+        if self.user.is_superuser:
+            await self.accept()
+            await self.send(json.dumps({
+                'type':        'connected',
+                'interval':    999999,  # No need for captures
+                'message':     'Admin user - face attendance disabled.',
+                'has_profile': True,  # Don't prompt for profile
+                'admin_exempt': True,
+            }))
+            return
+
         self.att_settings      = await self.get_settings()
         self.encrypted_emb     = await self.get_encrypted_embedding()
         self.verified_seconds  = 0
@@ -63,6 +75,9 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
         pass
 
     async def receive(self, text_data):
+        # Skip for admins or if already marked or no profile
+        if self.user.is_superuser:
+            return
         if self.attendance_marked or self.encrypted_emb is None:
             return
 

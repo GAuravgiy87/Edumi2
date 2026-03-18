@@ -5,10 +5,14 @@ from typing import Optional
 from urllib.parse import urlparse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import StreamingHttpResponse, JsonResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.contrib.auth.models import User
-from .models import Camera, CameraPermission
+from django.db.models import Avg, Max, Min, Count
+from django.utils import timezone
+from datetime import datetime, timedelta
+from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession
 from mobile_cameras.models import MobileCamera, MobileCameraPermission
+from .head_count_service import head_count_manager
 
 logger = logging.getLogger('cameras')
 
@@ -366,37 +370,40 @@ class CameraManager:
                 streamer.stop()
             cls._streamers.clear()
 
+@login_required
 def camera_feed(request, camera_id):
     """Proxy camera feed from camera service on port 8001"""
     camera = get_object_or_404(Camera, id=camera_id)
     
-    # Check permission
-    if not can_view_camera(request.user, camera):
-        return JsonResponse({'error': 'You do not have permission to view this camera'}, status=403)
+    # Check permission - allow anonymous for testing
+    if request.user.is_authenticated:
+        if not can_view_camera(request.user, camera):
+            return JsonResponse({'error': 'You do not have permission to view this camera'}, status=403)
     
     import requests
+    
+    camera_service_url = f'http://localhost:8001/api/cameras/{camera_id}/feed/'
+    logger.info(f"Proxying camera {camera_id} from {camera_service_url}")
     
     def generate_frames():
         """Proxy frames from camera service"""
         try:
-            camera_service_url = f'http://localhost:8001/api/cameras/{camera_id}/feed/'
-            logger.info(f"Proxying camera {camera_id} from {camera_service_url}")
-            
-            response = requests.get(camera_service_url, stream=True, timeout=None)
+            response = requests.get(camera_service_url, stream=True, timeout=30)
             response.raise_for_status()
+            logger.info(f"Connected to camera service for camera {camera_id}")
             
             # Stream the response directly
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     yield chunk
-                    
+                
         except requests.exceptions.ConnectionError as e:
-            # Camera service is not running
             logger.error(f"Camera service not running on port 8001: {e}")
             error_msg = (
                 b'--frame\r\n'
                 b'Content-Type: text/plain\r\n\r\n'
                 b'ERROR: Camera service not running on port 8001.\r\n'
+                b'Start: cd camera_service && python manage.py runserver 8001\r\n'
             )
             yield error_msg
         except requests.exceptions.RequestException as e:
@@ -411,7 +418,6 @@ def camera_feed(request, camera_id):
             logger.info(f"Client disconnected from camera {camera_id}")
         except Exception as e:
             logger.error(f"Unexpected error proxying camera {camera_id}: {e}")
-
 
     response = StreamingHttpResponse(
         generate_frames(),
@@ -481,33 +487,29 @@ def view_camera(request, camera_id):
 
 @login_required
 def test_camera(request, camera_id):
-    """Test camera connection"""
-    import cv2
+    """Test camera connection - uses camera service for diagnostics"""
+    import requests
     camera = get_object_or_404(Camera, id=camera_id)
     
     try:
-        cap = cv2.VideoCapture(camera.rtsp_url, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
-        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
+        # Use camera service for testing (it has better RTSP handling)
+        camera_service_url = f'http://localhost:8001/api/cameras/{camera_id}/test/'
+        response = requests.get(camera_service_url, timeout=30)
         
-        if cap.isOpened():
-            ret, frame = cap.read()
-            cap.release()
-            
-            if ret and frame is not None:
-                return JsonResponse({
-                    'status': 'success',
-                    'message': f'Camera is accessible. Frame size: {frame.shape}'
-                })
+        if response.status_code == 200:
+            data = response.json()
+            return JsonResponse(data)
+        else:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Camera opened but could not read frames'
+                'message': f'Camera service error: HTTP {response.status_code}',
+                'hint': 'Make sure camera service is running on port 8001'
             })
-        
-        cap.release()
+    except requests.exceptions.ConnectionError:
         return JsonResponse({
             'status': 'error',
-            'message': 'Could not open camera connection'
+            'message': 'Camera service not running on port 8001',
+            'hint': 'Start camera service: cd camera_service && python manage.py runserver 8001'
         })
     except Exception as e:
         return JsonResponse({
@@ -570,3 +572,349 @@ def manage_permissions(request, camera_id):
         'authorized_teachers': authorized_teachers,
     }
     return render(request, 'cameras/manage_permissions.html', context)
+
+
+# ─────────────────────────────────────────────────────────────
+# HEAD COUNTING VIEWS
+# ─────────────────────────────────────────────────────────────
+
+@login_required
+def head_count_dashboard(request):
+    """Dashboard for head counting - shows all cameras with head count capability"""
+    # Get cameras based on user role
+    if is_admin(request.user):
+        rtsp_cameras = Camera.objects.filter(is_active=True)
+        mobile_cameras = MobileCamera.objects.filter(is_active=True)
+    elif hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher':
+        # Teachers see cameras they have permission for
+        camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
+        rtsp_cameras = Camera.objects.filter(id__in=camera_ids, is_active=True)
+        
+        mobile_camera_ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
+        mobile_cameras = MobileCamera.objects.filter(id__in=mobile_camera_ids, is_active=True)
+    else:
+        rtsp_cameras = Camera.objects.none()
+        mobile_cameras = MobileCamera.objects.none()
+    
+    # Check active sessions
+    active_sessions = head_count_manager.get_active_sessions()
+    
+    # Add session status to cameras
+    for camera in rtsp_cameras:
+        camera.has_active_session = head_count_manager.is_session_active('rtsp', camera.id)
+        camera.camera_type = 'rtsp'
+    
+    for camera in mobile_cameras:
+        camera.has_active_session = head_count_manager.is_session_active('mobile', camera.id)
+        camera.camera_type = 'mobile'
+    
+    # Get recent head count logs
+    recent_logs = HeadCountLog.objects.all()[:10]
+    
+    context = {
+        'rtsp_cameras': rtsp_cameras,
+        'mobile_cameras': mobile_cameras,
+        'active_sessions': active_sessions,
+        'recent_logs': recent_logs,
+    }
+    return render(request, 'cameras/head_count_dashboard.html', context)
+
+
+@login_required
+def start_head_count(request, camera_type, camera_id):
+    """Start head counting session for a camera"""
+    # Get camera details
+    if camera_type == 'rtsp':
+        camera = get_object_or_404(Camera, id=camera_id)
+        stream_url = camera.get_full_rtsp_url()
+        camera_name = camera.name
+    elif camera_type == 'mobile':
+        camera = get_object_or_404(MobileCamera, id=camera_id)
+        stream_url = camera.get_stream_url()
+        camera_name = camera.name
+    else:
+        return JsonResponse({'error': 'Invalid camera type'}, status=400)
+    
+    # Check permission
+    if not can_view_camera(request.user, camera):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    # Check if already active
+    if head_count_manager.is_session_active(camera_type, camera_id):
+        return JsonResponse({'error': 'Session already active for this camera'}, status=400)
+    
+    # Get optional classroom
+    classroom_id = request.POST.get('classroom_id') or request.GET.get('classroom_id')
+    classroom = None
+    if classroom_id:
+        try:
+            from meetings.models import Classroom
+            classroom = Classroom.objects.get(id=classroom_id)
+        except:
+            pass
+    
+    # Get interval
+    interval = int(request.POST.get('interval', 30))
+    interval = max(10, min(300, interval))  # Clamp between 10-300 seconds
+    
+    # Start session
+    success, result = head_count_manager.start_session(
+        camera_type=camera_type,
+        camera_id=camera_id,
+        stream_url=stream_url,
+        camera_name=camera_name,
+        user=request.user,
+        classroom=classroom,
+        interval=interval
+    )
+    
+    if success:
+        return JsonResponse({'success': True, 'session_id': result})
+    else:
+        return JsonResponse({'error': result}, status=400)
+
+
+@login_required
+def stop_head_count(request, camera_type, camera_id):
+    """Stop head counting session for a camera"""
+    success, message = head_count_manager.stop_session(camera_type, camera_id)
+    
+    if success:
+        return JsonResponse({'success': True, 'message': message})
+    else:
+        return JsonResponse({'error': message}, status=400)
+
+
+@login_required
+def head_count_logs(request):
+    """View head count logs with filtering"""
+    logs = HeadCountLog.objects.all()
+    
+    # Filter by camera type
+    camera_type = request.GET.get('camera_type')
+    if camera_type:
+        logs = logs.filter(camera_type=camera_type)
+    
+    # Filter by camera
+    camera_id = request.GET.get('camera_id')
+    if camera_id:
+        logs = logs.filter(camera_id=camera_id)
+    
+    # Filter by classroom
+    classroom_id = request.GET.get('classroom')
+    if classroom_id:
+        logs = logs.filter(classroom_id=classroom_id)
+    
+    # Filter by date range
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    if date_from:
+        logs = logs.filter(date__gte=date_from)
+    if date_to:
+        logs = logs.filter(date__lte=date_to)
+    
+    # Filter by hour
+    hour = request.GET.get('hour')
+    if hour:
+        logs = logs.filter(hour=int(hour))
+    
+    # Calculate statistics
+    stats = logs.aggregate(
+        total_records=Count('id'),
+        avg_head_count=Avg('head_count'),
+        max_head_count=Max('head_count'),
+        min_head_count=Min('head_count'),
+        avg_confidence=Avg('confidence_score')
+    )
+    
+    # Group by date for chart data
+    date_stats = logs.values('date').annotate(
+        avg_count=Avg('head_count'),
+        max_count=Max('head_count'),
+        total=Count('id')
+    ).order_by('-date')[:30]
+    
+    # Group by hour for time-wise analysis
+    hour_stats = logs.values('hour').annotate(
+        avg_count=Avg('head_count'),
+        total=Count('id')
+    ).order_by('hour')
+    
+    # Get classrooms for filter dropdown
+    from meetings.models import Classroom
+    classrooms = Classroom.objects.all()
+    
+    context = {
+        'logs': logs[:100],  # Limit to 100 records
+        'stats': stats,
+        'date_stats': date_stats,
+        'hour_stats': hour_stats,
+        'classrooms': classrooms,
+        'filter_params': request.GET,
+    }
+    return render(request, 'cameras/head_count_logs.html', context)
+
+
+@login_required
+def head_count_log_detail(request, log_id):
+    """View details of a specific head count log"""
+    log = get_object_or_404(HeadCountLog, id=log_id)
+    
+    context = {
+        'log': log,
+    }
+    return render(request, 'cameras/head_count_log_detail.html', context)
+
+
+@login_required
+def head_count_session_history(request):
+    """View history of head counting sessions"""
+    sessions = HeadCountSession.objects.all()
+    
+    # Filter by status
+    status = request.GET.get('status')
+    if status:
+        sessions = sessions.filter(status=status)
+    
+    # Filter by date range
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    if date_from:
+        sessions = sessions.filter(started_at__date__gte=date_from)
+    if date_to:
+        sessions = sessions.filter(started_at__date__lte=date_to)
+    
+    context = {
+        'sessions': sessions[:50],
+    }
+    return render(request, 'cameras/head_count_sessions.html', context)
+
+
+@login_required
+def head_count_api(request, camera_type, camera_id):
+    """API endpoint to get current head count for a camera"""
+    current_count = head_count_manager.get_current_count(camera_type, camera_id)
+    is_active = head_count_manager.is_session_active(camera_type, camera_id)
+    
+    return JsonResponse({
+        'camera_type': camera_type,
+        'camera_id': camera_id,
+        'is_active': is_active,
+        'current_count': current_count,
+    })
+
+
+@login_required
+def head_count_report(request):
+    """Generate head count reports - class-wise, day-wise, time-wise"""
+    # Get filter parameters
+    report_type = request.GET.get('report_type', 'daily')
+    classroom_id = request.GET.get('classroom')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    logs = HeadCountLog.objects.all()
+    
+    # Apply filters
+    if classroom_id:
+        logs = logs.filter(classroom_id=classroom_id)
+    if date_from:
+        logs = logs.filter(date__gte=date_from)
+    if date_to:
+        logs = logs.filter(date__lte=date_to)
+    
+    report_data = {}
+    
+    if report_type == 'class_wise':
+        # Group by classroom
+        report_data = logs.values(
+            'classroom__title', 'classroom_id'
+        ).annotate(
+            total_records=Count('id'),
+            avg_head_count=Avg('head_count'),
+            max_head_count=Max('head_count'),
+            min_head_count=Min('head_count'),
+        ).order_by('-total_records')
+        
+    elif report_type == 'day_wise':
+        # Group by date
+        report_data = logs.values('date').annotate(
+            total_records=Count('id'),
+            avg_head_count=Avg('head_count'),
+            max_head_count=Max('head_count'),
+            min_head_count=Min('head_count'),
+        ).order_by('-date')
+        
+    elif report_type == 'time_wise':
+        # Group by hour
+        report_data = logs.values('hour').annotate(
+            total_records=Count('id'),
+            avg_head_count=Avg('head_count'),
+            max_head_count=Max('head_count'),
+        ).order_by('hour')
+        
+    elif report_type == 'camera_wise':
+        # Group by camera
+        report_data = logs.values(
+            'camera_type', 'camera_id', 'camera_name'
+        ).annotate(
+            total_records=Count('id'),
+            avg_head_count=Avg('head_count'),
+            max_head_count=Max('head_count'),
+        ).order_by('-total_records')
+    
+    # Get classrooms for filter
+    from meetings.models import Classroom
+    classrooms = Classroom.objects.all()
+    
+    context = {
+        'report_type': report_type,
+        'report_data': report_data,
+        'classrooms': classrooms,
+        'filter_params': request.GET,
+    }
+    return render(request, 'cameras/head_count_report.html', context)
+
+
+@login_required
+def export_head_count_csv(request):
+    """Export head count logs as CSV"""
+    import csv
+    
+    logs = HeadCountLog.objects.all()
+    
+    # Apply filters
+    camera_type = request.GET.get('camera_type')
+    if camera_type:
+        logs = logs.filter(camera_type=camera_type)
+    
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    if date_from:
+        logs = logs.filter(date__gte=date_from)
+    if date_to:
+        logs = logs.filter(date__lte=date_to)
+    
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="head_count_logs.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'Date', 'Time', 'Camera Type', 'Camera Name', 
+        'Classroom', 'Head Count', 'Confidence', 'Notes'
+    ])
+    
+    for log in logs:
+        writer.writerow([
+            log.date,
+            log.timestamp.strftime('%H:%M:%S'),
+            log.get_camera_type_display(),
+            log.camera_name,
+            log.classroom.title if log.classroom else 'N/A',
+            log.head_count,
+            f"{log.confidence_score:.2f}",
+            log.notes
+        ])
+    
+    return response

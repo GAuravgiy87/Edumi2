@@ -939,7 +939,7 @@ function saveEmojiAvatar() {
     const fd = new FormData();
     fd.append('data_url', dataUrl);
     fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    fetch('/accounts/save-emoji-avatar/', {method:'POST', body: fd})
+    fetch('/save-emoji-avatar/', {method:'POST', body: fd})
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
@@ -1217,7 +1217,7 @@ function savePhotoAvatar() {
     const fd = new FormData();
     fd.append('data_url', dataUrl);
     fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    fetch('/accounts/save-emoji-avatar/', {method:'POST', body: fd})
+    fetch('/save-emoji-avatar/', {method:'POST', body: fd})
         .then(r => r.json())
         .then(data => {
             if (data.ok) {

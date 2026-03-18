@@ -100,7 +100,7 @@
 }
 .face-guide-circle {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -55%);
-    width: 160px; height: 160px; border-radius: 50%;
+    width: 240px; height: 240px; border-radius: 50%;
     border: 3px solid rgba(255,255,255,.5); pointer-events: none;
     animation: pulse-ring 2s ease-in-out infinite;
 }
@@ -161,6 +161,16 @@
 }
 #captureResult.success { background: rgba(16,185,129,.15); color: #10b981; border: 1px solid rgba(16,185,129,.3); }
 #captureResult.error   { background: rgba(239,68,68,.12); color: #ef4444; border: 1px solid rgba(239,68,68,.25); }
+#captureResult.processing { background: rgba(102,126,234,.12); color: #667eea; border: 1px solid rgba(102,126,234,.25); display: flex; align-items: center; justify-content: center; gap: 8px; }
+#captureResult.processing::before {
+    content: '';
+    width: 16px; height: 16px;
+    border: 2px solid rgba(102,126,234,.3);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
 {% endblock %}
 
@@ -349,35 +359,63 @@ function stopCamera() {
 async function capturePhoto() {
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('captureCanvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const statusEl = document.getElementById('cameraStatus');
+    
+    // Show processing state immediately
+    showCaptureResult('processing', 'Processing...');
+    statusEl.textContent = '📸 Capturing photo...';
+    
+    // Disable button
+    captureBtn.disabled = true;
+    captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20" style="animation: spin 1s linear infinite;"/></svg> Capturing…';
+    
+    // Small delay to show capture animation
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Capture frame
     canvas.width = 640; canvas.height = 480;
     const ctx = canvas.getContext('2d');
-    ctx.scale(-1, 1); ctx.drawImage(video, -640, 0, 640, 480); // un-mirror
-    ctx.scale(-1, 1);
-
+    ctx.translate(640, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, 640, 480);
+    
     const frameB64 = canvas.toDataURL('image/jpeg', 0.92);
-
-    const captureBtn = document.getElementById('captureBtn');
-    captureBtn.disabled = true;
-    captureBtn.textContent = 'Processing…';
+    
+    // Show processing state
+    captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20" style="animation: spin 1s linear infinite;"/></svg> Processing…';
+    statusEl.textContent = '🧠 Processing face recognition...';
+    showCaptureResult('processing', 'Analyzing face...');
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
         const resp = await fetch("{% url 'capture_face_photo' %}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
             body: JSON.stringify({ frame_b64: frameB64 }),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
+        
         const data = await resp.json();
         if (data.status === 'success') {
             document.getElementById('faceGuide').classList.add('verified');
-            document.getElementById('cameraStatus').textContent = '✅ Registered!';
-            showCaptureResult('success', data.message);
+            statusEl.textContent = '✅ Registered!';
+            showCaptureResult('success', data.message || 'Face registered successfully!');
             stopCamera();
-            setTimeout(() => location.reload(), 1800);
+            setTimeout(() => location.reload(), 2000);
         } else {
-            showCaptureResult('error', data.message);
+            statusEl.textContent = '❌ ' + (data.message || 'Registration failed');
+            showCaptureResult('error', data.message || 'Face registration failed. Please try again.');
         }
     } catch(e) {
-        showCaptureResult('error', 'Network error. Please try again.');
+        if (e.name === 'AbortError') {
+            statusEl.textContent = '⏱ Request timed out';
+            showCaptureResult('error', 'Request timed out. Please try again.');
+        } else {
+            statusEl.textContent = '❌ Network error';
+            showCaptureResult('error', 'Network error. Please check your connection and try again.');
+        }
     } finally {
         captureBtn.disabled = false;
         captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg> Capture & Register';
@@ -386,7 +424,9 @@ async function capturePhoto() {
 
 function showCaptureResult(type, msg) {
     const el = document.getElementById('captureResult');
-    el.className = type; el.textContent = msg; el.style.display = 'block';
+    el.className = type; 
+    el.innerHTML = msg;
+    el.style.display = type === 'processing' ? 'flex' : 'block';
 }
 
 function getCsrf() {

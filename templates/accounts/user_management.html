@@ -129,7 +129,9 @@
                         <td class="searchable-name">{{ user.first_name }} {{ user.last_name }}</td>
                         <td class="searchable-email">{{ user.email|default:"—" }}</td>
                         <td>
-                            {% if user.userprofile %}
+                            {% if user.is_superuser %}
+                            <span class="badge badge-admin searchable-type">Admin</span>
+                            {% elif user.userprofile %}
                             <span class="badge badge-{{ user.userprofile.user_type }} searchable-type">{{ user.userprofile.get_user_type_display }}</span>
                             {% else %}
                             <span class="badge badge-admin searchable-type">Admin</span>

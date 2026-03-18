@@ -18,6 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
+from django.db import transaction, OperationalError
 
 from meetings.models import Classroom, Meeting
 from .models import (
@@ -75,17 +76,29 @@ def upload_face_photo(request):
     from django.core.files.base import ContentFile
     photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
 
-    StudentFaceProfile.objects.update_or_create(
-        student=request.user,
-        defaults={
-            'face_embedding_encrypted': encrypted,
-            'embedding_checksum':       checksum,
-            'face_quality_score':       result['quality'],
-            'is_active':                True,
-            'registration_ip':          _get_client_ip(request),
-            'face_photo':               photo_file,
-        }
-    )
+    # Use transaction with retry logic for database locked errors
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with transaction.atomic():
+                StudentFaceProfile.objects.update_or_create(
+                    student=request.user,
+                    defaults={
+                        'face_embedding_encrypted': encrypted,
+                        'embedding_checksum':       checksum,
+                        'face_quality_score':       result['quality'],
+                        'is_active':                True,
+                        'registration_ip':          _get_client_ip(request),
+                        'face_photo':               photo_file,
+                    }
+                )
+            break  # Success, exit retry loop
+        except OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries - 1:
+                import time
+                time.sleep(0.5 * (attempt + 1))  # Exponential backoff
+                continue
+            raise  # Re-raise if not a lock error or max retries reached
 
     messages.success(request, "✅ Face registered successfully! Attendance will now be tracked automatically.")
     return redirect('face_setup')
@@ -121,17 +134,29 @@ def capture_face_photo(request):
     from django.core.files.base import ContentFile
     photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
 
-    StudentFaceProfile.objects.update_or_create(
-        student=request.user,
-        defaults={
-            'face_embedding_encrypted': encrypted,
-            'embedding_checksum':       checksum,
-            'face_quality_score':       result['quality'],
-            'is_active':                True,
-            'registration_ip':          _get_client_ip(request),
-            'face_photo':               photo_file,
-        }
-    )
+    # Use transaction with retry logic for database locked errors
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with transaction.atomic():
+                StudentFaceProfile.objects.update_or_create(
+                    student=request.user,
+                    defaults={
+                        'face_embedding_encrypted': encrypted,
+                        'embedding_checksum':       checksum,
+                        'face_quality_score':       result['quality'],
+                        'is_active':                True,
+                        'registration_ip':          _get_client_ip(request),
+                        'face_photo':               photo_file,
+                    }
+                )
+            break  # Success, exit retry loop
+        except OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries - 1:
+                import time
+                time.sleep(0.5 * (attempt + 1))  # Exponential backoff
+                continue
+            raise  # Re-raise if not a lock error or max retries reached
 
     return JsonResponse({
         'status':  'success',

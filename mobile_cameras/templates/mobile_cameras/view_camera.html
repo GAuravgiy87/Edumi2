@@ -17,7 +17,18 @@
     </div>
     
     <div class="camera-feed-wrapper">
-        <img src="http://localhost:8001/api/mobile-cameras/{{ mobile_camera.id }}/feed/" alt="{{ mobile_camera.name }}" class="camera-feed">
+        <img id="cameraFeed" src="{% url 'mobile_cameras:feed' mobile_camera.id %}" alt="{{ mobile_camera.name }}" class="camera-feed">
+        <div class="headcount-badge" id="headcountBadge" style="display: none;">
+            <span class="badge-icon">👥</span>
+            <span class="badge-text">Head Count: <span id="headCountValue">0</span></span>
+        </div>
+    </div>
+    
+    <div class="camera-controls">
+        <button class="btn-toggle" id="headcountToggle" onclick="toggleHeadcount()">
+            <span class="toggle-icon">👁️</span>
+            <span class="toggle-text">Enable Head Count</span>
+        </button>
     </div>
     
     <div class="camera-info-card">
@@ -195,7 +206,101 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Head Count Styles */
+.camera-controls {
+    margin: 1rem 0;
+    display: flex;
+    gap: 1rem;
+}
+
+.btn-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-toggle.active {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.headcount-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    backdrop-filter: blur(10px);
+}
+
+.badge-icon {
+    font-size: 1.2rem;
+}
+
+.camera-feed-wrapper {
+    position: relative;
+}
 </style>
+
+<script>
+let headcountEnabled = false;
+
+function toggleHeadcount() {
+    const feed = document.getElementById('cameraFeed');
+    const toggle = document.getElementById('headcountToggle');
+    const badge = document.getElementById('headcountBadge');
+    
+    headcountEnabled = !headcountEnabled;
+    
+    if (headcountEnabled) {
+        feed.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}";
+        toggle.classList.add('active');
+        toggle.querySelector('.toggle-text').textContent = 'Disable Head Count';
+        toggle.querySelector('.toggle-icon').textContent = '👁️‍🗨️';
+        badge.style.display = 'flex';
+        
+        // Simulate head count updates (in real implementation, this would come from WebSocket or API)
+        updateHeadCount();
+    } else {
+        feed.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}";
+        toggle.classList.remove('active');
+        toggle.querySelector('.toggle-text').textContent = 'Enable Head Count';
+        toggle.querySelector('.toggle-icon').textContent = '👁️';
+        badge.style.display = 'none';
+    }
+}
+
+function updateHeadCount() {
+    if (!headcountEnabled) return;
+    
+    // In a real implementation, this would fetch from an API endpoint
+    // For now, we'll just show a placeholder that updates randomly
+    const count = Math.floor(Math.random() * 5) + 1;
+    document.getElementById('headCountValue').textContent = count;
+    
+    // Update every 3 seconds
+    setTimeout(updateHeadCount, 3000);
+}
+</script>
 
 <script>
 function changeQuality() {

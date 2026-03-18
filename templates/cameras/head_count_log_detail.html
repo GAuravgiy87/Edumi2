@@ -1,0 +1,293 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Head Count Detail{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <div class="page-header">
+        <h1>📊 Head Count Detail</h1>
+        <a href="{% url 'head_count_logs' %}" class="btn btn-secondary">← Back to Logs</a>
+    </div>
+
+    <div class="detail-grid">
+        <!-- Snapshot -->
+        <div class="snapshot-section">
+            {% if log.snapshot %}
+            <div class="snapshot-card">
+                <img src="{{ log.snapshot.url }}" alt="Head Count Snapshot" class="snapshot-image">
+                <p class="snapshot-note">Green boxes indicate detected heads/persons</p>
+            </div>
+            {% else %}
+            <div class="no-snapshot">
+                <p>📷 No snapshot available</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Details -->
+        <div class="info-section">
+            <div class="info-card">
+                <h3>📅 Timestamp</h3>
+                <div class="info-value">
+                    <strong>{{ log.timestamp|date:"l, d F Y" }}</strong><br>
+                    <span class="time">{{ log.timestamp|date:"H:i:s" }}</span>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h3>📹 Camera</h3>
+                <div class="info-value">
+                    <strong>{{ log.camera_name }}</strong><br>
+                    <span class="type-badge {{ log.camera_type }}">{{ log.get_camera_type_display }}</span>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h3>👥 Head Count</h3>
+                <div class="info-value big">
+                    <span class="count-number">{{ log.head_count }}</span>
+                    <span class="count-label">persons detected</span>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h3>🎯 Confidence Score</h3>
+                <div class="info-value">
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: {{ log.confidence_score|floatformat:0 }}%;"></div>
+                    </div>
+                    <span>{{ log.confidence_score|floatformat:2 }}</span>
+                </div>
+            </div>
+
+            {% if log.classroom %}
+            <div class="info-card">
+                <h3>🏫 Classroom</h3>
+                <div class="info-value">
+                    <strong>{{ log.classroom.title }}</strong><br>
+                    <span class="teacher">Teacher: {{ log.classroom.teacher.get_full_name|default:log.classroom.teacher.username }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if log.recorded_by %}
+            <div class="info-card">
+                <h3>👤 Recorded By</h3>
+                <div class="info-value">
+                    {{ log.recorded_by.get_full_name|default:log.recorded_by.username }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if log.notes %}
+            <div class="info-card full-width">
+                <h3>📝 Notes</h3>
+                <div class="info-value">
+                    {{ log.notes }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Related Logs -->
+    <div class="related-section">
+        <h3>📋 Related Logs (Same Camera, Same Day)</h3>
+        <div class="related-logs">
+            <p>View other head counts from this camera on the same day.</p>
+            <a href="{% url 'head_count_logs' %}?camera_type={{ log.camera_type }}&camera_id={{ log.camera_id }}&date_from={{ log.date|date:'Y-m-d' }}&date_to={{ log.date|date:'Y-m-d' }}" class="btn btn-primary">
+                View Related Logs
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .detail-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 25px 30px;
+        border-radius: 15px;
+        color: white;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-bottom: 30px;
+    }
+
+    @media (max-width: 768px) {
+        .detail-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .snapshot-section {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .snapshot-card {
+        padding: 20px;
+    }
+
+    .snapshot-image {
+        width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .snapshot-note {
+        text-align: center;
+        color: #636e72;
+        margin-top: 10px;
+        font-size: 0.9rem;
+    }
+
+    .no-snapshot {
+        padding: 60px;
+        text-align: center;
+        color: #b2bec3;
+    }
+
+    .info-section {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .info-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .info-card h3 {
+        margin: 0 0 10px;
+        font-size: 0.9rem;
+        color: #636e72;
+    }
+
+    .info-value {
+        color: #2d3436;
+    }
+
+    .info-value.big {
+        text-align: center;
+    }
+
+    .count-number {
+        font-size: 3rem;
+        font-weight: bold;
+        color: #00b894;
+        display: block;
+    }
+
+    .count-label {
+        color: #636e72;
+        font-size: 0.9rem;
+    }
+
+    .time {
+        color: #636e72;
+        font-size: 1.5rem;
+    }
+
+    .type-badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+    }
+
+    .type-badge.rtsp {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .type-badge.mobile {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    .teacher {
+        color: #636e72;
+        font-size: 0.9rem;
+    }
+
+    .confidence-bar {
+        width: 100%;
+        height: 10px;
+        background: #dfe6e9;
+        border-radius: 5px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+
+    .confidence-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #00b894, #55efc4);
+    }
+
+    .related-section {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .related-section h3 {
+        margin: 0 0 15px;
+    }
+
+    .related-logs {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #0984e3;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #636e72;
+        color: white;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}

@@ -252,7 +252,7 @@
 <script>
 function handleNotificationClick(notificationId, link) {
     // Mark as read
-    fetch(`/accounts/notifications/mark-read/${notificationId}/`, {
+    fetch(`/notifications/mark-read/${notificationId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}',
@@ -270,7 +270,7 @@ function handleNotificationClick(notificationId, link) {
 }
 
 function markAllAsRead() {
-    fetch('/accounts/notifications/mark-all-read/', {
+    fetch('/notifications/mark-all-read/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}',

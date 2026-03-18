@@ -294,7 +294,7 @@
             card.classList.add('closing');
             overlay.classList.add('closing');
             setTimeout(() => overlay.remove(), 350);
-            fetch('/accounts/dismiss-welcome/', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}});
+            fetch('/dismiss-welcome/', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}});
         }
     </script>
     {% endif %}

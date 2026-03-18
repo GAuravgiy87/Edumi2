@@ -17,7 +17,13 @@
     
     <div class="camera-feed-container">
         <div class="feed-wrapper">
-            <img id="camera-stream" src="{% url 'camera_feed' camera.id %}" alt="{{ camera.name }} feed" class="camera-stream" style="width: 100%; height: auto; display: block;">
+            <div id="loading-overlay" class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Connecting to camera...</p>
+                <p style="font-size: 0.8rem; color: #aaa; margin-top: 10px;">Attempting TCP/UDP connection...</p>
+            </div>
+            <img id="camera-stream" src="" alt="{{ camera.name }} feed" class="camera-stream" style="width: 100%; height: auto; display: block;">
+            <div id="stream-status" style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 10;">Connecting...</div>
         </div>
         
         <div class="camera-details">
@@ -51,13 +57,19 @@
             </div>
             
             <div class="troubleshooting">
-                <h4>Troubleshooting</h4>
+                <h4>Troubleshooting RTSP Cameras</h4>
                 <ul>
-                    <li>Ensure camera is on same WiFi network</li>
-                    <li>Check RTSP URL format is correct</li>
-                    <li>Verify camera credentials</li>
-                    <li>Try accessing camera from VLC player first</li>
+                    <li><strong>Check RTSP URL format:</strong> rtsp://username:password@ip:port/path</li>
+                    <li><strong>Common paths:</strong> /stream, /live, /h264, /cam/realmonitor</li>
+                    <li><strong>Test in VLC:</strong> Open Network Stream → paste RTSP URL</li>
+                    <li><strong>Check camera is on same network</strong> and powered on</li>
+                    <li><strong>Verify credentials:</strong> Username/password are correct</li>
+                    <li><strong>Try different port:</strong> Default is 554, some cameras use 5544</li>
+                    <li><strong>Mobile cameras work?</strong> Then camera service is running fine</li>
                 </ul>
+                <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 0.85rem;">
+                    <strong>Tip:</strong> Click "Test Connection" to see detailed diagnostics including which transport protocol works.
+                </div>
             </div>
         </div>
     </div>
@@ -68,6 +80,74 @@ let imageLoaded = false;
 let loadAttempts = 0;
 const maxAttempts = 3;
 let serverCheckInterval;
+let frameCount = 0;
+let lastFrameTime = 0;
+
+// Start loading the stream
+function startStream() {
+    const img = document.getElementById('camera-stream');
+    const streamStatus = document.getElementById('stream-status');
+    const feedUrl = '{% url "camera_feed" camera.id %}';
+    
+    console.log('Starting stream from:', feedUrl);
+    streamStatus.textContent = 'Connecting to camera...';
+    
+    // Add timestamp to prevent caching
+    img.src = feedUrl + '?t=' + Date.now();
+    
+    // Track if we're receiving frames
+    frameCount = 0;
+    lastFrameTime = Date.now();
+    
+    // For MJPEG, the onload event fires continuously
+    img.onload = function() {
+        frameCount++;
+        lastFrameTime = Date.now();
+        
+        if (frameCount === 1) {
+            console.log('First frame received!');
+            hideOverlay();
+            streamStatus.textContent = 'Live - ' + frameCount + ' frames';
+        } else if (frameCount % 30 === 0) {
+            streamStatus.textContent = 'Live - ' + frameCount + ' frames';
+        }
+    };
+    
+    img.onerror = function() {
+        console.error('Stream error');
+        streamStatus.textContent = 'Error - retrying...';
+        handleImageError();
+    };
+}
+
+function hideOverlay() {
+    const overlay = document.getElementById('loading-overlay');
+    const status = document.getElementById('camera-status');
+    
+    overlay.style.opacity = '0';
+    setTimeout(() => {
+        overlay.style.display = 'none';
+    }, 300);
+    status.innerHTML = '● Active';
+    status.className = 'value status-active';
+}
+
+// Start stream when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Page loaded, starting stream...');
+    startStream();
+    
+    // Check if frames are still coming (every 5 seconds)
+    setInterval(function() {
+        const now = Date.now();
+        if (now - lastFrameTime > 10000 && frameCount > 0) {
+            console.log('No frames for 10 seconds, reconnecting...');
+            const streamStatus = document.getElementById('stream-status');
+            streamStatus.textContent = 'Reconnecting...';
+            startStream();
+        }
+    }, 5000);
+});
 
 function testCamera() {
     const statusMsg = document.getElementById('status-message');
@@ -78,19 +158,44 @@ function testCamera() {
     fetch('{% url "test_camera" camera.id %}')
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                statusMsg.textContent = '✓ ' + data.message;
+            console.log('Test result:', data);
+            
+            if (data.overall_status === 'success') {
+                let msg = `✓ Camera working via: ${data.working_methods.join(', ')}`;
+                if (data.results) {
+                    const successResult = data.results.find(r => r.status === 'success');
+                    if (successResult && successResult.frame_size) {
+                        msg += ` (${successResult.frame_size})`;
+                    }
+                }
+                statusMsg.textContent = msg;
+                statusMsg.className = 'status-message success';
+            } else if (data.status === 'success') {
+                statusMsg.textContent = '✓ ' + (data.message || 'Camera accessible');
                 statusMsg.className = 'status-message success';
             } else {
-                statusMsg.textContent = '✗ ' + data.message;
+                let msg = '✗ ' + (data.message || 'Connection failed');
+                if (data.hint) {
+                    msg += '\n💡 ' + data.hint;
+                }
+                if (data.results) {
+                    const failedMethods = data.results.filter(r => r.status !== 'success').map(r => 
+                        `${r.method}: ${r.status}`
+                    ).join(', ');
+                    if (failedMethods) {
+                        msg += `\nAttempted: ${failedMethods}`;
+                    }
+                }
+                statusMsg.innerHTML = msg.replace(/\n/g, '<br>');
                 statusMsg.className = 'status-message error';
             }
+            statusMsg.style.display = 'block';
             setTimeout(() => {
                 statusMsg.style.display = 'none';
-            }, 5000);
+            }, 8000);
         })
         .catch(error => {
-            statusMsg.textContent = '✗ Server is offline or camera unreachable';
+            statusMsg.textContent = '✗ Camera service not running. Start: cd camera_service && python manage.py runserver 8001';
             statusMsg.className = 'status-message error';
             handleServerOffline();
         });
@@ -114,24 +219,27 @@ function handleImageError() {
     const overlay = document.getElementById('loading-overlay');
     const status = document.getElementById('camera-status');
     const img = document.getElementById('camera-stream');
+    const streamStatus = document.getElementById('stream-status');
     
     loadAttempts++;
     console.log('Image load error, attempt:', loadAttempts);
     
     if (loadAttempts < maxAttempts) {
+        streamStatus.textContent = 'Retrying (' + loadAttempts + '/' + maxAttempts + ')...';
         // Retry loading
         setTimeout(() => {
-            const timestamp = new Date().getTime();
-            img.src = img.src.split('?')[0] + '?t=' + timestamp;
+            startStream();
         }, 2000);
     } else {
         // Check if server is offline
         fetch('{% url "test_camera" camera.id %}')
-            .then(response => {
-                // Server is online, but camera is offline
-                overlay.innerHTML = '<p style="color: #d63031;">⚠ Cannot connect to camera<br><small>Check if camera is online and RTSP URL is correct</small></p>';
-                status.innerHTML = '● Camera Offline';
+            .then(response => response.json())
+            .then(data => {
+                // Server is online, show camera issue
+                overlay.innerHTML = '<p style="color: #d63031;">⚠ Camera Test Passed but Stream Failed<br><small>RTSP URL may be incorrect or camera not streaming</small></p>';
+                status.innerHTML = '● Stream Error';
                 status.className = 'value status-inactive';
+                streamStatus.textContent = 'Stream failed';
             })
             .catch(error => {
                 // Server is offline
@@ -145,32 +253,21 @@ const cameraStream = document.getElementById('camera-stream');
 const overlay = document.getElementById('loading-overlay');
 const status = document.getElementById('camera-status');
 
-// For MJPEG streams, hide overlay after a short delay
+// Fallback: hide overlay after 10 seconds if still showing
 setTimeout(() => {
-    console.log('Hiding loading overlay for MJPEG stream');
-    overlay.style.opacity = '0';
-    setTimeout(() => {
-        overlay.style.display = 'none';
-    }, 300);
-    status.innerHTML = '● Active';
-    status.className = 'value status-active';
-}, 2000);
-
-// Start loading the image after page loads
-window.addEventListener('DOMContentLoaded', function() {
-    console.log('Starting camera feed load...');
-    console.log('Feed URL:', cameraStream.src);
-});
+    if (overlay.style.display !== 'none') {
+        console.log('Fallback: hiding overlay after timeout');
+        overlay.innerHTML = '<p style="color: #f39c12;">Stream taking longer than expected...<br><small>Check camera service logs</small></p>';
+    }
+}, 10000);
 
 // Check server status periodically
 function checkServerStatus() {
     fetch('{% url "test_camera" camera.id %}')
         .then(response => {
-            // Server is online
             console.log('Server is online');
         })
         .catch(error => {
-            // Server is offline
             console.log('Server is offline');
             handleServerOffline();
         });
@@ -302,8 +399,14 @@ function changeQuality() {
 
 .camera-feed-container {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 1.5fr 1fr;
     gap: 2rem;
+}
+
+@media (max-width: 1200px) {
+    .camera-feed-container {
+        grid-template-columns: 1fr;
+    }
 }
 
 .feed-wrapper {
@@ -311,12 +414,14 @@ function changeQuality() {
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    min-height: 500px;
+    min-height: 300px;
+    max-height: 540px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     border: 1px solid #343a40;
+    aspect-ratio: 16/9;
 }
 
 .camera-stream {

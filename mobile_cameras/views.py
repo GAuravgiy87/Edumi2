@@ -310,6 +310,107 @@ def test_mobile_camera(request, mobile_camera_id):
 
 
 @login_required
+def mobile_camera_headcount_feed(request, mobile_camera_id):
+    """Stream mobile camera feed with head counting and face detection overlay"""
+    mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
+    
+    # Check permission
+    if not can_view_mobile_camera(request.user, mobile_camera):
+        return JsonResponse({'error': 'You do not have permission to view this camera'}, status=403)
+    
+    import requests
+    import cv2
+    import numpy as np
+    from cameras.head_count_service import HeadDetector
+    
+    # Initialize head detector with tracking
+    detector = HeadDetector()
+    
+    def generate_frames():
+        """Stream frames with head detection overlay"""
+        try:
+            url = mobile_camera.get_stream_url()
+            logger.info(f"Connecting to mobile camera headcount feed: {url}")
+            
+            # Connect to MJPEG stream
+            response = requests.get(url, stream=True, timeout=30)
+            
+            if response.status_code != 200:
+                logger.error(f"Failed to connect to mobile camera: HTTP {response.status_code}")
+                yield (b'--frame\r\n'
+                       b'Content-Type: text/plain\r\n\r\n'
+                       b'ERROR: Cannot connect to mobile camera\r\n')
+                return
+            
+            bytes_buffer = bytes()
+            frame_count = 0
+            
+            for chunk in response.iter_content(chunk_size=1024):
+                bytes_buffer += chunk
+                
+                # Look for JPEG frame boundaries
+                a = bytes_buffer.find(b'\xff\xd8')  # JPEG start
+                b = bytes_buffer.find(b'\xff\xd9')  # JPEG end
+                
+                if a != -1 and b != -1 and b > a:
+                    # Extract JPEG frame
+                    jpg = bytes_buffer[a:b+2]
+                    bytes_buffer = bytes_buffer[b+2:]
+                    
+                    try:
+                        # Decode frame
+                        frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        
+                        if frame is not None:
+                            frame_count += 1
+                            
+                            # Process every 3rd frame for performance (10 FPS instead of 30)
+                            if frame_count % 3 == 0:
+                                # Detect heads with movement tracking
+                                head_count, detections, annotated_frame, avg_confidence, tracked_persons = \
+                                    detector.detect_heads(frame, track_movement=True)
+                                
+                                # Encode annotated frame
+                                ret, jpeg = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                
+                                if ret:
+                                    yield (b'--frame\r\n'
+                                           b'Content-Type: image/jpeg\r\n'
+                                           b'Content-Length: ' + str(len(jpeg)).encode() + b'\r\n'
+                                           b'\r\n' + jpeg.tobytes() + b'\r\n')
+                            else:
+                                # Send original frame without processing
+                                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                if ret:
+                                    yield (b'--frame\r\n'
+                                           b'Content-Type: image/jpeg\r\n'
+                                           b'Content-Length: ' + str(len(jpeg)).encode() + b'\r\n'
+                                           b'\r\n' + jpeg.tobytes() + b'\r\n')
+                    except Exception as e:
+                        logger.error(f"Frame processing error: {e}")
+                        continue
+                        
+        except requests.exceptions.ConnectionError:
+            logger.error("Mobile camera connection error")
+            yield (b'--frame\r\n'
+                   b'Content-Type: text/plain\r\n\r\n'
+                   b'ERROR: Cannot connect to mobile camera\r\n')
+        except Exception as e:
+            logger.error(f"Headcount feed error: {e}")
+            yield (b'--frame\r\n'
+                   b'Content-Type: text/plain\r\n\r\n'
+                   b'ERROR: Stream error\r\n')
+    
+    response = StreamingHttpResponse(
+        generate_frames(),
+        content_type='multipart/x-mixed-replace; boundary=frame'
+    )
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['X-Accel-Buffering'] = 'no'
+    return response
+
+
+@login_required
 def grant_permission(request, mobile_camera_id):
     """Grant a teacher permission to view a mobile camera"""
     if not is_admin(request.user):

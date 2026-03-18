@@ -3,16 +3,26 @@ import cv2
 import threading
 import time
 import logging
+import os
 from typing import Optional
 from django.http import StreamingHttpResponse, JsonResponse
 import sys
 from pathlib import Path
+
+# Set FFmpeg environment variables for better RTSP handling
+os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp|udp'
 
 # Import Camera model from main project
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from cameras.models import Camera
 
 logger = logging.getLogger('camera_api')
+
+# RTSP Connection Settings
+RTSP_OPEN_TIMEOUT = 10000  # 10 seconds
+RTSP_READ_TIMEOUT = 10000  # 10 seconds
+RTSP_RECONNECT_DELAY = 3   # 3 seconds between reconnection attempts
+RTSP_MAX_RECONNECT = 10    # Max reconnection attempts before giving up
 
 class CameraStreamer:
     """Non-blocking camera streamer with automatic reconnection"""
@@ -45,23 +55,81 @@ class CameraStreamer:
         logger.info(f"Stopped streamer for camera {self.camera_id}")
 
     def _connect_camera(self):
+        """Connect to RTSP camera with multiple transport protocols"""
+        # Try different RTSP transport protocols
+        transport_options = [
+            ('tcp', 'rtsp_transport;tcp'),      # TCP - most reliable
+            ('udp', 'rtsp_transport;udp'),      # UDP - faster but less reliable
+            ('http', 'rtsp_transport;http'),    # HTTP tunneling
+        ]
+        
+        for transport_name, transport_opt in transport_options:
+            cap = None  # Initialize cap for this iteration
+            try:
+                logger.info(f"Trying {transport_name.upper()} transport for camera {self.camera_id}")
+                
+                # Set environment variable for this attempt
+                os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = transport_opt
+                
+                cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT)
+                cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                cap.set(cv2.CAP_PROP_FPS, 30)  # Request 30 FPS
+                
+                if cap.isOpened():
+                    logger.info(f"Connection opened with {transport_name.upper()}, attempting to read frame...")
+                    
+                    # Try to read multiple frames (some cameras need a few frames to start)
+                    for attempt in range(5):
+                        ret, frame = cap.read()
+                        if ret and frame is not None:
+                            self.connection_attempts = 0
+                            logger.info(f"Successfully connected to camera {self.camera_id} via {transport_name.upper()} (attempt {attempt + 1})")
+                            logger.info(f"Frame size: {frame.shape[1]}x{frame.shape[0]}")
+                            return cap
+                        time.sleep(0.2)
+                    
+                    logger.warning(f"{transport_name.upper()}: Opened but could not read frames")
+                    cap.release()
+                else:
+                    logger.warning(f"{transport_name.upper()}: Failed to open connection")
+                    
+            except Exception as e:
+                logger.error(f"{transport_name.upper()} transport error for camera {self.camera_id}: {e}")
+                if cap is not None:
+                    try:
+                        cap.release()
+                    except:
+                        pass
+        
+        # If all transports fail, try without specific transport (default)
+        cap = None
         try:
+            logger.info(f"Trying default connection for camera {self.camera_id}")
             cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
-            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT)
+            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             
             if cap.isOpened():
-                ret, frame = cap.read()
-                if ret and frame is not None:
-                    self.connection_attempts = 0
-                    logger.info(f"Connected to camera {self.camera_id}")
-                    return cap
+                for attempt in range(5):
+                    ret, frame = cap.read()
+                    if ret and frame is not None:
+                        self.connection_attempts = 0
+                        logger.info(f"Connected to camera {self.camera_id} via default (attempt {attempt + 1})")
+                        return cap
+                    time.sleep(0.2)
                 cap.release()
-            return None
         except Exception as e:
-            logger.error(f"Error connecting camera {self.camera_id}: {e}")
-            return None
+            logger.error(f"Default connection error: {e}")
+            if cap is not None:
+                try:
+                    cap.release()
+                except:
+                    pass
+            
+        return None
 
     def _update(self):
         while self.running:
@@ -70,20 +138,23 @@ class CameraStreamer:
                 break
 
             if self.cap is None:
-                if self.connection_attempts >= self.max_reconnect_attempts:
+                if self.connection_attempts >= RTSP_MAX_RECONNECT:
+                    logger.error(f"Max reconnection attempts reached for camera {self.camera_id}")
                     time.sleep(10)
                     self.connection_attempts = 0
                     continue
                 
                 self.connection_attempts += 1
+                logger.info(f"Reconnection attempt {self.connection_attempts}/{RTSP_MAX_RECONNECT} for camera {self.camera_id}")
                 self.cap = self._connect_camera()
                 if self.cap is None:
-                    time.sleep(self.reconnect_delay)
+                    time.sleep(RTSP_RECONNECT_DELAY)
                     continue
 
             try:
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
+                    self.connection_attempts = 0  # Reset on successful frame
                     with self.lock:
                         self.last_frame = frame.copy()
                     
@@ -97,16 +168,20 @@ class CameraStreamer:
                     
                     time.sleep(0.01)  # High capture rate, streaming will skip
                 else:
+                    logger.warning(f"Failed to read frame from camera {self.camera_id}, reconnecting...")
                     if self.cap is not None:
                         self.cap.release()
                     self.cap = None
-                    time.sleep(self.reconnect_delay)
+                    time.sleep(RTSP_RECONNECT_DELAY)
             except Exception as e:
                 logger.error(f"Error reading camera {self.camera_id}: {e}")
                 if self.cap is not None:
-                    self.cap.release()
+                    try:
+                        self.cap.release()
+                    except:
+                        pass
                 self.cap = None
-                time.sleep(self.reconnect_delay)
+                time.sleep(RTSP_RECONNECT_DELAY)
         
         if self.cap is not None:
             self.cap.release()
@@ -138,11 +213,6 @@ class CameraStreamer:
         except Exception:
             return self.frame
 
-    def get_frame(self):
-        self.last_access = time.time()
-        with self.lock:
-            return self.frame
-
 class CameraManager:
     _lock = threading.Lock()
     _streamers = {}
@@ -150,7 +220,14 @@ class CameraManager:
     @classmethod
     def get_streamer(cls, camera_id, rtsp_url):
         with cls._lock:
-            if camera_id not in cls._streamers or not cls._streamers[camera_id].running:
+            # Create new streamer if not exists or if existing one stopped
+            if camera_id not in cls._streamers:
+                logger.info(f"Creating new streamer for camera {camera_id}")
+                streamer = CameraStreamer(camera_id, rtsp_url)
+                streamer.start()
+                cls._streamers[camera_id] = streamer
+            elif not cls._streamers[camera_id].running:
+                logger.info(f"Restarting stopped streamer for camera {camera_id}")
                 streamer = CameraStreamer(camera_id, rtsp_url)
                 streamer.start()
                 cls._streamers[camera_id] = streamer
@@ -179,26 +256,54 @@ def camera_feed(request, camera_id):
     
     try:
         camera = Camera.objects.get(id=camera_id)
+        logger.info(f"=== FEED REQUEST for camera {camera_id} ===")
+        logger.info(f"RTSP URL: {camera.rtsp_url[:30]}...")
         streamer = camera_manager.get_streamer(camera.id, camera.rtsp_url)
+        logger.info(f"Streamer running: {streamer.running}")
         
         def generate_frames():
             # Throttle based on quality
             throttles = {'high': 0.033, 'med': 0.05, 'low': 0.1}
             delay = throttles.get(quality, 0.05)
             
+            # Wait for first frame (up to 30 seconds)
+            wait_count = 0
+            max_wait = 300  # 30 seconds at 0.1s intervals
+            while streamer.get_frame() is None and wait_count < max_wait:
+                time.sleep(0.1)
+                wait_count += 1
+                if wait_count % 10 == 0:
+                    logger.info(f"Waiting for first frame from camera {camera_id}... ({wait_count/10:.0f}s)")
+            
+            first_frame = streamer.get_frame()
+            if first_frame is None:
+                logger.error(f"No frame received from camera {camera_id} after 30 seconds")
+                yield (b'--frame\r\n'
+                       b'Content-Type: text/plain\r\n\r\n'
+                       b'ERROR: Could not get video frame from camera.\r\n'
+                       b'Check RTSP URL and credentials.\r\n')
+                return
+            
+            logger.info(f"=== STREAMING STARTED for camera {camera_id} ===")
+            frame_count = 0
+            
             try:
                 while True:
                     frame = streamer.get_adaptive_frame(quality)
                     if frame:
+                        frame_count += 1
+                        if frame_count % 100 == 0:
+                            logger.info(f"Camera {camera_id}: streamed {frame_count} frames")
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n'
                                b'Content-Length: ' + str(len(frame)).encode() + b'\r\n'
                                b'\r\n' + frame + b'\r\n')
                         time.sleep(delay)
                     else:
-                        time.sleep(0.1)
+                        # Frame lost, wait briefly
+                        time.sleep(0.05)
             except GeneratorExit:
-                logger.info(f"Client disconnected from camera {camera_id}")
+                logger.info(f"Client disconnected from camera {camera_id} after {frame_count} frames")
 
         response = StreamingHttpResponse(
             generate_frames(),
@@ -208,25 +313,120 @@ def camera_feed(request, camera_id):
         response['X-Accel-Buffering'] = 'no'
         return response
     except Camera.DoesNotExist:
+        logger.error(f"Camera {camera_id} not found")
         return JsonResponse({'error': 'Camera not found'}, status=404)
 
 def test_camera(request, camera_id):
-    """Test camera connection"""
+    """Test camera connection with detailed diagnostics"""
+    import subprocess
+    
     try:
         camera = Camera.objects.get(id=camera_id)
+        
+        # Log the RTSP URL (hide password)
+        safe_url = camera.rtsp_url
+        if '@' in safe_url:
+            parts = safe_url.split('@')
+            safe_url = parts[0].rsplit(':', 1)[0] + ':***@' + parts[1]
+        logger.info(f"Testing camera {camera_id}: {safe_url}")
+        
+        # Check if FFmpeg is available
+        try:
+            result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True, timeout=5)
+            ffmpeg_available = True
+            ffmpeg_version = result.stdout.split('\n')[0] if result.stdout else 'Unknown'
+        except:
+            ffmpeg_available = False
+            ffmpeg_version = 'Not installed'
+        
+        # Try different connection methods
+        results = []
+        
+        # Method 1: OpenCV with TCP
+        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
         cap = cv2.VideoCapture(camera.rtsp_url, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
+        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
         
         if cap.isOpened():
             ret, frame = cap.read()
-            cap.release()
             if ret and frame is not None:
-                return JsonResponse({'status': 'success', 'message': 'Camera accessible'})
-            return JsonResponse({'status': 'error', 'message': 'Cannot read frames'})
-        cap.release()
-        return JsonResponse({'status': 'error', 'message': 'Cannot connect'})
+                results.append({
+                    'method': 'OpenCV TCP',
+                    'status': 'success',
+                    'frame_size': f"{frame.shape[1]}x{frame.shape[0]}"
+                })
+            else:
+                results.append({'method': 'OpenCV TCP', 'status': 'opened_but_no_frame'})
+            cap.release()
+        else:
+            results.append({'method': 'OpenCV TCP', 'status': 'failed_to_open'})
+        
+        # Method 2: OpenCV with UDP
+        os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
+        cap = cv2.VideoCapture(camera.rtsp_url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
+        
+        if cap.isOpened():
+            ret, frame = cap.read()
+            if ret and frame is not None:
+                results.append({
+                    'method': 'OpenCV UDP',
+                    'status': 'success',
+                    'frame_size': f"{frame.shape[1]}x{frame.shape[0]}"
+                })
+            else:
+                results.append({'method': 'OpenCV UDP', 'status': 'opened_but_no_frame'})
+            cap.release()
+        else:
+            results.append({'method': 'OpenCV UDP', 'status': 'failed_to_open'})
+        
+        # Method 3: FFprobe (if available)
+        if ffmpeg_available:
+            try:
+                result = subprocess.run(
+                    ['ffprobe', '-v', 'error', '-rtsp_transport', 'tcp', 
+                     '-i', camera.rtsp_url, '-show_entries', 'stream=width,height,codec_name',
+                     '-of', 'json'],
+                    capture_output=True, text=True, timeout=15
+                )
+                if result.returncode == 0:
+                    import json
+                    probe_data = json.loads(result.stdout)
+                    results.append({
+                        'method': 'FFprobe',
+                        'status': 'success',
+                        'streams': probe_data.get('streams', [])
+                    })
+                else:
+                    results.append({
+                        'method': 'FFprobe',
+                        'status': 'failed',
+                        'error': result.stderr[:200] if result.stderr else 'Unknown error'
+                    })
+            except subprocess.TimeoutExpired:
+                results.append({'method': 'FFprobe', 'status': 'timeout'})
+            except Exception as e:
+                results.append({'method': 'FFprobe', 'status': 'error', 'error': str(e)[:100]})
+        
+        # Determine overall status
+        success_methods = [r for r in results if r['status'] == 'success']
+        
+        return JsonResponse({
+            'camera_id': camera_id,
+            'camera_name': camera.name,
+            'rtsp_url': safe_url,
+            'ffmpeg_available': ffmpeg_available,
+            'ffmpeg_version': ffmpeg_version,
+            'results': results,
+            'overall_status': 'success' if success_methods else 'failed',
+            'working_methods': [r['method'] for r in success_methods]
+        })
+        
+    except Camera.DoesNotExist:
+        return JsonResponse({'error': 'Camera not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)})
+        logger.error(f"Error testing camera {camera_id}: {e}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 

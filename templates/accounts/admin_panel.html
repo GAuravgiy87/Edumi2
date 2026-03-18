@@ -427,7 +427,9 @@
                         <td>{{ user.first_name }} {{ user.last_name }}</td>
                         <td>{{ user.email|default:"—" }}</td>
                         <td>
-                            {% if user.userprofile %}
+                            {% if user.is_superuser %}
+                            <span class="badge badge-admin">Admin</span>
+                            {% elif user.userprofile %}
                             <span class="badge badge-{{ user.userprofile.user_type }}">{{ user.userprofile.get_user_type_display }}</span>
                             {% else %}
                             <span class="badge badge-admin">Admin</span>

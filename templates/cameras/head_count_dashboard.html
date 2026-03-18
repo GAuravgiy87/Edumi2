@@ -1,0 +1,619 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Head Count Dashboard{% endblock %}
+
+{% block content %}
+<div class="headcount-container">
+    <div class="page-header">
+        <h1>📊 Head Count Monitoring</h1>
+        <div class="header-actions">
+            <a href="{% url 'head_count_logs' %}" class="btn btn-secondary">📋 View Logs</a>
+            <a href="{% url 'head_count_report' %}" class="btn btn-primary">📈 Reports</a>
+        </div>
+    </div>
+
+    <div class="info-banner">
+        <p>🎥 Start head counting on any camera to automatically detect and count people with green bounding boxes. 
+        Counts are logged with timestamps for class-wise, day-wise, and time-wise analysis.</p>
+    </div>
+
+    <!-- Active Sessions -->
+    {% if active_sessions %}
+    <div class="section active-sessions">
+        <h2>🟢 Active Sessions</h2>
+        <div class="sessions-grid">
+            {% for key, session in active_sessions.items %}
+            <div class="session-card active">
+                <div class="session-info">
+                    <h3>{{ session.camera_name }}</h3>
+                    <span class="session-type">{{ session.get_camera_type_display }}</span>
+                </div>
+                <div class="session-stats">
+                    <div class="stat">
+                        <span class="label">Started:</span>
+                        <span class="value">{{ session.started_at|timesince }} ago</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Captures:</span>
+                        <span class="value">{{ session.total_captures }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Avg Count:</span>
+                        <span class="value">{{ session.average_head_count|floatformat:1 }}</span>
+                    </div>
+                </div>
+                <button class="btn btn-danger stop-session" 
+                        data-camera-type="{{ session.camera_type }}" 
+                        data-camera-id="{{ session.camera_id }}">
+                    ⏹ Stop
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RTSP Cameras -->
+    <div class="section">
+        <h2>📹 RTSP Cameras</h2>
+        {% if rtsp_cameras %}
+        <div class="cameras-grid">
+            {% for camera in rtsp_cameras %}
+            <div class="camera-card" id="rtsp-{{ camera.id }}">
+                <div class="camera-header">
+                    <h3>{{ camera.name }}</h3>
+                    <span class="camera-ip">{{ camera.ip_address }}:{{ camera.port }}</span>
+                </div>
+                <div class="camera-body">
+                    <div class="camera-preview">
+                        <img src="{% url 'camera_feed' camera.id %}" alt="{{ camera.name }}" class="preview-feed">
+                    </div>
+                </div>
+                <div class="camera-footer">
+                    {% if camera.has_active_session %}
+                        <span class="status-badge active">🟢 Counting Active</span>
+                        <button class="btn btn-danger stop-session" 
+                                data-camera-type="rtsp" 
+                                data-camera-id="{{ camera.id }}">
+                            ⏹ Stop Counting
+                        </button>
+                    {% else %}
+                        <span class="status-badge inactive">⚪ Ready</span>
+                        <button class="btn btn-success start-session" 
+                                data-camera-type="rtsp" 
+                                data-camera-id="{{ camera.id }}"
+                                data-camera-name="{{ camera.name }}">
+                            ▶ Start Counting
+                        </button>
+                    {% endif %}
+                    <a href="{% url 'view_camera' camera.id %}" class="btn btn-secondary">👁 View</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-data">
+            <p>No RTSP cameras available. Contact admin to add cameras.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Mobile Cameras -->
+    <div class="section">
+        <h2>📱 Mobile Cameras</h2>
+        {% if mobile_cameras %}
+        <div class="cameras-grid">
+            {% for camera in mobile_cameras %}
+            <div class="camera-card" id="mobile-{{ camera.id }}">
+                <div class="camera-header">
+                    <h3>{{ camera.name }}</h3>
+                    <span class="camera-type">{{ camera.get_camera_type_display }}</span>
+                </div>
+                <div class="camera-body">
+                    <div class="camera-preview">
+                        <img src="{% url 'mobile_cameras:feed' camera.id %}" alt="{{ camera.name }}" class="preview-feed">
+                    </div>
+                </div>
+                <div class="camera-footer">
+                    {% if camera.has_active_session %}
+                        <span class="status-badge active">🟢 Counting Active</span>
+                        <button class="btn btn-danger stop-session" 
+                                data-camera-type="mobile" 
+                                data-camera-id="{{ camera.id }}">
+                            ⏹ Stop Counting
+                        </button>
+                    {% else %}
+                        <span class="status-badge inactive">⚪ Ready</span>
+                        <button class="btn btn-success start-session" 
+                                data-camera-type="mobile" 
+                                data-camera-id="{{ camera.id }}"
+                                data-camera-name="{{ camera.name }}">
+                            ▶ Start Counting
+                        </button>
+                    {% endif %}
+                    <a href="{% url 'mobile_cameras:view' camera.id %}" class="btn btn-secondary">👁 View</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-data">
+            <p>No mobile cameras available. Contact admin to add mobile cameras.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Logs -->
+    {% if recent_logs %}
+    <div class="section recent-logs">
+        <h2>📋 Recent Head Counts</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Camera</th>
+                    <th>Head Count</th>
+                    <th>Confidence</th>
+                    <th>Classroom</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                    <td>{{ log.timestamp|date:"H:i" }} {{ log.timestamp|date:"d M" }}</td>
+                    <td>{{ log.camera_name }}</td>
+                    <td><strong>{{ log.head_count }}</strong></td>
+                    <td>{{ log.confidence_score|floatformat:2 }}</td>
+                    <td>{{ log.classroom.title|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{% url 'head_count_logs' %}" class="view-all-link">View all logs →</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Start Session Modal -->
+<div id="startModal" class="modal">
+    <div class="modal-content">
+        <h3>Start Head Counting</h3>
+        <p id="modal-camera-name"></p>
+        <form id="startSessionForm">
+            <div class="form-group">
+                <label for="classroom">Classroom (Optional):</label>
+                <select name="classroom_id" id="classroom">
+                    <option value="">-- Select Classroom --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="interval">Capture Interval (seconds):</label>
+                <input type="number" name="interval" id="interval" value="30" min="10" max="300">
+            </div>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Start</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .headcount-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 25px 30px;
+        border-radius: 15px;
+        color: white;
+    }
+
+    .page-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .info-banner {
+        background: #e8f4fd;
+        border-left: 4px solid #0984e3;
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+
+    .info-banner p {
+        margin: 0;
+        color: #2d3436;
+    }
+
+    .section {
+        margin-bottom: 40px;
+    }
+
+    .section h2 {
+        font-size: 1.3rem;
+        color: #2d3436;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #dfe6e9;
+    }
+
+    .cameras-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+    }
+
+    .camera-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .camera-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+
+    .camera-header {
+        padding: 15px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .camera-header h3 {
+        margin: 0;
+        font-size: 1rem;
+        color: #2d3436;
+    }
+
+    .camera-ip, .camera-type {
+        font-size: 0.8rem;
+        color: #636e72;
+        background: #dfe6e9;
+        padding: 3px 8px;
+        border-radius: 4px;
+    }
+
+    .camera-body {
+        background: #000;
+        height: 180px;
+        position: relative;
+    }
+
+    .preview-feed {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .camera-footer {
+        padding: 15px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .status-badge {
+        font-size: 0.85rem;
+        padding: 5px 12px;
+        border-radius: 20px;
+        background: #dfe6e9;
+    }
+
+    .status-badge.active {
+        background: #c8f7c5;
+        color: #00a86b;
+    }
+
+    .status-badge.inactive {
+        background: #f0f0f0;
+        color: #636e72;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #0984e3;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #636e72;
+        color: white;
+    }
+
+    .btn-success {
+        background: #00b894;
+        color: white;
+    }
+
+    .btn-danger {
+        background: #d63031;
+        color: white;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+    }
+
+    .sessions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 15px;
+    }
+
+    .session-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 4px solid #00b894;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .session-card h3 {
+        margin: 0 0 5px;
+        color: #2d3436;
+    }
+
+    .session-type {
+        font-size: 0.8rem;
+        color: #636e72;
+    }
+
+    .session-stats {
+        margin: 15px 0;
+        display: flex;
+        gap: 20px;
+    }
+
+    .session-stats .stat {
+        text-align: center;
+    }
+
+    .session-stats .label {
+        display: block;
+        font-size: 0.75rem;
+        color: #636e72;
+    }
+
+    .session-stats .value {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #2d3436;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .data-table th, .data-table td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .data-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #2d3436;
+    }
+
+    .data-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .view-all-link {
+        display: block;
+        text-align: center;
+        padding: 15px;
+        color: #0984e3;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #636e72;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 400px;
+        width: 90%;
+    }
+
+    .modal-content h3 {
+        margin: 0 0 10px;
+    }
+
+    .form-group {
+        margin: 15px 0;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .form-group select, .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #dfe6e9;
+        border-radius: 6px;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .modal-actions .btn {
+        flex: 1;
+    }
+</style>
+
+<script>
+    let currentCameraType = null;
+    let currentCameraId = null;
+
+    // Load classrooms for modal
+    function loadClassrooms() {
+        fetch('/meetings/api/classrooms/')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('classroom');
+                select.innerHTML = '<option value="">-- Select Classroom --</option>';
+                data.forEach(classroom => {
+                    select.innerHTML += `<option value="${classroom.id}">${classroom.title}</option>`;
+                });
+            })
+            .catch(err => console.log('Could not load classrooms'));
+    }
+
+    // Start session buttons
+    document.querySelectorAll('.start-session').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentCameraType = this.dataset.cameraType;
+            currentCameraId = this.dataset.cameraId;
+            document.getElementById('modal-camera-name').textContent = this.dataset.cameraName;
+            document.getElementById('startModal').classList.add('active');
+            loadClassrooms();
+        });
+    });
+
+    // Stop session buttons
+    document.querySelectorAll('.stop-session').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const cameraType = this.dataset.cameraType;
+            const cameraId = this.dataset.cameraId;
+            
+            if (confirm('Stop head counting for this camera?')) {
+                fetch(`/cameras/head-count/stop/${cameraType}/${cameraId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+            }
+        });
+    });
+
+    // Form submit
+    document.getElementById('startSessionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        fetch(`/cameras/head-count/start/${currentCameraType}/${currentCameraId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                closeModal();
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    });
+
+    function closeModal() {
+        document.getElementById('startModal').classList.remove('active');
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Close modal on outside click
+    document.getElementById('startModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+</script>
+{% endblock %}
