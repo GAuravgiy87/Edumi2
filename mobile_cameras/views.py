@@ -311,7 +311,7 @@ def test_mobile_camera(request, mobile_camera_id):
 
 @login_required
 def mobile_camera_headcount_feed(request, mobile_camera_id):
-    """Stream mobile camera feed with head counting and motion detection overlay"""
+    """Stream mobile camera feed with optimized face detection"""
     mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
     
     # Check permission
@@ -321,18 +321,18 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
     import requests
     import cv2
     import numpy as np
-    from cameras.head_count_service import HeadDetector
+    import time
+    from collections import deque
     
-    # Initialize head detector with tracking
-    detector = HeadDetector()
+    # Load face cascade once
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     
     def generate_frames():
-        """Stream frames with head detection and motion tracking overlay"""
+        """Stream frames with fast face detection"""
         try:
             url = mobile_camera.get_stream_url()
             logger.info(f"Connecting to mobile camera headcount feed: {url}")
             
-            # Connect to MJPEG stream
             response = requests.get(url, stream=True, timeout=30)
             
             if response.status_code != 200:
@@ -344,117 +344,110 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
             
             bytes_buffer = bytes()
             frame_count = 0
-            prev_frame = None
+            last_faces = []
+            last_count = 0
+            detection_history = deque(maxlen=5)
             
-            for chunk in response.iter_content(chunk_size=4096):
+            for chunk in response.iter_content(chunk_size=16384):  # Larger chunks
                 bytes_buffer += chunk
                 
-                # Look for JPEG frame boundaries
                 while True:
-                    a = bytes_buffer.find(b'\xff\xd8')  # JPEG start
-                    b = bytes_buffer.find(b'\xff\xd9')  # JPEG end
+                    a = bytes_buffer.find(b'\xff\xd8')
+                    b = bytes_buffer.find(b'\xff\xd9')
                     
                     if a == -1 or b == -1 or b <= a:
                         break
                     
-                    # Extract JPEG frame
                     jpg = bytes_buffer[a:b+2]
                     bytes_buffer = bytes_buffer[b+2:]
                     
                     try:
-                        # Decode frame
                         frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
                         
                         if frame is not None:
                             frame_count += 1
+                            display_frame = frame.copy()
                             
-                            # Process every frame for smooth video
-                            try:
-                                # First apply motion detection for any movement
-                                motion_frame, motion_detected = detect_motion(frame, prev_frame)
-                                prev_frame = frame.copy()
+                            # Run detection every 3rd frame for performance (10 FPS detection)
+                            if frame_count % 3 == 0:
+                                try:
+                                    # Resize to smaller size for faster processing
+                                    small_frame = cv2.resize(frame, (320, 240))
+                                    gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+                                    
+                                    # Fast face detection
+                                    faces = face_cascade.detectMultiScale(
+                                        gray,
+                                        scaleFactor=1.2,  # Faster but less accurate
+                                        minNeighbors=3,
+                                        minSize=(30, 30),
+                                        maxSize=(200, 200)
+                                    )
+                                    
+                                    # Scale coordinates back to original size
+                                    scale_x = frame.shape[1] / 320
+                                    scale_y = frame.shape[0] / 240
+                                    
+                                    current_faces = []
+                                    for (x, y, w, h) in faces:
+                                        x = int(x * scale_x)
+                                        y = int(y * scale_y)
+                                        w = int(w * scale_x)
+                                        h = int(h * scale_y)
+                                        current_faces.append((x, y, w, h))
+                                    
+                                    # Simple stability: use current if similar to last
+                                    if abs(len(current_faces) - last_count) <= 1:
+                                        last_faces = current_faces
+                                        last_count = len(current_faces)
+                                    elif len(current_faces) > 0:
+                                        last_faces = current_faces
+                                        last_count = len(current_faces)
+                                    
+                                    detection_history.append(last_count)
+                                    
+                                except Exception as e:
+                                    logger.error(f"Detection error: {e}")
+                            
+                            # Draw boxes on every frame (smooth display)
+                            for i, (x, y, w, h) in enumerate(last_faces):
+                                x, y = max(0, x), max(0, y)
+                                w = min(w, display_frame.shape[1] - x)
+                                h = min(h, display_frame.shape[0] - y)
                                 
-                                # Then detect heads/persons with tracking
-                                head_count, detections, annotated_frame, avg_confidence, tracked_persons = \
-                                    detector.detect_heads(motion_frame, track_movement=True)
+                                # Simple green box
+                                cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                                 
-                                # Add motion detection overlay
-                                if motion_detected:
-                                    cv2.putText(annotated_frame, "MOTION DETECTED", (10, 60),
-                                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                                
-                                # Encode annotated frame
-                                ret, jpeg = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                                
-                                if ret:
-                                    yield (b'--frame\r\n'
-                                           b'Content-Type: image/jpeg\r\n'
-                                           b'\r\n' + jpeg.tobytes() + b'\r\n')
-                            except Exception as e:
-                                logger.error(f"Frame processing error: {e}")
-                                # Send original frame on error
-                                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                                if ret:
-                                    yield (b'--frame\r\n'
-                                           b'Content-Type: image/jpeg\r\n'
-                                           b'\r\n' + jpeg.tobytes() + b'\r\n')
+                                # Simple label
+                                label = f"{i + 1}"
+                                cv2.putText(display_frame, label, (x + 5, y + 25),
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                            
+                            # Show count
+                            display_count = last_count
+                            cv2.putText(display_frame, f"COUNT: {display_count}", (10, 35),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+                            
+                            # Fast encoding
+                            ret, jpeg = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                            if ret:
+                                yield (b'--frame\r\n'
+                                       b'Content-Type: image/jpeg\r\n'
+                                       b'\r\n' + jpeg.tobytes() + b'\r\n')
                     except Exception as e:
-                        logger.error(f"Frame decode error: {e}")
                         continue
                         
-        except requests.exceptions.ConnectionError:
-            logger.error("Mobile camera connection error")
-            yield (b'--frame\r\n'
-                   b'Content-Type: text/plain\r\n\r\n'
-                   b'ERROR: Cannot connect to mobile camera\r\n')
         except Exception as e:
             logger.error(f"Headcount feed error: {e}")
             yield (b'--frame\r\n'
                    b'Content-Type: text/plain\r\n\r\n'
                    b'ERROR: Stream error\r\n')
     
-    def detect_motion(frame, prev_frame, threshold=25, min_area=500):
-        """Detect any motion in the frame - works for persons, animals, objects"""
-        if prev_frame is None:
-            return frame, False
-        
-        # Convert to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (21, 21), 0)
-        
-        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-        prev_gray = cv2.GaussianBlur(prev_gray, (21, 21), 0)
-        
-        # Calculate frame difference
-        frame_delta = cv2.absdiff(prev_gray, gray)
-        thresh = cv2.threshold(frame_delta, threshold, 255, cv2.THRESH_BINARY)[1]
-        
-        # Dilate to fill holes
-        thresh = cv2.dilate(thresh, None, iterations=2)
-        
-        # Find contours
-        contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        motion_detected = False
-        for contour in contours:
-            if cv2.contourArea(contour) < min_area:
-                continue
-            
-            motion_detected = True
-            # Draw red bounding box around motion
-            (x, y, w, h) = cv2.boundingRect(contour)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
-            cv2.putText(frame, "Motion", (x, y - 10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-        
-        return frame, motion_detected
-    
     response = StreamingHttpResponse(
         generate_frames(),
         content_type='multipart/x-mixed-replace; boundary=frame'
     )
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Pragma'] = 'no-cache'
+    response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
 

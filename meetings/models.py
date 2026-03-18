@@ -80,6 +80,11 @@ class Meeting(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     
+    SLEEP_STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('sleeping', 'Sleeping'),
+    ]
+    
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='meetings', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -88,6 +93,7 @@ class Meeting(models.Model):
     scheduled_time = models.DateTimeField()
     duration_minutes = models.IntegerField(default=60)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    sleep_status = models.CharField(max_length=20, choices=SLEEP_STATUS_CHOICES, default='active')
     max_participants = models.IntegerField(default=100)
     allow_screen_share = models.BooleanField(default=True)
     allow_chat = models.BooleanField(default=True)
@@ -101,6 +107,24 @@ class Meeting(models.Model):
     
     class Meta:
         ordering = ['-scheduled_time']
+    
+    def is_sleeping(self):
+        """Check if meeting is in sleep mode"""
+        return self.sleep_status == 'sleeping'
+    
+    def can_join(self):
+        """Check if users can join this meeting"""
+        return self.status == 'live' and self.sleep_status == 'active'
+    
+    def put_to_sleep(self):
+        """Put meeting to sleep mode"""
+        self.sleep_status = 'sleeping'
+        self.save(update_fields=['sleep_status'])
+    
+    def unfreeze(self):
+        """Unfreeze/wake up the meeting"""
+        self.sleep_status = 'active'
+        self.save(update_fields=['sleep_status'])
 
 class MeetingParticipant(models.Model):
     meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='participants')

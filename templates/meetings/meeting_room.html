@@ -116,6 +116,19 @@
                 <span class="notification-badge" id="chatBadge" style="display: none;">0</span>
             </button>
             
+            <!-- Dark/Light Mode Toggle -->
+            <button class="control-button" id="themeBtn" onclick="toggleTheme()" title="Toggle dark/light mode">
+                <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            </button>
+            
+            {% if is_host %}
+            <!-- Sleep Mode Button -->
+            <button class="control-button" id="sleepBtn" onclick="toggleSleepMode()" title="Put meeting to sleep">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+            {% endif %}
+            
             <div class="control-divider"></div>
             
             <button class="control-button danger" onclick="leaveMeeting()" title="Leave call">
@@ -524,9 +537,21 @@ function connectWebSocket() {
                 break;
             
             case 'recording_started':
-                if (data.user_id !== currentUserId) {
-                    showRecordingNotification('Recording started by host');
-                }
+                showNotification('Recording started', 'info');
+                break;
+            
+            case 'meeting_sleeping':
+                isSleeping = true;
+                updateSleepButton();
+                showNotification('Meeting has been put to sleep by the host', 'warning');
+                enterSleepMode();
+                break;
+            
+            case 'meeting_unfrozen':
+                isSleeping = false;
+                updateSleepButton();
+                showNotification('Meeting is now active', 'success');
+                exitSleepMode();
                 break;
             
             case 'recording_stopped':
@@ -1816,6 +1841,14 @@ function toggleSettings() {
 function leaveMeeting() {
     const message = isHost ? 'End meeting for everyone?' : 'Leave this meeting?';
     if (confirm(message)) {
+        // If host, ask about sleep mode before leaving
+        if (isHost && !isSleeping) {
+            const putToSleep = confirm('Put meeting to sleep mode?\n\nYes = Meeting stays active but no one can join\nNo = Meeting ends completely');
+            if (putToSleep) {
+                putMeetingToSleep(true); // Silent mode - no alerts
+            }
+        }
+        
         // Stop recording if active
         if (isRecording) {
             stopRecording();
@@ -1839,6 +1872,312 @@ function leaveMeeting() {
         const url = isHost ? '/meetings/teacher/' : '/meetings/student/';
         window.location.href = url;
     }
+}
+
+// Sleep Mode Functions
+let isSleeping = false;
+
+function toggleSleepMode() {
+    if (!isHost) return;
+    
+    if (isSleeping) {
+        // Unfreeze meeting
+        unfreezeMeeting();
+    } else {
+        // Put meeting to sleep
+        putMeetingToSleep();
+    }
+}
+
+function putMeetingToSleep(silent = false) {
+    if (!silent && !confirm('Put meeting to sleep? No one will be able to join until you unfreeze it.')) {
+        return;
+    }
+    
+    fetch(`/meetings/sleep/${meetingCode}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            isSleeping = true;
+            updateSleepButton();
+            if (!silent) {
+                showNotification('Meeting is now sleeping. No one can join.');
+            }
+        } else {
+            if (!silent) {
+                showNotification(data.error || 'Failed to put meeting to sleep');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        if (!silent) {
+            showNotification('Error putting meeting to sleep');
+        }
+    });
+}
+
+function unfreezeMeeting() {
+    fetch(`/meetings/unfreeze/${meetingCode}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            isSleeping = false;
+            updateSleepButton();
+            exitSleepMode();
+            showNotification('Meeting is now active. People can join.');
+        } else {
+            showNotification(data.error || 'Failed to unfreeze meeting');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error unfreezing meeting');
+    });
+}
+
+function updateSleepButton() {
+    const sleepBtn = document.getElementById('sleepBtn');
+    if (!sleepBtn) return;
+    
+    if (isSleeping) {
+        sleepBtn.classList.add('active');
+        sleepBtn.title = 'Unfreeze meeting';
+        sleepBtn.style.background = '#f59e0b'; // Orange for sleeping
+    } else {
+        sleepBtn.classList.remove('active');
+        sleepBtn.title = 'Put meeting to sleep';
+        sleepBtn.style.background = '';
+    }
+}
+
+// Sleep Mode Resource Management
+let sleepModeState = {
+    localStreamActive: false,
+    screenStreamActive: false,
+    peerConnectionsActive: false,
+    timerInterval: null,
+    wasRecording: false
+};
+
+function enterSleepMode() {
+    console.log('Entering sleep mode - stopping resources...');
+    
+    // Save current state
+    sleepModeState.localStreamActive = localStream !== null;
+    sleepModeState.screenStreamActive = screenStream !== null;
+    sleepModeState.peerConnectionsActive = Object.keys(peerConnections).length > 0;
+    sleepModeState.wasRecording = isRecording;
+    
+    // Stop recording if active
+    if (isRecording) {
+        stopRecording();
+    }
+    
+    // Stop local media streams (camera/mic)
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('Stopped local track:', track.kind);
+        });
+        localStream = null;
+    }
+    
+    // Stop screen sharing
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('Stopped screen track:', track.kind);
+        });
+        screenStream = null;
+        isScreenSharing = false;
+        updateScreenButton();
+    }
+    
+    // Close all peer connections
+    Object.keys(peerConnections).forEach(userId => {
+        const pc = peerConnections[userId];
+        if (pc) {
+            pc.close();
+            console.log('Closed peer connection for user:', userId);
+        }
+    });
+    peerConnections = {};
+    
+    // Clear all video elements
+    const videoElements = document.querySelectorAll('video');
+    videoElements.forEach(video => {
+        video.srcObject = null;
+        video.pause();
+    });
+    
+    // Clear remote streams
+    remoteStreams = {};
+    
+    // Update UI to show sleep overlay
+    showSleepOverlay();
+    
+    // Stop the timer
+    if (sleepModeState.timerInterval) {
+        clearInterval(sleepModeState.timerInterval);
+    }
+    
+    console.log('Sleep mode entered - resources freed');
+}
+
+function exitSleepMode() {
+    console.log('Exiting sleep mode - resuming resources...');
+    
+    // Hide sleep overlay
+    hideSleepOverlay();
+    
+    // Re-initialize media if it was active before
+    if (sleepModeState.localStreamActive) {
+        initMedia().then(() => {
+            console.log('Media re-initialized after sleep');
+        }).catch(err => {
+            console.error('Failed to re-initialize media:', err);
+        });
+    }
+    
+    // Clear saved state
+    sleepModeState = {
+        localStreamActive: false,
+        screenStreamActive: false,
+        peerConnectionsActive: false,
+        timerInterval: null,
+        wasRecording: false
+    };
+    
+    console.log('Sleep mode exited - resources resumed');
+}
+
+function showSleepOverlay() {
+    // Create or show sleep overlay
+    let overlay = document.getElementById('sleepOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'sleepOverlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        `;
+        overlay.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" style="margin-bottom: 20px;">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+                <h2 style="font-size: 28px; margin-bottom: 10px; font-weight: 600;">Meeting is Sleeping</h2>
+                <p style="font-size: 16px; color: #aaa; margin-bottom: 30px;">The host has put this meeting to sleep.<br>No resources are being used.</p>
+                ${isHost ? `
+                <button onclick="unfreezeMeeting()" style="
+                    padding: 14px 32px;
+                    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin: 0 auto;
+                ">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    Wake Up Meeting
+                </button>
+                ` : ''}
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+}
+
+function hideSleepOverlay() {
+    const overlay = document.getElementById('sleepOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+// Theme Toggle Function
+let isDarkMode = true;
+function toggleTheme() {
+    isDarkMode = !isDarkMode;
+    const moonIcon = document.getElementById('moonIcon');
+    const sunIcon = document.getElementById('sunIcon');
+    
+    if (isDarkMode) {
+        moonIcon.style.display = 'none';
+        sunIcon.style.display = 'block';
+        document.body.classList.remove('light-mode');
+        localStorage.setItem('theme', 'dark');
+    } else {
+        moonIcon.style.display = 'block';
+        sunIcon.style.display = 'none';
+        document.body.classList.add('light-mode');
+        localStorage.setItem('theme', 'light');
+    }
+}
+
+// Load saved theme on page load
+function loadTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const moonIcon = document.getElementById('moonIcon');
+    const sunIcon = document.getElementById('sunIcon');
+    
+    if (savedTheme === 'light') {
+        isDarkMode = false;
+        moonIcon.style.display = 'block';
+        sunIcon.style.display = 'none';
+        document.body.classList.add('light-mode');
+    } else {
+        isDarkMode = true;
+        moonIcon.style.display = 'none';
+        sunIcon.style.display = 'block';
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 
 let startTime = Date.now();
@@ -1889,7 +2228,10 @@ function showNotification(message, type = 'info') {
 }
 
 // Initialize on load
-window.addEventListener('load', init);
+window.addEventListener('load', function() {
+    loadTheme();
+    init();
+});
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════ -->

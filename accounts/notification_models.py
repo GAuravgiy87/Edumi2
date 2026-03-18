@@ -172,6 +172,18 @@ class Notification(models.Model):
         )
     
     @classmethod
+    def create_broadcast_notification(cls, recipient, title, message, sender=None):
+        """Create broadcast notification for all users"""
+        return cls.objects.create(
+            recipient=recipient,
+            notification_type='system',
+            title=title,
+            message=message,
+            link='/notifications/',
+            related_user=sender
+        )
+    
+    @classmethod
     def get_unread_count(cls, user):
         """Get count of unread notifications for user"""
         return cls.objects.filter(recipient=user, is_read=False).count()

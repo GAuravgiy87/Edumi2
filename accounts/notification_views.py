@@ -66,3 +66,43 @@ def get_recent_notifications(request):
         'notifications': data,
         'unread_count': Notification.get_unread_count(request.user)
     })
+
+
+from django.contrib.auth.models import User
+from django.views.decorators.http import require_POST
+
+@require_POST
+def send_broadcast(request):
+    """Send broadcast message to all users (admin only)"""
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    import json
+    try:
+        data = json.loads(request.body)
+        title = data.get('title', 'Broadcast Message')
+        message = data.get('message', '')
+        
+        if not message.strip():
+            return JsonResponse({'error': 'Message cannot be empty'}, status=400)
+        
+        # Create notification for all users
+        count = 0
+        for user in User.objects.filter(is_active=True):
+            Notification.create_broadcast_notification(
+                recipient=user,
+                title=title,
+                message=message,
+                sender=request.user
+            )
+            count += 1
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Broadcast sent to {count} users',
+            'recipient_count': count
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

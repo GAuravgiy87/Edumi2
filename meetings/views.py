@@ -5,6 +5,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password, check_password
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from meetings.models import Meeting, MeetingParticipant, Classroom, ClassroomMembership, MeetingAttendanceLog, MeetingChat, MeetingSummary
 from meetings.tasks import generate_meeting_summary
 from accounts.notification_utils import (
@@ -388,8 +390,13 @@ def teacher_meetings(request):
     else:
         return redirect('login')
     
+    # Separate sleeping meetings
+    sleeping_meetings = meetings.filter(status='live', sleep_status='sleeping')
+    active_meetings = meetings.exclude(sleep_status='sleeping')
+    
     return render(request, 'meetings/teacher_meetings.html', {
-        'meetings': meetings,
+        'meetings': active_meetings,
+        'sleeping_meetings': sleeping_meetings,
         'is_admin': request.user.is_superuser
     })
 
@@ -405,6 +412,11 @@ def student_meetings(request):
 @login_required
 def join_meeting(request, meeting_code):
     meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # Check if meeting is sleeping - prevent joining
+    if meeting.is_sleeping():
+        messages.error(request, 'This meeting is currently in sleep mode. Please wait for the host to unfreeze it.')
+        return redirect('student_dashboard' if request.user.userprofile.user_type == 'student' else 'teacher_dashboard')
     
     # Check if meeting is in a classroom
     if meeting.classroom:
@@ -585,6 +597,88 @@ def cancel_meeting(request, meeting_id):
     notify_meeting_cancelled(meeting, meeting.classroom)
     
     return JsonResponse({'status': 'success'})
+
+
+@login_required
+def sleep_meeting(request, meeting_code):
+    """Put meeting to sleep mode - only teacher/host can do this"""
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # Check if user is the teacher/host
+    if request.user != meeting.teacher:
+        return JsonResponse({'error': 'Only the meeting host can put it to sleep'}, status=403)
+    
+    # Can only sleep live meetings
+    if meeting.status != 'live':
+        return JsonResponse({'error': 'Only live meetings can be put to sleep'}, status=400)
+    
+    # Put meeting to sleep
+    meeting.put_to_sleep()
+    
+    # Notify all participants that meeting is sleeping
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'meeting_{meeting.meeting_code}',
+        {
+            'type': 'meeting_sleeping',
+            'message': 'Meeting has been put to sleep by the host'
+        }
+    )
+    
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Meeting is now sleeping',
+        'sleep_status': 'sleeping'
+    })
+
+
+@login_required
+def unfreeze_meeting(request, meeting_code):
+    """Unfreeze/wake up a sleeping meeting - only teacher/host can do this"""
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # Check if user is the teacher/host
+    if request.user != meeting.teacher:
+        return JsonResponse({'error': 'Only the meeting host can unfreeze it'}, status=403)
+    
+    # Can only unfreeze sleeping meetings
+    if meeting.sleep_status != 'sleeping':
+        return JsonResponse({'error': 'Meeting is not in sleep mode'}, status=400)
+    
+    # Unfreeze the meeting
+    meeting.unfreeze()
+    
+    # Notify all participants via WebSocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'meeting_{meeting.meeting_code}',
+        {
+            'type': 'meeting_unfrozen',
+            'message': 'Meeting is now active'
+        }
+    )
+    
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Meeting is now active',
+        'sleep_status': 'active'
+    })
+
+
+@login_required
+def get_meeting_status(request, meeting_code):
+    """Get current meeting status including sleep status"""
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    return JsonResponse({
+        'status': meeting.status,
+        'sleep_status': meeting.sleep_status,
+        'can_join': meeting.can_join(),
+        'is_teacher': request.user == meeting.teacher
+    })
 
 
 

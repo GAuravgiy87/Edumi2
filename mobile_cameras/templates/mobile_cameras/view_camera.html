@@ -280,8 +280,7 @@ function toggleHeadcount() {
         toggle.querySelector('.toggle-icon').textContent = '👁️‍🗨️';
         badge.style.display = 'flex';
         
-        // Simulate head count updates
-        simulateHeadCount();
+        // Note: Count is displayed on the video feed itself by the server
     } else {
         // Switch back to normal feed
         feed.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
@@ -289,24 +288,13 @@ function toggleHeadcount() {
         toggle.querySelector('.toggle-text').textContent = 'Enable Detection';
         toggle.querySelector('.toggle-icon').textContent = '👁️';
         badge.style.display = 'none';
-        
-        // Stop simulation
-        if (headcountInterval) {
-            clearInterval(headcountInterval);
-            headcountInterval = null;
-        }
     }
 }
 
 function simulateHeadCount() {
-    if (!headcountEnabled) return;
-    
-    // Random count between 0-5 for demo
-    const count = Math.floor(Math.random() * 6);
-    document.getElementById('headCountValue').textContent = count;
-    
-    // Update every 2 seconds
-    headcountInterval = setTimeout(simulateHeadCount, 2000);
+    // DISABLED - Using actual detection from server
+    // This function is kept for compatibility but does nothing
+    return;
 }
 
 // Handle image load errors

@@ -198,6 +198,20 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             'username': event['username']
         }))
 
+    async def meeting_sleeping(self, event):
+        """Handle meeting sleep notification"""
+        await self.send(text_data=json.dumps({
+            'type': 'meeting_sleeping',
+            'message': event.get('message', 'Meeting has been put to sleep')
+        }))
+    
+    async def meeting_unfrozen(self, event):
+        """Handle meeting unfrozen notification"""
+        await self.send(text_data=json.dumps({
+            'type': 'meeting_unfrozen',
+            'message': event.get('message', 'Meeting is now active')
+        }))
+    
     @database_sync_to_async
     def record_join(self):
         try:

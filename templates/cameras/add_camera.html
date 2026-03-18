@@ -60,7 +60,13 @@
             </div>
             
             <div class="form-actions">
-                <button type="submit" class="btn-submit">Add Camera & Auto-Detect Path</button>
+                <button type="submit" class="btn-submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; vertical-align: middle;">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Camera & Auto-Detect Path
+                </button>
                 <a href="{% url 'admin_dashboard' %}" class="btn-cancel">Cancel</a>
             </div>
         </form>
@@ -71,32 +77,33 @@
 .add-camera-container {
     max-width: 700px;
     margin: 2rem auto;
-    padding: 2rem;
+    padding: 1rem;
 }
 
 .form-card-large {
     background: #ffffff;
     padding: 2.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
     border: 1px solid #e9ecef;
 }
 
 .form-card-large h2 {
-    font-size: 2rem;
+    font-size: 1.75rem;
     color: #212529;
     margin-bottom: 0.5rem;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .form-card-large .subtitle {
     color: #6c757d;
     margin-bottom: 2rem;
+    font-size: 0.95rem;
 }
 
 .alert {
-    padding: 1rem;
-    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    border-radius: 10px;
     margin-bottom: 1.5rem;
 }
 
@@ -104,6 +111,41 @@
     background: #fff3cd;
     border: 1px solid #ffc107;
     color: #856404;
+}
+
+/* Form Inputs */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.2s;
+    background: #fafafa;
+    box-sizing: border-box;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input::placeholder {
+    color: #9ca3af;
 }
 
 .form-row {
@@ -119,55 +161,103 @@
     margin-top: 0.3rem;
 }
 
+/* Info Box */
 .info-box {
     display: flex;
     gap: 1rem;
-    padding: 1rem;
-    background: #e7f3ff;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #e7f3ff, #f0f9ff);
     border: 1px solid #b3d9ff;
-    border-radius: 8px;
+    border-radius: 12px;
     margin: 1.5rem 0;
 }
 
 .info-box svg {
     flex-shrink: 0;
     color: #0066cc;
+    margin-top: 0.125rem;
 }
 
 .info-box strong {
     display: block;
     color: #004080;
     margin-bottom: 0.25rem;
+    font-weight: 600;
 }
 
 .info-box p {
     color: #004080;
     font-size: 0.9rem;
     margin: 0;
+    line-height: 1.5;
 }
 
+/* Buttons */
 .form-actions {
     display: flex;
     gap: 1rem;
-    margin-top: 1.5rem;
+    margin-top: 2rem;
+}
+
+.btn-submit {
+    flex: 2;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 .btn-cancel {
     flex: 1;
-    padding: 0.85rem;
-    background: #e9ecef;
-    color: #495057;
-    border: none;
-    border-radius: 6px;
+    padding: 1rem 1.5rem;
+    background: #f3f4f6;
+    color: #4b5563;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
     font-size: 1rem;
     font-weight: 600;
     text-align: center;
     text-decoration: none;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-cancel:hover {
-    background: #ced4da;
+    background: #e5e7eb;
+    border-color: #d1d5db;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .form-card-large {
+        padding: 1.5rem;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn-submit, .btn-cancel {
+        flex: 1;
+        width: 100%;
+    }
 }
 </style>
 {% endblock %}

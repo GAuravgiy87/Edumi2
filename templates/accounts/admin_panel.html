@@ -750,17 +750,100 @@
         const modal = document.getElementById('broadcast-modal');
         modal.style.display = 'flex';
     }
+    
+    async function sendBroadcast() {
+        const titleInput = document.getElementById('broadcast-title');
+        const messageInput = document.getElementById('broadcast-message');
+        const statusDiv = document.getElementById('broadcast-status');
+        const sendBtn = document.getElementById('broadcast-send-btn');
+        
+        const title = titleInput.value.trim() || 'Broadcast Message';
+        const message = messageInput.value.trim();
+        
+        if (!message) {
+            statusDiv.textContent = 'Please enter a message';
+            statusDiv.style.color = '#e53e3e';
+            return;
+        }
+        
+        // Disable button and show loading
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending...';
+        statusDiv.textContent = '';
+        
+        try {
+            const response = await fetch('/notifications/broadcast/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ title, message })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                statusDiv.textContent = `✅ ${data.message}`;
+                statusDiv.style.color = '#38a169';
+                
+                // Clear inputs after success
+                setTimeout(() => {
+                    titleInput.value = '';
+                    messageInput.value = '';
+                    document.getElementById('broadcast-modal').style.display = 'none';
+                    statusDiv.textContent = '';
+                }, 2000);
+            } else {
+                statusDiv.textContent = `❌ ${data.error || 'Failed to send'}`;
+                statusDiv.style.color = '#e53e3e';
+            }
+        } catch (error) {
+            statusDiv.textContent = '❌ Network error. Please try again.';
+            statusDiv.style.color = '#e53e3e';
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Send Now';
+        }
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 </script>
 
-<!-- Broadcast Modal Placeholder -->
+<!-- Broadcast Modal -->
 <div id="broadcast-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-    <div style="background: white; border-radius: 12px; padding: 30px; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-        <h3>Send Global Broadcast</h3>
-        <p style="font-size: 13px; color: #718096; margin-bottom: 20px;">Message will be sent instantly to all connected students and teachers.</p>
-        <textarea style="width: 100%; height: 100px; border-radius: 8px; border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 20px;" placeholder="Enter message..."></textarea>
+    <div style="background: white; border-radius: 16px; padding: 30px; width: 450px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+        <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600;">📢 Send Global Broadcast</h3>
+        <p style="font-size: 14px; color: #718096; margin-bottom: 20px;">Message will be sent as notification to all active users.</p>
+        
+        <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 6px;">Title (Optional)</label>
+            <input type="text" id="broadcast-title" style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; box-sizing: border-box;" placeholder="Broadcast Message">
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 6px;">Message *</label>
+            <textarea id="broadcast-message" style="width: 100%; height: 100px; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; resize: vertical; box-sizing: border-box;" placeholder="Enter your broadcast message..."></textarea>
+        </div>
+        
+        <div id="broadcast-status" style="margin-bottom: 16px; font-size: 14px; min-height: 20px;"></div>
+        
         <div style="display: flex; gap: 10px; justify-content: flex-end;">
-            <button onclick="document.getElementById('broadcast-modal').style.display='none'" style="padding: 10px 20px; background: #edf2f7; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
-            <button style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">Send Now</button>
+            <button onclick="document.getElementById('broadcast-modal').style.display='none'" style="padding: 10px 20px; background: #edf2f7; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; color: #4a5568;">Cancel</button>
+            <button id="broadcast-send-btn" onclick="sendBroadcast()" style="padding: 10px 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Send Now</button>
         </div>
     </div>
 </div>

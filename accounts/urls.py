@@ -34,6 +34,7 @@ urlpatterns = [
     path('notifications/mark-all-read/', notification_views.mark_all_notifications_read, name='mark_all_notifications_read'),
     path('notifications/unread-count/', notification_views.get_unread_count, name='get_unread_count'),
     path('notifications/recent/', notification_views.get_recent_notifications, name='get_recent_notifications'),
+    path('notifications/broadcast/', notification_views.send_broadcast, name='send_broadcast'),
     
     # Admin list views
     path('admin/users/', admin_list_views.admin_all_users, name='admin_all_users'),

@@ -27,4 +27,9 @@ urlpatterns = [
     path('cancel/<int:meeting_id>/', views.cancel_meeting, name='cancel_meeting'),
     path('attendance/<str:meeting_code>/', views.meeting_attendance, name='meeting_attendance'),
     path('summary/<str:meeting_code>/', views.meeting_summary, name='meeting_summary'),
+    
+    # Meeting Sleep Mode
+    path('sleep/<str:meeting_code>/', views.sleep_meeting, name='sleep_meeting'),
+    path('unfreeze/<str:meeting_code>/', views.unfreeze_meeting, name='unfreeze_meeting'),
+    path('status/<str:meeting_code>/', views.get_meeting_status, name='get_meeting_status'),
 ]
