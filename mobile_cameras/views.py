@@ -311,7 +311,7 @@ def test_mobile_camera(request, mobile_camera_id):
 
 @login_required
 def mobile_camera_headcount_feed(request, mobile_camera_id):
-    """Stream mobile camera feed with head counting and face detection overlay"""
+    """Stream mobile camera feed with head counting and motion detection overlay"""
     mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
     
     # Check permission
@@ -327,7 +327,7 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
     detector = HeadDetector()
     
     def generate_frames():
-        """Stream frames with head detection overlay"""
+        """Stream frames with head detection and motion tracking overlay"""
         try:
             url = mobile_camera.get_stream_url()
             logger.info(f"Connecting to mobile camera headcount feed: {url}")
@@ -344,15 +344,19 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
             
             bytes_buffer = bytes()
             frame_count = 0
+            prev_frame = None
             
-            for chunk in response.iter_content(chunk_size=1024):
+            for chunk in response.iter_content(chunk_size=4096):
                 bytes_buffer += chunk
                 
                 # Look for JPEG frame boundaries
-                a = bytes_buffer.find(b'\xff\xd8')  # JPEG start
-                b = bytes_buffer.find(b'\xff\xd9')  # JPEG end
-                
-                if a != -1 and b != -1 and b > a:
+                while True:
+                    a = bytes_buffer.find(b'\xff\xd8')  # JPEG start
+                    b = bytes_buffer.find(b'\xff\xd9')  # JPEG end
+                    
+                    if a == -1 or b == -1 or b <= a:
+                        break
+                    
                     # Extract JPEG frame
                     jpg = bytes_buffer[a:b+2]
                     bytes_buffer = bytes_buffer[b+2:]
@@ -364,30 +368,38 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
                         if frame is not None:
                             frame_count += 1
                             
-                            # Process every 3rd frame for performance (10 FPS instead of 30)
-                            if frame_count % 3 == 0:
-                                # Detect heads with movement tracking
+                            # Process every frame for smooth video
+                            try:
+                                # First apply motion detection for any movement
+                                motion_frame, motion_detected = detect_motion(frame, prev_frame)
+                                prev_frame = frame.copy()
+                                
+                                # Then detect heads/persons with tracking
                                 head_count, detections, annotated_frame, avg_confidence, tracked_persons = \
-                                    detector.detect_heads(frame, track_movement=True)
+                                    detector.detect_heads(motion_frame, track_movement=True)
+                                
+                                # Add motion detection overlay
+                                if motion_detected:
+                                    cv2.putText(annotated_frame, "MOTION DETECTED", (10, 60),
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                                 
                                 # Encode annotated frame
-                                ret, jpeg = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                ret, jpeg = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                                 
                                 if ret:
                                     yield (b'--frame\r\n'
                                            b'Content-Type: image/jpeg\r\n'
-                                           b'Content-Length: ' + str(len(jpeg)).encode() + b'\r\n'
                                            b'\r\n' + jpeg.tobytes() + b'\r\n')
-                            else:
-                                # Send original frame without processing
-                                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                            except Exception as e:
+                                logger.error(f"Frame processing error: {e}")
+                                # Send original frame on error
+                                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                                 if ret:
                                     yield (b'--frame\r\n'
                                            b'Content-Type: image/jpeg\r\n'
-                                           b'Content-Length: ' + str(len(jpeg)).encode() + b'\r\n'
                                            b'\r\n' + jpeg.tobytes() + b'\r\n')
                     except Exception as e:
-                        logger.error(f"Frame processing error: {e}")
+                        logger.error(f"Frame decode error: {e}")
                         continue
                         
         except requests.exceptions.ConnectionError:
@@ -401,11 +413,48 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
                    b'Content-Type: text/plain\r\n\r\n'
                    b'ERROR: Stream error\r\n')
     
+    def detect_motion(frame, prev_frame, threshold=25, min_area=500):
+        """Detect any motion in the frame - works for persons, animals, objects"""
+        if prev_frame is None:
+            return frame, False
+        
+        # Convert to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+        
+        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+        prev_gray = cv2.GaussianBlur(prev_gray, (21, 21), 0)
+        
+        # Calculate frame difference
+        frame_delta = cv2.absdiff(prev_gray, gray)
+        thresh = cv2.threshold(frame_delta, threshold, 255, cv2.THRESH_BINARY)[1]
+        
+        # Dilate to fill holes
+        thresh = cv2.dilate(thresh, None, iterations=2)
+        
+        # Find contours
+        contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        motion_detected = False
+        for contour in contours:
+            if cv2.contourArea(contour) < min_area:
+                continue
+            
+            motion_detected = True
+            # Draw red bounding box around motion
+            (x, y, w, h) = cv2.boundingRect(contour)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            cv2.putText(frame, "Motion", (x, y - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        
+        return frame, motion_detected
+    
     response = StreamingHttpResponse(
         generate_frames(),
         content_type='multipart/x-mixed-replace; boundary=frame'
     )
     response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
 

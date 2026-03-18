@@ -263,6 +263,7 @@
 
 <script>
 let headcountEnabled = false;
+let headcountInterval = null;
 
 function toggleHeadcount() {
     const feed = document.getElementById('cameraFeed');
@@ -272,33 +273,56 @@ function toggleHeadcount() {
     headcountEnabled = !headcountEnabled;
     
     if (headcountEnabled) {
-        feed.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}";
+        // Switch to headcount feed
+        feed.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
         toggle.classList.add('active');
-        toggle.querySelector('.toggle-text').textContent = 'Disable Head Count';
+        toggle.querySelector('.toggle-text').textContent = 'Disable Detection';
         toggle.querySelector('.toggle-icon').textContent = '👁️‍🗨️';
         badge.style.display = 'flex';
         
-        // Simulate head count updates (in real implementation, this would come from WebSocket or API)
-        updateHeadCount();
+        // Simulate head count updates
+        simulateHeadCount();
     } else {
-        feed.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}";
+        // Switch back to normal feed
+        feed.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
         toggle.classList.remove('active');
-        toggle.querySelector('.toggle-text').textContent = 'Enable Head Count';
+        toggle.querySelector('.toggle-text').textContent = 'Enable Detection';
         toggle.querySelector('.toggle-icon').textContent = '👁️';
         badge.style.display = 'none';
+        
+        // Stop simulation
+        if (headcountInterval) {
+            clearInterval(headcountInterval);
+            headcountInterval = null;
+        }
     }
 }
 
-function updateHeadCount() {
+function simulateHeadCount() {
     if (!headcountEnabled) return;
     
-    // In a real implementation, this would fetch from an API endpoint
-    // For now, we'll just show a placeholder that updates randomly
-    const count = Math.floor(Math.random() * 5) + 1;
+    // Random count between 0-5 for demo
+    const count = Math.floor(Math.random() * 6);
     document.getElementById('headCountValue').textContent = count;
     
-    // Update every 3 seconds
-    setTimeout(updateHeadCount, 3000);
+    // Update every 2 seconds
+    headcountInterval = setTimeout(simulateHeadCount, 2000);
+}
+
+// Handle image load errors
+const cameraFeed = document.getElementById('cameraFeed');
+if (cameraFeed) {
+    cameraFeed.onerror = function() {
+        console.error('Camera feed error');
+        // Retry after 2 seconds
+        setTimeout(() => {
+            if (headcountEnabled) {
+                this.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
+            } else {
+                this.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
+            }
+        }, 2000);
+    };
 }
 </script>
 
