@@ -63,7 +63,10 @@
                                 </div>
                                 <div class="participant-info">
                                     <div class="participant-name">{{ user.username }} (You)</div>
-                                    {% if is_host %}<span class="host-label">Host</span>{% endif %}
+                                    <div style="display: flex; gap: 4px;">
+                                        {% if user.is_superuser %}<span class="host-label" style="background:#ef4444;">Admin</span>{% endif %}
+                                        {% if is_host %}<span class="host-label">Host</span>{% endif %}
+                                    </div>
                                 </div>
                                 <div class="participant-status" id="localStatus">
                                     <svg id="localMicStatus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
@@ -73,6 +76,15 @@
                         </div>
                     </div>
                     
+                    <!-- Debug HUD (Ctrl+Shift+D to toggle) -->
+                    <div id="debugHUD" style="display: none; position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: #00ff00; padding: 10px; border-radius: 5px; font-family: monospace; z-index: 10000; font-size: 12px; pointer-events: none;">
+                        <div>Meeting: <span id="debugCode"></span></div>
+                        <div>WS Status: <span id="debugWS">Disconnected</span></div>
+                        <div>User ID: <span id="debugUID"></span></div>
+                        <div>Participants: <span id="debugParts"></span></div>
+                        <div>Last Msg: <span id="debugLast">None</span></div>
+                        <button onclick="syncParticipants()" style="pointer-events: auto; background: #333; color: white; border: 1px solid #555; margin-top: 5px; padding: 2px 5px; cursor: pointer;">Force Sync</button>
+                    </div>
                     <!-- Chat Tab -->
                     <div class="sidebar-panel" id="chatPanel">
                         <div class="chat-messages" id="chatMessages"></div>
@@ -116,16 +128,15 @@
                 <span class="notification-badge" id="chatBadge" style="display: none;">0</span>
             </button>
             
-            <!-- Dark/Light Mode Toggle -->
+            <!-- Dark/Light Mode Toggle (Simplified) -->
             <button class="control-button" id="themeBtn" onclick="toggleTheme()" title="Toggle dark/light mode">
-                <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                 <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
             </button>
             
             {% if is_host %}
             <!-- Sleep Mode Button -->
             <button class="control-button" id="sleepBtn" onclick="toggleSleepMode()" title="Put meeting to sleep">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
             </button>
             {% endif %}
             
@@ -158,7 +169,7 @@ const userAvatarUrl = scriptTag.dataset.avatar || '';
 
 // WebSocket connection
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${meetingCode}/`;
+const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${meetingCode.toUpperCase()}/`;
 let ws = null;
 
 // WebRTC configuration
@@ -270,16 +281,16 @@ async function init() {
                 }
             } : {
                 video: {
-                    width: { ideal: 480, max: 640 },
-                    height: { ideal: 360, max: 480 },
-                    frameRate: { ideal: 15, max: 24 },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    frameRate: { ideal: 30, max: 60 },
                     facingMode: 'user'
                 },
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true,
-                    sampleRate: 16000
+                    sampleRate: 48000
                 }
             };
             
@@ -489,10 +500,22 @@ function connectWebSocket() {
     ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
         
+        console.log('WS message:', data.type);
+        if (document.getElementById('debugHUD')?.style.display === 'block') {
+            document.getElementById('debugLast').textContent = data.type;
+        }
+        
         switch(data.type) {
             case 'user_joined':
-                if (String(data.user_id) !== String(currentUserId)) {
-                    await handleUserJoined(data);
+                handleUserJoined(data);
+                break;
+            
+            case 'participant_list':
+                console.log('Received participant list:', data.participants);
+                if (data.participants && Array.isArray(data.participants)) {
+                    data.participants.forEach(p => {
+                        handleUserJoined(p);
+                    });
                 }
                 break;
             
@@ -572,59 +595,51 @@ function connectWebSocket() {
 }
 
 async function handleUserJoined(data) {
+    if (data.user_id == currentUserId) return;
     console.log('User joined:', data.username);
     
     // Add to participants list FIRST
-    addParticipant(data.user_id, data.username);
+    addParticipant(data.user_id, data.username, data.is_host, data.is_admin);
     
-    // Create peer connection and send offer (pass username)
+    // Create or reuse peer connection
     const pc = createPeerConnection(data.user_id, data.username);
+    
+    // Tie-breaker to ensure only one peer creates the offer
+    const myId = String(currentUserId);
+    const peerId = String(data.user_id);
+    let shouldOffer = false;
+    
+    if (isHost && !data.is_host) {
+        shouldOffer = true;
+    } else if (isHost === data.is_host) {
+        shouldOffer = myId < peerId;
+    } else if (!isHost && !data.is_host) {
+        shouldOffer = myId < peerId;
+    }
+
+    if (!shouldOffer) {
+        console.log('Waiting for offer from:', data.username);
+        return;
+    }
+
+    console.log('Initiating offer to:', data.username);
     
     // Add local stream tracks with optimized parameters
     localStream.getTracks().forEach(track => {
         const sender = pc.addTrack(track, localStream);
-        
-        // Set aggressive encoding parameters for low latency
         if (track.kind === 'video') {
             const params = sender.getParameters();
-            if (!params.encodings) {
-                params.encodings = [{}];
-            }
-            params.encodings[0].maxBitrate = 3000000; // 3 Mbps
+            if (!params.encodings) params.encodings = [{}];
+            params.encodings[0].maxBitrate = 3000000;
             params.encodings[0].maxFramerate = 60;
-            params.encodings[0].priority = 'high';
-            params.encodings[0].networkPriority = 'high';
-            sender.setParameters(params);
-        } else if (track.kind === 'audio') {
-            const params = sender.getParameters();
-            if (!params.encodings) {
-                params.encodings = [{}];
-            }
-            params.encodings[0].maxBitrate = 510000; // 510 Kbps
-            params.encodings[0].priority = 'high';
-            params.encodings[0].networkPriority = 'high';
             sender.setParameters(params);
         }
     });
-    
-    // Create offer with ultra-low latency settings
+
     const offer = await pc.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
-        voiceActivityDetection: false
+        offerToReceiveVideo: true
     });
-    
-    // EXTREME SDP OPTIMIZATION for zero latency & lip-sync
-    offer.sdp = offer.sdp
-        .replace('a=fmtp:111', 'a=fmtp:111 minptime=10;useinbandfec=1;maxaveragebitrate=510000;stereo=1;cbr=1')
-        .replace(/(m=video .*\r\n)/g, '$1a=x-google-min-playout-delay:0\r\na=x-google-max-playout-delay:0\r\n')
-        .replace(/(m=audio .*\r\n)/g, '$1a=ptime:10\r\n') // Reduce ptime to 10ms
-        .replace(/(a=fmtp:\d+ .*)/g, '$1;x-google-min-bitrate=500;x-google-max-bitrate=5000'); // Consistent bitrate
-    
-    // Prefer H.264 constrained baseline for lowest possible latency if available
-    if (offer.sdp.indexOf('42e01f') !== -1) {
-        offer.sdp = offer.sdp.replace(/(m=video 9 [^\r\n]*)/, '$1 107'); // Reorder for H.264 preference
-    }
     
     await pc.setLocalDescription(offer);
     
@@ -747,6 +762,11 @@ async function handleIceCandidate(data) {
 }
 
 function createPeerConnection(userId, username) {
+    if (peerConnections[userId]) {
+        console.log('Reusing existing PeerConnection for:', username);
+        return peerConnections[userId];
+    }
+    console.log('Creating new PeerConnection for:', username);
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnections[userId] = pc;
     
@@ -795,7 +815,7 @@ function createPeerConnection(userId, username) {
         remoteStream.getTracks().forEach(t => syncStream.addTrack(t));
         
         // Use username from participants (should be there now) or passed parameter
-        const displayName = participants[userId] || username || 'User';
+        const displayName = (participants[userId] && participants[userId].username) || username || 'User';
         addVideoElement(userId, displayName, syncStream, false);
     };
     
@@ -813,7 +833,7 @@ function createPeerConnection(userId, username) {
                     params.encodings[0].networkPriority = 'high';
                     
                     if (sender.track.kind === 'video') {
-                        params.encodings[0].maxBitrate = 3000000;
+                        params.encodings[0].maxBitrate = 10000000; // 10 Mbps
                         params.encodings[0].scaleResolutionDownBy = 1; // No downscaling
                     } else if (sender.track.kind === 'audio') {
                         params.encodings[0].maxBitrate = 510000;
@@ -1184,7 +1204,7 @@ function addScreenShareIndicator(mainArea, userId) {
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>
-            <span>${String(userId) === String(currentUserId) ? 'You are' : participants[userId] || 'Someone is'} presenting</span>
+            <span>${String(userId) === String(currentUserId) ? 'You are' : (participants[userId] && participants[userId].username) || 'Someone is'} presenting</span>
         </div>
     `;
     
@@ -1226,8 +1246,8 @@ function updateParticipantCount(count) {
 // Debounced version for frequent calls - reduces lag significantly
 const debouncedUpdateLayout = debounce(updateVideoLayout, 50);
 
-function addParticipant(userId, username) {
-    participants[userId] = username;
+function addParticipant(userId, username, isHost = false, isAdmin = false) {
+    participants[userId] = { username, isHost, isAdmin };
     updateParticipantsList();
 }
 
@@ -1239,7 +1259,8 @@ function updateParticipantsList() {
     const existingItems = list.querySelectorAll('.participant-item:not(:first-child)');
     existingItems.forEach(item => item.remove());
     
-    Object.entries(participants).forEach(([userId, username]) => {
+    Object.entries(participants).forEach(([userId, data]) => {
+        const { username, isHost, isAdmin } = data;
         const item = document.createElement('div');
         item.className = 'participant-item';
         item.innerHTML = `
@@ -1248,6 +1269,10 @@ function updateParticipantsList() {
             </div>
             <div class="participant-info">
                 <div class="participant-name">${username}</div>
+                <div style="display: flex; gap: 4px; margin-top: 2px;">
+                    ${isAdmin ? '<span class="host-label" style="background:#ef4444; font-size: 10px; padding: 1px 6px;">Admin</span>' : ''}
+                    ${isHost ? '<span class="host-label" style="font-size: 10px; padding: 1px 6px;">Host</span>' : ''}
+                </div>
             </div>
             <div class="participant-status">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
@@ -1320,10 +1345,9 @@ async function toggleScreenShare() {
             // Full quality screen sharing
             screenStream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
-                    cursor: 'always',
-                    frameRate: { ideal: 30, max: 60 },
                     width: { ideal: 1920, max: 3840 },
-                    height: { ideal: 1080, max: 2160 }
+                    height: { ideal: 1080, max: 2160 },
+                    frameRate: { ideal: 90, max: 120 }
                 },
                 audio: false
             });
@@ -1346,8 +1370,8 @@ async function toggleScreenShare() {
                         }
                         
                         // High quality encoding for screen share
-                        params.encodings[0].maxBitrate = 5000000; // 5 Mbps
-                        params.encodings[0].maxFramerate = 60;
+                        params.encodings[0].maxBitrate = 10000000; // 10 Mbps
+                        params.encodings[0].maxFramerate = 90;
                         params.encodings[0].priority = 'high';
                         params.encodings[0].networkPriority = 'high';
                         
@@ -2088,7 +2112,11 @@ function showSleepOverlay() {
         overlay.innerHTML = `
             <div style="text-align: center; padding: 40px;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" style="margin-bottom: 20px;">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                    <line x1="6" y1="1" x2="6" y2="4"></line>
+                    <line x1="10" y1="1" x2="10" y2="4"></line>
+                    <line x1="14" y1="1" x2="14" y2="4"></line>
                 </svg>
                 <h2 style="font-size: 28px; margin-bottom: 10px; font-weight: 600;">Meeting is Sleeping</h2>
                 <p style="font-size: 16px; color: #aaa; margin-bottom: 30px;">The host has put this meeting to sleep.<br>No resources are being used.</p>
@@ -2108,7 +2136,8 @@ function showSleepOverlay() {
                     margin: 0 auto;
                 ">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                        <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
                     </svg>
                     Wake Up Meeting
                 </button>
@@ -2135,13 +2164,13 @@ function toggleTheme() {
     const sunIcon = document.getElementById('sunIcon');
     
     if (isDarkMode) {
-        moonIcon.style.display = 'none';
-        sunIcon.style.display = 'block';
+        if (moonIcon) moonIcon.style.display = 'none';
+        if (sunIcon) sunIcon.style.display = 'block';
         document.body.classList.remove('light-mode');
         localStorage.setItem('theme', 'dark');
     } else {
-        moonIcon.style.display = 'block';
-        sunIcon.style.display = 'none';
+        if (moonIcon) moonIcon.style.display = 'block';
+        if (sunIcon) sunIcon.style.display = 'none';
         document.body.classList.add('light-mode');
         localStorage.setItem('theme', 'light');
     }
@@ -2155,13 +2184,13 @@ function loadTheme() {
     
     if (savedTheme === 'light') {
         isDarkMode = false;
-        moonIcon.style.display = 'block';
-        sunIcon.style.display = 'none';
+        if (moonIcon) moonIcon.style.display = 'block';
+        if (sunIcon) sunIcon.style.display = 'none';
         document.body.classList.add('light-mode');
     } else {
         isDarkMode = true;
-        moonIcon.style.display = 'none';
-        sunIcon.style.display = 'block';
+        if (moonIcon) moonIcon.style.display = 'none';
+        if (sunIcon) sunIcon.style.display = 'block';
     }
 }
 
@@ -2228,9 +2257,41 @@ function showNotification(message, type = 'info') {
 }
 
 // Initialize on load
+// Debug HUD Logic
+function updateDebugHUD() {
+    const hud = document.getElementById('debugHUD');
+    if (!hud) return;
+    document.getElementById('debugCode').textContent = meetingCode.toUpperCase();
+    document.getElementById('debugWS').textContent = ws ? (ws.readyState === 1 ? 'Connected' : 'Connecting/Closed') : 'None';
+    document.getElementById('debugUID').textContent = currentUserId;
+    document.getElementById('debugParts').textContent = JSON.stringify(Object.keys(participants));
+}
+
+function syncParticipants() {
+    console.log('Manual sync requested');
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'request_participants' }));
+    }
+}
+
+// Handle key shortcut for Debug HUD
+window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        const hud = document.getElementById('debugHUD');
+        hud.style.display = hud.style.display === 'none' ? 'block' : 'none';
+    }
+});
+
+setInterval(updateDebugHUD, 2000);
+
+// Auto-sync participants every 60 seconds
+setInterval(syncParticipants, 60000);
+
 window.addEventListener('load', function() {
-    loadTheme();
-    init();
+    try { loadTheme(); } catch (e) { console.error('Theme load failed:', e); }
+    try { init(); } catch (e) { console.error('Init failed:', e); }
+    startTimer();
+    updateDebugHUD();
 });
 </script>
 

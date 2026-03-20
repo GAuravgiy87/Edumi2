@@ -14,11 +14,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_GET
-from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.contrib.auth.models import User
-from django.db.models import Count, Q
-from django.db import transaction, OperationalError
+from django.db import transaction
+from django.core.files.base import ContentFile
 
 from meetings.models import Classroom, Meeting
 from .models import (
@@ -27,6 +26,7 @@ from .models import (
 )
 from .forms import FacePhotoForm
 from .face_service import FaceService, get_face_service
+from .services import get_daily_report_context, get_classroom_attendance_stats
 
 logger = logging.getLogger('attendance')
 
@@ -59,46 +59,31 @@ def upload_face_photo(request):
         return redirect('face_setup')
 
     photo = form.cleaned_data['photo']
-    photo.seek(0)                   # reset pointer — Django may have read it during validation
+    photo.seek(0)
     image_bytes = photo.read()
 
     svc = get_face_service()
-    result = svc.extract_embedding(image_bytes)  # live=False (default) — skip variance check for uploads
+    result = svc.extract_embedding(image_bytes)
 
     if result['status'] != 'success':
         messages.error(request, f"Face detection failed: {result['message']}")
         return redirect('face_setup')
 
-    # Encrypt and save
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
-
-    # Save the actual photo file for admin review
-    from django.core.files.base import ContentFile
     photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
 
-    # Use transaction with retry logic for database locked errors
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            with transaction.atomic():
-                StudentFaceProfile.objects.update_or_create(
-                    student=request.user,
-                    defaults={
-                        'face_embedding_encrypted': encrypted,
-                        'embedding_checksum':       checksum,
-                        'face_quality_score':       result['quality'],
-                        'is_active':                True,
-                        'registration_ip':          _get_client_ip(request),
-                        'face_photo':               photo_file,
-                    }
-                )
-            break  # Success, exit retry loop
-        except OperationalError as e:
-            if 'database is locked' in str(e) and attempt < max_retries - 1:
-                import time
-                time.sleep(0.5 * (attempt + 1))  # Exponential backoff
-                continue
-            raise  # Re-raise if not a lock error or max retries reached
+    # Fast database update
+    StudentFaceProfile.objects.update_or_create(
+        student=request.user,
+        defaults={
+            'face_embedding_encrypted': encrypted,
+            'embedding_checksum':       checksum,
+            'face_quality_score':       result['quality'],
+            'is_active':                True,
+            'registration_ip':          _get_client_ip(request),
+            'face_photo':               photo_file,
+        }
+    )
 
     messages.success(request, "✅ Face registered successfully! Attendance will now be tracked automatically.")
     return redirect('face_setup')
@@ -113,55 +98,96 @@ def capture_face_photo(request):
         b64    = body.get('frame_b64', '')
         if not b64:
             return JsonResponse({'status': 'error', 'message': 'No frame data received.'}, status=400)
-
-        # Strip data-URL prefix if present
         if ',' in b64:
             b64 = b64.split(',', 1)[1]
-
         image_bytes = base64.b64decode(b64)
     except Exception as exc:
         return JsonResponse({'status': 'error', 'message': f'Invalid frame data: {exc}'}, status=400)
 
     svc    = get_face_service()
-    result = svc.extract_embedding(image_bytes)  # live=False (default) — skip variance check for captures
+    result = svc.extract_embedding(image_bytes)
 
     if result['status'] != 'success':
         return JsonResponse({'status': 'error', 'message': result['message']})
 
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
-
-    # Save the captured frame as the face photo for admin review
-    from django.core.files.base import ContentFile
     photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
 
-    # Use transaction with retry logic for database locked errors
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            with transaction.atomic():
-                StudentFaceProfile.objects.update_or_create(
-                    student=request.user,
-                    defaults={
-                        'face_embedding_encrypted': encrypted,
-                        'embedding_checksum':       checksum,
-                        'face_quality_score':       result['quality'],
-                        'is_active':                True,
-                        'registration_ip':          _get_client_ip(request),
-                        'face_photo':               photo_file,
-                    }
-                )
-            break  # Success, exit retry loop
-        except OperationalError as e:
-            if 'database is locked' in str(e) and attempt < max_retries - 1:
-                import time
-                time.sleep(0.5 * (attempt + 1))  # Exponential backoff
-                continue
-            raise  # Re-raise if not a lock error or max retries reached
+    StudentFaceProfile.objects.update_or_create(
+        student=request.user,
+        defaults={
+            'face_embedding_encrypted': encrypted,
+            'embedding_checksum':       checksum,
+            'face_quality_score':       result['quality'],
+            'is_active':                True,
+            'registration_ip':          _get_client_ip(request),
+            'face_photo':               photo_file,
+        }
+    )
 
     return JsonResponse({
         'status':  'success',
         'quality': result['quality'],
         'message': '✅ Face registered successfully!',
+    })
+
+
+@login_required
+@require_POST
+def detect_face(request):
+    """
+    Lightweight face detection for real-time feedback.
+    Includes low-light enhancement.
+    """
+    try:
+        body = json.loads(request.body)
+        b64 = body.get('frame_b64', '')
+        if not b64:
+            return JsonResponse({'status': 'no_frame'})
+        if ',' in b64:
+            b64 = b64.split(',', 1)[1]
+        image_bytes = base64.b64decode(b64)
+    except Exception:
+        return JsonResponse({'status': 'invalid_data'})
+
+    import cv2
+    import numpy as np
+    from PIL import Image
+
+    # Decode for enhancement
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    if img is None:
+        return JsonResponse({'status': 'decode_error'})
+
+    # ── Low-Light Enhancement ──
+    # Check average brightness
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    avg_brightness = np.mean(gray)
+    
+    enhanced = False
+    if avg_brightness < 60: # Threshold for "dark"
+        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+        img_yuv[:,:,0] = clahe.apply(img_yuv[:,:,0])
+        img = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+        enhanced = True
+        
+        # Encode back to bytes for face_recognition
+        _, buffer = cv2.imencode('.jpg', img)
+        image_bytes = buffer.tobytes()
+
+    svc = get_face_service()
+    # Use hog model (fast) and skip liveness for detection feedback
+    result = svc.extract_embedding(image_bytes, live=False)
+
+    return JsonResponse({
+        'status': result['status'],
+        'quality': result['quality'],
+        'low_light_enhanced': enhanced,
+        'message': result['message']
     })
 
 
@@ -187,7 +213,6 @@ def my_attendance(request):
         student=request.user
     ).select_related('meeting', 'classroom').order_by('-date')
 
-    # Per-classroom summary
     summary = {}
     for rec in records:
         key = rec.classroom_id
@@ -220,10 +245,8 @@ def set_class_schedule(request, classroom_id):
     classroom = get_object_or_404(Classroom, id=classroom_id, teacher=request.user)
 
     if request.method == 'POST':
-        # Delete old schedules
         ClassSchedule.objects.filter(classroom=classroom).delete()
-
-        days        = request.POST.getlist('days')          # ['0','2','4']
+        days        = request.POST.getlist('days')
         start_times = request.POST.getlist('start_times')
         end_times   = request.POST.getlist('end_times')
 
@@ -236,7 +259,6 @@ def set_class_schedule(request, classroom_id):
                     end_time=end,
                     created_by=request.user,
                 )
-
         messages.success(request, "Class schedule updated successfully.")
         return redirect('classroom_detail', classroom_id=classroom_id)
 
@@ -288,7 +310,6 @@ def attendance_settings_view(request, classroom_id):
 def override_attendance(request, record_id):
     """Teacher manually marks a student present/absent/late."""
     record = get_object_or_404(AttendanceRecord, id=record_id)
-    # Verify requester is the classroom teacher
     if record.classroom.teacher != request.user:
         return JsonResponse({'status': 'forbidden'}, status=403)
 
@@ -323,43 +344,13 @@ def daily_report(request, classroom_id):
     except ValueError:
         report_date = timezone.now().date()
 
-    # All approved students
-    memberships = classroom.get_approved_memberships()
-    student_ids = [m.student_id for m in memberships]
-
-    # Records for that date
-    records_qs = AttendanceRecord.objects.filter(
-        classroom=classroom, date=report_date
-    ).select_related('student', 'student__userprofile')
-
-    records_map = {r.student_id: r for r in records_qs}
-
-    rows = []
-    for m in memberships:
-        rec = records_map.get(m.student_id)
-        rows.append({
-            'student':    m.student,
-            'record':     rec,
-            'status':     rec.status if rec else 'absent',
-            'time_in':    rec.marked_present_at if rec else None,
-            'confidence': round(rec.face_match_confidence * 100, 1) if rec else 0,
-            'method':     rec.verification_method if rec else '—',
-        })
-
-    present_count = sum(1 for r in rows if r['status'] == 'present')
-    late_count    = sum(1 for r in rows if r['status'] == 'late')
-    absent_count  = len(rows) - present_count - late_count
-
+    report_ctx = get_daily_report_context(classroom, report_date)
     ctx = {
         'classroom':     classroom,
         'report_date':   report_date,
         'date_str':      date_str,
-        'rows':          rows,
-        'present_count': present_count,
-        'late_count':    late_count,
-        'absent_count':  absent_count,
-        'total':         len(rows),
         'page_title':    f'Daily Attendance — {report_date}',
+        **report_ctx
     }
     return render(request, 'attendance/daily_report.html', ctx)
 
@@ -394,47 +385,14 @@ def student_report(request, classroom_id, student_id):
 @login_required
 def classroom_attendance_overview(request, classroom_id):
     """Teacher dashboard: all students with overall attendance %."""
-    from django.db.models import Count, Q
-    classroom   = get_object_or_404(Classroom, id=classroom_id, teacher=request.user)
-    memberships = classroom.get_approved_memberships()
-
+    classroom = get_object_or_404(Classroom, id=classroom_id, teacher=request.user)
     total_meetings = Meeting.objects.filter(classroom=classroom, status='ended').count()
 
-    # Single query: aggregate attendance per student
-    att_map = {
-        r['student_id']: r
-        for r in AttendanceRecord.objects.filter(classroom=classroom)
-            .values('student_id')
-            .annotate(
-                total=Count('id'),
-                present=Count('id', filter=Q(status__in=['present', 'late']))
-            )
-    }
-
-    rows = []
-    for m in memberships:
-        agg = att_map.get(m.student_id, {'total': 0, 'present': 0})
-        total   = agg['total']
-        present = agg['present']
-        try:
-            face_registered = m.student.face_profile.is_active
-        except Exception:
-            face_registered = False
-
-        rows.append({
-            'student':         m.student,
-            'total':           total,
-            'present':         present,
-            'absent':          total - present,
-            'percentage':      round(present / total * 100) if total else 0,
-            'face_registered': face_registered,
-        })
-
-    rows.sort(key=lambda x: x['percentage'])
+    rows = get_classroom_attendance_stats(classroom)
 
     face_registered_count = sum(1 for r in rows if r['face_registered'])
     settings_obj, _ = AttendanceSettings.objects.get_or_create(classroom=classroom)
-    schedules        = ClassSchedule.objects.filter(classroom=classroom, is_active=True)
+    schedules = ClassSchedule.objects.filter(classroom=classroom, is_active=True)
 
     ctx = {
         'classroom':             classroom,
@@ -468,7 +426,6 @@ def export_excel(request, classroom_id):
     ws = wb.active
     ws.title = 'Attendance'
 
-    # ── Styling helpers ────────────────────────────────────────
     header_fill  = PatternFill('solid', fgColor='1877F2')
     header_font  = Font(bold=True, color='FFFFFF', size=11)
     center_align = Alignment(horizontal='center', vertical='center')
@@ -481,17 +438,15 @@ def export_excel(request, classroom_id):
         'absent':  'F8D7DA', 'partial': 'D1ECF1',
     }
 
-    # ── Title row ─────────────────────────────────────────────
     ws.merge_cells('A1:H1')
     title_cell = ws['A1']
     title_cell.value = f'Attendance Report  —  {classroom.title}'
     title_cell.font  = Font(bold=True, size=14, color='1A1A2E')
     title_cell.alignment = center_align
 
-    # ── Header row ────────────────────────────────────────────
     headers = ['Student Name', 'Student ID', 'Date', 'Meeting', 'Status',
                'Time In', 'Method', 'Confidence']
-    ws.append([])  # blank row
+    ws.append([])
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_idx, value=header)
         cell.fill      = header_fill
@@ -508,7 +463,6 @@ def export_excel(request, classroom_id):
     ws.column_dimensions['G'].width = 20
     ws.column_dimensions['H'].width = 14
 
-    # ── Data rows ─────────────────────────────────────────────
     records = AttendanceRecord.objects.filter(
         classroom=classroom
     ).select_related('student', 'student__userprofile', 'meeting').order_by('-date', 'student__last_name')
@@ -537,13 +491,12 @@ def export_excel(request, classroom_id):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
             cell.alignment = Alignment(vertical='center')
-            if col_idx == 5:  # Status column
+            if col_idx == 5:
                 color = status_colors.get(rec.status, 'FFFFFF')
                 cell.fill = PatternFill('solid', fgColor=color)
                 cell.alignment = center_align
                 cell.font = Font(bold=True)
 
-    # ── Response ───────────────────────────────────────────────
     filename = f"attendance_{classroom.class_code}_{timezone.now().strftime('%Y%m%d')}.xlsx"
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -594,27 +547,31 @@ def check_schedule_api(request, meeting_code):
 @login_required
 def engagement_report_view(request, meeting_id):
     """Teacher views the engagement report for a completed meeting."""
-    from meetings.models import Meeting
-    from .models import EngagementReport
-
     meeting = get_object_or_404(Meeting, id=meeting_id)
-
     if meeting.teacher != request.user and not request.user.is_superuser:
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Access denied.")
 
+    from .models import EngagementReport
     report = EngagementReport.objects.filter(meeting=meeting).first()
 
-    # If report doesn't exist yet, generate it now
     if not report and meeting.status == 'ended':
         from .engagement_service import generate_engagement_report
         generate_engagement_report(meeting.id)
         report = EngagementReport.objects.filter(meeting=meeting).first()
 
+    import os
+    from django.conf import settings
+    log_filename = f'engagement_{meeting.meeting_code}.csv'
+    log_path = os.path.join(settings.MEDIA_ROOT, 'meeting_logs', log_filename)
+    log_exists = os.path.exists(log_path)
+
     ctx = {
         'meeting':    meeting,
         'report':     report,
         'page_title': f'Engagement Report — {meeting.title}',
+        'log_exists': log_exists,
+        'log_url':    f"{settings.MEDIA_URL}meeting_logs/{log_filename}" if log_exists else None,
     }
     return render(request, 'attendance/engagement_report.html', ctx)
 

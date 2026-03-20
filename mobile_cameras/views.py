@@ -326,6 +326,8 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
     
     # Load face cascade once
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    # Add motion detection
+    bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=300, varThreshold=25, detectShadows=True)
     
     def generate_frames():
         """Stream frames with fast face detection"""
@@ -368,65 +370,72 @@ def mobile_camera_headcount_feed(request, mobile_camera_id):
                             frame_count += 1
                             display_frame = frame.copy()
                             
-                            # Run detection every 3rd frame for performance (10 FPS detection)
+                            # Run detection every 3rd frame
                             if frame_count % 3 == 0:
                                 try:
-                                    # Resize to smaller size for faster processing
                                     small_frame = cv2.resize(frame, (320, 240))
                                     gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
                                     
-                                    # Fast face detection
-                                    faces = face_cascade.detectMultiScale(
-                                        gray,
-                                        scaleFactor=1.2,  # Faster but less accurate
-                                        minNeighbors=3,
-                                        minSize=(30, 30),
-                                        maxSize=(200, 200)
-                                    )
+                                    # Face detection
+                                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=3, minSize=(30, 30))
                                     
-                                    # Scale coordinates back to original size
+                                    # Motion detection
+                                    fg_mask = bg_subtractor.apply(small_frame)
+                                    _, fg_mask = cv2.threshold(fg_mask, 200, 255, cv2.THRESH_BINARY)
+                                    contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                                    
                                     scale_x = frame.shape[1] / 320
                                     scale_y = frame.shape[0] / 240
                                     
-                                    current_faces = []
+                                    current_detections = []
+                                    # Add faces
                                     for (x, y, w, h) in faces:
-                                        x = int(x * scale_x)
-                                        y = int(y * scale_y)
-                                        w = int(w * scale_x)
-                                        h = int(h * scale_y)
-                                        current_faces.append((x, y, w, h))
+                                        current_detections.append({
+                                            'bbox': (int(x*scale_x), int(y*scale_y), int(w*scale_x), int(h*scale_y)),
+                                            'type': 'face'
+                                        })
                                     
-                                    # Simple stability: use current if similar to last
-                                    if abs(len(current_faces) - last_count) <= 1:
-                                        last_faces = current_faces
-                                        last_count = len(current_faces)
-                                    elif len(current_faces) > 0:
-                                        last_faces = current_faces
-                                        last_count = len(current_faces)
+                                    # Add motion (if not overlapping with faces)
+                                    for contour in contours:
+                                        if cv2.contourArea(contour) > 300:
+                                            mx, my, mw, mh = cv2.boundingRect(contour)
+                                            # Simple overlap check would go here, but for mobile we'll show all significant motion
+                                            current_detections.append({
+                                                'bbox': (int(mx*scale_x), int(my*scale_y), int(mw*scale_x), int(mh*scale_y)),
+                                                'type': 'motion'
+                                            })
                                     
-                                    detection_history.append(last_count)
+                                    # Detect heads
+                                    head_count, detections, annotated, avg_conf, tracked_persons = \
+                                        head_count_manager.detector.detect_heads(frame, track_movement=True)
+                                    frame = annotated
+                                    
+                                    last_detections = detections # Assuming 'detections' from detect_heads is in the desired format
+                                    raw_count = head_count # Use the head_count from the new detector
+                                    detection_history.append(raw_count)
+                                    last_count = int(np.median(list(detection_history))) if detection_history else raw_count
                                     
                                 except Exception as e:
                                     logger.error(f"Detection error: {e}")
                             
-                            # Draw boxes on every frame (smooth display)
-                            for i, (x, y, w, h) in enumerate(last_faces):
-                                x, y = max(0, x), max(0, y)
-                                w = min(w, display_frame.shape[1] - x)
-                                h = min(h, display_frame.shape[0] - y)
-                                
-                                # Simple green box
-                                cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                                
-                                # Simple label
-                                label = f"{i + 1}"
-                                cv2.putText(display_frame, label, (x + 5, y + 25),
-                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                            # Draw detections
+                            for det in last_detections:
+                                x, y, w, h = det['bbox']
+                                color = (0, 255, 0) if det['type'] == 'face' else (0, 255, 255) # Green for face, Yellow for motion
+                                cv2.rectangle(display_frame, (x, y), (x + w, y + h), color, 2)
                             
-                            # Show count
-                            display_count = last_count
-                            cv2.putText(display_frame, f"COUNT: {display_count}", (10, 35),
-                                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+                            # Optimized UI Overlay
+                            overlay = display_frame.copy()
+                            cv2.rectangle(overlay, (0, 0), (220, 50), (0, 0, 0), -1)
+                            cv2.addWeighted(overlay, 0.6, display_frame, 0.4, 0, display_frame)
+                            
+                            cv2.putText(display_frame, f"HEADS: {last_count}", (10, 35),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                            
+                            # LIVE indicator
+                            cv2.circle(display_frame, (frame.shape[1] - 25, 25), 8, (0, 0, 255), -1)
+                            cv2.putText(display_frame, "LIVE", (frame.shape[1] - 75, 32),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
                             
                             # Fast encoding
                             ret, jpeg = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])

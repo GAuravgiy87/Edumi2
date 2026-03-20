@@ -13,351 +13,153 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.conf import settings
-from collections import defaultdict
+from collections import defaultdict, deque
+
+# Force OpenCV to use TCP transport for RTSP to prevent "bad cseq" and packet loss
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 
 logger = logging.getLogger('cameras')
 
 
-class TrackedPerson:
-    """Track a detected person across frames"""
-    def __init__(self, person_id, bbox, confidence):
-        self.id = person_id
-        self.bbox = bbox  # (x, y, w, h)
-        self.confidence = confidence
-        self.last_seen = time.time()
-        self.movement_history = []  # Track movement path
-        self.color = self._generate_color()
-        self.missed_frames = 0
-        
-    def _generate_color(self):
-        """Generate unique color for this person"""
-        colors = [
-            (0, 255, 0),    # Green
-            (0, 255, 255),  # Cyan
-            (255, 255, 0),  # Yellow
-            (255, 0, 255),  # Magenta
-            (0, 128, 255),  # Orange
-            (128, 0, 255),  # Purple
-            (255, 128, 0),  # Blue-Orange
-            (128, 255, 0),  # Lime
-        ]
-        return colors[self.id % len(colors)]
-    
-    def update_position(self, bbox, confidence):
-        """Update person position and track movement"""
-        # Calculate center point
-        x, y, w, h = bbox
-        center = (int(x + w/2), int(y + h/2))
-        
-        self.movement_history.append({
-            'time': time.time(),
-            'center': center,
-            'bbox': bbox
-        })
-        
-        # Keep only last 30 seconds of history
-        cutoff = time.time() - 30
-        self.movement_history = [h for h in self.movement_history if h['time'] > cutoff]
-        
-        self.bbox = bbox
-        self.confidence = confidence
-        self.last_seen = time.time()
-        self.missed_frames = 0
-        
-    def mark_missed(self):
-        """Mark that person was not detected in current frame"""
-        self.missed_frames += 1
-        
-    def is_stale(self, timeout=2.0):
-        """Check if person hasn't been seen for a while"""
-        return (time.time() - self.last_seen > timeout) or self.missed_frames > 5
-    
-    def get_movement_trail(self):
-        """Get movement trail for drawing"""
-        if len(self.movement_history) < 2:
-            return []
-        return [h['center'] for h in self.movement_history]
+# Tracking logic removed to focus exclusively on accurate headcount and performance
 
 
 class HeadDetector:
     """
-    Head detection using OpenCV HOG (Histogram of Oriented Gradients) 
-    with SVM classifier for human detection.
-    Also uses Haar Cascade for face detection as a secondary method.
-    Includes movement tracking for detected persons.
+    Optimized Head Detection with Frame Skipping & Resolution Control.
+    Ensures high FPS while maintaining tracking accuracy.
     """
     
     def __init__(self):
-        # Initialize HOG descriptor for person detection
+        # Initialize HOG descriptor
         self.hog = cv2.HOGDescriptor()
         self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
         
-        # Load Haar Cascade for face detection (backup method)
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+        # Load Haar Cascades
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.profile_face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_profileface.xml')
+        self.upper_body_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_upperbody.xml')
         
-        # Upper body cascade for additional detection
-        upper_body_path = cv2.data.haarcascades + 'haarcascade_upperbody.xml'
-        self.upper_body_cascade = cv2.CascadeClassifier(upper_body_path)
-        
-        # Detection parameters
-        self.hog_scale = 1.05
-        self.hog_padding = (8, 8)
-        self.hog_win_stride = (4, 4)
-        
-        # Minimum confidence threshold
-        self.confidence_threshold = 0.5
-        
-        # Person tracking
-        self.tracked_persons = {}
-        self.next_person_id = 0
+        # Parameters
+        self.confidence_threshold = 0.35
         self.tracking_lock = threading.Lock()
         
-    def detect_heads(self, frame, track_movement=True):
-        """
-        Detect heads/persons in a frame with optional movement tracking.
-        Returns: (head_count, detections, annotated_frame, avg_confidence, tracked_persons)
-        """
-        if frame is None:
-            return 0, [], None, 0.0, {}
+        # Motion detection (DISABLED)
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=True)
         
-        # Make a copy for annotation
-        annotated_frame = frame.copy()
+        # Performance/Stabilization State
+        self.frame_counter = 0
+        self.last_full_detections = []
+        self.head_count_history = deque(maxlen=15)
+        self.stable_head_count = 0
+
+    def detect_heads(self, frame, track_movement=False):
+        """Main entry point for detection. Optimized for headcount accuracy."""
+        if frame is None: return 0, [], None, 0.0, {}
         
-        # Resize for faster processing
-        height, width = frame.shape[:2]
-        max_width = 800
+        orig_h, orig_w = frame.shape[:2]
+        
+        # Resize for performance
+        max_p_w = 400
         scale = 1.0
-        if width > max_width:
-            scale = max_width / width
-            frame = cv2.resize(frame, (max_width, int(height * scale)))
-            annotated_frame = frame.copy()
-        
-        all_detections = []
-        
-        # Method 1: HOG Person Detection (full body)
-        try:
-            boxes, weights = self.hog.detectMultiScale(
-                frame,
-                winStride=self.hog_win_stride,
-                padding=self.hog_padding,
-                scale=self.hog_scale
-            )
+        if orig_w > max_p_w:
+            scale = max_p_w / orig_w
+            p_frame = cv2.resize(frame, (max_p_w, int(orig_h * scale)))
+        else:
+            p_frame = frame
             
+        inv_scale = 1.0 / scale
+        annotated_raw = frame.copy()
+
+        with self.tracking_lock:
+            self.frame_counter += 1
+            # SKIP LOGIC: Run heavy models every 5 frames
+            should_run_heavy = (self.frame_counter % 5 == 0)
+            
+            if not should_run_heavy and hasattr(self, 'last_full_detections') and self.last_full_detections:
+                return self._finalize(self.stable_head_count, self.last_full_detections, 
+                                     annotated_raw, inv_scale)
+
+        # START DETECTION
+        all_detections = []
+        gray = cv2.cvtColor(p_frame, cv2.COLOR_BGR2GRAY)
+        
+        # 1. HOG
+        try:
+            boxes, weights = self.hog.detectMultiScale(p_frame, winStride=(8,8), padding=(8,8), scale=1.05)
             for (x, y, w, h), weight in zip(boxes, weights):
                 if weight > self.confidence_threshold:
-                    all_detections.append({
-                        'bbox': (x, y, w, h),
-                        'confidence': float(weight),
-                        'type': 'hog_person'
-                    })
-        except Exception as e:
-            logger.error(f"HOG detection error: {e}")
+                    all_detections.append({'bbox': (x, y, w, h), 'confidence': float(weight), 'type': 'hog_person'})
+        except Exception: pass
         
-        # Method 2: Haar Cascade Face Detection
+        # 2. Haar Face (Frontal and Profile)
         try:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = self.face_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(30, 30)
-            )
+            faces = self.face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(20, 20))
+            for box in faces:
+                if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
+                    all_detections.append({'bbox': tuple(box), 'confidence': 0.7, 'type': 'haar_face'})
             
-            for (x, y, w, h) in faces:
-                # Check if this face overlaps with existing detections
-                overlaps = False
-                for det in all_detections:
-                    dx, dy, dw, dh = det['bbox']
-                    # Check overlap
-                    if self._boxes_overlap((x, y, w, h), (dx, dy, dw, dh)):
-                        overlaps = True
-                        break
-                
-                if not overlaps:
-                    all_detections.append({
-                        'bbox': (x, y, w, h),
-                        'confidence': 0.7,  # Default confidence for Haar
-                        'type': 'haar_face'
-                    })
-        except Exception as e:
-            logger.error(f"Haar face detection error: {e}")
+            profiles = self.profile_face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(20, 20))
+            for box in profiles:
+                if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
+                    all_detections.append({'bbox': tuple(box), 'confidence': 0.65, 'type': 'profile_face'})
+        except Exception: pass
         
-        # Method 3: Upper Body Detection (for seated students)
+        # 3. Upper Body
         try:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            upper_bodies = self.upper_body_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(60, 60)
-            )
-            
-            for (x, y, w, h) in upper_bodies:
-                # Check overlap with existing detections
-                overlaps = False
-                for det in all_detections:
-                    dx, dy, dw, dh = det['bbox']
-                    if self._boxes_overlap((x, y, w, h), (dx, dy, dw, dh)):
-                        overlaps = True
-                        break
-                
-                if not overlaps:
-                    all_detections.append({
-                        'bbox': (x, y, w, h),
-                        'confidence': 0.6,
-                        'type': 'upper_body'
-                    })
-        except Exception as e:
-            logger.error(f"Upper body detection error: {e}")
-        
-        # Update tracking
-        if track_movement:
-            self._update_tracking(all_detections)
-        
-        # Draw movement trails first (so they're behind boxes)
-        if track_movement:
-            for person in self.tracked_persons.values():
-                trail = person.get_movement_trail()
-                if len(trail) > 1:
-                    for i in range(1, len(trail)):
-                        alpha = i / len(trail)
-                        thickness = max(1, int(3 * alpha))
-                        cv2.line(annotated_frame, trail[i-1], trail[i], person.color, thickness)
-        
-        # Draw green bounding boxes on all detections
-        for i, det in enumerate(all_detections):
-            x, y, w, h = det['bbox']
-            confidence = det['confidence']
-            
-            # Get color from tracked person if available
-            if track_movement and i < len(self.tracked_persons):
-                person = list(self.tracked_persons.values())[i]
-                color = person.color
-            else:
-                color = (0, 255, 0)  # Default green
-            
-            thickness = 2
-            
-            # Draw rectangle with rounded corners effect
-            cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), color, thickness)
-            
-            # Draw corner markers for better visibility
-            corner_len = min(20, w//4, h//4)
-            # Top-left
-            cv2.line(annotated_frame, (x, y), (x + corner_len, y), color, thickness+1)
-            cv2.line(annotated_frame, (x, y), (x, y + corner_len), color, thickness+1)
-            # Top-right
-            cv2.line(annotated_frame, (x + w, y), (x + w - corner_len, y), color, thickness+1)
-            cv2.line(annotated_frame, (x + w, y), (x + w, y + corner_len), color, thickness+1)
-            # Bottom-left
-            cv2.line(annotated_frame, (x, y + h), (x + corner_len, y + h), color, thickness+1)
-            cv2.line(annotated_frame, (x, y + h), (x, y + h - corner_len), color, thickness+1)
-            # Bottom-right
-            cv2.line(annotated_frame, (x + w, y + h), (x + w - corner_len, y + h), color, thickness+1)
-            cv2.line(annotated_frame, (x + w, y + h), (x + w, y + h - corner_len), color, thickness+1)
-            
-            # Draw confidence score with background
-            label = f"{confidence:.2f}"
-            if track_movement and i < len(self.tracked_persons):
-                person = list(self.tracked_persons.values())[i]
-                label = f"ID:{person.id} {label}"
-            
-            label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-            # Draw label background
-            cv2.rectangle(annotated_frame, (x, y - label_size[1] - 8), 
-                         (x + label_size[0] + 8, y), color, -1)
-            # Draw label text
-            cv2.putText(annotated_frame, label, (x + 4, y - 4),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-        
-        # Draw total count on frame with background
-        head_count = len(all_detections)
-        count_text = f"Heads: {head_count}"
-        if track_movement:
-            count_text = f"Heads: {head_count} | Tracked: {len(self.tracked_persons)}"
-        
-        # Draw background for count text
-        text_size, _ = cv2.getTextSize(count_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
-        cv2.rectangle(annotated_frame, (5, 5), (text_size[0] + 15, 40), (0, 0, 0), -1)
-        cv2.putText(annotated_frame, count_text, (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        
-        # Calculate average confidence
-        avg_confidence = 0.0
-        if all_detections:
-            avg_confidence = sum(d['confidence'] for d in all_detections) / len(all_detections)
-        
-        return head_count, all_detections, annotated_frame, avg_confidence, self.tracked_persons
-    
-    def _update_tracking(self, detections):
-        """Update person tracking based on new detections"""
+            bodies = self.upper_body_cascade.detectMultiScale(gray, 1.1, 3, minSize=(30, 30))
+            for box in bodies:
+                if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
+                    all_detections.append({'bbox': tuple(box), 'confidence': 0.6, 'type': 'upper_body'})
+        except Exception: pass
+
         with self.tracking_lock:
-            current_time = time.time()
+            # Stabilize and Cache
+            current_count = len(all_detections)
+            self.head_count_history.append(current_count)
+            self.stable_head_count = int(np.median(list(self.head_count_history))) if self.head_count_history else current_count
+            self.last_full_detections = all_detections
             
-            # Mark all existing persons as potentially missed
-            for person in self.tracked_persons.values():
-                person.mark_missed()
+            return self._finalize(self.stable_head_count, all_detections, annotated_raw, inv_scale)
+
+    def _finalize(self, count, detections, frame, inv_scale):
+        """Annotate and return frame with professional HUD."""
+        
+        # 1. Solid Top Bar for HUD - Fixed height 80px
+        cv2.rectangle(frame, (0, 0), (frame.shape[1], 80), (0, 0, 0), -1)
+        
+        # 2. Status Text
+        status_text = f"Heads: {count}"
+        cv2.putText(frame, status_text, (20, 55), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 0), 3)
+        
+        # 3. Current Time on the right
+        ts = time.strftime("%H:%M:%S")
+        cv2.putText(frame, ts, (frame.shape[1]-150, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 1)
+        
+        # Resize once to common display size
+        if frame.shape[1] > 1280:
+            frame = cv2.resize(frame, (1280, 720))
             
-            # Match detections to existing tracked persons
-            matched_persons = set()
-            
-            for det in detections:
-                bbox = det['bbox']
-                confidence = det['confidence']
-                
-                # Find best matching existing person
-                best_match = None
-                best_iou = 0.3  # Minimum IOU threshold
-                
-                for person_id, person in self.tracked_persons.items():
-                    if person_id in matched_persons:
-                        continue
-                    
-                    iou = self._calculate_iou(bbox, person.bbox)
-                    if iou > best_iou:
-                        best_iou = iou
-                        best_match = person_id
-                
-                if best_match is not None:
-                    # Update existing person
-                    self.tracked_persons[best_match].update_position(bbox, confidence)
-                    matched_persons.add(best_match)
-                else:
-                    # Create new tracked person
-                    new_person = TrackedPerson(self.next_person_id, bbox, confidence)
-                    self.tracked_persons[self.next_person_id] = new_person
-                    self.next_person_id += 1
-                    matched_persons.add(new_person.id)
-            
-            # Remove stale persons
-            stale_ids = [pid for pid, person in self.tracked_persons.items() if person.is_stale()]
-            for pid in stale_ids:
-                del self.tracked_persons[pid]
-    
-    def _calculate_iou(self, box1, box2):
-        """Calculate Intersection over Union (IOU) between two boxes"""
-        x1, y1, w1, h1 = box1
-        x2, y2, w2, h2 = box2
-        
-        xi1 = max(x1, x2)
-        yi1 = max(y1, y2)
-        xi2 = min(x1 + w1, x2 + w2)
-        yi2 = min(y1 + h1, y2 + h2)
-        
-        if xi2 <= xi1 or yi2 <= yi1:
-            return 0.0
-        
-        intersection = (xi2 - xi1) * (yi2 - yi1)
-        area1 = w1 * h1
-        area2 = w2 * h2
-        union = area1 + area2 - intersection
-        
-        return intersection / union if union > 0 else 0.0
-    
-    def _boxes_overlap(self, box1, box2, threshold=0.3):
-        """Check if two boxes overlap significantly"""
-        return self._calculate_iou(box1, box2) > threshold
+        return count, detections, frame, 0.0, {}
+
+    def _calculate_iou(self, b1, b2):
+        x1, y1, w1, h1 = b1
+        x2, y2, w2, h2 = b2
+        xi1, yi1, xi2, yi2 = max(x1, x2), max(y1, y2), min(x1+w1, x2+w2), min(y1+h1, y2+h2)
+        if xi2 <= xi1 or yi2 <= yi1: return 0.0
+        inter = (xi2-xi1) * (yi2-yi1)
+        return inter / (w1*h1 + w2*h2 - inter)
+
+    def _calculate_inclusion(self, s, l):
+        sx, sy, sw, sh = s
+        lx, ly, lw, lh = l
+        xi1, yi1, xi2, yi2 = max(sx, lx), max(sy, ly), min(sx+sw, lx+lw), min(sy+sh, ly+lh)
+        if xi2 <= xi1 or yi2 <= yi1: return 0.0
+        return (xi2-xi1)*(yi2-yi1) / (sw*sh)
+
+    def _boxes_overlap(self, b1, b2, threshold=0.3):
+        if self._calculate_iou(b1, b2) > threshold: return True
+        return self._calculate_inclusion(b1, b2) > 0.8 or self._calculate_inclusion(b2, b1) > 0.8
 
 
 class HeadCountManager:
@@ -499,8 +301,16 @@ class HeadCountManager:
             try:
                 # Connect to stream
                 if cap is None or not cap.isOpened():
-                    if reconnect_attempts >= max_reconnect:
-                        logger.error(f"Max reconnection attempts reached for {camera_key}")
+                    if reconnect_attempts >= 3: # Reduced from 5 for faster "Stop"
+                        logger.error(f"Camera {camera_key} is OFFLINE. Stopping session.")
+                        # Stop the session properly
+                        self.stop_session(session.camera_type, session.camera_id)
+                        # Mark as errored in DB if possible
+                        try:
+                            s = HeadCountSession.objects.get(id=session.id)
+                            s.status = 'error'
+                            s.save()
+                        except: pass
                         break
                     
                     cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
@@ -510,7 +320,7 @@ class HeadCountManager:
                     
                     if not cap.isOpened():
                         reconnect_attempts += 1
-                        time.sleep(5)
+                        time.sleep(2) # Faster check
                         continue
                     
                     reconnect_attempts = 0
@@ -526,7 +336,7 @@ class HeadCountManager:
                     continue
                 
                 # Detect heads
-                head_count, detections, annotated_frame, avg_confidence = \
+                head_count, detections, annotated_frame, avg_confidence, tracked_persons = \
                     self.detector.detect_heads(frame)
                 
                 # Save log entry
@@ -553,10 +363,10 @@ class HeadCountManager:
                 except HeadCountSession.DoesNotExist:
                     pass
                 
-                session_data['last_count'] = head_count
-                
-                # Wait for next interval
-                time.sleep(interval)
+                # Wait for next interval (checked in small increments for faster shutdown)
+                for _ in range(int(interval * 2)):
+                    if not session_data['running']: break
+                    time.sleep(0.5)
                 
             except Exception as e:
                 logger.error(f"Error in head count session {camera_key}: {e}")

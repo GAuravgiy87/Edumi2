@@ -47,6 +47,9 @@ class FaceService:
             pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
             np_img  = np.array(pil_img)
 
+            # ── Low-light enhancement ─────────────────────
+            np_img = self._enhance_low_light(np_img)
+
             # ── Liveness variance check (live frames only) ──
             # Printed photos / screen-grabs have very low pixel variance.
             # Skip this for registration uploads — they are intentionally static.
@@ -195,6 +198,36 @@ class FaceService:
             return diff >= MIN_MOTION_DIFF
         except Exception:
             return True  # if check fails, don't block
+
+    def _enhance_low_light(self, np_img):
+        """
+        Applies CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        if the image is determined to be too dark.
+        """
+        try:
+            import cv2
+            import numpy as np
+
+            # Calculate brightness
+            avg_brightness = np.mean(np_img)
+            if avg_brightness > 65:  # Sufficiently bright
+                return np_img
+
+            # Convert to LAB color space
+            lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
+            l, a, b = cv2.split(lab)
+
+            # Apply CLAHE to L-channel
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            cl = clahe.apply(l)
+
+            # Merge and convert back to RGB
+            limg = cv2.merge((cl, a, b))
+            enhanced = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
+            return enhanced
+        except Exception as e:
+            logger.warning(f"Low-light enhancement failed: {e}")
+            return np_img
 
 
 # ─────────────────────────────────────────────────────────────

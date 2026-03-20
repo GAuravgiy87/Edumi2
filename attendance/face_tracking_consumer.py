@@ -29,6 +29,8 @@ SNAPSHOT_SAVE_INTERVAL = 4
 EMOTION_LABELS = {
     'focused':    '🎯 Focused',
     'happy':      '😊 Happy',
+    'surprised':  '😲 Surprised',
+    'tired':      '😴 Tired/Sleeping',
     'confused':   '🤔 Confused',
     'distracted': '😶 Distracted',
     'unknown':    '❓ Unknown',
@@ -127,6 +129,12 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
                             res.get('confidence', 0.0),
                             res.get('face_visible', True),
                         )
+                        # Also write to physical log
+                        await self._write_to_meeting_log(
+                            res['matched_user_id'],
+                            res.get('matched_name', 'Unknown'),
+                            res.get('emotion', 'unknown')
+                        )
 
             await self.send(json.dumps({
                 'type':    'bulk_tracking_result',
@@ -148,6 +156,21 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
 
             pil_img = Image.open(io.BytesIO(frame_bytes)).convert('RGB')
             np_img  = np.array(pil_img)
+            
+            # ── Low-light enhancement ─────────────────────
+            try:
+                avg_brightness = np.mean(np_img)
+                if avg_brightness < 65:
+                    import cv2
+                    lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
+                    l, a, b = cv2.split(lab)
+                    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+                    cl = clahe.apply(l)
+                    limg = cv2.merge((cl, a, b))
+                    np_img = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
+            except Exception as e:
+                logger.warning(f"Low-light enhancement inline failed: {e}")
+
             h, w    = np_img.shape[:2]
 
             face_locations = face_recognition.face_locations(np_img, model='hog')
@@ -298,10 +321,28 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
                 right_cy = np.mean([p[1] for p in right_eye])
                 eye_asym = abs(left_cy - right_cy)
 
+            # ── Eye openness (EAR proxy) ────────────────────
+            def get_ear(eye_points):
+                if not eye_points or len(eye_points) < 6: return 1.0
+                # Roughly dist(P2,P6)+dist(P3,P5) / 2*dist(P1,P4)
+                p1, p2, p3, p4, p5, p6 = eye_points[0], eye_points[1], eye_points[2], eye_points[3], eye_points[4], eye_points[5]
+                ver1 = np.linalg.norm(np.array(p2) - np.array(p6))
+                ver2 = np.linalg.norm(np.array(p3) - np.array(p5))
+                hor  = np.linalg.norm(np.array(p1) - np.array(p4))
+                return (ver1 + ver2) / (2.0 * hor)
+
+            left_ear  = get_ear(lm.get('left_eye'))
+            right_ear = get_ear(lm.get('right_eye'))
+            avg_ear   = (left_ear + right_ear) / 2.0
+
             # ── Decision tree ───────────────────────────────
             face_h = face_location[2] - face_location[0]   # bottom - top
 
-            if mouth_open > face_h * 0.12 and brow_raise > face_h * 0.08:
+            if avg_ear < 0.21:
+                return 'tired'
+            elif mouth_open > face_h * 0.25:
+                return 'surprised'
+            elif mouth_open > face_h * 0.12 and brow_raise > face_h * 0.08:
                 return 'happy'
             elif brow_furrow < face_h * 0.15 and brow_raise < face_h * 0.04:
                 return 'confused'
@@ -320,7 +361,7 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
         from meetings.models import Meeting
         try:
             meeting = Meeting.objects.get(meeting_code=self.meeting_code)
-            return meeting.teacher == self.user
+            return meeting.teacher == self.user or self.user.is_superuser
         except Meeting.DoesNotExist:
             return False
 
@@ -390,3 +431,34 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
             )
         except Exception as exc:
             logger.debug(f'Snapshot save failed: {exc}')
+
+    @database_sync_to_async
+    def _write_to_meeting_log(self, user_id: int, name: str, emotion: str):
+        """Append a record to the meeting's physical engagement CSV log."""
+        import os
+        import csv
+        from django.conf import settings
+        
+        log_dir = os.path.join(settings.MEDIA_ROOT, 'meeting_logs')
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+            
+        log_file = os.path.join(log_dir, f'engagement_{self.meeting_code}.csv')
+        file_exists = os.path.isfile(log_file)
+        
+        try:
+            with open(log_file, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow(['Timestamp', 'User ID', 'Name', 'Expression', 'Status'])
+                
+                status = 'Active' if emotion not in ['tired', 'distracted', 'absent'] else 'Inactive/Distracted'
+                writer.writerow([
+                    timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    user_id,
+                    name,
+                    emotion.capitalize(),
+                    status
+                ])
+        except Exception as e:
+            logger.error(f"Failed to write to engagement log: {e}")

@@ -100,9 +100,15 @@
 }
 .face-guide-circle {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -55%);
-    width: 240px; height: 240px; border-radius: 50%;
-    border: 3px solid rgba(255,255,255,.5); pointer-events: none;
-    animation: pulse-ring 2s ease-in-out infinite;
+    width: 320px; height: 320px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.4); pointer-events: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 0 500px rgba(0,0,0,0.3); /* Spotlight effect */
+}
+.face-guide-circle.detected { 
+    border-color: #10b981; 
+    border-width: 4px;
+    box-shadow: 0 0 0 500px rgba(0,0,0,0.2), 0 0 20px rgba(16,185,129,0.4); 
 }
 .face-guide-circle.verified { border-color: #10b981; box-shadow: 0 0 0 6px rgba(16,185,129,.2); animation: none; }
 @keyframes pulse-ring {
@@ -171,6 +177,9 @@
     animation: spin 1s linear infinite;
 }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.face-panel-message { margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-weight: 500; }
+.face-panel-message.error   { background: rgba(239, 68, 68, .12); color: #ef4444; border: 1px solid rgba(239, 68, 68, .2); }
+.face-panel-message.success { background: rgba(16, 185, 129, .12); color: #10b981; border: 1px solid rgba(16, 185, 129, .2); }
 </style>
 {% endblock %}
 
@@ -248,9 +257,7 @@
 
             {% if messages %}
             {% for message in messages %}
-            <div class="face-panel-message {{ message.tags }}" style="margin-top:16px; padding:12px 16px; border-radius:10px;
-                background:{% if 'error' in message.tags %}rgba(239,68,68,.12){% else %}rgba(16,185,129,.12){% endif %};
-                color:{% if 'error' in message.tags %}#ef4444{% else %}#10b981{% endif %};">
+            <div class="face-panel-message {{ message.tags }}">
                 {{ message }}
             </div>
             {% endfor %}
@@ -329,10 +336,15 @@ zone.addEventListener('drop', e => {
 
 // ── Camera logic ────────────────────────────────────────────
 let cameraStream = null;
+let detectionInterval = null;
+let stabilityCounter = 0;
+let isCapturing = false;
 
 async function startCamera() {
     try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: {ideal:640}, height: {ideal:480} } });
+        cameraStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user', width: {ideal:1280}, height: {ideal:720} } 
+        });
         const video = document.getElementById('cameraFeed');
         video.srcObject = cameraStream;
         video.style.display = 'block';
@@ -341,12 +353,18 @@ async function startCamera() {
         document.getElementById('startCamBtn').style.display = 'none';
         document.getElementById('captureBtn').style.display = 'inline-flex';
         document.getElementById('stopCamBtn').style.display = 'inline-flex';
+        
+        // Start auto-detection
+        stabilityCounter = 0;
+        isCapturing = false;
+        detectionInterval = setInterval(detectFace, 800);
     } catch(e) {
         showCaptureResult('error', '⚠ Camera access denied. Please allow camera access in your browser settings.');
     }
 }
 
 function stopCamera() {
+    if (detectionInterval) { clearInterval(detectionInterval); detectionInterval = null; }
     if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
     document.getElementById('cameraFeed').style.display = 'none';
     document.getElementById('cameraPlaceholder').style.display = 'flex';
@@ -354,13 +372,69 @@ function stopCamera() {
     document.getElementById('startCamBtn').style.display = 'inline-flex';
     document.getElementById('captureBtn').style.display = 'none';
     document.getElementById('stopCamBtn').style.display = 'none';
+    document.getElementById('faceGuide').classList.remove('detected');
+}
+
+async function detectFace() {
+    if (isCapturing || !cameraStream) return;
+    
+    const video = document.getElementById('cameraFeed');
+    const canvas = document.getElementById('captureCanvas');
+    const guide = document.getElementById('faceGuide');
+    const statusEl = document.getElementById('cameraStatus');
+
+    // Small frame for fast detection
+    canvas.width = 240; canvas.height = 180;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(240, 0); ctx.scale(-1, 1); 
+    ctx.drawImage(video, 0, 0, 240, 180);
+    
+    const frameB64 = canvas.toDataURL('image/jpeg', 0.5);
+
+    try {
+        const resp = await fetch("{% url 'detect_face' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify({ frame_b64: frameB64 })
+        });
+        const data = await resp.json();
+        
+        if (data.status === 'success') {
+            guide.classList.add('detected');
+            stabilityCounter++;
+            
+            if (data.low_light_enhanced) {
+                statusEl.textContent = '🌙 Low-light assisted detection... Keep still';
+            } else {
+                statusEl.textContent = '🟢 Face detected! Hold still...';
+            }
+
+            if (stabilityCounter >= 2) {
+                statusEl.textContent = '📸 Auto-capturing...';
+                capturePhoto(); // Trigger final high-quality capture
+            }
+        } else {
+            guide.classList.remove('detected');
+            stabilityCounter = 0;
+            statusEl.textContent = data.message || 'Position your face inside the circle';
+        }
+    } catch(e) {
+        console.error("Detection error:", e);
+    }
 }
 
 async function capturePhoto() {
+    if (isCapturing) return;
+    isCapturing = true;
+    if (detectionInterval) { clearInterval(detectionInterval); detectionInterval = null; }
+
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('captureCanvas');
     const captureBtn = document.getElementById('captureBtn');
     const statusEl = document.getElementById('cameraStatus');
+    const guide = document.getElementById('faceGuide');
+    
+    guide.classList.add('detected');
     
     // Show processing state immediately
     showCaptureResult('processing', 'Processing...');

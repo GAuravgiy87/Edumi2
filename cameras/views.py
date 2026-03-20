@@ -63,9 +63,12 @@ def test_rtsp_paths(ip, port, username, password):
         '/',
     ]
     
+    from urllib.parse import quote
     for path in common_paths:
         if username and password:
-            rtsp_url = f"rtsp://{username}:{password}@{ip}:{port}{path}"
+            safe_user = quote(username)
+            safe_pass = quote(password)
+            rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip}:{port}{path}"
         else:
             rtsp_url = f"rtsp://{ip}:{port}{path}"
         
@@ -89,19 +92,48 @@ def test_rtsp_paths(ip, port, username, password):
 
 
 def parse_rtsp_url(url):
-    """Parse an RTSP URL to extract components"""
-    parsed = urlparse(url)
+    """
+    Robustly parse an RTSP URL to extract components.
+    Handles complex passwords with multiple '@' symbols.
+    """
+    if not url.startswith('rtsp://'):
+        raise ValueError("URL must start with rtsp://")
     
-    # Extract username and password
-    username = parsed.username or ''
-    password = parsed.password or ''
+    # Remove prefix
+    temp = url[7:]
     
-    # Extract IP and port
-    ip_address = parsed.hostname
-    port = parsed.port or 554  # Default RTSP port
+    # Standard format: [user[:pass]@]host[:port][/path]
+    # Split at the LAST '@' to separate userinfo from host/path
+    if '@' in temp:
+        userinfo, rest = temp.rsplit('@', 1)
+        # Split userinfo at the FIRST ':' to handle '@' in password
+        if ':' in userinfo:
+            username, password = userinfo.split(':', 1)
+        else:
+            username = userinfo
+            password = ''
+    else:
+        username = ''
+        password = ''
+        rest = temp
     
-    # Extract path
-    stream_path = parsed.path or '/stream'
+    # Now 'rest' is host[:port][/path]
+    if '/' in rest:
+        hostport, stream_path = rest.split('/', 1)
+        stream_path = '/' + stream_path
+    else:
+        hostport = rest
+        stream_path = '/'
+    
+    if ':' in hostport:
+        ip_address, port = hostport.split(':', 1)
+        try:
+            port = int(port)
+        except ValueError:
+            port = 554
+    else:
+        ip_address = hostport
+        port = 554
     
     return {
         'ip_address': ip_address,
@@ -182,7 +214,10 @@ def add_camera(request):
             # If auto-detection fails, save with default path but mark as inactive
             logger.warning(f"Could not auto-detect path for {ip_address}:{port}")
             if username and password:
-                rtsp_url = f"rtsp://{username}:{password}@{ip_address}:{port}/stream"
+                from urllib.parse import quote
+                safe_user = quote(username)
+                safe_pass = quote(password)
+                rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip_address}:{port}/stream"
             else:
                 rtsp_url = f"rtsp://{ip_address}:{port}/stream"
             
@@ -251,9 +286,11 @@ class CameraStreamer:
         """Attempt to connect to the camera"""
         import cv2
         try:
+            import os
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
             cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
-            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
+            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             
             if cap.isOpened():
@@ -270,66 +307,71 @@ class CameraStreamer:
 
     def _update(self):
         """Background thread to continuously read frames"""
-        while self.running:
-            # Stop if inactive for too long
-            if time.time() - self.last_access > 90:
-                logger.info(f"Stopping camera {self.camera_id} due to inactivity")
-                break
+        try:
+            while self.running:
+                # Stop if inactive for too long
+                if time.time() - self.last_access > 90:
+                    logger.info(f"Stopping camera {self.camera_id} due to inactivity")
+                    break
 
-            # Try to connect if not connected
-            if self.cap is None:
-                if self.connection_attempts >= self.max_reconnect_attempts:
-                    time.sleep(10)  # Wait longer before trying again
-                    self.connection_attempts = 0
-                    continue
-                
-                self.connection_attempts += 1
-                logger.info(f"Connecting to camera {self.camera_id} (attempt {self.connection_attempts})")
-                self.cap = self._connect_camera()
-                
+                # Try to connect if not connected
                 if self.cap is None:
-                    time.sleep(self.reconnect_delay)
-                    continue
+                    if self.connection_attempts >= self.max_reconnect_attempts:
+                        logger.warning(f"Camera {self.camera_id} is OFFLINE. Stopping live streamer.")
+                        break
+                    
+                    self.connection_attempts += 1
+                    logger.info(f"Connecting to camera {self.camera_id} (attempt {self.connection_attempts})")
+                    self.cap = self._connect_camera()
+                    
+                    if self.cap is None:
+                        time.sleep(self.reconnect_delay)
+                        continue
 
-            # Read frame from camera
-            try:
-                import cv2
-                ret, frame = self.cap.read()
-                
-                if ret and frame is not None:
-                    # Resize for efficient streaming
-                    frame = cv2.resize(frame, (960, 540))
+                # Read frame from camera
+                try:
+                    import cv2
+                    ret, frame = self.cap.read()
                     
-                    # Encode to JPEG with compression
-                    ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
-                    
-                    if ret:
-                        with self.lock:
-                            self.frame = jpeg.tobytes()
-                    
-                    # Small delay to control frame rate (~25 FPS)
-                    time.sleep(0.04)
-                    
-                else:
-                    # Frame read failed - reconnect
-                    logger.warning(f"Failed to read frame from camera {self.camera_id}, reconnecting...")
+                    if ret and frame is not None:
+                        # PROCESS TRACKING on the live feed
+                        try:
+                            # Use the already imported head_count_manager from line 15
+                            head_count, detections, annotated, avg_conf, tracked_persons = \
+                                head_count_manager.detector.detect_heads(frame)
+                            frame = annotated
+                        except Exception as e:
+                            logger.error(f"Tracking error in streamer: {e}")
+                        
+                        # Encode to JPEG
+                        ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                        
+                        if ret:
+                            with self.lock:
+                                self.frame = jpeg.tobytes()
+                        
+                        # No fixed delay here - it helps drain the camera buffer faster
+                        
+                    else:
+                        # Frame read failed - reconnect
+                        logger.warning(f"Failed to read frame from camera {self.camera_id}, reconnecting...")
+                        if self.cap is not None:
+                            self.cap.release()
+                        self.cap = None
+                        time.sleep(self.reconnect_delay)
+                        
+                except Exception as e:
+                    logger.error(f"Error reading from camera {self.camera_id}: {e}")
                     if self.cap is not None:
                         self.cap.release()
                     self.cap = None
                     time.sleep(self.reconnect_delay)
-                    
-            except Exception as e:
-                logger.error(f"Error reading from camera {self.camera_id}: {e}")
-                if self.cap is not None:
-                    self.cap.release()
+        finally:
+            self.running = False
+            if self.cap is not None:
+                self.cap.release()
                 self.cap = None
-                time.sleep(self.reconnect_delay)
-        
-        # Cleanup
-        if self.cap is not None:
-            self.cap.release()
-            self.cap = None
-        logger.info(f"Background thread stopped for camera {self.camera_id}")
+            logger.info(f"Background thread stopped for camera {self.camera_id}")
 
     def get_frame(self):
         """Get the latest frame (thread-safe)"""
@@ -347,12 +389,18 @@ class CameraManager:
     def get_streamer(cls, camera_id, rtsp_url):
         """Get or create a streamer for the given camera"""
         with cls._lock:
-            if camera_id not in cls._streamers or not cls._streamers[camera_id].running:
-                logger.info(f"Creating new streamer for camera {camera_id}")
-                streamer = CameraStreamer(camera_id, rtsp_url)
-                streamer.start()
-                cls._streamers[camera_id] = streamer
-            return cls._streamers[camera_id]
+            try:
+                camera = Camera.objects.get(id=camera_id)
+                full_url = camera.get_full_rtsp_url()
+                if camera_id not in cls._streamers or not cls._streamers[camera_id].running:
+                    logger.info(f"Creating new streamer for camera {camera_id}")
+                    streamer = CameraStreamer(camera_id, full_url)
+                    streamer.start()
+                    cls._streamers[camera_id] = streamer
+                return cls._streamers[camera_id]
+            except Camera.DoesNotExist:
+                logger.warning(f"Camera {camera_id} not found, cannot create streamer.")
+                return None
     
     @classmethod
     def stop_streamer(cls, camera_id):
@@ -372,62 +420,45 @@ class CameraManager:
 
 @login_required
 def camera_feed(request, camera_id):
-    """Proxy camera feed from camera service on port 8001"""
+    """
+    Directly serve the camera feed with real-time tracking annotations.
+    Uses the internal CameraManager and Streamer for high performance.
+    """
     camera = get_object_or_404(Camera, id=camera_id)
     
-    # Check permission - allow anonymous for testing
-    if request.user.is_authenticated:
-        if not can_view_camera(request.user, camera):
-            return JsonResponse({'error': 'You do not have permission to view this camera'}, status=403)
+    # Check permission
+    if not can_view_camera(request.user, camera):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    import requests
+    rtsp_url = camera.get_full_rtsp_url()
+    streamer = CameraManager.get_streamer(camera.id, rtsp_url)
     
-    camera_service_url = f'http://localhost:8001/api/cameras/{camera_id}/feed/'
-    logger.info(f"Proxying camera {camera_id} from {camera_service_url}")
-    
-    def generate_frames():
-        """Proxy frames from camera service"""
-        try:
-            response = requests.get(camera_service_url, stream=True, timeout=30)
-            response.raise_for_status()
-            logger.info(f"Connected to camera service for camera {camera_id}")
-            
-            # Stream the response directly
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    yield chunk
+    def generate():
+        last_frame = None
+        while True:
+            try:
+                frame = streamer.get_frame()
+                if frame and frame != last_frame:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                    last_frame = frame
+                else:
+                    time.sleep(0.01)
+            except GeneratorExit:
+                logger.info(f"Client disconnected from camera feed {camera_id}")
+                break
+            except Exception as e:
+                logger.error(f"Error in camera feed {camera_id}: {e}")
+                time.sleep(0.1)
                 
-        except requests.exceptions.ConnectionError as e:
-            logger.error(f"Camera service not running on port 8001: {e}")
-            error_msg = (
-                b'--frame\r\n'
-                b'Content-Type: text/plain\r\n\r\n'
-                b'ERROR: Camera service not running on port 8001.\r\n'
-                b'Start: cd camera_service && python manage.py runserver 8001\r\n'
-            )
-            yield error_msg
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error proxying camera {camera_id}: {e}")
-            error_msg = (
-                b'--frame\r\n'
-                b'Content-Type: text/plain\r\n\r\n'
-                b'ERROR: ' + str(e).encode() + b'\r\n'
-            )
-            yield error_msg
-        except GeneratorExit:
-            logger.info(f"Client disconnected from camera {camera_id}")
-        except Exception as e:
-            logger.error(f"Unexpected error proxying camera {camera_id}: {e}")
-
     response = StreamingHttpResponse(
-        generate_frames(),
+        generate(),
         content_type='multipart/x-mixed-replace; boundary=frame'
     )
     response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response['Pragma'] = 'no-cache'
     response['Expires'] = '0'
     response['X-Accel-Buffering'] = 'no'
-    response['Connection'] = 'keep-alive'
     return response
 
 @login_required

@@ -81,16 +81,8 @@ def teacher_dashboard(request):
     if not hasattr(request.user, 'userprofile') or request.user.userprofile.user_type != 'teacher':
         return redirect('login')
     
-    # Get real meeting statistics (exclude classroom meetings)
-    total_meetings = Meeting.objects.filter(teacher=request.user, classroom__isnull=True).count()
-    live_meetings = Meeting.objects.filter(teacher=request.user, status='live', classroom__isnull=True).count()
-    scheduled_meetings = Meeting.objects.filter(teacher=request.user, status='scheduled', classroom__isnull=True).count()
-    
-    context = {
-        'total_meetings': total_meetings,
-        'live_meetings': live_meetings,
-        'scheduled_meetings': scheduled_meetings,
-    }
+    from .services import get_teacher_stats
+    context = get_teacher_stats(request.user)
     
     return render(request, 'accounts/teacher_dashboard.html', context)
 
@@ -101,28 +93,10 @@ def student_dashboard(request):
     
     profile = request.user.userprofile
     
-    # Get real meeting statistics (exclude classroom meetings)
-    available_meetings = Meeting.objects.filter(status__in=['scheduled', 'live'], classroom__isnull=True).count()
-    attended_meetings = request.user.meetingparticipant_set.filter(meeting__classroom__isnull=True).count()
-    
-    # Calculate profile completion
-    completion = 0
-    if profile.display_name: completion += 10
-    if request.user.first_name: completion += 10
-    if request.user.last_name: completion += 10
-    if request.user.email: completion += 10
-    if profile.bio: completion += 15
-    if profile.phone: completion += 10
-    if profile.date_of_birth: completion += 10
-    if profile.address: completion += 10
-    if profile.profile_picture or profile.avatar_url: completion += 15
-    
-    context = {
-        'available_meetings': available_meetings,
-        'attended_meetings': attended_meetings,
-        'profile_completion': completion,
-        'profile': profile,
-    }
+    from .services import get_student_stats, get_profile_completion
+    context = get_student_stats(request.user)
+    context['profile_completion'] = get_profile_completion(request.user)
+    context['profile'] = profile
     
     return render(request, 'accounts/student_dashboard.html', context)
 
@@ -320,15 +294,10 @@ def admin_panel(request):
     if not request.user.is_superuser:
         return redirect('login')
     
-    # Get all statistics (exclude classroom meetings from general counts)
-    total_users = User.objects.count()
-    total_students = UserProfile.objects.filter(user_type='student').count()
-    total_teachers = UserProfile.objects.filter(user_type='teacher').count()
-    total_meetings = Meeting.objects.filter(classroom__isnull=True).count()
-    live_meetings_count = Meeting.objects.filter(status='live', classroom__isnull=True).count()
-    total_cameras = Camera.objects.count()
+    from .services import get_admin_stats
+    stats = get_admin_stats()
     
-    # Get all detailed lists (exclude classroom meetings)
+    # Get detailed lists for the dashboard
     all_users = User.objects.all().select_related('userprofile').order_by('-date_joined')
     students = User.objects.filter(userprofile__user_type='student').select_related('userprofile').order_by('-date_joined')
     teachers = User.objects.filter(userprofile__user_type='teacher').select_related('userprofile').order_by('-date_joined')
@@ -341,25 +310,15 @@ def admin_panel(request):
     
     all_cameras = Camera.objects.all().order_by('-created_at')
     recent_users = User.objects.all().select_related('userprofile').order_by('-date_joined')[:10]
-    
-    # Check Camera Service Status
-    import requests
-    camera_service_online = False
-    try:
-        response = requests.get("http://127.0.0.1:8001/api/cameras/", timeout=1)
-        if response.status_code == 200:
-            camera_service_online = True
-    except:
-        camera_service_online = False
 
     context = {
-        'total_users': total_users,
-        'total_students': total_students,
-        'total_teachers': total_teachers,
-        'total_meetings': total_meetings,
-        'live_meetings_count': live_meetings_count,
-        'total_cameras': total_cameras,
-        'camera_service_online': camera_service_online,
+        'total_users': stats['total_users'],
+        'total_students': stats['total_students'],
+        'total_teachers': stats['total_teachers'],
+        'total_meetings': stats['total_meetings'],
+        'live_meetings_count': stats['live_meetings_count'],
+        'total_cameras': stats['total_cameras'],
+        'camera_service_online': stats['camera_service_online'],
         
         # Detailed lists
         'all_users': all_users,
@@ -752,7 +711,9 @@ def inbox(request):
     """View all conversations with search"""
     search_query = request.GET.get('q', '').strip()
     
-    conversations = request.user.conversations.all().prefetch_related('participants', 'messages')
+    conversations = request.user.conversations.all().prefetch_related(
+        'participants', 'participants__userprofile', 'messages'
+    )
     
     # Add unread count and last message to each conversation
     for conv in conversations:

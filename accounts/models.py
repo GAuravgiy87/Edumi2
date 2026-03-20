@@ -8,7 +8,7 @@ class UserProfile(models.Model):
     )
     
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
+    user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, db_index=True)
     
     # Profile Information
     bio = models.TextField(blank=True, null=True)
@@ -20,12 +20,12 @@ class UserProfile(models.Model):
     display_name = models.CharField(max_length=100, blank=True, null=True)
     
     # Student Specific
-    student_id = models.CharField(max_length=20, blank=True, null=True)
+    student_id = models.CharField(max_length=20, blank=True, null=True, db_index=True)
     grade = models.CharField(max_length=20, blank=True, null=True)
     enrollment_date = models.DateField(blank=True, null=True)
     
     # Teacher Specific
-    employee_id = models.CharField(max_length=20, blank=True, null=True)
+    employee_id = models.CharField(max_length=20, blank=True, null=True, db_index=True)
     department = models.CharField(max_length=100, blank=True, null=True)
     specialization = models.CharField(max_length=200, blank=True, null=True)
     join_date = models.DateField(blank=True, null=True)

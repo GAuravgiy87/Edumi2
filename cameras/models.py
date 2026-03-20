@@ -16,8 +16,12 @@ class Camera(models.Model):
         return self.name
     
     def get_full_rtsp_url(self):
+        from urllib.parse import quote
         if self.username and self.password:
-            return f"rtsp://{self.username}:{self.password}@{self.ip_address}:{self.port}{self.stream_path}"
+            # Quote username and password to handle special chars like '@'
+            safe_user = quote(self.username)
+            safe_pass = quote(self.password)
+            return f"rtsp://{safe_user}:{safe_pass}@{self.ip_address}:{self.port}{self.stream_path}"
         return f"rtsp://{self.ip_address}:{self.port}{self.stream_path}"
     
     def has_permission(self, user):

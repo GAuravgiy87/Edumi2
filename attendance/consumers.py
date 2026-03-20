@@ -187,6 +187,8 @@ class FaceAttendanceConsumer(AsyncWebsocketConsumer):
             meeting = Meeting.objects.select_related('classroom').get(
                 meeting_code=self.meeting_code
             )
+            if not meeting.classroom:
+                return defaults
             s, _ = AttendanceSettings.objects.get_or_create(classroom=meeting.classroom)
             return {
                 'interval':             s.recognition_interval_seconds,

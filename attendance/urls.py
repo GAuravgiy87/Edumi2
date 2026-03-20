@@ -6,6 +6,7 @@ urlpatterns = [
     path('face/setup/',   views.face_setup,              name='face_setup'),
     path('face/upload/',  views.upload_face_photo,       name='upload_face_photo'),
     path('face/capture/', views.capture_face_photo,      name='capture_face_photo'),
+    path('face/detect/',  views.detect_face,             name='detect_face'),
     path('face/status/',  views.face_registration_status, name='face_status'),
 
     # ── Student: My Attendance ──────────────────────────────────

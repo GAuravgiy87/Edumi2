@@ -10,18 +10,24 @@ import sys
 from pathlib import Path
 
 # Set FFmpeg environment variables for better RTSP handling
-os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp|udp'
+os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
 
 # Import Camera model from main project
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from cameras.models import Camera
+try:
+    from cameras.head_count_service import head_count_manager
+except ImportError:
+    # If not in path, try adding it again carefully
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+    from cameras.head_count_service import head_count_manager
 
 logger = logging.getLogger('camera_api')
 
 # RTSP Connection Settings
-RTSP_OPEN_TIMEOUT = 10000  # 10 seconds
-RTSP_READ_TIMEOUT = 10000  # 10 seconds
-RTSP_RECONNECT_DELAY = 3   # 3 seconds between reconnection attempts
+RTSP_OPEN_TIMEOUT = 4000  # 4 seconds
+RTSP_READ_TIMEOUT = 4000  # 4 seconds
+RTSP_RECONNECT_DELAY = 2   # 2 seconds
 RTSP_MAX_RECONNECT = 10    # Max reconnection attempts before giving up
 
 class CameraStreamer:
@@ -155,11 +161,23 @@ class CameraStreamer:
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
                     self.connection_attempts = 0  # Reset on successful frame
+                    # Detect heads and draw annotations
+                    try:
+                        # Use the head_count_manager detector
+                        # We pass track_movement=True as requested for "always track everything"
+                        count, detections, annotated, avg_conf, tracked = \
+                            head_count_manager.detector.detect_heads(frame, track_movement=True)
+                        frame_to_stream = annotated
+                    except Exception as e:
+                        logger.error(f"Tracking error in microservice: {e}")
+                        frame_to_stream = frame
+
+                    # Store for adaptive encoding if needed
                     with self.lock:
-                        self.last_frame = frame.copy()
+                        self.last_frame = frame_to_stream.copy()
                     
                     # Store a default 'med' frame as fallback
-                    frame_med = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_NEAREST)
+                    frame_med = cv2.resize(frame_to_stream, (640, 360), interpolation=cv2.INTER_NEAREST)
                     ret_med, jpeg = cv2.imencode('.jpg', frame_med, [cv2.IMWRITE_JPEG_QUALITY, 60])
                     
                     if ret_med:
@@ -257,8 +275,9 @@ def camera_feed(request, camera_id):
     try:
         camera = Camera.objects.get(id=camera_id)
         logger.info(f"=== FEED REQUEST for camera {camera_id} ===")
-        logger.info(f"RTSP URL: {camera.rtsp_url[:30]}...")
-        streamer = camera_manager.get_streamer(camera.id, camera.rtsp_url)
+        full_url = camera.get_full_rtsp_url()
+        logger.info(f"RTSP URL (Quoted): {full_url[:30]}...")
+        streamer = camera_manager.get_streamer(camera.id, full_url)
         logger.info(f"Streamer running: {streamer.running}")
         
         def generate_frames():
@@ -301,9 +320,11 @@ def camera_feed(request, camera_id):
                         time.sleep(delay)
                     else:
                         # Frame lost, wait briefly
-                        time.sleep(0.05)
+                        time.sleep(0.01)
             except GeneratorExit:
                 logger.info(f"Client disconnected from camera {camera_id} after {frame_count} frames")
+            except Exception as e:
+                logger.error(f"Error in streaming loop for camera {camera_id}: {e}")
 
         response = StreamingHttpResponse(
             generate_frames(),
@@ -322,6 +343,7 @@ def test_camera(request, camera_id):
     
     try:
         camera = Camera.objects.get(id=camera_id)
+        results = []
         
         # Log the RTSP URL (hide password)
         safe_url = camera.rtsp_url
@@ -339,12 +361,12 @@ def test_camera(request, camera_id):
             ffmpeg_available = False
             ffmpeg_version = 'Not installed'
         
-        # Try different connection methods
-        results = []
+        # Use encoded URL for all tests
+        full_url = camera.get_full_rtsp_url()
         
         # Method 1: OpenCV with TCP
         os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
-        cap = cv2.VideoCapture(camera.rtsp_url, cv2.CAP_FFMPEG)
+        cap = cv2.VideoCapture(full_url, cv2.CAP_FFMPEG)
         cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
         
         if cap.isOpened():
@@ -363,7 +385,7 @@ def test_camera(request, camera_id):
         
         # Method 2: OpenCV with UDP
         os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
-        cap = cv2.VideoCapture(camera.rtsp_url, cv2.CAP_FFMPEG)
+        cap = cv2.VideoCapture(full_url, cv2.CAP_FFMPEG)
         cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
         
         if cap.isOpened():
@@ -385,7 +407,7 @@ def test_camera(request, camera_id):
             try:
                 result = subprocess.run(
                     ['ffprobe', '-v', 'error', '-rtsp_transport', 'tcp', 
-                     '-i', camera.rtsp_url, '-show_entries', 'stream=width,height,codec_name',
+                     '-i', full_url, '-show_entries', 'stream=width,height,codec_name',
                      '-of', 'json'],
                     capture_output=True, text=True, timeout=15
                 )
@@ -414,7 +436,7 @@ def test_camera(request, camera_id):
         return JsonResponse({
             'camera_id': camera_id,
             'camera_name': camera.name,
-            'rtsp_url': safe_url,
+            'rtsp_url': full_url,
             'ffmpeg_available': ffmpeg_available,
             'ffmpeg_version': ffmpeg_version,
             'results': results,
@@ -469,7 +491,7 @@ class MobileCameraStreamer:
                 break
 
             try:
-                response = requests.get(self.stream_url, stream=True, timeout=10)
+                response = requests.get(self.stream_url, stream=True, timeout=5)
                 
                 if response.status_code == 200:
                     logger.info(f"Connected to mobile camera {self.mobile_camera_id}")
@@ -491,11 +513,20 @@ class MobileCameraStreamer:
                                 # Decode
                                 img = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
                                 if img is not None:
+                                    try:
+                                        # Inject tracking into mobile stream
+                                        count, detections, annotated, avg_conf, tracked = \
+                                            head_count_manager.detector.detect_heads(img, track_movement=True)
+                                        img_to_stream = annotated
+                                    except Exception as e:
+                                        logger.error(f"Mobile tracking error in microservice: {e}")
+                                        img_to_stream = img
+
                                     with self.lock:
-                                        self.last_frame = img.copy()
+                                        self.last_frame = img_to_stream.copy()
                                         
                                     # Fallback med frame
-                                    img_med = cv2.resize(img, (640, 360), interpolation=cv2.INTER_NEAREST)
+                                    img_med = cv2.resize(img_to_stream, (640, 360), interpolation=cv2.INTER_NEAREST)
                                     ret, jpeg = cv2.imencode('.jpg', img_med, [cv2.IMWRITE_JPEG_QUALITY, 60])
                                     if ret:
                                         with self.lock:

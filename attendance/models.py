@@ -24,7 +24,7 @@ class StudentFaceProfile(models.Model):
     # Original registration photo — admin-only visibility
     face_photo = models.ImageField(upload_to='face_photos/', blank=True, null=True)
 
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
     face_quality_score = models.FloatField(default=0.0)   # 0.0–1.0
     registration_ip = models.GenericIPAddressField(null=True, blank=True)
 
@@ -105,10 +105,10 @@ class AttendanceRecord(models.Model):
         related_name='attendance_records'
     )
     date = models.DateField()
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='absent')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='absent', db_index=True)
     verification_method = models.CharField(
         max_length=20, choices=VERIFICATION_METHOD,
-        default='face_recognition'
+        default='face_recognition', db_index=True
     )
     face_match_confidence = models.FloatField(default=0.0)
     face_verified_at = models.DateTimeField(null=True, blank=True)
@@ -282,6 +282,8 @@ class StudentEngagementSnapshot(models.Model):
     EMOTION_CHOICES = [
         ('focused',     'Focused'),
         ('happy',       'Happy'),
+        ('surprised',   'Surprised'),
+        ('tired',       'Tired/Sleeping'),
         ('confused',    'Confused'),
         ('distracted',  'Distracted'),
         ('absent',      'Not Visible'),

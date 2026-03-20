@@ -72,44 +72,14 @@ def classroom_detail(request, classroom_id):
     """View classroom details with pending requests and approved students"""
     classroom = get_object_or_404(Classroom, id=classroom_id)
     
-    # Check permissions
-    is_teacher = classroom.teacher == request.user
-    is_approved_student = ClassroomMembership.objects.filter(
-        classroom=classroom,
-        student=request.user,
-        status='approved'
-    ).exists()
+    from .services import get_classroom_detail_context
+    ctx = get_classroom_detail_context(classroom, request.user)
     
-    if not (is_teacher or is_approved_student):
+    if ctx is None:
         messages.error(request, 'You do not have access to this classroom')
         return redirect('student_classrooms')
     
-    # Get data based on role
-    if is_teacher:
-        pending_requests = classroom.get_pending_requests()
-        approved_students = classroom.get_approved_memberships()
-        meetings = classroom.meetings.all().order_by('-created_at')
-        # Annotate each meeting with face attendance counts
-        from attendance.models import AttendanceRecord
-        for m in meetings:
-            recs = AttendanceRecord.objects.filter(meeting=m)
-            m.att_present = recs.filter(status__in=['present', 'late']).count()
-            m.att_total   = approved_students.count()
-    else:
-        pending_requests = None
-        approved_students = None
-        meetings = classroom.meetings.filter(status__in=['scheduled', 'live']).order_by('-created_at')
-    
-    active_meeting = classroom.get_active_meeting()
-    
-    return render(request, 'meetings/classroom_detail.html', {
-        'classroom': classroom,
-        'is_teacher': is_teacher,
-        'pending_requests': pending_requests,
-        'approved_students': approved_students,
-        'meetings': meetings,
-        'active_meeting': active_meeting
-    })
+    return render(request, 'meetings/classroom_detail.html', ctx)
 
 @login_required
 def join_classroom_request(request):
@@ -227,7 +197,6 @@ def deny_join_request(request, membership_id):
     
     # Send notification to student
     notify_classroom_request_denied(membership.student, membership.classroom)
-    membership.save()
     
     return JsonResponse({
         'status': 'success',
@@ -416,7 +385,8 @@ def join_meeting(request, meeting_code):
     # Check if meeting is sleeping - prevent joining
     if meeting.is_sleeping():
         messages.error(request, 'This meeting is currently in sleep mode. Please wait for the host to unfreeze it.')
-        return redirect('student_dashboard' if request.user.userprofile.user_type == 'student' else 'teacher_dashboard')
+        user_type = request.user.userprofile.user_type if hasattr(request.user, 'userprofile') else None
+        return redirect('student_dashboard' if user_type == 'student' else 'teacher_dashboard')
     
     # Check if meeting is in a classroom
     if meeting.classroom:
@@ -454,7 +424,7 @@ def join_meeting(request, meeting_code):
     
     return render(request, 'meetings/meeting_room.html', {
         'meeting': meeting,
-        'is_host': meeting.teacher == request.user
+        'is_host': meeting.teacher == request.user or request.user.is_superuser
     })
 
 @login_required

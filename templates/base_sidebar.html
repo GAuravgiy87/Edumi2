@@ -18,6 +18,8 @@
     {% endcompress %}
 
     <!-- Hotwired Turbo for seamless navigation (no full page reloads) -->
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script type="module" src="https://cdn.skypack.dev/@hotwired/turbo"></script>
 </head>
 <body>
@@ -54,249 +56,13 @@
 
             <!-- Sidebar Navigation -->
             <nav class="sidebar-nav">
-                {% if user.is_superuser %}
-                    <!-- Admin Navigation -->
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Dashboard</div>
-                        <a href="{% url 'admin_panel' %}" class="sidebar-nav-item {% if request.path == '/accounts/admin-panel/' %}active{% endif %}">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <rect x="3" y="3" width="7" height="7"></rect>
-                                    <rect x="14" y="3" width="7" height="7"></rect>
-                                    <rect x="14" y="14" width="7" height="7"></rect>
-                                    <rect x="3" y="14" width="7" height="7"></rect>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Admin Panel</span>
-                        </a>
-                    </div>
-
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Management</div>
-                        <a href="{% url 'user_management' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="9" cy="7" r="4"></circle>
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Users</span>
-                        </a>
-                        <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Meetings</span>
-                        </a>
-                        <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                                    <circle cx="12" cy="13" r="4"></circle>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Cameras</span>
-                        </a>
-                        <a href="{% url 'admin_face_photos' %}" class="sidebar-nav-item {% if '/attendance/admin/face-photos/' in request.path %}active{% endif %}">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Face Photos</span>
-                        </a>
-                    </div>
-
-                {% elif user.userprofile.user_type == 'teacher' %}
-                    <!-- Teacher Navigation -->
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Dashboard</div>
-                        <a href="{% url 'teacher_dashboard' %}" class="sidebar-nav-item {% if request.path == '/accounts/teacher-dashboard/' %}active{% endif %}">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <rect x="3" y="3" width="7" height="7"></rect>
-                                    <rect x="14" y="3" width="7" height="7"></rect>
-                                    <rect x="14" y="14" width="7" height="7"></rect>
-                                    <rect x="3" y="14" width="7" height="7"></rect>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Dashboard</span>
-                        </a>
-                    </div>
-
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Teaching</div>
-                        <a href="{% url 'teacher_classrooms' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">My Classrooms</span>
-                        </a>
-                        <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">My Meetings</span>
-                        </a>
-                        <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                                    <line x1="8" y1="21" x2="16" y2="21"></line>
-                                    <line x1="12" y1="17" x2="12" y2="21"></line>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">My Cameras</span>
-                        </a>
-                    </div>
-
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Attendance</div>
-                        <a href="{% url 'teacher_classrooms' %}" class="sidebar-nav-item {% if 'attendance' in request.path %}active{% endif %}">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M9 11l3 3L22 4"></path>
-                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Attendance</span>
-                        </a>
-                    </div>
-
-                {% elif user.userprofile.user_type == 'student' %}
-                    <!-- Student Navigation -->
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Dashboard</div>
-                        <a href="{% url 'student_dashboard' %}" class="sidebar-nav-item {% if request.path == '/accounts/student-dashboard/' %}active{% endif %}">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <rect x="3" y="3" width="7" height="7"></rect>
-                                    <rect x="14" y="3" width="7" height="7"></rect>
-                                    <rect x="14" y="14" width="7" height="7"></rect>
-                                    <rect x="3" y="14" width="7" height="7"></rect>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Dashboard</span>
-                        </a>
-                    </div>
-
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Learning</div>
-                        <a href="{% url 'student_classrooms' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">My Classrooms</span>
-                        </a>
-                        <a href="{% url 'student_meetings' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Meetings</span>
-                        </a>
-                        <a href="{% url 'join_classroom_request' %}" class="sidebar-nav-item">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="8" x2="12" y2="16"></line>
-                                    <line x1="8" y1="12" x2="16" y2="12"></line>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Join Classroom</span>
-                        </a>
-                    </div>
-
-                    <div class="sidebar-nav-section">
-                        <div class="sidebar-nav-title">Attendance</div>
-                        <a href="{% url 'my_attendance' %}" class="sidebar-nav-item {% if 'attendance' in request.path %}active{% endif %}">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M9 11l3 3L22 4"></path>
-                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">My Attendance</span>
-                        </a>
-                        <a href="{% url 'face_setup' %}" class="sidebar-nav-item {% if 'face' in request.path %}active{% endif %}">
-                            <span class="sidebar-nav-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                                    <line x1="12" y1="19" x2="12" y2="23"></line>
-                                    <line x1="8" y1="23" x2="16" y2="23"></line>
-                                </svg>
-                            </span>
-                            <span class="sidebar-nav-text">Face Setup</span>
-                            {% if not request.user.face_profile %}<span style="background:#ef4444;color:#fff;font-size:.65rem;padding:2px 6px;border-radius:8px;margin-left:4px;">!</span>{% endif %}
-                        </a>
-                    </div>
-                {% endif %}
-
-                <!-- Common Navigation -->
-                <div class="sidebar-nav-section">
-                    <div class="sidebar-nav-title">Communication</div>
-                    <a href="{% url 'inbox' %}" class="sidebar-nav-item">
-                        <span class="sidebar-nav-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                <polyline points="22,6 12,13 2,6"></polyline>
-                            </svg>
-                        </span>
-                        <span class="sidebar-nav-text">Messages</span>
-                    </a>
-                </div>
-
-                <div class="sidebar-nav-section">
-                    <div class="sidebar-nav-title">Account</div>
-                    <a href="{% url 'profile_view' user.username %}" class="sidebar-nav-item">
-                        <span class="sidebar-nav-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="12" cy="7" r="4"></circle>
-                            </svg>
-                        </span>
-                        <span class="sidebar-nav-text">My Profile</span>
-                    </a>
-                    <a href="{% url 'settings' %}" class="sidebar-nav-item">
-                        <span class="sidebar-nav-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                <circle cx="12" cy="12" r="3"></circle>
-                                <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2M23 12h-6m-6 0H1m18.2-5.2l-4.2 4.2m0 6l4.2 4.2"></path>
-                            </svg>
-                        </span>
-                        <span class="sidebar-nav-text">Settings</span>
-                    </a>
-                </div>
+                {% include 'includes/nav_items.html' with nav_type='sidebar' %}
             </nav>
 
             <!-- Sidebar Footer -->
             <div class="sidebar-footer">
                 <a href="#" class="sidebar-footer-item logout" onclick="event.preventDefault();document.getElementById('logout-form-sidebar').submit();">
-                    <span class="sidebar-nav-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                    </span>
+                    <span class="sidebar-nav-icon"><i data-lucide="log-out"></i></span>
                     <span class="sidebar-nav-text">Logout</span>
                 </a>
                 <form id="logout-form-sidebar" method="post" action="{% url 'logout' %}" style="display:none;">{% csrf_token %}</form>
@@ -312,49 +78,27 @@
             <div class="topbar">
                 <div class="topbar-left">
                     <button class="mobile-menu-btn" onclick="openMobileSidebar()">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="3" y1="12" x2="21" y2="12"></line>
-                            <line x1="3" y1="6" x2="21" y2="6"></line>
-                            <line x1="3" y1="18" x2="21" y2="18"></line>
-                        </svg>
+                        <i data-lucide="menu" class="icon" style="width: 24px; height: 24px;"></i>
                     </button>
                     <h1 class="topbar-title">{% block page_title %}Dashboard{% endblock %}</h1>
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-search">
                         <span class="topbar-search-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <path d="m21 21-4.35-4.35"></path>
-                            </svg>
+                            <i data-lucide="search" class="icon" style="width: 16px; height: 16px;"></i>
                         </span>
                         <input type="text" placeholder="Search..." onkeypress="handleSearch(event)">
                     </div>
                     
                     <!-- Theme Toggle -->
                     <button type="button" class="topbar-icon-btn theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
-                        <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                        </svg>
-                        <svg id="sunIcon" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="5"></circle>
-                            <line x1="12" y1="1" x2="12" y2="3"></line>
-                            <line x1="12" y1="21" x2="12" y2="23"></line>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                            <line x1="1" y1="12" x2="3" y2="12"></line>
-                            <line x1="21" y1="12" x2="23" y2="12"></line>
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                        </svg>
+                        <i data-lucide="moon" id="moonIcon" style="width: 20px; height: 20px;"></i>
+                        <i data-lucide="sun" id="sunIcon" style="display: none; width: 20px; height: 20px;"></i>
                     </button>
 
                     <div class="notification-wrapper">
                         <button type="button" class="topbar-icon-btn notification-btn" id="notificationBtn" onclick="toggleNotifications(event)">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                            </svg>
+                            <i data-lucide="bell" class="icon" style="width: 20px; height: 20px;"></i>
                             <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
                         </button>
                         
@@ -379,178 +123,7 @@
                 {% block content %}{% endblock %}
             </div>
 
-            <!-- Welcome popup for new users -->
-            {% if request.session.show_welcome %}
-            <style>
-                #welcome-overlay {
-                    position: fixed; inset: 0; z-index: 9999;
-                    display: flex; align-items: center; justify-content: center;
-                    background: rgba(10, 10, 30, 0.7);
-                    backdrop-filter: blur(6px);
-                    animation: overlayIn .4s ease forwards;
-                }
-                @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
-                #welcome-card {
-                    position: relative;
-                    background: var(--bg-card, #fff);
-                    border-radius: 28px;
-                    max-width: 460px;
-                    width: 92%;
-                    overflow: hidden;
-                    box-shadow: 0 32px 80px rgba(102,126,234,0.35), 0 8px 24px rgba(0,0,0,0.15);
-                    animation: cardPop .5s cubic-bezier(.34,1.56,.64,1) forwards;
-                }
-                @keyframes cardPop {
-                    from { transform: scale(0.6) translateY(40px); opacity: 0; }
-                    to   { transform: scale(1) translateY(0); opacity: 1; }
-                }
-                .wc-header {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    padding: 36px 40px 28px;
-                    text-align: center;
-                    position: relative;
-                    overflow: hidden;
-                }
-                .wc-header::before {
-                    content: '';
-                    position: absolute; inset: 0;
-                    background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 60%),
-                                radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06) 0%, transparent 50%);
-                }
-                .wc-icon {
-                    display: flex; align-items: center; justify-content: center;
-                    width: 72px; height: 72px;
-                    background: rgba(255,255,255,0.18);
-                    border-radius: 50%;
-                    margin: 0 auto 16px;
-                    position: relative;
-                    animation: iconFloat 3s ease-in-out infinite;
-                    box-shadow: 0 0 0 12px rgba(255,255,255,0.07);
-                }
-                .wc-icon svg { width: 38px; height: 38px; }
-                @keyframes iconFloat {
-                    0%, 100% { transform: translateY(0); }
-                    50%       { transform: translateY(-7px); }
-                }
-                .wc-header h2 {
-                    margin: 0; font-size: 1.85rem; font-weight: 800;
-                    color: #fff; font-family: Inter, sans-serif;
-                    letter-spacing: -0.5px; position: relative;
-                }
-                .wc-header p {
-                    margin: 6px 0 0; color: rgba(255,255,255,0.8);
-                    font-size: 0.95rem; position: relative;
-                }
-                .wc-close {
-                    position: absolute; top: 14px; right: 16px;
-                    background: rgba(255,255,255,0.18); border: none; color: #fff;
-                    width: 30px; height: 30px; border-radius: 50%;
-                    cursor: pointer; display: flex; align-items: center; justify-content: center;
-                    transition: background .2s; z-index: 1;
-                }
-                .wc-close:hover { background: rgba(255,255,255,0.32); }
-                .wc-close svg { width: 14px; height: 14px; }
-                .wc-body { padding: 28px 36px 32px; text-align: center; }
-                .wc-features { display: flex; gap: 10px; margin-bottom: 26px; }
-                .wc-feature {
-                    flex: 1; background: rgba(102,126,234,0.07);
-                    border: 1px solid rgba(102,126,234,0.15);
-                    border-radius: 14px; padding: 16px 8px;
-                    font-size: 0.78rem; color: var(--text-muted, #555);
-                    font-family: Inter, sans-serif; transition: transform .2s;
-                }
-                .wc-feature:hover { transform: translateY(-2px); }
-                .wc-feature-icon {
-                    width: 36px; height: 36px;
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    border-radius: 10px; display: flex;
-                    align-items: center; justify-content: center;
-                    margin: 0 auto 8px;
-                }
-                .wc-feature-icon svg { width: 18px; height: 18px; }
-                .wc-feature strong { display: block; color: var(--text-main, #1a1a2e); font-size: 0.82rem; margin-bottom: 2px; }
-                .wc-btn {
-                    background: linear-gradient(135deg, #667eea, #764ba2);
-                    color: #fff; border: none; padding: 14px 44px;
-                    border-radius: 50px; font-size: 1rem; font-weight: 700;
-                    cursor: pointer; font-family: Inter, sans-serif;
-                    box-shadow: 0 8px 24px rgba(102,126,234,0.45);
-                    transition: transform .15s, box-shadow .15s;
-                    display: inline-flex; align-items: center; gap: 8px;
-                }
-                .wc-btn svg { width: 18px; height: 18px; }
-                .wc-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(102,126,234,0.55); }
-                .wc-btn:active { transform: translateY(0); }
-                #welcome-card.closing { animation: cardOut .3s ease forwards; }
-                #welcome-overlay.closing { animation: overlayOut .35s ease forwards; }
-                @keyframes cardOut { to { transform: scale(0.85) translateY(20px); opacity: 0; } }
-                @keyframes overlayOut { to { opacity: 0; } }
-            </style>
-            <div id="welcome-overlay">
-                <div id="welcome-card">
-                    <div class="wc-header">
-                        <button class="wc-close" onclick="closeWelcome()" aria-label="Close">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        </button>
-                        <div class="wc-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
-                                <path d="M6 12v5c3 3 9 3 12 0v-5"/>
-                            </svg>
-                        </div>
-                        <h2>Welcome to Edumi!</h2>
-                        <p>Your account is ready. Let's get started.</p>
-                    </div>
-                    <div class="wc-body">
-                        <div class="wc-features">
-                            <div class="wc-feature">
-                                <div class="wc-feature-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                                        <polyline points="9 22 9 12 15 12 15 22"/>
-                                    </svg>
-                                </div>
-                                <strong>Classrooms</strong>
-                                Join or create
-                            </div>
-                            <div class="wc-feature">
-                                <div class="wc-feature-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polygon points="23 7 16 12 23 17 23 7"/>
-                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                                    </svg>
-                                </div>
-                                <strong>Meetings</strong>
-                                Live sessions
-                            </div>
-                            <div class="wc-feature">
-                                <div class="wc-feature-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                    </svg>
-                                </div>
-                                <strong>Messaging</strong>
-                                Stay connected
-                            </div>
-                        </div>
-                        <button class="wc-btn" onclick="closeWelcome()">
-                            Let's go
-                            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <script>
-                function closeWelcome() {
-                    const overlay = document.getElementById('welcome-overlay');
-                    const card = document.getElementById('welcome-card');
-                    card.classList.add('closing');
-                    overlay.classList.add('closing');
-                    setTimeout(() => overlay.remove(), 350);
-                    fetch('/dismiss-welcome/', {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}});
-                }
-            </script>
-            {% endif %}
+            {% include 'includes/welcome_popup.html' %}
         </main>
     </div>
 
@@ -765,5 +338,11 @@
     <!-- Not authenticated - redirect to login -->
     <script>window.location.href = "{% url 'login' %}";</script>
     {% endif %}
+    <script>
+        lucide.createIcons();
+        document.addEventListener('turbo:load', () => {
+            lucide.createIcons();
+        });
+    </script>
 </body>
 </html>

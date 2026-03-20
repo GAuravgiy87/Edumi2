@@ -7,30 +7,96 @@ from .models import Meeting, MeetingParticipant, MeetingAttendanceLog, MeetingCh
 
 class MeetingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.meeting_code = self.scope['url_route']['kwargs']['meeting_code']
-        self.room_group_name = f'meeting_{self.meeting_code}'
-        self.user = self.scope['user']
-        
-        # Join room group
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
-        
-        # Record join in database
-        await self.record_join()
+        try:
+            self.meeting_code = self.scope['url_route']['kwargs']['meeting_code'].upper()
+            self.room_group_name = f'meeting_{self.meeting_code}'
+            self.user = self.scope['user']
+            
+            if not self.user.is_authenticated:
+                await self.close()
+                return
 
-        await self.accept()
-        
-        # Notify others that user joined
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'user_joined',
-                'user_id': self.user.id,
-                'username': self.user.username
-            }
+            # Join room group
+            await self.channel_layer.group_add(
+                self.room_group_name,
+                self.channel_name
+            )
+            
+            # Record join and get user meta in one go
+            user_data = await self.get_user_meta()
+            
+            # Get other active participants BEFORE accepting to ensure we have them
+            active_participants = await self.get_active_participants()
+            
+            await self.accept()
+
+            # Send current participant list to the joiner
+            await self.send(text_data=json.dumps({
+                'type': 'participant_list',
+                'participants': active_participants
+            }))
+
+            # Notify others that user joined
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_joined',
+                    'user_id': user_data['id'],
+                    'username': user_data['username'],
+                    'is_host': user_data['is_host'],
+                    'is_admin': user_data['is_admin'],
+                }
+            )
+        except Exception as e:
+            # Avoid using self.user directly in strings to prevent DB access errors
+            print(f"WS Connect Error: {str(e)}")
+            await self.close()
+
+    @database_sync_to_async
+    def get_user_meta(self):
+        meeting = Meeting.objects.get(meeting_code=self.meeting_code)
+        # Record join while we are here
+        participant, _ = MeetingParticipant.objects.get_or_create(
+            meeting=meeting,
+            user=self.user
         )
+        participant.joined_at = timezone.now()
+        participant.is_active = True
+        participant.save()
+        
+        MeetingAttendanceLog.objects.create(
+            participant=participant,
+            event_type='join'
+        )
+        
+        return {
+            'id': self.user.id,
+            'username': self.user.username,
+            'is_host': meeting.teacher == self.user or self.user.is_superuser,
+            'is_admin': self.user.is_superuser
+        }
+
+    @database_sync_to_async
+    def get_active_participants(self):
+        try:
+            meeting = Meeting.objects.get(meeting_code=self.meeting_code)
+            # Find all users who are marked active in this meeting, excluding self
+            active = MeetingParticipant.objects.filter(
+                meeting=meeting, 
+                is_active=True
+            ).exclude(user=self.user).select_related('user')
+            
+            return [
+                {
+                    'user_id': p.user.id,
+                    'username': p.user.username,
+                    'is_host': meeting.teacher == p.user or p.user.is_superuser,
+                    'is_admin': p.user.is_superuser
+                } for p in active
+            ]
+        except Exception as e:
+            print(f"Error fetching active participants: {e}")
+            return []
     
     async def disconnect(self, close_code):
         # Notify others that user left
@@ -53,90 +119,101 @@ class MeetingConsumer(AsyncWebsocketConsumer):
         await self.record_leave()
     
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        message_type = data.get('type')
-        
-        if message_type == 'offer':
-            # Forward WebRTC offer to specific peer
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'webrtc_offer',
-                    'offer': data['offer'],
-                    'from_user_id': self.user.id,
-                    'from_username': self.user.username,
-                    'to_user_id': data.get('to_user_id')
-                }
-            )
-        
-        elif message_type == 'answer':
-            # Forward WebRTC answer to specific peer
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'webrtc_answer',
-                    'answer': data['answer'],
-                    'from_user_id': self.user.id,
-                    'from_username': self.user.username,
-                    'to_user_id': data.get('to_user_id')
-                }
-            )
-        
-        elif message_type == 'ice_candidate':
-            # Forward ICE candidate to specific peer
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'ice_candidate',
-                    'candidate': data['candidate'],
-                    'from_user_id': self.user.id,
-                    'to_user_id': data.get('to_user_id')
-                }
-            )
-        
-        elif message_type == 'chat':
-            # Save to database
-            await self.save_chat_message(data['message'])
+        try:
+            data = json.loads(text_data)
+            message_type = data.get('type')
             
-            # Broadcast chat message
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'chat_message',
-                    'message': data['message'],
-                    'username': self.user.username,
-                    'user_id': self.user.id,
-                    'timestamp': data.get('timestamp')
-                }
-            )
-        
-        elif message_type == 'screen_share_started':
-            # Broadcast screen share started
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'screen_share_started',
-                    'user_id': self.user.id,
-                    'username': self.user.username
-                }
-            )
-        
-        elif message_type == 'screen_share_stopped':
-            # Broadcast screen share stopped
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'screen_share_stopped',
-                    'user_id': self.user.id,
-                    'username': self.user.username
-                }
-            )
+            # Debug logging
+            try:
+                with open('ws_debug.log', 'a') as f:
+                    f.write(f"RECV: {self.user.id} ({self.user.username}) - {message_type} to {data.get('to_user_id')}\n")
+            except: pass
+
+            if message_type == 'offer':
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'webrtc_offer',
+                        'offer': data['offer'],
+                        'from_user_id': self.user.id,
+                        'from_username': self.user.username,
+                        'to_user_id': data.get('to_user_id')
+                    }
+                )
+            
+            elif message_type == 'answer':
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'webrtc_answer',
+                        'answer': data['answer'],
+                        'from_user_id': self.user.id,
+                        'from_username': self.user.username,
+                        'to_user_id': data.get('to_user_id')
+                    }
+                )
+            
+            elif message_type == 'ice_candidate':
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'ice_candidate',
+                        'candidate': data['candidate'],
+                        'from_user_id': self.user.id,
+                        'to_user_id': data.get('to_user_id')
+                    }
+                )
+            
+            elif message_type == 'chat':
+                if 'message' in data:
+                    await self.save_chat_message(data['message'])
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'chat_message',
+                            'message': data['message'],
+                            'username': self.user.username,
+                            'user_id': self.user.id,
+                            'timestamp': data.get('timestamp', timezone.now().isoformat())
+                        }
+                    )
+            
+            elif message_type == 'screen_share_started':
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'screen_share_started',
+                        'user_id': self.user.id,
+                        'username': self.user.username
+                    }
+                )
+            
+            elif message_type == 'screen_share_stopped':
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'screen_share_stopped',
+                        'user_id': self.user.id,
+                        'username': self.user.username
+                    }
+                )
+            
+            elif message_type == 'request_participants':
+                active_participants = await self.get_active_participants()
+                await self.send(text_data=json.dumps({
+                    'type': 'participant_list',
+                    'participants': active_participants
+                }))
+        except Exception as e:
+            print(f"Receive error: {e}")
     
     async def user_joined(self, event):
         await self.send(text_data=json.dumps({
             'type': 'user_joined',
             'user_id': event['user_id'],
-            'username': event['username']
+            'username': event['username'],
+            'is_host': event.get('is_host', False),
+            'is_admin': event.get('is_admin', False),
         }))
     
     async def user_left(self, event):
@@ -212,6 +289,10 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             'message': event.get('message', 'Meeting is now active')
         }))
     
+    @database_sync_to_async
+    def get_meeting(self):
+        return Meeting.objects.get(meeting_code=self.meeting_code)
+
     @database_sync_to_async
     def record_join(self):
         try:
