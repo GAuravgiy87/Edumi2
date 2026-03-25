@@ -94,8 +94,6 @@ Edumi is a real-time video conferencing platform designed for educational instit
 
 **Description**: The meeting room is where online classes take place. It features a grid view of all participants, a chat window for real-time communication, and controls for screen sharing, muting, and other meeting functions.
 
-**AI Prompt**: "A realistic and immersive virtual classroom environment. It should show a grid of video feeds from multiple students, with the teacher's video feed being the largest. Include a chat window on the side and a control bar at the bottom with icons for 'Mute', 'Share Screen', and 'End Call'. The overall atmosphere should be collaborative and engaging."
-
 ![Meeting Room](screenshots/meeting_room.png)
 
 ## 5. Technical Architecture
