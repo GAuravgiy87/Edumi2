@@ -20,6 +20,7 @@ django-two-factor-auth==1.15.5
 qrcode==7.4.2
 django-phonenumber-field==7.2.0
 phonenumbers==8.13.26
+python-dotenv
 
 # ── Attendance System ──────────────────────────────────────
 # face-recognition==1.3.0  # Requires CMake and C++ compiler on Windows
