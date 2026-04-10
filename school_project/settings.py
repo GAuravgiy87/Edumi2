@@ -250,3 +250,29 @@ FACE_ENCRYPTION_KEY = os.environ.get('FACE_ENCRYPTION_KEY', '')
 FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.50'))
 # Cumulative verified seconds before attendance is recorded
 FACE_PRESENCE_DURATION = int(os.environ.get('FACE_PRESENCE_DURATION', '30'))
+
+# ─── GPU / CPU Optimization ──────────────────────────────────────────────────
+# Initialize GPU environment at startup (AMD dGPU + Intel iGPU + i7 12-core)
+try:
+    import sys as _sys
+    _sys.path.insert(0, str(BASE_DIR))
+    from scripts.gpu_setup import get_gpu_config as _get_gpu_config
+    GPU_CONFIG = _get_gpu_config()
+except Exception as _e:
+    GPU_CONFIG = {
+        'gpu_available': False,
+        'face_model': 'hog',
+        'opencl_available': False,
+        'threads': {
+            'face_recognition_workers': 4,
+            'camera_stream_workers': 4,
+            'opencv_threads': 10,
+            'celery_workers': 6,
+        }
+    }
+
+# Celery: use physical core count for CPU-bound tasks
+CELERY_WORKER_CONCURRENCY = GPU_CONFIG['threads'].get('celery_workers', 6)
+
+# ─── Recording Storage ───────────────────────────────────────────────────────
+RECORDINGS_DIR = BASE_DIR / 'media' / 'recordings'

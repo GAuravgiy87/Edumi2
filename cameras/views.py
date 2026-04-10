@@ -336,16 +336,26 @@ class CameraStreamer:
                     if ret and frame is not None:
                         # PROCESS TRACKING on the live feed
                         try:
-                            # Use the already imported head_count_manager from line 15
                             head_count, detections, annotated, avg_conf, tracked_persons = \
                                 head_count_manager.detector.detect_heads(frame)
                             frame = annotated
                         except Exception as e:
                             logger.error(f"Tracking error in streamer: {e}")
-                        
-                        # Encode to JPEG
-                        ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        
+
+                        # GPU-accelerated JPEG encode via OpenCL if available
+                        try:
+                            import cv2 as _cv2
+                            if _cv2.ocl.useOpenCL():
+                                umat = _cv2.UMat(frame)
+                                ret, jpeg = _cv2.imencode('.jpg', umat,
+                                    [_cv2.IMWRITE_JPEG_QUALITY, 75])
+                            else:
+                                ret, jpeg = _cv2.imencode('.jpg', frame,
+                                    [_cv2.IMWRITE_JPEG_QUALITY, 75])
+                        except Exception:
+                            ret, jpeg = cv2.imencode('.jpg', frame,
+                                [cv2.IMWRITE_JPEG_QUALITY, 75])
+
                         if ret:
                             with self.lock:
                                 self.frame = jpeg.tobytes()

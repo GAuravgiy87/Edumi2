@@ -1,16 +1,19 @@
 """
-Face recognition service — high-accuracy, anti-spoofing.
+Face recognition service — high-accuracy, anti-spoofing, GPU-accelerated.
 
   - Uses 'large' face landmark model (68 points) for better encoding accuracy
   - Anti-spoofing motion liveness: only applied during live WebSocket frames,
     NOT during registration (which is intentionally a static photo/upload)
   - Strict distance threshold with per-classroom override
+  - OpenCL/GPU acceleration via OpenCV when AMD GPU is available
+  - CNN face detection model when dlib CUDA is available
 """
 import io
 import hashlib
 import json
 import logging
 from typing import Optional
+import concurrent.futures
 
 from .encryption_service import FaceEncryptionService
 
@@ -22,6 +25,24 @@ MIN_QUALITY_SCORE = 0.08
 MIN_LIVENESS_VARIANCE = 6.0
 # Minimum motion diff between two consecutive live frames
 MIN_MOTION_DIFF = 1.5
+
+# ── GPU config (loaded once) ──────────────────────────────────────────────────
+def _load_gpu_config():
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from scripts.gpu_setup import get_gpu_config
+        return get_gpu_config()
+    except Exception:
+        return {'face_model': 'hog', 'opencl_available': False, 'threads': {'face_recognition_workers': 4}}
+
+_GPU_CONFIG = None
+
+def _get_gpu_config():
+    global _GPU_CONFIG
+    if _GPU_CONFIG is None:
+        _GPU_CONFIG = _load_gpu_config()
+    return _GPU_CONFIG
 
 
 class FaceService:
@@ -38,21 +59,23 @@ class FaceService:
         """
         Extract a 128-d face embedding.
         Returns: {status, embedding, quality, message}
+        Uses CNN model when GPU/dlib-CUDA is available, HOG otherwise.
         """
         try:
             import face_recognition
             import numpy as np
             from PIL import Image
 
+            cfg = _get_gpu_config()
+            face_model = cfg.get('face_model', 'hog')
+
             pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
             np_img  = np.array(pil_img)
 
-            # ── Low-light enhancement ─────────────────────
+            # ── Low-light enhancement (GPU-accelerated via OpenCL) ────────
             np_img = self._enhance_low_light(np_img)
 
             # ── Liveness variance check (live frames only) ──
-            # Printed photos / screen-grabs have very low pixel variance.
-            # Skip this for registration uploads — they are intentionally static.
             if live:
                 gray_var = float(np.std(np.mean(np_img, axis=2)))
                 if gray_var < MIN_LIVENESS_VARIANCE:
@@ -60,8 +83,8 @@ class FaceService:
                                    'Image appears to be a static photo or screen. '
                                    'Please use a live camera feed.')
 
-            # ── Face detection (HOG — fast, good for webcams) ──
-            face_locations = face_recognition.face_locations(np_img, model='hog')
+            # ── Face detection: CNN (GPU) or HOG (CPU) ────────────────────
+            face_locations = face_recognition.face_locations(np_img, model=face_model)
 
             if not face_locations:
                 return _result('no_face', None, 0.0, 'No face detected.')
@@ -81,8 +104,10 @@ class FaceService:
                                'Face too small — move closer to the camera.')
 
             # ── Encode with 'large' model (68 landmarks, more accurate) ──
+            # num_jitters=1 on GPU (fast enough), 2 on CPU
+            jitters = 1 if face_model == 'cnn' else 2
             encodings = face_recognition.face_encodings(
-                np_img, face_locations, num_jitters=2, model='large'
+                np_img, face_locations, num_jitters=jitters, model='large'
             )
             if not encodings:
                 return _result('no_face', None, 0.0, 'Could not encode face landmarks.')
@@ -201,30 +226,36 @@ class FaceService:
 
     def _enhance_low_light(self, np_img):
         """
-        Applies CLAHE (Contrast Limited Adaptive Histogram Equalization)
-        if the image is determined to be too dark.
+        Applies CLAHE via OpenCV with OpenCL (GPU) acceleration when available.
+        Falls back to CPU if OpenCL is not available.
         """
         try:
             import cv2
             import numpy as np
 
-            # Calculate brightness
             avg_brightness = np.mean(np_img)
-            if avg_brightness > 65:  # Sufficiently bright
+            if avg_brightness > 65:
                 return np_img
 
-            # Convert to LAB color space
-            lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
-            l, a, b = cv2.split(lab)
+            # Use OpenCL UMat for GPU-accelerated processing if available
+            use_opencl = cv2.ocl.useOpenCL()
 
-            # Apply CLAHE to L-channel
-            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-            cl = clahe.apply(l)
-
-            # Merge and convert back to RGB
-            limg = cv2.merge((cl, a, b))
-            enhanced = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
-            return enhanced
+            if use_opencl:
+                # Upload to GPU memory
+                lab = cv2.cvtColor(cv2.UMat(np_img), cv2.COLOR_RGB2LAB)
+                l, a, b = cv2.split(lab)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                cl = clahe.apply(l)
+                limg = cv2.merge((cl, a, b))
+                enhanced = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
+                return enhanced.get()  # Download from GPU
+            else:
+                lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
+                l, a, b = cv2.split(lab)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                cl = clahe.apply(l)
+                limg = cv2.merge((cl, a, b))
+                return cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
         except Exception as e:
             logger.warning(f"Low-light enhancement failed: {e}")
             return np_img

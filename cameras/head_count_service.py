@@ -1,7 +1,7 @@
 """
-Head Counting Service using OpenCV
-Detects and counts heads in video frames with green bounding boxes
-Includes movement tracking for detected persons
+Head Counting Service using OpenCV with GPU/OpenCL acceleration.
+Detects and counts heads in video frames with green bounding boxes.
+Uses AMD GPU via OpenCL when available, falls back to optimized CPU.
 """
 import cv2
 import numpy as np
@@ -14,14 +14,23 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.conf import settings
 from collections import defaultdict, deque
+import concurrent.futures
 
-# Force OpenCV to use TCP transport for RTSP to prevent "bad cseq" and packet loss
+# Force TCP transport for RTSP
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 
 logger = logging.getLogger('cameras')
 
+# Enable OpenCL (AMD GPU) for OpenCV
+cv2.ocl.setUseOpenCL(True)
+_OPENCL_AVAILABLE = cv2.ocl.useOpenCL()
+if _OPENCL_AVAILABLE:
+    logger.info(f"[HeadCount] OpenCL enabled: {cv2.ocl.Device.getDefault().name()}")
+else:
+    logger.info("[HeadCount] OpenCL not available — using CPU")
 
-# Tracking logic removed to focus exclusively on accurate headcount and performance
+# Use all available cores for OpenCV
+cv2.setNumThreads(max(1, os.cpu_count() - 2))
 
 
 class HeadDetector:
@@ -54,11 +63,11 @@ class HeadDetector:
         self.stable_head_count = 0
 
     def detect_heads(self, frame, track_movement=False):
-        """Main entry point for detection. Optimized for headcount accuracy."""
+        """Main entry point for detection. GPU-accelerated via OpenCL when available."""
         if frame is None: return 0, [], None, 0.0, {}
-        
+
         orig_h, orig_w = frame.shape[:2]
-        
+
         # Resize for performance
         max_p_w = 400
         scale = 1.0
@@ -66,60 +75,72 @@ class HeadDetector:
             scale = max_p_w / orig_w
             p_frame = cv2.resize(frame, (max_p_w, int(orig_h * scale)))
         else:
-            p_frame = frame
-            
+            p_frame = frame.copy()
+
         inv_scale = 1.0 / scale
         annotated_raw = frame.copy()
 
         with self.tracking_lock:
             self.frame_counter += 1
-            # SKIP LOGIC: Run heavy models every 5 frames
             should_run_heavy = (self.frame_counter % 5 == 0)
-            
-            if not should_run_heavy and hasattr(self, 'last_full_detections') and self.last_full_detections:
-                return self._finalize(self.stable_head_count, self.last_full_detections, 
-                                     annotated_raw, inv_scale)
 
-        # START DETECTION
+            if not should_run_heavy and self.last_full_detections:
+                return self._finalize(self.stable_head_count, self.last_full_detections,
+                                      annotated_raw, inv_scale)
+
+        # ── GPU-accelerated grayscale conversion ──────────────────────────
+        if _OPENCL_AVAILABLE:
+            umat_frame = cv2.UMat(p_frame)
+            gray_umat  = cv2.cvtColor(umat_frame, cv2.COLOR_BGR2GRAY)
+            gray       = gray_umat.get()
+        else:
+            gray = cv2.cvtColor(p_frame, cv2.COLOR_BGR2GRAY)
+
         all_detections = []
-        gray = cv2.cvtColor(p_frame, cv2.COLOR_BGR2GRAY)
-        
-        # 1. HOG
+
+        # 1. HOG (CPU — no OpenCL support in HOG)
         try:
-            boxes, weights = self.hog.detectMultiScale(p_frame, winStride=(8,8), padding=(8,8), scale=1.05)
+            boxes, weights = self.hog.detectMultiScale(p_frame, winStride=(8, 8), padding=(8, 8), scale=1.05)
             for (x, y, w, h), weight in zip(boxes, weights):
                 if weight > self.confidence_threshold:
                     all_detections.append({'bbox': (x, y, w, h), 'confidence': float(weight), 'type': 'hog_person'})
-        except Exception: pass
-        
-        # 2. Haar Face (Frontal and Profile)
+        except Exception:
+            pass
+
+        # 2. Haar Face (OpenCL-accelerated when available)
         try:
-            faces = self.face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(20, 20))
-            for box in faces:
+            gray_src = gray_umat if _OPENCL_AVAILABLE else gray
+            faces = self.face_cascade.detectMultiScale(gray_src, 1.1, 3, minSize=(20, 20))
+            if _OPENCL_AVAILABLE and hasattr(faces, 'get'):
+                faces = faces.get() if len(faces) > 0 else []
+            for box in (faces if len(faces) > 0 else []):
                 if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
                     all_detections.append({'bbox': tuple(box), 'confidence': 0.7, 'type': 'haar_face'})
-            
-            profiles = self.profile_face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(20, 20))
-            for box in profiles:
+
+            profiles = self.profile_face_cascade.detectMultiScale(gray_src, 1.1, 3, minSize=(20, 20))
+            if _OPENCL_AVAILABLE and hasattr(profiles, 'get'):
+                profiles = profiles.get() if len(profiles) > 0 else []
+            for box in (profiles if len(profiles) > 0 else []):
                 if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
                     all_detections.append({'bbox': tuple(box), 'confidence': 0.65, 'type': 'profile_face'})
-        except Exception: pass
-        
+        except Exception:
+            pass
+
         # 3. Upper Body
         try:
             bodies = self.upper_body_cascade.detectMultiScale(gray, 1.1, 3, minSize=(30, 30))
-            for box in bodies:
+            for box in (bodies if len(bodies) > 0 else []):
                 if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
                     all_detections.append({'bbox': tuple(box), 'confidence': 0.6, 'type': 'upper_body'})
-        except Exception: pass
+        except Exception:
+            pass
 
         with self.tracking_lock:
-            # Stabilize and Cache
             current_count = len(all_detections)
             self.head_count_history.append(current_count)
             self.stable_head_count = int(np.median(list(self.head_count_history))) if self.head_count_history else current_count
             self.last_full_detections = all_detections
-            
+
             return self._finalize(self.stable_head_count, all_detections, annotated_raw, inv_scale)
 
     def _finalize(self, count, detections, frame, inv_scale):

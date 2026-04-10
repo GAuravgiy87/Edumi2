@@ -111,30 +111,47 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
             # All student frames in one message: {student_id: frame_b64, ...}
             frames = data.get('frames', {})
             results = {}
+
+            # Decode all frames first
+            decoded = {}
             for sid, frame_b64 in frames.items():
                 if not frame_b64:
                     continue
                 try:
-                    frame_bytes = base64.b64decode(frame_b64)
+                    decoded[sid] = base64.b64decode(frame_b64)
                 except Exception:
                     continue
-                res = await database_sync_to_async(self._process_frame)(frame_bytes, sid)
-                results[sid] = res
-                if res.get('matched_user_id'):
-                    self._frame_count[res['matched_user_id']] += 1
-                    if self._frame_count[res['matched_user_id']] % SNAPSHOT_SAVE_INTERVAL == 0:
-                        await self._save_snapshot(
-                            res['matched_user_id'],
-                            res.get('emotion', 'unknown'),
-                            res.get('confidence', 0.0),
-                            res.get('face_visible', True),
-                        )
-                        # Also write to physical log
-                        await self._write_to_meeting_log(
-                            res['matched_user_id'],
-                            res.get('matched_name', 'Unknown'),
-                            res.get('emotion', 'unknown')
-                        )
+
+            # Process frames in parallel using thread pool (i7 12-core)
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=min(len(decoded), 6)) as pool:
+                future_map = {
+                    pool.submit(self._process_frame, fb, sid): sid
+                    for sid, fb in decoded.items()
+                }
+                for future in future_map:
+                    sid = future_map[future]
+                    try:
+                        res = future.result(timeout=3.0)
+                    except Exception:
+                        res = {'face_visible': False, 'faces': [], 'emotion': 'unknown',
+                               'emotion_label': '❓', 'matched_user_id': None,
+                               'matched_name': 'Unknown', 'confidence': 0.0}
+                    results[sid] = res
+                    if res.get('matched_user_id'):
+                        self._frame_count[res['matched_user_id']] += 1
+                        if self._frame_count[res['matched_user_id']] % SNAPSHOT_SAVE_INTERVAL == 0:
+                            await self._save_snapshot(
+                                res['matched_user_id'],
+                                res.get('emotion', 'unknown'),
+                                res.get('confidence', 0.0),
+                                res.get('face_visible', True),
+                            )
+                            await self._write_to_meeting_log(
+                                res['matched_user_id'],
+                                res.get('matched_name', 'Unknown'),
+                                res.get('emotion', 'unknown')
+                            )
 
             await self.send(json.dumps({
                 'type':    'bulk_tracking_result',
@@ -157,17 +174,26 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
             pil_img = Image.open(io.BytesIO(frame_bytes)).convert('RGB')
             np_img  = np.array(pil_img)
             
-            # ── Low-light enhancement ─────────────────────
+            # ── Low-light enhancement (OpenCL/GPU accelerated) ───────────
             try:
                 avg_brightness = np.mean(np_img)
                 if avg_brightness < 65:
                     import cv2
-                    lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
-                    l, a, b = cv2.split(lab)
-                    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-                    cl = clahe.apply(l)
-                    limg = cv2.merge((cl, a, b))
-                    np_img = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
+                    if cv2.ocl.useOpenCL():
+                        umat = cv2.UMat(np_img)
+                        lab  = cv2.cvtColor(umat, cv2.COLOR_RGB2LAB)
+                        l, a, b = cv2.split(lab)
+                        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                        cl = clahe.apply(l)
+                        limg = cv2.merge((cl, a, b))
+                        np_img = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB).get()
+                    else:
+                        lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
+                        l, a, b = cv2.split(lab)
+                        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                        cl = clahe.apply(l)
+                        limg = cv2.merge((cl, a, b))
+                        np_img = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
             except Exception as e:
                 logger.warning(f"Low-light enhancement inline failed: {e}")
 
