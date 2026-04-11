@@ -1,39 +1,28 @@
-# =============================================================================
-#  EduMi — requirements.txt
-#  Target: Linux (Docker or bare metal), 4 CPU cores + AMD GPU
-#  Install: pip install -r requirements.txt
-# =============================================================================
+# EduMi — Python dependencies
+# Python 3.10+ required. Install: pip install -r requirements.txt
 
-# ── Django core ───────────────────────────────────────────────────────────────
+# ── Django ────────────────────────────────────────────────────────────────────
 Django==4.2.9
 daphne==4.0.0
 channels==4.0.0
 channels-redis==4.1.0
+django-compressor==4.4
+django-extensions==3.2.3
+django-browser-reload==1.21.0
 
-# ── Database / Cache ──────────────────────────────────────────────────────────
+# ── Celery + Redis ────────────────────────────────────────────────────────────
+celery==5.3.6
 redis==5.0.1
 django-redis==5.4.0
 
-# ── Celery (background tasks) ─────────────────────────────────────────────────
-celery==5.3.6
-
-# ── Static files compression ──────────────────────────────────────────────────
-django-compressor==4.4
-
-# ── Django utilities ──────────────────────────────────────────────────────────
-django-extensions==3.2.3        # runserver_plus, shell_plus, etc.
-django-browser-reload==1.21.0   # dev hot-reload (harmless in prod)
-django-phonenumber-field==7.2.0
-phonenumbers==8.13.26
+# ── Computer vision ───────────────────────────────────────────────────────────
+opencv-python==4.8.1.78
+numpy>=1.26.0
+face_recognition>=1.3.0     # compiles dlib — needs cmake + build-essential
+# dlib installs automatically as a face_recognition dependency
 
 # ── Image handling ────────────────────────────────────────────────────────────
 Pillow==10.2.0
-
-# ── Computer vision (face recognition + camera streams) ───────────────────────
-opencv-python==4.8.1.78
-numpy>=1.26.0
-face_recognition>=1.3.0         # Requires cmake + C++ build tools (see Dockerfile)
-# dlib is installed as a dependency of face_recognition — no need to pin separately
 
 # ── Encryption (face vector storage) ─────────────────────────────────────────
 cryptography>=42.0.0
@@ -44,12 +33,11 @@ openpyxl>=3.1.2
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 requests==2.31.0
 
-# ── Environment variables ─────────────────────────────────────────────────────
+# ── Env vars ──────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0
 
-# ── GPU / CPU performance ─────────────────────────────────────────────────────
-psutil>=5.9.0                   # CPU affinity + core count detection
+# ── GPU / CPU monitoring ──────────────────────────────────────────────────────
+psutil>=5.9.0
 
-# Optional — install manually if AMD OpenCL runtime is present on the host:
-# pyopencl>=2023.1              # AMD GPU OpenCL detection (Linux: needs ocl-icd)
-# rocm-torch or torch-rocm      # PyTorch ROCm for AMD GPU (install via pip separately)
+# ── Optional: AMD GPU OpenCL (install manually if ROCm is present on host) ───
+# pyopencl>=2023.1
