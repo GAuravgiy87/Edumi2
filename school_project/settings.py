@@ -276,3 +276,30 @@ CELERY_WORKER_CONCURRENCY = GPU_CONFIG['threads'].get('celery_workers', 6)
 
 # ─── Recording Storage ───────────────────────────────────────────────────────
 RECORDINGS_DIR = BASE_DIR / 'media' / 'recordings'
+
+# ─── Storage Optimization ────────────────────────────────────────────────────
+# Max age for recordings before auto-delete (days)
+RECORDING_RETENTION_DAYS = int(os.environ.get('RECORDING_RETENTION_DAYS', '30'))
+# Max age for head count snapshots (days)
+HEADCOUNT_SNAPSHOT_RETENTION_DAYS = int(os.environ.get('HEADCOUNT_SNAPSHOT_RETENTION_DAYS', '7'))
+
+# ─── Celery Beat — Scheduled Cleanup Tasks ───────────────────────────────────
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # Delete engagement snapshots + CSV logs older than 24h — runs at 2am daily
+    'cleanup-engagement-data': {
+        'task': 'attendance.tasks.cleanup_engagement_data',
+        'schedule': crontab(hour=2, minute=0),
+    },
+    # Delete recordings older than RECORDING_RETENTION_DAYS — runs at 3am daily
+    'cleanup-old-recordings': {
+        'task': 'attendance.tasks.cleanup_old_recordings',
+        'schedule': crontab(hour=3, minute=0),
+    },
+    # Delete head count snapshots older than 7 days — runs at 3am daily
+    'cleanup-headcount-snapshots': {
+        'task': 'attendance.tasks.cleanup_headcount_snapshots',
+        'schedule': crontab(hour=3, minute=30),
+    },
+}
