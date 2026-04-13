@@ -1,15 +1,14 @@
-﻿version: '3.8'
 
 # =============================================================================
-#  EduMi â€” Docker Compose (separate container per service for performance)
+#  EduMi — Docker Compose (separate container per service for performance)
 #
 #  Services:
-#    redis      â€” Channel layer + Celery broker  (dedicated instance)
-#    db         â€” SQLite via volume (swap for postgres easily)
-#    web        â€” Daphne ASGI server             (dedicated instance)
-#    celery     â€” Background task worker         (dedicated instance, 6 workers)
-#    celery_beatâ€” Scheduled tasks                (dedicated instance)
-#    nginx      â€” Reverse proxy + static files   (dedicated instance)
+#    redis      — Channel layer + Celery broker  (dedicated instance)
+#    db         — SQLite via volume (swap for postgres easily)
+#    web        — Daphne ASGI server             (dedicated instance)
+#    celery     — Background task worker         (dedicated instance, 6 workers)
+#    celery_beat— Scheduled tasks                (dedicated instance)
+#    nginx      — Reverse proxy + static files   (dedicated instance)
 # =============================================================================
 
 x-app-env: &app-env
@@ -21,7 +20,7 @@ x-app-env: &app-env
   FACE_ENCRYPTION_KEY: ${FACE_ENCRYPTION_KEY:-}
   FACE_MATCH_THRESHOLD: ${FACE_MATCH_THRESHOLD:-0.50}
   FACE_PRESENCE_DURATION: ${FACE_PRESENCE_DURATION:-30}
-  # OpenCV performance — capped to 4 shared cores
+  # OpenCV performance � capped to 4 shared cores
   OMP_NUM_THREADS: "2"
   OPENBLAS_NUM_THREADS: "2"
   MKL_NUM_THREADS: "2"
@@ -45,7 +44,7 @@ x-app-base: &app-base
 
 services:
 
-  # â”€â”€ Redis: dedicated broker + channel layer instance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # ── Redis: dedicated broker + channel layer instance ─────────────────────
   redis:
     image: redis:7-alpine
     container_name: edumi_redis
@@ -72,7 +71,7 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  # â”€â”€ Web: Daphne ASGI â€” dedicated instance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # ── Web: Daphne ASGI — dedicated instance ────────────────────────────────
   web:
     <<: *app-base
     container_name: edumi_web
@@ -90,7 +89,8 @@ services:
       - static_data:/app/staticfiles
       - db_data:/app/db
       - logs_data:/app/logs
-    # AMD GPU device passthrough (works on Linux with ROCm driver)
+    # AMD GPU device passthrough — only works if /dev/dri exists on the host.
+    # If GPU is not available, comment out the devices + group_add lines.
     devices:
       - /dev/dri:/dev/dri
     group_add:
@@ -101,13 +101,13 @@ services:
           cpus: "2.0"
           memory: 2G
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # â”€â”€ Celery worker: dedicated instance, 6 concurrent workers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # ── Celery worker: dedicated instance, 6 concurrent workers ──────────────
   celery:
     <<: *app-base
     container_name: edumi_celery
@@ -133,7 +133,7 @@ services:
       retries: 3
       start_period: 15s
 
-  # â”€â”€ Celery beat: scheduled tasks â€” dedicated lightweight instance â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # ── Celery beat: scheduled tasks — dedicated lightweight instance ─────────
   celery_beat:
     <<: *app-base
     container_name: edumi_celery_beat
@@ -150,7 +150,7 @@ services:
           cpus: "0.2"
           memory: 256M
 
-  # â”€â”€ Nginx: reverse proxy + static/media serving â€” dedicated instance â”€â”€â”€â”€â”€
+  # ── Nginx: reverse proxy + static/media serving — dedicated instance ─────
   nginx:
     image: nginx:1.25-alpine
     container_name: edumi_nginx

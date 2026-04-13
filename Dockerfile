@@ -52,12 +52,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Runtime-only system libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
+# Runtime-only system libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 libxext6 libxrender1 \
     libopenblas-base \
     ffmpeg \
-    # OpenCL runtime for AMD GPU passthrough
+    curl \
     ocl-icd-libopencl1 \
     && rm -rf /var/lib/apt/lists/*
 

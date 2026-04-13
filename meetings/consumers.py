@@ -1,9 +1,8 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import Meeting, MeetingParticipant, MeetingAttendanceLog, MeetingChat
+
 
 class MeetingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -54,6 +53,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_meta(self):
+        from .models import Meeting, MeetingParticipant, MeetingAttendanceLog
         meeting = Meeting.objects.get(meeting_code=self.meeting_code)
         # Record join while we are here
         participant, _ = MeetingParticipant.objects.get_or_create(
@@ -78,6 +78,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_active_participants(self):
+        from .models import Meeting, MeetingParticipant
         try:
             meeting = Meeting.objects.get(meeting_code=self.meeting_code)
             # Find all users who are marked active in this meeting, excluding self
@@ -291,10 +292,12 @@ class MeetingConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def get_meeting(self):
+        from .models import Meeting
         return Meeting.objects.get(meeting_code=self.meeting_code)
 
     @database_sync_to_async
     def record_join(self):
+        from .models import Meeting, MeetingParticipant, MeetingAttendanceLog
         try:
             meeting = Meeting.objects.get(meeting_code=self.meeting_code)
             participant, created = MeetingParticipant.objects.get_or_create(
@@ -314,6 +317,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def record_leave(self):
+        from .models import Meeting, MeetingParticipant, MeetingAttendanceLog
         try:
             meeting = Meeting.objects.get(meeting_code=self.meeting_code)
             participant = MeetingParticipant.objects.get(
@@ -340,6 +344,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             print(f"Error recording leave: {e}")
     @database_sync_to_async
     def save_chat_message(self, message):
+        from .models import Meeting, MeetingChat
         try:
             meeting = Meeting.objects.get(meeting_code=self.meeting_code)
             MeetingChat.objects.create(
