@@ -252,27 +252,20 @@ FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.50'))
 FACE_PRESENCE_DURATION = int(os.environ.get('FACE_PRESENCE_DURATION', '30'))
 
 # ─── GPU / CPU Optimization ──────────────────────────────────────────────────
-# Initialize GPU environment at startup (AMD dGPU + Intel iGPU + i7 12-core)
-try:
-    import sys as _sys
-    _sys.path.insert(0, str(BASE_DIR))
-    from scripts.gpu_setup import get_gpu_config as _get_gpu_config
-    GPU_CONFIG = _get_gpu_config()
-except Exception as _e:
-    GPU_CONFIG = {
-        'gpu_available': False,
-        'face_model': 'hog',
-        'opencl_available': False,
-        'threads': {
-            'face_recognition_workers': 4,
-            'camera_stream_workers': 4,
-            'opencv_threads': 10,
-            'celery_workers': 6,
-        }
+# GPU setup runs in attendance/apps.py ready() — AFTER Django app registry loads.
+# These are the safe defaults used until then.
+GPU_CONFIG = {
+    'gpu_available': False,
+    'face_model': 'hog',
+    'opencl_available': False,
+    'threads': {
+        'face_recognition_workers': 2,
+        'camera_stream_workers': 2,
+        'opencv_threads': 3,
+        'celery_workers': 2,
+        'django_workers': 4,
     }
-
-# Celery: use physical core count for CPU-bound tasks
-CELERY_WORKER_CONCURRENCY = GPU_CONFIG['threads'].get('celery_workers', 6)
+}
 
 # ─── Recording Storage ───────────────────────────────────────────────────────
 RECORDINGS_DIR = BASE_DIR / 'media' / 'recordings'
@@ -284,22 +277,17 @@ RECORDING_RETENTION_DAYS = int(os.environ.get('RECORDING_RETENTION_DAYS', '30'))
 HEADCOUNT_SNAPSHOT_RETENTION_DAYS = int(os.environ.get('HEADCOUNT_SNAPSHOT_RETENTION_DAYS', '7'))
 
 # ─── Celery Beat — Scheduled Cleanup Tasks ───────────────────────────────────
-from celery.schedules import crontab
-
 CELERY_BEAT_SCHEDULE = {
-    # Delete engagement snapshots + CSV logs older than 24h — runs at 2am daily
     'cleanup-engagement-data': {
         'task': 'attendance.tasks.cleanup_engagement_data',
-        'schedule': crontab(hour=2, minute=0),
+        'schedule': 86400,   # every 24h in seconds
     },
-    # Delete recordings older than RECORDING_RETENTION_DAYS — runs at 3am daily
     'cleanup-old-recordings': {
         'task': 'attendance.tasks.cleanup_old_recordings',
-        'schedule': crontab(hour=3, minute=0),
+        'schedule': 86400,
     },
-    # Delete head count snapshots older than 7 days — runs at 3am daily
     'cleanup-headcount-snapshots': {
         'task': 'attendance.tasks.cleanup_headcount_snapshots',
-        'schedule': crontab(hour=3, minute=30),
+        'schedule': 86400,
     },
 }
