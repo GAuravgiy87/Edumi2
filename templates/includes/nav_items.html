@@ -8,7 +8,6 @@
         {% if nav_type == 'topbar' %}
             <a href="{% url 'admin_panel' %}">Admin Panel</a>
             <a href="{% url 'user_management' %}">Users</a>
-            <a href="{% url 'admin_dashboard' %}">Cameras</a>
             <a href="{% url 'teacher_meetings' %}">Meetings</a>
             <a href="{% url 'inbox' %}">Inbox</a>
         {% else %}
@@ -29,17 +28,12 @@
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
                     <span class="sidebar-nav-text">Meetings</span>
                 </a>
-                <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
-                    <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
-                    <span class="sidebar-nav-text">Cameras</span>
-                </a>
             </div>
         {% endif %}
     {% elif user.userprofile.user_type == 'teacher' %}
         {% if nav_type == 'topbar' %}
             <a href="{% url 'teacher_dashboard' %}">Dashboard</a>
             <a href="{% url 'teacher_classrooms' %}">Classrooms</a>
-            <a href="{% url 'live_monitor' %}">Cameras</a>
             <a href="{% url 'teacher_meetings' %}">Meetings</a>
             <a href="{% url 'inbox' %}">Inbox</a>
         {% else %}
@@ -59,10 +53,6 @@
                 <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
                     <span class="sidebar-nav-text">Meetings</span>
-                </a>
-                <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
-                    <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
-                    <span class="sidebar-nav-text">Cameras</span>
                 </a>
             </div>
         {% endif %}

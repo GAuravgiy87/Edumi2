@@ -73,8 +73,6 @@ INSTALLED_APPS = [
     'channels',
     'accounts',
     'pages',
-    'cameras',  # RTSP Camera management
-    'mobile_cameras',  # Mobile Camera management (IP Webcam, DroidCam)
     'meetings',
     'attendance',  # Face Recognition Attendance System
     'django_browser_reload',
@@ -220,11 +218,6 @@ LOGGING = {
         },
     },
     'loggers': {
-        'cameras': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
@@ -273,8 +266,6 @@ RECORDINGS_DIR = BASE_DIR / 'media' / 'recordings'
 # ─── Storage Optimization ────────────────────────────────────────────────────
 # Max age for recordings before auto-delete (days)
 RECORDING_RETENTION_DAYS = int(os.environ.get('RECORDING_RETENTION_DAYS', '30'))
-# Max age for head count snapshots (days)
-HEADCOUNT_SNAPSHOT_RETENTION_DAYS = int(os.environ.get('HEADCOUNT_SNAPSHOT_RETENTION_DAYS', '7'))
 
 # ─── Celery Beat — Scheduled Cleanup Tasks ───────────────────────────────────
 CELERY_BEAT_SCHEDULE = {
@@ -284,10 +275,6 @@ CELERY_BEAT_SCHEDULE = {
     },
     'cleanup-old-recordings': {
         'task': 'attendance.tasks.cleanup_old_recordings',
-        'schedule': 86400,
-    },
-    'cleanup-headcount-snapshots': {
-        'task': 'attendance.tasks.cleanup_headcount_snapshots',
         'schedule': 86400,
     },
 }

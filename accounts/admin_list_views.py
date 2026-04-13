@@ -4,7 +4,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from .models import UserProfile
 from meetings.models import Meeting
-from cameras.models import Camera
 
 def check_admin(user):
     """Check if user is admin"""
@@ -73,17 +72,4 @@ def admin_live_meetings(request):
     return render(request, 'accounts/admin_live_meetings.html', {
         'meetings': meetings,
         'total_count': meetings.count()
-    })
-
-@login_required
-def admin_all_cameras(request):
-    """Show all cameras"""
-    if not check_admin(request.user):
-        return redirect('login')
-    
-    cameras = Camera.objects.all().order_by('-created_at')
-    
-    return render(request, 'accounts/admin_all_cameras.html', {
-        'cameras': cameras,
-        'total_count': cameras.count()
     })

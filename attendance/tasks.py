@@ -117,30 +117,3 @@ def cleanup_old_recordings():
     mb = removed_bytes / (1024 * 1024)
     logger.info(f"[Cleanup] Recordings: removed {removed_files} files ({mb:.1f} MB freed)")
 
-
-@shared_task
-def cleanup_headcount_snapshots():
-    """
-    Scheduled: delete head count snapshot images older than 7 days.
-    Runs daily via Celery beat.
-    """
-    import datetime
-    from cameras.models import HeadCountLog
-
-    cutoff = timezone.now() - datetime.timedelta(days=7)
-    old_logs = HeadCountLog.objects.filter(timestamp__lt=cutoff, snapshot__isnull=False)
-
-    removed = 0
-    for log in old_logs:
-        if log.snapshot:
-            try:
-                path = Path(log.snapshot.path)
-                if path.exists():
-                    path.unlink()
-                    removed += 1
-            except Exception:
-                pass
-            log.snapshot = None
-            log.save(update_fields=['snapshot'])
-
-    logger.info(f"[Cleanup] Removed {removed} head count snapshots")

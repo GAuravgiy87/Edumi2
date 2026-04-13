@@ -9,7 +9,6 @@ from django.views.decorators.http import require_POST
 from .forms import RegisterForm
 from .models import UserProfile
 from meetings.models import Meeting
-from cameras.models import Camera
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -213,7 +212,6 @@ def profile_view(request, username=None):
         stats['total_users'] = User.objects.count()
         stats['total_meetings'] = Meeting.objects.count()
         stats['live_meetings'] = Meeting.objects.filter(status='live').count()
-        stats['total_cameras'] = Camera.objects.count()
     elif profile and profile.user_type == 'teacher':
         stats['total_meetings'] = Meeting.objects.filter(teacher=profile_user, classroom__isnull=True).count()
         stats['live_meetings'] = Meeting.objects.filter(teacher=profile_user, status='live', classroom__isnull=True).count()
@@ -308,7 +306,6 @@ def admin_panel(request):
     for meeting in live_meetings:
         meeting.active_participants_count = meeting.participants.filter(is_active=True).count()
     
-    all_cameras = Camera.objects.all().order_by('-created_at')
     recent_users = User.objects.all().select_related('userprofile').order_by('-date_joined')[:10]
 
     context = {
@@ -317,8 +314,6 @@ def admin_panel(request):
         'total_teachers': stats['total_teachers'],
         'total_meetings': stats['total_meetings'],
         'live_meetings_count': stats['live_meetings_count'],
-        'total_cameras': stats['total_cameras'],
-        'camera_service_online': stats['camera_service_online'],
         
         # Detailed lists
         'all_users': all_users,
@@ -326,7 +321,6 @@ def admin_panel(request):
         'teachers': teachers,
         'all_meetings': all_meetings,
         'live_meetings': live_meetings,
-        'all_cameras': all_cameras,
         'recent_users': recent_users,
     }
     

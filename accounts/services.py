@@ -5,8 +5,6 @@ Contains business logic for profile management and dashboards.
 from django.contrib.auth.models import User
 from .models import UserProfile
 from meetings.models import Meeting
-from cameras.models import Camera
-
 def get_profile_completion(user):
     """Calculate profile completion percentage."""
     if not hasattr(user, 'userprofile'):
@@ -44,20 +42,10 @@ def get_student_stats(user):
 
 def get_admin_stats():
     """Get overall platform statistics for the admin panel."""
-    import requests
-    camera_service_online = False
-    try:
-        response = requests.get("http://127.0.0.1:8001/api/cameras/", timeout=1)
-        camera_service_online = (response.status_code == 200)
-    except:
-        camera_service_online = False
-
     return {
         'total_users': User.objects.count(),
         'total_students': UserProfile.objects.filter(user_type='student').count(),
         'total_teachers': UserProfile.objects.filter(user_type='teacher').count(),
         'total_meetings': Meeting.objects.filter(classroom__isnull=True).count(),
         'live_meetings_count': Meeting.objects.filter(status='live', classroom__isnull=True).count(),
-        'total_cameras': Camera.objects.count(),
-        'camera_service_online': camera_service_online,
     }

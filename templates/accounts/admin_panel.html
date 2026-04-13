@@ -23,13 +23,6 @@
             </div>
         </div>
         <div class="status-card">
-            <div class="status-indicator {% if camera_service_online %}online{% else %}offline{% endif %}"></div>
-            <div class="status-info">
-                <span class="status-label">Camera Microservice</span>
-                <span class="status-value">{% if camera_service_online %}Active (Port 8001){% else %}Disconnected{% endif %}</span>
-            </div>
-        </div>
-        <div class="status-card">
             <div class="status-indicator online"></div>
             <div class="status-info">
                 <span class="status-label">Database Status</span>
@@ -94,16 +87,6 @@
             <div class="stat-info">
                 <h3>Live Meetings</h3>
                 <p class="stat-number">{{ live_meetings_count }}</p>
-            </div>
-        </div>
-        
-        <div class="stat-card" onclick="toggleSection('cameras-section')" style="cursor: pointer; transition: transform 0.2s;">
-            <div class="stat-icon" style="background: #06b6d4;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
-            </div>
-            <div class="stat-info">
-                <h3>Cameras</h3>
-                <p class="stat-number">{{ total_cameras }}</p>
             </div>
         </div>
     </div>
@@ -342,46 +325,6 @@
         {% endif %}
     </div>
     
-    <!-- Cameras Section -->
-    <div id="cameras-section" class="detail-section" style="display: none;">
-        <div class="section-header">
-            <h2>📹 All Cameras ({{ total_cameras }})</h2>
-            <button onclick="toggleSection('cameras-section')" class="btn-close">✕ Close</button>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>IP Address</th>
-                        <th>Port</th>
-                        <th>Stream Path</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for camera in all_cameras %}
-                        <tr>
-                            <td style="font-weight: 600;">{{ camera.name }}</td>
-                            <td style="font-family: monospace;">{{ camera.ip_address }}</td>
-                            <td>{{ camera.port }}</td>
-                            <td style="font-family: monospace; font-size: 13px;">{{ camera.stream_path }}</td>
-                            <td>
-                                {% if camera.is_active %}
-                                    <span class="badge badge-active">● Active</span>
-                                {% else %}
-                                    <span class="badge badge-inactive">● Inactive</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ camera.created_at|date:"M d, Y" }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
     <!-- Quick Actions -->
     <div class="admin-section">
         <h2>Quick Actions</h2>
@@ -389,10 +332,6 @@
             <a href="{% url 'user_management' %}" class="action-btn" style="text-decoration: none;">
                 <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
                 <p>Manage Users</p>
-            </a>
-            <a href="{% url 'admin_dashboard' %}" class="action-btn" style="text-decoration: none;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
-                <p>Manage Cameras</p>
             </a>
             <a href="{% url 'teacher_meetings' %}" class="action-btn" style="text-decoration: none;">
                 <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></span>
