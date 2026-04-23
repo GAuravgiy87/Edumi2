@@ -5,7 +5,7 @@ const os = require('os');
 module.exports = {
     port:       parseInt(process.env.SFU_PORT || '3000', 10),
     secret:     process.env.SFU_SECRET || 'change-me-in-production',
-    numWorkers: parseInt(process.env.NUM_WORKERS || '') || Math.max(1, os.cpus().length),
+    numWorkers: parseInt(process.env.NUM_WORKERS || '') || 2,
 
     worker: {
         rtcMinPort: parseInt(process.env.RTC_MIN_PORT || '40000', 10),
