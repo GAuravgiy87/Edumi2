@@ -17,10 +17,8 @@
     {% block extra_css %}{% endblock %}
     {% endcompress %}
 
-    <!-- Hotwired Turbo for seamless navigation (no full page reloads) -->
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script type="module" src="https://cdn.skypack.dev/@hotwired/turbo"></script>
 </head>
 <body>
     {% if user.is_authenticated %}
@@ -297,7 +295,7 @@
                         badge.style.display = 'none';
                     }
                 })
-                .catch(error => console.error('Error fetching notification count:', error));
+                .catch(() => {}); // silently ignore if server unreachable
         }
 
         // Update notification count on page load
@@ -340,9 +338,6 @@
     {% endif %}
     <script>
         lucide.createIcons();
-        document.addEventListener('turbo:load', () => {
-            lucide.createIcons();
-        });
     </script>
 </body>
 </html>

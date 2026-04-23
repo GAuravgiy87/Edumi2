@@ -15,10 +15,8 @@
     <link rel="stylesheet" href="{% static 'css/modern-design.css' %}?v={{ timestamp }}">
     <link rel="stylesheet" href="{% static 'css/auth.css' %}?v={{ timestamp }}">
     <link rel="stylesheet" href="{% static 'css/main.css' %}?v={{ timestamp }}">
-    <!-- Hotwired Turbo for seamless navigation (no full page reloads) -->
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script type="module" src="https://cdn.skypack.dev/@hotwired/turbo"></script>
     {% block extra_css %}{% endblock %}
 </head>
 
@@ -131,9 +129,6 @@
     {% block extra_js %}{% endblock %}
     <script>
         lucide.createIcons();
-        document.addEventListener('turbo:load', () => {
-            lucide.createIcons();
-        });
     </script>
 </body>
 
