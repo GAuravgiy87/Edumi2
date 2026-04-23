@@ -14,9 +14,7 @@ staticfiles/
 media/
 
 # ── Environment ───────────────────────────────────────────────────────────────
-.env
-.env.*
-!.env.example
+# .env is committed — repo is private
 
 # ── Virtual environments ──────────────────────────────────────────────────────
 venv/
@@ -26,14 +24,13 @@ ENV/
 
 # ── Node.js (SFU) ─────────────────────────────────────────────────────────────
 sfu/node_modules/
-sfu/package-lock.json
+# package-lock.json is committed — ensures reproducible npm install on the VM
 
 # ── Logs & runtime ────────────────────────────────────────────────────────────
 logs/
 *.log
 .pids/
 ws_debug.log
-staticfiles/
 
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
