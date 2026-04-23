@@ -1,55 +1,39 @@
-# ── Python ────────────────────────────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
-*$py.class
 *.egg-info/
 dist/
 build/
 
-# ── Django ────────────────────────────────────────────────────────────────────
+# Django
 db.sqlite3
 db.sqlite3-journal
 staticfiles/
 media/
 
-# ── Environment ───────────────────────────────────────────────────────────────
-# .env is committed — repo is private
-
-# ── Virtual environments ──────────────────────────────────────────────────────
+# Virtual environment
 venv/
 env/
 .venv/
 ENV/
 
-# ── Node.js (SFU) ─────────────────────────────────────────────────────────────
-sfu/node_modules/
-# package-lock.json is committed — ensures reproducible npm install on the VM
-
-# ── Logs & runtime ────────────────────────────────────────────────────────────
+# Logs & runtime
 logs/
 *.log
 .pids/
 ws_debug.log
 
-# ── OS ────────────────────────────────────────────────────────────────────────
+# Node.js (SFU)
+sfu/node_modules/
+sfu/_build_tmp/
+
+# OS
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 
-# ── IDE ───────────────────────────────────────────────────────────────────────
+# IDE
 .vscode/
 .idea/
-*.iml
-
-# ── Test / scratch ────────────────────────────────────────────────────────────
-_archive/
-test_captures/
-test_capture*.jpg
-generate_excel.py
-reproduce_face_fix.py
-verify_face_detect.py
-migrate_error.txt
-migrations_status.txt
-~$*

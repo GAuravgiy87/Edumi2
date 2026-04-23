@@ -1,4 +1,4 @@
-/**
+﻿/**
  * EduMi SFU Client — mediasoup-client + Socket.IO
  * Optimised for full HD video, stereo audio, low latency.
  */
@@ -42,20 +42,20 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
 // Three layers: thumbnail → HD → Full HD
 // SFU picks the right layer per receiver based on bandwidth.
 const VIDEO_ENCODINGS = [
-    { rid: 'r0', maxBitrate:   300_000, scaleResolutionDownBy: 4, maxFramerate: 15, priority: 'low',    networkPriority: 'low'    },
-    { rid: 'r1', maxBitrate: 1_500_000, scaleResolutionDownBy: 2, maxFramerate: 30, priority: 'medium', networkPriority: 'medium' },
-    { rid: 'r2', maxBitrate: 6_000_000, scaleResolutionDownBy: 1, maxFramerate: 60, priority: 'high',   networkPriority: 'high'   },
+    { rid: 'r0', maxBitrate:   300_000, scaleResolutionDownBy: 4, maxFramerate: 15, },
+    { rid: 'r1', maxBitrate: 1_500_000, scaleResolutionDownBy: 2, maxFramerate: 30, },
+    { rid: 'r2', maxBitrate: 6_000_000, scaleResolutionDownBy: 1, maxFramerate: 60, },
 ];
 
 const VIDEO_ENCODINGS_MOBILE = [
-    { rid: 'r0', maxBitrate:   200_000, scaleResolutionDownBy: 4, maxFramerate: 10, priority: 'low',    networkPriority: 'low'    },
-    { rid: 'r1', maxBitrate:   800_000, scaleResolutionDownBy: 2, maxFramerate: 15, priority: 'medium', networkPriority: 'medium' },
-    { rid: 'r2', maxBitrate: 2_500_000, scaleResolutionDownBy: 1, maxFramerate: 30, priority: 'high',   networkPriority: 'high'   },
+    { rid: 'r0', maxBitrate:   200_000, scaleResolutionDownBy: 4, maxFramerate: 10, },
+    { rid: 'r1', maxBitrate:   800_000, scaleResolutionDownBy: 2, maxFramerate: 15, },
+    { rid: 'r2', maxBitrate: 2_500_000, scaleResolutionDownBy: 1, maxFramerate: 30, },
 ];
 
 // Screen share: single high-bitrate layer — crisp text matters more than motion
 const SCREEN_ENCODINGS = [
-    { maxBitrate: 8_000_000, scaleResolutionDownBy: 1, maxFramerate: 30, priority: 'high', networkPriority: 'high' },
+    { maxBitrate: 8_000_000, scaleResolutionDownBy: 1, maxFramerate: 30, },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
