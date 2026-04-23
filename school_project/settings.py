@@ -124,10 +124,35 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379/0')],
+            'hosts': [os.environ.get('REDIS_URL', 'redis://localhost:6379/0')],
+            'capacity': 1500,
+            'expiry': 10,
         },
     }
 }
+
+# Fall back to in-memory channel layer if Redis is not available
+# (dev only — in-memory does NOT work across multiple processes)
+import socket as _socket
+def _redis_available():
+    try:
+        _url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        _host = _url.split('//')[1].split(':')[0]
+        _port = int(_url.split(':')[-1].split('/')[0])
+        s = _socket.create_connection((_host, _port), timeout=1)
+        s.close()
+        return True
+    except Exception:
+        return False
+
+if not _redis_available():
+    import warnings
+    warnings.warn('Redis unavailable — using in-memory channel layer. WebSockets work single-process only.')
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
 
 # Sessions — use database when Redis unavailable (dev), cache in production
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
@@ -316,76 +341,55 @@ LOGGING = {
     },
 
     'loggers': {
-        # Django request errors (500s) — file + terminal
+        # 500 errors only — no request spam
         'django.request': {
             'handlers': ['app_file', 'console'],
-            'level': 'WARNING',
+            'level': 'ERROR',
             'propagate': False,
         },
 
-        # Django server errors
+        # Silence Daphne's per-request access log on terminal completely
         'django.server': {
             'handlers': ['access_file'],
             'level': 'INFO',
             'propagate': False,
         },
 
-        # Security events (CSRF failures, bad auth, etc.)
+        # Silence daphne access noise
+        'daphne': {
+            'handlers': ['access_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+
+        # Security events
         'django.security': {
             'handlers': ['security_file', 'console'],
             'level': 'WARNING',
             'propagate': False,
         },
 
-        # Database errors only
+        # DB errors only — never show queries
         'django.db.backends': {
             'handlers': ['app_file'],
             'level': 'ERROR',
             'propagate': False,
         },
 
-        # Our apps — WARNING+ to file, nothing to terminal unless critical
-        'accounts': {
-            'handlers': ['app_file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'meetings': {
-            'handlers': ['app_file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'attendance': {
-            'handlers': ['app_file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'attendance.consumers': {
-            'handlers': ['app_file'],
-            'level': 'ERROR',   # face recognition is noisy — only real errors
-            'propagate': False,
-        },
+        # Our apps — file only, nothing on terminal
+        'accounts':             {'handlers': ['app_file'], 'level': 'WARNING', 'propagate': False},
+        'meetings':             {'handlers': ['app_file'], 'level': 'WARNING', 'propagate': False},
+        'attendance':           {'handlers': ['app_file'], 'level': 'WARNING', 'propagate': False},
+        'attendance.consumers': {'handlers': ['app_file'], 'level': 'ERROR',   'propagate': False},
 
-        # Celery task failures
-        'celery': {
-            'handlers': ['app_file', 'console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'celery.task': {
-            'handlers': ['app_file'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
+        # Celery — file only
+        'celery':      {'handlers': ['app_file'], 'level': 'WARNING', 'propagate': False},
+        'celery.task': {'handlers': ['app_file'], 'level': 'ERROR',   'propagate': False},
 
-        # Channels WebSocket errors
-        'channels': {
-            'handlers': ['app_file'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
+        # Channels — file only
+        'channels': {'handlers': ['app_file'], 'level': 'ERROR', 'propagate': False},
 
-        # Root — catch anything else at ERROR level
+        # Root — only real errors reach terminal
         '': {
             'handlers': ['app_file', 'console'],
             'level': 'ERROR',
@@ -393,10 +397,7 @@ LOGGING = {
     },
 }
 
-# In DEBUG mode, also show WARNING+ on terminal for development convenience
-if DEBUG:
-    LOGGING['handlers']['console']['level'] = 'WARNING'
-    LOGGING['loggers']['django.request']['handlers'] = ['app_file', 'console']
+# Terminal only shows actual errors regardless of DEBUG mode
 
 # Create log subdirectories
 for _subdir in ('app', 'access', 'security'):

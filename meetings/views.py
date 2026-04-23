@@ -453,10 +453,25 @@ def join_meeting(request, meeting_code):
         notify_meeting_started(meeting, meeting.classroom)
     
     from django.conf import settings as _s
+    import socket as _sock
+
+    # Only pass SFU_URL if the SFU server is actually reachable
+    sfu_url = getattr(_s, 'SFU_URL', '') or 'http://localhost:3000'
+    try:
+        _host = sfu_url.split('//')[1].split(':')[0]
+        _port = int(sfu_url.split(':')[-1].split('/')[0])
+        _s2 = _sock.create_connection((_host, _port), timeout=1)
+        _s2.close()
+        sfu_available = True
+    except Exception:
+        sfu_available = False
+        sfu_url = ''
+
     return render(request, 'meetings/meeting_room.html', {
-        'meeting':  meeting,
-        'is_host':  meeting.teacher == request.user or request.user.is_superuser,
-        'sfu_url':  getattr(_s, 'SFU_URL', 'http://localhost:3000'),
+        'meeting':       meeting,
+        'is_host':       meeting.teacher == request.user or request.user.is_superuser,
+        'sfu_url':       sfu_url,
+        'sfu_available': sfu_available,
     })
 
 @login_required

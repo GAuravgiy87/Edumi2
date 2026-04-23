@@ -350,7 +350,12 @@ async function init() {
         _reconnectAttempts = 0;
     } catch (err) {
         console.error('[SFU] join failed:', err);
-        showErrorBoundary(`Could not connect to the media server. ${err.message || 'Check your connection and try again.'}`, true);
+        showErrorBoundary(
+            window.SFU_AVAILABLE === false
+                ? 'The media server (SFU) is not running. Start it with: cd sfu && node src/server.js'
+                : `Could not connect to the media server. ${err.message || 'Check your connection and try again.'}`,
+            true
+        );
         return;
     }
 
