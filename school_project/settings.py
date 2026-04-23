@@ -129,27 +129,33 @@ CHANNEL_LAYERS = {
     }
 }
 
-# Sessions in Redis — avoids SQLite read/write on every page load
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-SESSION_CACHE_ALIAS = 'default'
+# Sessions — use database when Redis unavailable (dev), cache in production
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
-# Cache — Redis backend (DB 1, separate from Channels which uses DB 0)
-_redis_base = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-_redis_cache = _redis_base.rsplit('/', 1)[0] + '/1'  # swap DB index to 1
-
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': _redis_cache,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'SOCKET_CONNECT_TIMEOUT': 2,
-            'SOCKET_TIMEOUT': 2,
-            'IGNORE_EXCEPTIONS': True,
-        },
-        'TIMEOUT': 300,
+# Cache — Redis if available, fallback to local memory
+try:
+    import django_redis  # noqa
+    _redis_base  = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    _redis_cache = _redis_base.rsplit('/', 1)[0] + '/1'
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': _redis_cache,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 2,
+                'SOCKET_TIMEOUT': 2,
+                'IGNORE_EXCEPTIONS': True,
+            },
+            'TIMEOUT': 300,
+        }
     }
-}
+    if not DEBUG:
+        # Only use Redis sessions in production where Redis is guaranteed running
+        SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+        SESSION_CACHE_ALIAS = 'default'
+except ImportError:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
 
 
 # Database
