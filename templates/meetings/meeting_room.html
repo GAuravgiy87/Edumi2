@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <!-- mediasoup-client + Socket.IO (loaded before our SFU client) -->
-    <script src="https://cdn.jsdelivr.net/npm/mediasoup-client@3/lib/mediasoup-client.min.js"></script>
+    <!-- mediasoup-client browser bundle served locally -->
+    <script src="{% static 'js/mediasoup-client.min.js' %}"></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <!-- SFU URL injected from Django settings -->
     <script>window.SFU_URL = "{{ sfu_url }}"; window.SFU_AVAILABLE = {{ sfu_available|yesno:"true,false" }};</script>
