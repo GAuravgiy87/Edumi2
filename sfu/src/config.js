@@ -24,46 +24,30 @@ module.exports = {
                 parameters: {
                     minptime:       10,
                     useinbandfec:   1,
-                    usedtx:         1,   // discontinuous transmission — saves CPU on silence
+                    usedtx:         1,
                     maxplaybackrate: 48000,
                     'sprop-stereo': 1,
                 },
             },
             {
-                // VP9 — best quality/bitrate ratio, hardware-decoded on most modern devices
+                // VP8 — supports simulcast, widest browser support
                 kind:      'video',
-                mimeType:  'video/VP9',
+                mimeType:  'video/VP8',
                 clockRate: 90000,
                 parameters: {
-                    'profile-id':              0,    // profile 0 = widest browser support
-                    'x-google-start-bitrate':  2000,
-                    'x-google-min-bitrate':    500,
-                    'x-google-max-bitrate':    8000,
+                    'x-google-start-bitrate': 1000,
                 },
             },
             {
-                // H264 High profile — best for hardware encode/decode on most CPUs
+                // H264 — hardware accelerated on most devices, supports simulcast
                 kind:      'video',
                 mimeType:  'video/h264',
                 clockRate: 90000,
                 parameters: {
                     'packetization-mode':      1,
-                    'profile-level-id':        '42e032',  // Baseline High — broad compat + quality
+                    'profile-level-id':        '42e032',
                     'level-asymmetry-allowed': 1,
-                    'x-google-start-bitrate':  2000,
-                    'x-google-min-bitrate':    500,
-                    'x-google-max-bitrate':    8000,
-                },
-            },
-            {
-                // VP8 — fallback for older browsers
-                kind:      'video',
-                mimeType:  'video/VP8',
-                clockRate: 90000,
-                parameters: {
-                    'x-google-start-bitrate': 1500,
-                    'x-google-min-bitrate':   300,
-                    'x-google-max-bitrate':   6000,
+                    'x-google-start-bitrate':  1000,
                 },
             },
         ],
