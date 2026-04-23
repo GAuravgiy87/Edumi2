@@ -34,3 +34,6 @@ urlpatterns = [
     # ── Engagement Reports ───────────────────────────────────────
     path('engagement-report/<int:meeting_id>/', views.engagement_report_view, name='engagement_report'),
 ]
+
+    # ── Attendance dashboard API (chart data) ────────────────────
+    path('api/classroom/<int:classroom_id>/monthly/', views.attendance_monthly_api, name='attendance_monthly_api'),

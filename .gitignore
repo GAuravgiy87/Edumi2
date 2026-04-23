@@ -1,56 +1,58 @@
-# Python cache
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*.pyo
 *$py.class
+*.egg-info/
+dist/
+build/
 
-# SQLite database
+# ── Django ────────────────────────────────────────────────────────────────────
 db.sqlite3
 db.sqlite3-journal
-
-# Media files
+staticfiles/
 media/
 
-# Static collected files
-staticfiles/
+# ── Environment ───────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
 
-# Virtual environment
+# ── Virtual environments ──────────────────────────────────────────────────────
 venv/
 env/
 .venv/
 ENV/
 
-# VSCode
-.vscode/
+# ── Node.js (SFU) ─────────────────────────────────────────────────────────────
+sfu/node_modules/
+sfu/package-lock.json
 
-# Python environment
-.env
-
-# Logs
+# ── Logs & runtime ────────────────────────────────────────────────────────────
+logs/
 *.log
+.pids/
+ws_debug.log
+staticfiles/
 
-# OS generated files
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-# ── Archive / scratch ─────────────────────────────────────────────────────────
+*.swp
+*.swo
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+
+# ── Test / scratch ────────────────────────────────────────────────────────────
 _archive/
-
-# ── Test captures & debug output ──────────────────────────────────────────────
 test_captures/
-test_capture.jpg
 test_capture*.jpg
-
-# ── One-off / temp scripts (already deleted, keep ignored) ───────────────────
 generate_excel.py
 reproduce_face_fix.py
 verify_face_detect.py
 migrate_error.txt
 migrations_status.txt
-
-# ── Office temp lock files ────────────────────────────────────────────────────
 ~$*
-
-# ── Old test files ────────────────────────────────────────────────────────────
-templates/test_feed.html
-APP_TEST_CASES.md
-APP_TEST_CASES.xlsx
-APP_TEST_CASES_V2.xlsx

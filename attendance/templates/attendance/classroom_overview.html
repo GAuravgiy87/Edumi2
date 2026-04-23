@@ -161,4 +161,47 @@ tbody tr:hover { background:rgba(102,126,234,.04); }
         </div>
     </div>
 </div>
+
+<!-- Monthly Attendance Trend Chart -->
+<div style="max-width:980px;margin:24px auto 48px;background:var(--bg-card,#fff);border:1px solid var(--border-color,rgba(0,0,0,.08));border-radius:20px;padding:24px;box-shadow:0 2px 16px rgba(0,0,0,.05);">
+    <h3 style="font-size:1rem;font-weight:700;margin-bottom:16px;">Monthly Attendance Trend (last 6 months)</h3>
+    <canvas id="attendanceChart" height="80"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+fetch('{% url "attendance_monthly_api" classroom.id %}')
+    .then(r => r.json())
+    .then(data => {
+        const colors = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16'];
+        new Chart(document.getElementById('attendanceChart'), {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: data.datasets.map((ds, i) => ({
+                    label: ds.label,
+                    data: ds.data,
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: colors[i % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 4,
+                    spanGaps: true,
+                }))
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16 } },
+                    tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? 'N/A'}%` } }
+                },
+                scales: {
+                    y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    })
+    .catch(() => {});
+</script>
 {% endblock %}

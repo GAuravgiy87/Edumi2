@@ -1,75 +1,99 @@
-"""Admin list views for detailed statistics"""
+"""Admin list views — paginated, minimal DB load."""
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.contrib.auth.models import User
-from .models import UserProfile
 from meetings.models import Meeting
 
-def check_admin(user):
-    """Check if user is admin"""
+PAGE_SIZE = 25
+
+
+def _admin_required(user):
     return user.is_superuser
+
 
 @login_required
 def admin_all_users(request):
-    """Show all users with details"""
-    if not check_admin(request.user):
+    if not _admin_required(request.user):
         return redirect('login')
-    
-    users = User.objects.all().select_related('userprofile').order_by('-date_joined')
-    
+    qs = (
+        User.objects
+        .select_related('userprofile')
+        .only('id', 'username', 'email', 'date_joined', 'is_active',
+              'userprofile__user_type')
+        .order_by('-date_joined')
+    )
+    page = Paginator(qs, PAGE_SIZE).get_page(request.GET.get('page', 1))
     return render(request, 'accounts/admin_all_users.html', {
-        'users': users,
-        'total_count': users.count()
+        'users': page, 'total_count': qs.count()
     })
+
 
 @login_required
 def admin_all_students(request):
-    """Show all students"""
-    if not check_admin(request.user):
+    if not _admin_required(request.user):
         return redirect('login')
-    
-    students = User.objects.filter(userprofile__user_type='student').select_related('userprofile').order_by('-date_joined')
-    
+    qs = (
+        User.objects
+        .filter(userprofile__user_type='student')
+        .select_related('userprofile')
+        .only('id', 'username', 'email', 'date_joined', 'userprofile__user_type')
+        .order_by('-date_joined')
+    )
+    page = Paginator(qs, PAGE_SIZE).get_page(request.GET.get('page', 1))
     return render(request, 'accounts/admin_all_students.html', {
-        'students': students,
-        'total_count': students.count()
+        'students': page, 'total_count': qs.count()
     })
+
 
 @login_required
 def admin_all_teachers(request):
-    """Show all teachers"""
-    if not check_admin(request.user):
+    if not _admin_required(request.user):
         return redirect('login')
-    
-    teachers = User.objects.filter(userprofile__user_type='teacher').select_related('userprofile').order_by('-date_joined')
-    
+    qs = (
+        User.objects
+        .filter(userprofile__user_type='teacher')
+        .select_related('userprofile')
+        .only('id', 'username', 'email', 'date_joined', 'userprofile__user_type')
+        .order_by('-date_joined')
+    )
+    page = Paginator(qs, PAGE_SIZE).get_page(request.GET.get('page', 1))
     return render(request, 'accounts/admin_all_teachers.html', {
-        'teachers': teachers,
-        'total_count': teachers.count()
+        'teachers': page, 'total_count': qs.count()
     })
+
 
 @login_required
 def admin_all_meetings(request):
-    """Show all non-classroom meetings"""
-    if not check_admin(request.user):
+    if not _admin_required(request.user):
         return redirect('login')
-    
-    meetings = Meeting.objects.filter(classroom__isnull=True).select_related('teacher', 'classroom').order_by('-created_at')
-    
+    qs = (
+        Meeting.objects
+        .filter(classroom__isnull=True)
+        .select_related('teacher')
+        .only('id', 'title', 'meeting_code', 'status', 'scheduled_time',
+              'teacher__username')
+        .order_by('-scheduled_time')
+    )
+    page = Paginator(qs, PAGE_SIZE).get_page(request.GET.get('page', 1))
     return render(request, 'accounts/admin_all_meetings.html', {
-        'meetings': meetings,
-        'total_count': meetings.count()
+        'meetings': page, 'total_count': qs.count()
     })
+
 
 @login_required
 def admin_live_meetings(request):
-    """Show live non-classroom meetings only"""
-    if not check_admin(request.user):
+    if not _admin_required(request.user):
         return redirect('login')
-    
-    meetings = Meeting.objects.filter(status='live', classroom__isnull=True).select_related('teacher', 'classroom').order_by('-created_at')
-    
+    # Live meetings are few — no pagination needed, but still use .only()
+    meetings = (
+        Meeting.objects
+        .filter(status='live', classroom__isnull=True)
+        .select_related('teacher')
+        .only('id', 'title', 'meeting_code', 'status', 'scheduled_time',
+              'teacher__username')
+        .order_by('-scheduled_time')
+    )
     return render(request, 'accounts/admin_live_meetings.html', {
-        'meetings': meetings,
-        'total_count': meetings.count()
+        'meetings': meetings, 'total_count': meetings.count()
     })

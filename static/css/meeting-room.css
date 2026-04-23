@@ -512,7 +512,8 @@
     gap: 6px;
 }
 
-.sidebar-tab svg {
+.sidebar-tab svg,
+.sidebar-tab i[data-lucide] {
     width: clamp(16px, 2vw, 20px);
     height: clamp(16px, 2vw, 20px);
     stroke: currentColor;
@@ -635,7 +636,8 @@
     gap: 6px;
 }
 
-.participant-status svg {
+.participant-status svg,
+.participant-status i[data-lucide] {
     width: clamp(14px, 2vw, 18px);
     height: clamp(14px, 2vw, 18px);
     stroke: #999;

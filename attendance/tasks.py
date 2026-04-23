@@ -117,3 +117,27 @@ def cleanup_old_recordings():
     mb = removed_bytes / (1024 * 1024)
     logger.info(f"[Cleanup] Recordings: removed {removed_files} files ({mb:.1f} MB freed)")
 
+
+
+@shared_task(bind=True, max_retries=0, ignore_result=False)
+def run_face_recognition(self, frame_bytes_b64: str, encrypted_emb_b64: str,
+                          threshold: float, prev_frame_b64=None) -> dict:
+    """
+    CPU-bound face recognition offloaded from the WebSocket event loop.
+    Called by FaceAttendanceConsumer via delay() + AsyncResult.
+    Returns the same dict as FaceService.compare_frame_to_stored().
+    """
+    import base64
+    try:
+        frame_bytes = base64.b64decode(frame_bytes_b64)
+        encrypted_emb = base64.b64decode(encrypted_emb_b64)
+        prev_bytes = base64.b64decode(prev_frame_b64) if prev_frame_b64 else None
+        svc = get_face_service()
+        return svc.compare_frame_to_stored(
+            frame_bytes, encrypted_emb,
+            threshold=threshold,
+            prev_frame_bytes=prev_bytes,
+        )
+    except Exception as exc:
+        logger.warning('run_face_recognition error: %s', exc)
+        return {'match': False, 'event': 'error', 'confidence': 0.0, 'message': str(exc)}

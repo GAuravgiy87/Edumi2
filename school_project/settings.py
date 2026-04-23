@@ -72,25 +72,31 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'channels',
     'accounts',
-    'pages',
     'meetings',
-    'attendance',  # Face Recognition Attendance System
-    'django_browser_reload',
-    'django_extensions',  # For HTTPS development server
+    'attendance',
     'compressor',
 ]
 
+# Dev-only apps — not loaded in production
+if DEBUG:
+    INSTALLED_APPS += [
+        'django_browser_reload',
+        'django_extensions',
+    ]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'school_project.middleware.DatabaseErrorMiddleware',  # Handle database locked errors
+    'school_project.middleware.DatabaseErrorMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
+
+if DEBUG:
+    MIDDLEWARE.append('django_browser_reload.middleware.BrowserReloadMiddleware')
 
 ROOT_URLCONF = 'school_project.urls'
 
@@ -120,6 +126,28 @@ CHANNEL_LAYERS = {
         'CONFIG': {
             "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379/0')],
         },
+    }
+}
+
+# Sessions in Redis — avoids SQLite read/write on every page load
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+
+# Cache — Redis backend (DB 1, separate from Channels which uses DB 0)
+_redis_base = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+_redis_cache = _redis_base.rsplit('/', 1)[0] + '/1'  # swap DB index to 1
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': _redis_cache,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'SOCKET_CONNECT_TIMEOUT': 2,
+            'SOCKET_TIMEOUT': 2,
+            'IGNORE_EXCEPTIONS': True,
+        },
+        'TIMEOUT': 300,
     }
 }
 
@@ -183,10 +211,11 @@ STATICFILES_FINDERS = [
     'compressor.finders.CompressorFinder',
 ]
 
-COMPRESS_ENABLED = False
-COMPRESS_URL = '/static/'
+COMPRESS_ENABLED = not DEBUG   # compress in production, skip in dev
+COMPRESS_URL = STATIC_URL
 COMPRESS_STORAGE = 'compressor.storage.CompressorFileStorage'
 COMPRESS_ROOT = STATIC_ROOT
+COMPRESS_OFFLINE = not DEBUG   # pre-compress at deploy time in production
 
 # Media files (uploaded by users)
 MEDIA_URL = '/media/'
@@ -201,38 +230,185 @@ LOGIN_REDIRECT_URL = 'student_dashboard'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Logging configuration
+# ─── Logging ─────────────────────────────────────────────────────────────────
+# Day-wise rotating log files. Only WARNING+ goes to files.
+# Terminal shows nothing in production (DEBUG=False), minimal in dev.
+
+import logging.handlers
+
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+        # File: structured, machine-readable
+        'file': {
+            'format': '[{asctime}] {levelname:<8} {name} — {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        # Terminal: minimal, human-readable
+        'console': {
+            'format': '{levelname:<8} {message}',
             'style': '{',
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+
+    'filters': {
+        # Drop noisy Django internals that aren't real errors
+        'suppress_404': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda r: not (
+                r.name == 'django.request' and r.status_code == 404
+            ),
         },
     },
+
+    'handlers': {
+        # ── Terminal: WARNING+ only, no noise ──────────────────────────────
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'console',
+            'level': 'WARNING',
+        },
+
+        # ── App errors: WARNING+ → logs/app/YYYY-MM-DD.log ────────────────
+        'app_file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'app' / 'app.log'),
+            'when': 'midnight',
+            'backupCount': 30,
+            'encoding': 'utf-8',
+            'formatter': 'file',
+            'level': 'WARNING',
+        },
+
+        # ── Access log: INFO+ → logs/access/YYYY-MM-DD.log ────────────────
+        'access_file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'access' / 'access.log'),
+            'when': 'midnight',
+            'backupCount': 14,
+            'encoding': 'utf-8',
+            'formatter': 'file',
+            'level': 'INFO',
+        },
+
+        # ── Security: WARNING+ → logs/security/YYYY-MM-DD.log ─────────────
+        'security_file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'security' / 'security.log'),
+            'when': 'midnight',
+            'backupCount': 90,
+            'encoding': 'utf-8',
+            'formatter': 'file',
+            'level': 'WARNING',
+        },
+    },
+
     'loggers': {
-        'django': {
-            'handlers': ['console'],
+        # Django request errors (500s) — file + terminal
+        'django.request': {
+            'handlers': ['app_file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+
+        # Django server errors
+        'django.server': {
+            'handlers': ['access_file'],
             'level': 'INFO',
             'propagate': False,
+        },
+
+        # Security events (CSRF failures, bad auth, etc.)
+        'django.security': {
+            'handlers': ['security_file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+
+        # Database errors only
+        'django.db.backends': {
+            'handlers': ['app_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+
+        # Our apps — WARNING+ to file, nothing to terminal unless critical
+        'accounts': {
+            'handlers': ['app_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'meetings': {
+            'handlers': ['app_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'attendance': {
+            'handlers': ['app_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'attendance.consumers': {
+            'handlers': ['app_file'],
+            'level': 'ERROR',   # face recognition is noisy — only real errors
+            'propagate': False,
+        },
+
+        # Celery task failures
+        'celery': {
+            'handlers': ['app_file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'celery.task': {
+            'handlers': ['app_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+
+        # Channels WebSocket errors
+        'channels': {
+            'handlers': ['app_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+
+        # Root — catch anything else at ERROR level
+        '': {
+            'handlers': ['app_file', 'console'],
+            'level': 'ERROR',
         },
     },
 }
 
-# Celery Configuration Options
+# In DEBUG mode, also show WARNING+ on terminal for development convenience
+if DEBUG:
+    LOGGING['handlers']['console']['level'] = 'WARNING'
+    LOGGING['loggers']['django.request']['handlers'] = ['app_file', 'console']
+
+# Create log subdirectories
+for _subdir in ('app', 'access', 'security'):
+    (LOGS_DIR / _subdir).mkdir(exist_ok=True)
+
+# Celery
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+# Don't store results for tasks that nobody reads (cleanup, summary generation)
+CELERY_TASK_IGNORE_RESULT = True
+# face recognition task DOES need its result — override per-task with ignore_result=False
+CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
+# Limit worker memory growth
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 50
 
 # ─── Face Recognition Attendance ────────────────────────────────────────────
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -245,20 +421,14 @@ FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.50'))
 FACE_PRESENCE_DURATION = int(os.environ.get('FACE_PRESENCE_DURATION', '30'))
 
 # ─── GPU / CPU Optimization ──────────────────────────────────────────────────
-# GPU setup runs in attendance/apps.py ready() — AFTER Django app registry loads.
-# These are the safe defaults used until then.
-GPU_CONFIG = {
-    'gpu_available': False,
-    'face_model': 'hog',
-    'opencl_available': False,
-    'threads': {
-        'face_recognition_workers': 2,
-        'camera_stream_workers': 2,
-        'opencv_threads': 3,
-        'celery_workers': 2,
-        'django_workers': 4,
-    }
-}
+# OpenCV thread limits are set in attendance/apps.py after app registry loads.
+
+# ─── SFU (mediasoup) ─────────────────────────────────────────────────────────
+# URL the BROWSER uses to connect to the SFU Socket.IO server.
+# In Docker with nginx: set to '' so the browser connects to the same origin
+# (nginx proxies /socket.io/ → sfu:3000).
+# For local dev without Docker: http://localhost:3000
+SFU_URL = os.environ.get('SFU_URL', '')
 
 # ─── Recording Storage ───────────────────────────────────────────────────────
 RECORDINGS_DIR = BASE_DIR / 'media' / 'recordings'

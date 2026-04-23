@@ -8,13 +8,12 @@ class AttendanceConfig(AppConfig):
 
     def ready(self):
         from . import signals  # noqa
-        # Run GPU setup here — app registry is fully loaded at this point
+        # Configure OpenCV thread count to avoid CPU saturation
         try:
-            from scripts.gpu_setup import get_gpu_config
-            from django.conf import settings
-            cfg = get_gpu_config()
-            settings.GPU_CONFIG = cfg
-            # Update Celery concurrency based on actual GPU config
-            settings.CELERY_WORKER_CONCURRENCY = cfg['threads'].get('celery_workers', 2)
+            import cv2, os
+            # Cap OpenCV to half the available cores — leave room for Django/Celery
+            threads = max(1, (os.cpu_count() or 4) // 2)
+            cv2.setNumThreads(threads)
+            cv2.ocl.setUseOpenCL(True)  # enable GPU if available, no-op if not
         except Exception:
-            pass  # safe defaults already set in settings.py
+            pass

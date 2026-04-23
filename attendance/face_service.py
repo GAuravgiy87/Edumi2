@@ -13,36 +13,28 @@ import hashlib
 import json
 import logging
 from typing import Optional
-import concurrent.futures
 
 from .encryption_service import FaceEncryptionService
 
 logger = logging.getLogger('attendance.face_service')
 
-MATCH_THRESHOLD   = 0.55   # default; overridden per-classroom
-MIN_QUALITY_SCORE = 0.08
-# Minimum pixel std-dev — only used for live frames, not registration uploads
+MATCH_THRESHOLD       = 0.55
+MIN_QUALITY_SCORE     = 0.08
 MIN_LIVENESS_VARIANCE = 6.0
-# Minimum motion diff between two consecutive live frames
-MIN_MOTION_DIFF = 1.5
+MIN_MOTION_DIFF       = 1.5
 
-# ── GPU config (loaded once) ──────────────────────────────────────────────────
-def _load_gpu_config():
+# Cached once at module import — not re-evaluated per frame
+def _get_gpu_config() -> dict:
+    """Detect available face detection model. CNN if dlib CUDA, else HOG."""
     try:
-        import sys, os
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-        from scripts.gpu_setup import get_gpu_config
-        return get_gpu_config()
+        import dlib
+        if dlib.DLIB_USE_CUDA and dlib.cuda.get_num_devices() > 0:
+            return {'face_model': 'cnn', 'jitters': 1}
     except Exception:
-        return {'face_model': 'hog', 'opencl_available': False, 'threads': {'face_recognition_workers': 4}}
+        pass
+    return {'face_model': 'hog', 'jitters': 2}
 
-_GPU_CONFIG = None
-
-def _get_gpu_config():
-    global _GPU_CONFIG
-    if _GPU_CONFIG is None:
-        _GPU_CONFIG = _load_gpu_config()
-    return _GPU_CONFIG
+_GPU_CFG = _get_gpu_config()   # evaluated once on first import
 
 
 class FaceService:
@@ -66,8 +58,9 @@ class FaceService:
             import numpy as np
             from PIL import Image
 
-            cfg = _get_gpu_config()
-            face_model = cfg.get('face_model', 'hog')
+            cfg = _GPU_CFG
+            face_model = cfg['face_model']
+            jitters    = cfg['jitters']
 
             pil_img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
             np_img  = np.array(pil_img)
@@ -104,8 +97,6 @@ class FaceService:
                                'Face too small — move closer to the camera.')
 
             # ── Encode with 'large' model (68 landmarks, more accurate) ──
-            # num_jitters=1 on GPU (fast enough), 2 on CPU
-            jitters = 1 if face_model == 'cnn' else 2
             encodings = face_recognition.face_encodings(
                 np_img, face_locations, num_jitters=jitters, model='large'
             )

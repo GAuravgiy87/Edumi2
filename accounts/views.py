@@ -288,53 +288,56 @@ def edit_profile(request):
 
 @login_required
 def admin_panel(request):
-    # Check if user is admin
     if not request.user.is_superuser:
         return redirect('login')
-    
+
     from .services import get_admin_stats
     stats = get_admin_stats()
-    
-    # Get detailed lists for the dashboard
-    all_users = User.objects.all().select_related('userprofile').order_by('-date_joined')
-    students = User.objects.filter(userprofile__user_type='student').select_related('userprofile').order_by('-date_joined')
-    teachers = User.objects.filter(userprofile__user_type='teacher').select_related('userprofile').order_by('-date_joined')
-    all_meetings = Meeting.objects.filter(classroom__isnull=True).select_related('teacher', 'classroom').order_by('-created_at')
-    live_meetings = Meeting.objects.filter(status='live', classroom__isnull=True).select_related('teacher', 'classroom').prefetch_related('participants').order_by('-created_at')
-    
-    # Add active participant count to each live meeting
-    for meeting in live_meetings:
-        meeting.active_participants_count = meeting.participants.filter(is_active=True).count()
-    
-    recent_users = User.objects.all().select_related('userprofile').order_by('-date_joined')[:10]
+
+    # Only load what's needed for the summary cards — no full table dumps
+    live_meetings = (
+        Meeting.objects
+        .filter(status='live', classroom__isnull=True)
+        .select_related('teacher')
+        .only('id', 'title', 'meeting_code', 'teacher__username')
+        .prefetch_related('participants')
+        [:10]  # cap at 10 for the dashboard widget
+    )
+    for m in live_meetings:
+        m.active_participants_count = m.participants.filter(is_active=True).count()
+
+    # Recent 10 users only — full list is in user_management
+    recent_users = (
+        User.objects
+        .select_related('userprofile')
+        .only('id', 'username', 'email', 'date_joined', 'userprofile__user_type', 'userprofile__avatar_url')
+        .order_by('-date_joined')
+        [:10]
+    )
 
     context = {
-        'total_users': stats['total_users'],
-        'total_students': stats['total_students'],
-        'total_teachers': stats['total_teachers'],
-        'total_meetings': stats['total_meetings'],
-        'live_meetings_count': stats['live_meetings_count'],
-        
-        # Detailed lists
-        'all_users': all_users,
-        'students': students,
-        'teachers': teachers,
-        'all_meetings': all_meetings,
+        **stats,
         'live_meetings': live_meetings,
         'recent_users': recent_users,
     }
-    
     return render(request, 'accounts/admin_panel.html', context)
 
 @login_required
 def user_management(request):
-    # Check if user is admin
     if not request.user.is_superuser:
         return redirect('login')
-    
-    users = User.objects.all().order_by('-date_joined')
-    
-    return render(request, 'accounts/user_management.html', {'users': users})
+
+    from django.core.paginator import Paginator
+    qs = (
+        User.objects
+        .select_related('userprofile')
+        .only('id', 'username', 'email', 'date_joined', 'is_active',
+              'userprofile__user_type', 'userprofile__avatar_url')
+        .order_by('-date_joined')
+    )
+    paginator = Paginator(qs, 25)  # 25 per page
+    page = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'accounts/user_management.html', {'users': page, 'paginator': paginator})
 
 @login_required
 def delete_user(request, user_id):
@@ -349,300 +352,6 @@ def delete_user(request, user_id):
     
     return redirect('user_management')
 
-
-@login_required
-def architecture_view(request):
-    """Display system architecture visualization"""
-    # Check if user is admin
-    if not request.user.is_superuser:
-        return redirect('login')
-    
-    # HTML page with both architecture diagrams
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>System Architecture - EduMi</title>
-        <meta charset="UTF-8">
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            body {
-                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-                font-family: Arial, sans-serif;
-                padding: 20px;
-            }
-            .header {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 20px;
-                text-align: center;
-                border-radius: 10px;
-                margin-bottom: 20px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            }
-            .header h1 {
-                color: white;
-                font-size: 2.5em;
-                margin-bottom: 5px;
-            }
-            .header p {
-                color: rgba(255,255,255,0.9);
-                font-size: 1.1em;
-            }
-            .back-btn {
-                position: fixed;
-                top: 20px;
-                left: 20px;
-                background: rgba(255,255,255,0.2);
-                backdrop-filter: blur(10px);
-                color: white;
-                padding: 10px 20px;
-                text-decoration: none;
-                border-radius: 25px;
-                z-index: 1000;
-                transition: all 0.3s;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            }
-            .back-btn:hover {
-                background: rgba(255,255,255,0.3);
-                transform: translateX(-5px);
-            }
-            .tabs {
-                display: flex;
-                gap: 10px;
-                margin-bottom: 20px;
-                justify-content: center;
-            }
-            .tab-btn {
-                background: rgba(255,255,255,0.1);
-                backdrop-filter: blur(10px);
-                color: white;
-                border: 2px solid rgba(255,255,255,0.2);
-                padding: 15px 30px;
-                border-radius: 10px;
-                cursor: pointer;
-                font-size: 1.1em;
-                transition: all 0.3s;
-            }
-            .tab-btn:hover {
-                background: rgba(255,255,255,0.2);
-                transform: translateY(-2px);
-            }
-            .tab-btn.active {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                border-color: #667eea;
-            }
-            .tab-content {
-                display: none;
-            }
-            .tab-content.active {
-                display: block;
-            }
-            .legend {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: rgba(255,255,255,0.1);
-                backdrop-filter: blur(10px);
-                padding: 15px;
-                border-radius: 10px;
-                z-index: 1000;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-                max-width: 300px;
-            }
-            .legend h3 {
-                color: white;
-                margin-bottom: 10px;
-                font-size: 1.1em;
-            }
-            .legend-item {
-                display: flex;
-                align-items: center;
-                margin: 8px 0;
-                color: white;
-                font-size: 0.9em;
-            }
-            .legend-dot {
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-                margin-right: 10px;
-                box-shadow: 0 0 10px currentColor;
-            }
-            .container {
-                max-width: 1850px;
-                margin: 0 auto;
-                background: rgba(255,255,255,0.05);
-                backdrop-filter: blur(10px);
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            }
-            .svg-wrapper {
-                background: white;
-                border-radius: 10px;
-                padding: 10px;
-                overflow: auto;
-                max-height: 85vh;
-            }
-            svg {
-                max-width: 100%;
-                height: auto;
-                display: block;
-            }
-            object {
-                width: 100%;
-                min-height: 2600px;
-            }
-            .info-box {
-                background: rgba(52, 152, 219, 0.2);
-                border-left: 4px solid #3498db;
-                padding: 15px;
-                margin: 20px 0;
-                border-radius: 5px;
-                color: white;
-            }
-            .info-box h3 {
-                margin-bottom: 10px;
-                color: #3498db;
-            }
-        </style>
-    </head>
-    <body>
-        <a href="/accounts/admin-panel/" class="back-btn">← Back to Admin Panel</a>
-        
-        <div class="header">
-            <h1>🏗️ EduMi Platform - System Architecture</h1>
-            <p>Complete Backend Architecture Visualization</p>
-        </div>
-        
-        <div class="tabs">
-            <button class="tab-btn active" onclick="showTab('full')">
-                🌐 Full System Architecture
-            </button>
-            <button class="tab-btn" onclick="showTab('backend')">
-                ⚙️ Django Backend Flow
-            </button>
-        </div>
-        
-        <div id="legend-full" class="legend">
-            <h3>🎯 Live Data Flow</h3>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #3498db;"></div>
-                <span>HTTP Request/Response</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #e74c3c;"></div>
-                <span>Video Stream (RTSP/MJPEG)</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #2ecc71;"></div>
-                <span>Database Query/Response</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #9b59b6;"></div>
-                <span>WebSocket Message</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #f39c12;"></div>
-                <span>WebRTC P2P (Direct)</span>
-            </div>
-        </div>
-        
-        <div id="legend-backend" class="legend" style="display: none;">
-            <h3>📋 Request Flow</h3>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #3498db;"></div>
-                <span>HTTP Request</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #e74c3c;"></div>
-                <span>Middleware Processing</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #f39c12;"></div>
-                <span>URL Routing</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #2ecc71;"></div>
-                <span>View & ORM</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-dot" style="background: #9b59b6;"></div>
-                <span>Models & Database</span>
-            </div>
-        </div>
-        
-        <div class="container">
-            <div id="tab-full" class="tab-content active">
-                <div class="info-box">
-                    <h3>📡 Watch the packets flow in real-time!</h3>
-                    <p>• Blue circles = HTTP requests going to Django server</p>
-                    <p>• Red circles = Video streams from cameras to Camera Service</p>
-                    <p>• Green circles = Database queries and responses</p>
-                    <p>• Purple circles = WebSocket messages for real-time meetings</p>
-                    <p>• Orange circles = WebRTC peer-to-peer video (direct between users)</p>
-                    <p>• Pulsing boxes = Active components processing data</p>
-                </div>
-                
-                <div class="svg-wrapper">
-                    <object data="/static/architecture_diagram.svg" type="image/svg+xml" style="width: 100%; height: auto;">
-                        <img src="/static/architecture_diagram.svg" alt="System Architecture Diagram">
-                    </object>
-                </div>
-            </div>
-            
-            <div id="tab-backend" class="tab-content">
-                <div class="info-box">
-                    <h3>⚙️ Django Backend Request-Response Cycle</h3>
-                    <p>• Shows complete flow from HTTP request to database and back</p>
-                    <p>• Middleware stack: Security, Session, CSRF, Authentication</p>
-                    <p>• URL routing: How Django matches URLs to views</p>
-                    <p>• ORM: Python code to SQL translation</p>
-                    <p>• Models & Database: Table structure and relationships</p>
-                    <p>• Template rendering: How HTML is generated</p>
-                </div>
-                
-                <div class="svg-wrapper">
-                    <object data="/static/backend_architecture.svg" type="image/svg+xml" style="width: 100%; height: auto;">
-                        <img src="/static/backend_architecture.svg" alt="Backend Architecture Diagram">
-                    </object>
-                </div>
-            </div>
-        </div>
-        
-        <script>
-            function showTab(tabName) {
-                // Hide all tabs
-                document.querySelectorAll('.tab-content').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                document.querySelectorAll('.tab-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                
-                // Show selected tab
-                document.getElementById('tab-' + tabName).classList.add('active');
-                event.target.classList.add('active');
-                
-                // Show appropriate legend
-                if (tabName === 'full') {
-                    document.getElementById('legend-full').style.display = 'block';
-                    document.getElementById('legend-backend').style.display = 'none';
-                } else {
-                    document.getElementById('legend-full').style.display = 'none';
-                    document.getElementById('legend-backend').style.display = 'block';
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
-    from django.http import HttpResponse
-    return HttpResponse(html_content)
 
 
 @login_required

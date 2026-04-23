@@ -68,9 +68,11 @@
                     <h3 style="color: #2c3e50; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
                         <span>📬 Join Requests</span>
                         {% if pending_requests %}
-                            <span style="padding: 4px 12px; background: #e74c3c; color: white; border-radius: 15px; font-size: 12px;">
+                            <span id="pending-badge" style="padding: 4px 12px; background: #e74c3c; color: white; border-radius: 15px; font-size: 12px;">
                                 {{ pending_requests.count }}
                             </span>
+                        {% else %}
+                            <span id="pending-badge" style="padding: 4px 12px; background: #e74c3c; color: white; border-radius: 15px; font-size: 12px; display:none;">0</span>
                         {% endif %}
                     </h3>
                     
@@ -101,8 +103,9 @@
                     {% else %}
                         <div style="text-align: center; padding: 30px; color: #95a5a6;">
                             <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
-                            <p>No pending requests</p>
+                            <p class="empty-requests">No pending requests</p>
                         </div>
+                        <div id="pending-requests"></div>
                     {% endif %}
                 </div>
                 
@@ -113,7 +116,7 @@
                     </h3>
                     
                     {% if approved_students %}
-                        <div style="max-height: 400px; overflow-y: auto;">
+                        <div style="max-height: 400px; overflow-y: auto;" class="student-list-container">
                             {% for membership in approved_students %}
                                 <div class="student-item" data-id="{{ membership.id }}" style="padding: 12px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
                                     <div>
@@ -205,64 +208,120 @@ function getCookie(name) {
     return cookieValue;
 }
 
+// ── Real-time classroom WebSocket ─────────────────────────────────────────
+const classroomId = {{ classroom.id }};
+const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const classroomWs = new WebSocket(`${wsProto}//${location.host}/ws/classroom/${classroomId}/`);
+
+classroomWs.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'new_join_request')    addPendingRequest(data);
+    else if (data.type === 'pending_count_update') updatePendingBadge(data.count);
+    else if (data.type === 'student_removed') {
+        document.querySelector(`.student-item[data-id="${data.membership_id}"]`)?.remove();
+    } else if (data.type === 'meeting_started') showMeetingAlert(data.meeting_code, data.meeting_title);
+    else if (data.type === 'meeting_ended')   hideMeetingAlert();
+};
+classroomWs.onerror = (e) => console.warn('Classroom WS error', e);
+
+function addPendingRequest(data) {
+    const container = document.getElementById('pending-requests');
+    container.querySelector('.empty-requests')?.remove();
+    if (container.querySelector(`[data-id="${data.membership_id}"]`)) return;
+    const div = document.createElement('div');
+    div.className = 'request-item';
+    div.dataset.id = data.membership_id;
+    div.style.cssText = 'padding:15px;background:#f8f9fa;border-radius:5px;margin-bottom:10px;';
+    div.innerHTML = `
+        <div style="margin-bottom:10px;">
+            <div style="font-weight:600;color:#2c3e50;">${data.student_name}</div>
+            <div style="font-size:12px;color:#7f8c8d;">${data.student_email}</div>
+            <div style="font-size:11px;color:#95a5a6;margin-top:5px;">just now</div>
+        </div>
+        <div style="display:flex;gap:5px;">
+            <button onclick="approveRequest(${data.membership_id})" style="flex:1;padding:8px;background:#2ecc71;color:white;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;">✓ Approve</button>
+            <button onclick="denyRequest(${data.membership_id})"   style="flex:1;padding:8px;background:#e74c3c;color:white;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;">✗ Deny</button>
+        </div>`;
+    container.prepend(div);
+    div.animate([{background:'#fffde7'},{background:'#f8f9fa'}], {duration:1500});
+}
+
+function updatePendingBadge(count) {
+    const badge = document.getElementById('pending-badge');
+    if (!badge) return;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+}
+
+function showMeetingAlert(meetingCode, meetingTitle) {
+    let alert = document.getElementById('meeting-alert');
+    if (!alert) {
+        alert = document.createElement('div');
+        alert.id = 'meeting-alert';
+        alert.style.cssText = 'background:#fee;border-left:4px solid #e74c3c;padding:20px;border-radius:5px;margin-bottom:30px;';
+        document.querySelector('.container').insertBefore(alert, document.querySelector('.container').children[2]);
+    }
+    alert.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><h3 style="color:#e74c3c;margin-bottom:5px;">🔴 Meeting in Progress</h3><p style="color:#555;margin:0;">${meetingTitle}</p></div>
+        <a href="/meetings/join/${meetingCode}/" style="padding:12px 24px;background:#e74c3c;color:white;text-decoration:none;border-radius:5px;font-weight:600;">Join Meeting Now</a>
+    </div>`;
+    alert.style.display = 'block';
+}
+
+function hideMeetingAlert() {
+    const alert = document.getElementById('meeting-alert');
+    if (alert) alert.style.display = 'none';
+}
+
 function approveRequest(membershipId) {
     fetch(`/meetings/classroom/approve/${membershipId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json'
-        }
+        method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }
     })
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
-            document.querySelector(`[data-id="${membershipId}"]`).remove();
-            location.reload();
+            document.querySelector(`.request-item[data-id="${membershipId}"]`)?.remove();
+            addApprovedStudent(data);
         }
     });
 }
 
 function denyRequest(membershipId) {
-    if (confirm('Are you sure you want to deny this request?')) {
-        fetch(`/meetings/classroom/deny/${membershipId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                document.querySelector(`[data-id="${membershipId}"]`).remove();
-            }
-        });
-    }
+    if (!confirm('Deny this request?')) return;
+    fetch(`/meetings/classroom/deny/${membershipId}/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success')
+            document.querySelector(`.request-item[data-id="${membershipId}"]`)?.remove();
+    });
 }
 
 function removeStudent(membershipId) {
-    if (confirm('Are you sure you want to remove this student from the classroom?')) {
-        fetch(`/meetings/classroom/remove/${membershipId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                document.querySelector(`.student-item[data-id="${membershipId}"]`).remove();
-                alert(data.message);
-            } else {
-                alert(data.message || 'Failed to remove student');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while removing the student');
-        });
-    }
+    if (!confirm('Remove this student from the classroom?')) return;
+    fetch(`/meetings/classroom/remove/${membershipId}/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success')
+            document.querySelector(`.student-item[data-id="${membershipId}"]`)?.remove();
+    });
+}
+
+function addApprovedStudent(data) {
+    const list = document.querySelector('.student-list-container');
+    if (!list) return;
+    list.querySelector('.no-students')?.remove();
+    const div = document.createElement('div');
+    div.className = 'student-item';
+    div.dataset.id = data.membership_id;
+    div.style.cssText = 'padding:12px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;';
+    div.innerHTML = `
+        <div><div style="font-weight:500;color:#2c3e50;">${data.message.replace(' approved','')}</div></div>
+        <button onclick="removeStudent(${data.membership_id})" style="padding:6px 12px;background:#e74c3c;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Remove</button>`;
+    list.appendChild(div);
 }
 </script>
 {% endif %}

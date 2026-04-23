@@ -22,8 +22,10 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('meetings/', include('meetings.urls')),
     path('attendance/', include('attendance.urls')),
-    path("__reload__/", include("django_browser_reload.urls")),
 ]
+
+if settings.DEBUG:
+    urlpatterns += [path("__reload__/", include("django_browser_reload.urls"))]
 
 # Error handlers
 handler404 = 'accounts.views.error_404'

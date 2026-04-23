@@ -26,7 +26,6 @@ urlpatterns = [
     path('admin-panel/', views.admin_panel, name='admin_panel'),
     path('user-management/', views.user_management, name='user_management'),
     path('delete-user/<int:user_id>/', views.delete_user, name='delete_user'),
-    path('architecture/', views.architecture_view, name='architecture'),
     
     # Notification URLs
     path('notifications/', notification_views.notifications_list, name='notifications_list'),

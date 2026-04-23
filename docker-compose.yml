@@ -1,14 +1,14 @@
 
 # =============================================================================
-#  EduMi — Docker Compose (separate container per service for performance)
+#  EduMi — Docker Compose
 #
 #  Services:
-#    redis      — Channel layer + Celery broker  (dedicated instance)
-#    db         — SQLite via volume (swap for postgres easily)
-#    web        — Daphne ASGI server             (dedicated instance)
-#    celery     — Background task worker         (dedicated instance, 6 workers)
-#    celery_beat— Scheduled tasks                (dedicated instance)
-#    nginx      — Reverse proxy + static files   (dedicated instance)
+#    redis       — Channel layer + Celery broker
+#    sfu         — mediasoup Node.js SFU (WebRTC media server)
+#    web         — Daphne ASGI server
+#    celery      — Background task worker
+#    celery_beat — Scheduled tasks
+#    nginx       — Reverse proxy + static files
 # =============================================================================
 
 x-app-env: &app-env
@@ -44,6 +44,39 @@ x-app-base: &app-base
 
 services:
 
+  # ── SFU: mediasoup Node.js server ────────────────────────────────────────
+  sfu:
+    build:
+      context: ./sfu
+      dockerfile: Dockerfile
+    container_name: edumi_sfu
+    environment:
+      SFU_PORT: "3000"
+      ANNOUNCED_IP: ${ANNOUNCED_IP:-127.0.0.1}
+      RTC_MIN_PORT: "40000"
+      RTC_MAX_PORT: "40100"
+      SFU_SECRET: ${SFU_SECRET:-change-me-in-production}
+      NUM_WORKERS: "2"
+    ports:
+      # HTTP/WS signaling
+      - "3000:3000"
+      # UDP media ports — MUST be exposed for WebRTC
+      - "40000-40200:40000-40200/udp"
+      # TCP fallback
+      - "40000-40200:40000-40200/tcp"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # ── Redis: dedicated broker + channel layer instance ─────────────────────
   redis:
     image: redis:7-alpine
@@ -75,6 +108,14 @@ services:
   web:
     <<: *app-base
     container_name: edumi_web
+    environment:
+      <<: *app-env
+      SFU_URL: "http://sfu:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      sfu:
+        condition: service_healthy
     command: >
       daphne
         -b 0.0.0.0

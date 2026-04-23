@@ -9,6 +9,11 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from meetings.models import Meeting, MeetingParticipant, Classroom, ClassroomMembership, MeetingAttendanceLog, MeetingChat, MeetingSummary
 from meetings.tasks import generate_meeting_summary
+from meetings.realtime import (
+    push_new_join_request, push_request_approved, push_request_denied,
+    push_student_removed, push_meeting_started, push_meeting_ended, push_pending_count,
+)
+from school_project.ratelimit import rate_limit, by_user
 from accounts.notification_utils import (
     notify_classroom_join_request, 
     notify_classroom_request_approved, 
@@ -82,6 +87,7 @@ def classroom_detail(request, classroom_id):
     return render(request, 'meetings/classroom_detail.html', ctx)
 
 @login_required
+@rate_limit(by_user, limit=5, window=60, message='Too many join requests. Please wait a minute.')
 def join_classroom_request(request):
     """Student submits request to join a classroom"""
     if not hasattr(request.user, 'userprofile') or request.user.userprofile.user_type != 'student':
@@ -121,7 +127,7 @@ def join_classroom_request(request):
                 return redirect('student_classrooms')
         
         # Create new membership request
-        ClassroomMembership.objects.create(
+        membership = ClassroomMembership.objects.create(
             classroom=classroom,
             student=request.user,
             status='pending'
@@ -129,6 +135,8 @@ def join_classroom_request(request):
         
         # Send notification to teacher
         notify_classroom_join_request(request.user, classroom)
+        # Push real-time event to teacher's classroom page
+        push_new_join_request(classroom.id, membership)
         
         messages.success(request, f'Join request submitted for "{classroom.title}". Waiting for teacher approval.')
         return redirect('student_classrooms')
@@ -160,6 +168,7 @@ def student_classrooms(request):
 
 @login_required
 @require_http_methods(["POST"])
+@rate_limit(by_user, limit=30, window=60, message='Too many approval actions.')
 def approve_join_request(request, membership_id):
     """Teacher approves a student's join request"""
     membership = get_object_or_404(ClassroomMembership, id=membership_id)
@@ -176,10 +185,17 @@ def approve_join_request(request, membership_id):
     # Send notification to student
     notify_classroom_request_approved(membership.student, membership.classroom, request.user)
     notify_student_joined_classroom(membership.student, membership.classroom)
+
+    # Push real-time events
+    push_request_approved(membership.classroom.id, membership.student.id, membership.classroom)
+    pending_count = membership.classroom.get_pending_requests().count()
+    push_pending_count(membership.classroom.id, pending_count)
     
     return JsonResponse({
         'status': 'success',
-        'message': f'{membership.student.username} approved'
+        'message': f'{membership.student.username} approved',
+        'student_id': membership.student.id,
+        'membership_id': membership.id,
     })
 
 @login_required
@@ -197,10 +213,17 @@ def deny_join_request(request, membership_id):
     
     # Send notification to student
     notify_classroom_request_denied(membership.student, membership.classroom)
+
+    # Push real-time events
+    push_request_denied(membership.classroom.id, membership.student.id, membership.classroom)
+    pending_count = membership.classroom.get_pending_requests().count()
+    push_pending_count(membership.classroom.id, pending_count)
     
     return JsonResponse({
         'status': 'success',
-        'message': f'{membership.student.username} denied'
+        'message': f'{membership.student.username} denied',
+        'student_id': membership.student.id,
+        'membership_id': membership.id,
     })
 
 @login_required
@@ -218,10 +241,15 @@ def remove_student(request, membership_id):
     
     # Send notification to student
     notify_student_removed_from_classroom(membership.student, membership.classroom)
+
+    # Push real-time event
+    push_student_removed(membership.classroom.id, membership.student.id, membership.id)
     
     return JsonResponse({
         'status': 'success',
-        'message': f'{membership.student.username} removed from classroom'
+        'message': f'{membership.student.username} removed from classroom',
+        'student_id': membership.student.id,
+        'membership_id': membership.id,
     })
 
 @login_required
@@ -310,6 +338,8 @@ def start_classroom_meeting(request, classroom_id):
         
         # Send notification to all approved students
         notify_meeting_started(meeting, classroom)
+        # Push real-time event to all classroom members
+        push_meeting_started(classroom.id, meeting)
         
         messages.success(request, 'Meeting started successfully!')
         return redirect('join_meeting', meeting_code=meeting.meeting_code)
@@ -422,9 +452,11 @@ def join_meeting(request, meeting_code):
         # Send notification to all participants that meeting has started
         notify_meeting_started(meeting, meeting.classroom)
     
+    from django.conf import settings as _s
     return render(request, 'meetings/meeting_room.html', {
-        'meeting': meeting,
-        'is_host': meeting.teacher == request.user or request.user.is_superuser
+        'meeting':  meeting,
+        'is_host':  meeting.teacher == request.user or request.user.is_superuser,
+        'sfu_url':  getattr(_s, 'SFU_URL', 'http://localhost:3000'),
     })
 
 @login_required
@@ -505,6 +537,10 @@ def end_meeting(request, meeting_id):
     
     # Redirect to classroom if meeting was in a classroom
     if meeting.classroom:
+        push_meeting_ended(meeting.classroom.id)
+        # Invalidate classroom meeting cache
+        from django.core.cache import cache
+        cache.delete(f'classroom_meetings_{meeting.classroom.id}')
         return JsonResponse({
             'status': 'success',
             'redirect_url': f'/meetings/classroom/{meeting.classroom.id}/'

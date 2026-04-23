@@ -18,8 +18,12 @@ import logging
 import time
 from pathlib import Path
 
-import cv2
-import numpy as np
+try:
+    import cv2
+    import numpy as np
+except ImportError:
+    cv2 = None
+    np = None
 from django.conf import settings
 from django.utils import timezone
 

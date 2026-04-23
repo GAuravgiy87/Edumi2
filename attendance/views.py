@@ -150,34 +150,36 @@ def detect_face(request):
     except Exception:
         return JsonResponse({'status': 'invalid_data'})
 
-    import cv2
-    import numpy as np
-    from PIL import Image
+    try:
+        import cv2
+        import numpy as np
+        from PIL import Image
 
-    # Decode for enhancement
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    if img is None:
-        return JsonResponse({'status': 'decode_error'})
-
-    # ── Low-Light Enhancement ──
-    # Check average brightness
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    avg_brightness = np.mean(gray)
-    
-    enhanced = False
-    if avg_brightness < 60: # Threshold for "dark"
-        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
-        img_yuv[:,:,0] = clahe.apply(img_yuv[:,:,0])
-        img = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-        enhanced = True
+        # Decode for enhancement
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        # Encode back to bytes for face_recognition
-        _, buffer = cv2.imencode('.jpg', img)
-        image_bytes = buffer.tobytes()
+        enhanced = False
+        if img is not None:
+            # ── Low-Light Enhancement ──
+            # Check average brightness
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            avg_brightness = np.mean(gray)
+            
+            if avg_brightness < 60: # Threshold for "dark"
+                # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+                img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+                img_yuv[:,:,0] = clahe.apply(img_yuv[:,:,0])
+                img_yuv = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+                img = img_yuv
+                enhanced = True
+                
+                # Encode back to bytes for face_recognition
+                _, buffer = cv2.imencode('.jpg', img)
+                image_bytes = buffer.tobytes()
+    except ImportError:
+        enhanced = False
 
     svc = get_face_service()
     # Use hog model (fast) and skip liveness for detection feedback
@@ -409,6 +411,62 @@ def classroom_attendance_overview(request, classroom_id):
 # ══════════════════════════════════════════════════════════════
 #  EXPORT
 # ══════════════════════════════════════════════════════════════
+
+@login_required
+def attendance_monthly_api(request, classroom_id):
+    """
+    JSON: monthly attendance % per student for the last 6 months.
+    Used by the classroom overview chart.
+    """
+    from django.db.models import Count, Q
+    from django.http import JsonResponse
+    import datetime
+
+    classroom = get_object_or_404(Classroom, id=classroom_id, teacher=request.user)
+    today = datetime.date.today()
+
+    # Build last 6 months labels
+    months = []
+    for i in range(5, -1, -1):
+        d = today.replace(day=1) - datetime.timedelta(days=i * 28)
+        months.append((d.year, d.month, d.strftime('%b %Y')))
+
+    # Total meetings per month
+    meetings_per_month = {}
+    for year, month, _ in months:
+        count = Meeting.objects.filter(
+            classroom=classroom, status='ended',
+            scheduled_time__year=year, scheduled_time__month=month
+        ).count()
+        meetings_per_month[(year, month)] = count
+
+    # Attendance per student per month
+    students = classroom.get_approved_students()
+    datasets = []
+    for student in students:
+        data = []
+        for year, month, _ in months:
+            total = meetings_per_month.get((year, month), 0)
+            if total == 0:
+                data.append(None)
+                continue
+            present = AttendanceRecord.objects.filter(
+                student=student, classroom=classroom,
+                status__in=['present', 'late'],
+                date__year=year, date__month=month
+            ).count()
+            data.append(round(present / total * 100, 1))
+        datasets.append({
+            'label': student.get_full_name() or student.username,
+            'data': data,
+        })
+
+    return JsonResponse({
+        'labels': [m[2] for m in months],
+        'datasets': datasets,
+        'meetings_per_month': [meetings_per_month.get((y, m), 0) for y, m, _ in months],
+    })
+
 
 @login_required
 def export_excel(request, classroom_id):
