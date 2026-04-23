@@ -410,12 +410,10 @@ CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
-# Don't store results for tasks that nobody reads (cleanup, summary generation)
 CELERY_TASK_IGNORE_RESULT = True
-# face recognition task DOES need its result — override per-task with ignore_result=False
 CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
-# Limit worker memory growth
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 50
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True  # silence deprecation warning
 
 # ─── Face Recognition Attendance ────────────────────────────────────────────
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
