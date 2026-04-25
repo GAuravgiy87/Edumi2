@@ -371,6 +371,6 @@ window.addEventListener('beforeunload', () => { SFUClient.leave(); ws?.close(); 
 
 window.addEventListener('load', () => {
     if (typeof lucide !== 'undefined') lucide.createIcons();
-    // init() is called by the pre-join screen's "Join Now" button
+    init().catch(e => { console.error('[Init] fatal:', e); showErrorBoundary('Failed to initialize meeting room. Please refresh.', true); });
 });
 window.addEventListener('beforeunload', () => { SFUClient.leave(); ws?.close(); });

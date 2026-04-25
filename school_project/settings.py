@@ -414,6 +414,7 @@ CELERY_TASK_IGNORE_RESULT = True
 CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 50
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True  # silence deprecation warning
+CELERY_TASK_ALWAYS_EAGER = True  # RUN synchronously locally
 
 # ─── Face Recognition Attendance ────────────────────────────────────────────
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

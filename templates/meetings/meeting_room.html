@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
     <!-- mediasoup-client browser bundle served locally -->
     <script src="{% static 'js/mediasoup-client.min.js' %}"></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
@@ -19,120 +19,6 @@
 </head>
 <body class="meeting-body">
 
-<!-- Pre-join screen -->
-<div id="prejoin-screen" style="position:fixed;inset:0;background:#111827;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem;">
-    <div style="background:#1f2937;border-radius:16px;padding:2rem;max-width:480px;width:100%;box-shadow:0 25px 50px rgba(0,0,0,.5);">
-        <h2 style="color:white;font-size:1.25rem;font-weight:700;margin-bottom:.25rem;">{{ meeting.title }}</h2>
-        <p style="color:#9ca3af;font-size:.875rem;margin-bottom:1.5rem;">Check your camera and mic before joining</p>
-
-        <!-- Camera preview -->
-        <div style="position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9;margin-bottom:1.25rem;">
-            <video id="prejoin-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
-            <div id="prejoin-no-cam" style="display:none;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;color:#6b7280;">
-                <i data-lucide="video-off" style="width:40px;height:40px;"></i>
-                <span style="font-size:.875rem;">Camera off</span>
-            </div>
-            <!-- Mic level indicator -->
-            <div style="position:absolute;bottom:12px;left:12px;display:flex;gap:3px;align-items:flex-end;height:20px;" id="mic-bars">
-                <div class="mic-bar" style="width:4px;background:#10b981;border-radius:2px;height:4px;transition:height .1s;"></div>
-                <div class="mic-bar" style="width:4px;background:#10b981;border-radius:2px;height:4px;transition:height .1s;"></div>
-                <div class="mic-bar" style="width:4px;background:#10b981;border-radius:2px;height:4px;transition:height .1s;"></div>
-                <div class="mic-bar" style="width:4px;background:#10b981;border-radius:2px;height:4px;transition:height .1s;"></div>
-                <div class="mic-bar" style="width:4px;background:#10b981;border-radius:2px;height:4px;transition:height .1s;"></div>
-            </div>
-        </div>
-
-        <!-- Toggle buttons -->
-        <div style="display:flex;gap:.75rem;margin-bottom:1.5rem;">
-            <button id="pj-mic-btn" onclick="prejoinToggleMic()" style="flex:1;padding:.75rem;background:#374151;color:white;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;font-weight:600;font-size:.875rem;">
-                <i data-lucide="mic" style="width:18px;height:18px;"></i> Mic On
-            </button>
-            <button id="pj-cam-btn" onclick="prejoinToggleCam()" style="flex:1;padding:.75rem;background:#374151;color:white;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;font-weight:600;font-size:.875rem;">
-                <i data-lucide="video" style="width:18px;height:18px;"></i> Camera On
-            </button>
-        </div>
-
-        <div style="display:flex;gap:.75rem;">
-            <a href="{% if meeting.classroom %}{% url 'classroom_detail' meeting.classroom.id %}{% else %}{% if is_host %}/meetings/teacher/{% else %}/meetings/student/{% endif %}{% endif %}"
-               style="flex:1;padding:.875rem;background:#374151;color:#d1d5db;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.9rem;text-align:center;text-decoration:none;">
-                Cancel
-            </a>
-            <button onclick="prejoinJoin()" style="flex:2;padding:.875rem;background:#6366f1;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:.9rem;">
-                Join Now
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-(function() {
-    let pjStream = null, pjMicOn = true, pjCamOn = true, pjAudioCtx = null;
-
-    async function initPrejoin() {
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        try {
-            pjStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById('prejoin-video').srcObject = pjStream;
-            document.getElementById('prejoin-no-cam').style.display = 'none';
-            startMicMeter(pjStream);
-        } catch (_) {
-            document.getElementById('prejoin-no-cam').style.display = 'flex';
-            document.getElementById('prejoin-video').style.display = 'none';
-        }
-    }
-
-    function startMicMeter(stream) {
-        try {
-            pjAudioCtx = new AudioContext();
-            const an = pjAudioCtx.createAnalyser(); an.fftSize = 64;
-            pjAudioCtx.createMediaStreamSource(stream).connect(an);
-            const buf = new Uint8Array(an.frequencyBinCount);
-            const bars = document.querySelectorAll('.mic-bar');
-            function tick() {
-                if (!pjAudioCtx) return;
-                an.getByteFrequencyData(buf);
-                const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
-                bars.forEach((b, i) => { b.style.height = Math.max(4, Math.min(20, (avg / 255) * 20 * (i + 1) / bars.length * 2)) + 'px'; });
-                requestAnimationFrame(tick);
-            }
-            tick();
-        } catch (_) {}
-    }
-
-    window.prejoinToggleMic = function() {
-        pjMicOn = !pjMicOn;
-        pjStream?.getAudioTracks().forEach(t => { t.enabled = pjMicOn; });
-        const btn = document.getElementById('pj-mic-btn');
-        btn.style.background = pjMicOn ? '#374151' : '#ef4444';
-        btn.innerHTML = `<i data-lucide="${pjMicOn ? 'mic' : 'mic-off'}" style="width:18px;height:18px;"></i> Mic ${pjMicOn ? 'On' : 'Off'}`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    };
-
-    window.prejoinToggleCam = function() {
-        pjCamOn = !pjCamOn;
-        pjStream?.getVideoTracks().forEach(t => { t.enabled = pjCamOn; });
-        const btn = document.getElementById('pj-cam-btn');
-        btn.style.background = pjCamOn ? '#374151' : '#ef4444';
-        btn.innerHTML = `<i data-lucide="${pjCamOn ? 'video' : 'video-off'}" style="width:18px;height:18px;"></i> Camera ${pjCamOn ? 'On' : 'Off'}`;
-        document.getElementById('prejoin-no-cam').style.display = pjCamOn ? 'none' : 'flex';
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    };
-
-    window.prejoinJoin = function() {
-        // Stop prejoin tracks — SFU client will acquire fresh ones
-        if (pjAudioCtx) { pjAudioCtx.close(); pjAudioCtx = null; }
-        pjStream?.getTracks().forEach(t => t.stop());
-        // Pass initial state to SFU client
-        window._prejoinMicOn = pjMicOn;
-        window._prejoinCamOn = pjCamOn;
-        document.getElementById('prejoin-screen').style.display = 'none';
-        // Trigger main init
-        if (typeof init === 'function') init().catch(console.error);
-    };
-
-    window.addEventListener('load', initPrejoin);
-})();
-</script>
 
 <div class="meet-container">
         <!-- Top Bar -->
