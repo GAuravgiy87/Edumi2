@@ -576,17 +576,95 @@ function insertEmoji(emoji) {
     textarea.focus();
 }
 
-// Scroll to bottom on load
-window.addEventListener('load', function() {
+function scrollToBottom() {
     const container = document.getElementById('messagesContainer');
     container.scrollTop = container.scrollHeight;
+}
+
+// Scroll to bottom on load
+window.addEventListener('load', scrollToBottom);
+
+// Handle Real-time Messages from WebSocket (dispatched via base_sidebar.html)
+window.addEventListener('new_message', function(e) {
+    const data = e.detail;
+    // Only append if it's for THIS conversation
+    if (data.conversation_id == {{ conversation.id }}) {
+        appendMessage(data.sender, data.message, false);
+    }
+});
+
+function appendMessage(sender, content, isSent, imageUrl = null, fileUrl = null, fileName = null) {
+    const container = document.getElementById('messagesContainer');
+    const emptyChat = container.querySelector('.empty-chat');
+    if (emptyChat) emptyChat.remove();
+
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper ${isSent ? 'sent' : 'received'}`;
+    
+    let contentHtml = '';
+    if (imageUrl) contentHtml += `<img src="${imageUrl}" alt="Image" class="message-image">`;
+    if (fileUrl) contentHtml += `
+        <a href="${fileUrl}" download class="message-file">
+            <span style="font-size: 20px;">📎</span>
+            <span>${fileName || 'File'}</span>
+        </a>`;
+    if (content) contentHtml += `<div class="message-content">${content}</div>`;
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    wrapper.innerHTML = `
+        <div class="message-bubble">
+            ${contentHtml}
+            <div class="message-time">${timeStr}</div>
+        </div>
+    `;
+    
+    container.appendChild(wrapper);
+    scrollToBottom();
+}
+
+// Handle Form Submission via AJAX
+document.getElementById('messageForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const input = document.getElementById('messageInput');
+    const content = input.value.trim();
+    const form = this;
+    const formData = new FormData(form);
+
+    if (!content && !document.getElementById('imageInput').files.length && !document.getElementById('fileInput').files.length) return;
+
+    // Optimistically append (optional, but better to wait for server success for time/ID)
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            appendMessage('{{ user.username }}', data.content, true, data.image_url, data.file_url, data.file_name);
+            input.value = '';
+            input.style.height = 'auto';
+            form.reset();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error sending message:', error);
+    });
 });
 
 // Handle Enter key to send (Shift+Enter for new line)
 document.getElementById('messageInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        document.getElementById('messageForm').submit();
+        const event = new Event('submit', { cancelable: true });
+        document.getElementById('messageForm').dispatchEvent(event);
     }
 });
 

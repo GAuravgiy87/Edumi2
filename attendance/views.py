@@ -39,9 +39,16 @@ logger = logging.getLogger('attendance')
 def face_setup(request):
     """Landing page for face registration — tabs: upload / camera capture."""
     profile = getattr(request.user, 'face_profile', None)
+    u_profile = request.user.userprofile
+    
+    # Check if profile info is complete
+    info_complete = all([u_profile.roll_number, u_profile.branch, u_profile.contact_number])
+    
     ctx = {
         'has_profile': profile is not None and profile.is_active,
         'profile':     profile,
+        'u_profile':   u_profile,
+        'info_complete': info_complete,
         'page_title':  'Face Registration',
     }
     return render(request, 'attendance/face_setup.html', ctx)
@@ -52,16 +59,14 @@ def face_setup(request):
 def upload_face_photo(request):
     """Handle file upload approach to face registration."""
     form = FacePhotoForm(request.POST, request.FILES)
-    if not form.is_valid():
-        messages.error(request, ' '.join(
-            e for errors in form.errors.values() for e in errors
-        ))
+    # Note: form might not be valid if fields are missing, but we'll check profile
+    
+    photo = request.FILES.get('photo')
+    if not photo:
+        messages.error(request, 'Please select a photo.')
         return redirect('face_setup')
 
-    photo = form.cleaned_data['photo']
-    photo.seek(0)
     image_bytes = photo.read()
-
     svc = get_face_service()
     result = svc.extract_embedding(image_bytes)
 
@@ -69,10 +74,25 @@ def upload_face_photo(request):
         messages.error(request, f"Face detection failed: {result['message']}")
         return redirect('face_setup')
 
+    # Ensure profile info is present
+    u_profile = request.user.userprofile
+    roll = request.POST.get('roll_number') or u_profile.roll_number
+    branch = request.POST.get('branch') or u_profile.branch
+    contact = request.POST.get('contact_number') or u_profile.contact_number
+
+    if not all([roll, branch, contact]):
+        messages.error(request, 'Student details (Roll, Branch, Contact) are missing. Please complete your profile.')
+        return redirect('face_setup')
+
+    # Update profile if provided in request
+    u_profile.roll_number = roll
+    u_profile.branch = branch
+    u_profile.contact_number = contact
+    u_profile.save()
+
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
     photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
 
-    # Fast database update
     StudentFaceProfile.objects.update_or_create(
         student=request.user,
         defaults={
@@ -85,7 +105,7 @@ def upload_face_photo(request):
         }
     )
 
-    messages.success(request, "✅ Face registered successfully! Attendance will now be tracked automatically.")
+    messages.success(request, "✅ Face registered successfully!")
     return redirect('face_setup')
 
 
@@ -96,19 +116,36 @@ def capture_face_photo(request):
     try:
         body   = json.loads(request.body)
         b64    = body.get('frame_b64', '')
+        
+        # Check profile first, then request
+        u_profile = request.user.userprofile
+        roll    = body.get('roll_number') or u_profile.roll_number
+        branch  = body.get('branch') or u_profile.branch
+        contact = body.get('contact_number') or u_profile.contact_number
+
         if not b64:
             return JsonResponse({'status': 'error', 'message': 'No frame data received.'}, status=400)
+        
+        if not all([roll, branch, contact]):
+            return JsonResponse({'status': 'error', 'message': 'Student details are missing. Please complete your profile first.'}, status=400)
+
         if ',' in b64:
             b64 = b64.split(',', 1)[1]
         image_bytes = base64.b64decode(b64)
     except Exception as exc:
-        return JsonResponse({'status': 'error', 'message': f'Invalid frame data: {exc}'}, status=400)
+        return JsonResponse({'status': 'error', 'message': f'Invalid request data: {exc}'}, status=400)
 
     svc    = get_face_service()
     result = svc.extract_embedding(image_bytes)
 
     if result['status'] != 'success':
         return JsonResponse({'status': 'error', 'message': result['message']})
+
+    # Ensure profile is updated if data came in request
+    u_profile.roll_number = roll
+    u_profile.branch = branch
+    u_profile.contact_number = contact
+    u_profile.save()
 
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
     photo_file = ContentFile(image_bytes, name=f"{request.user.username}_face.jpg")
@@ -189,6 +226,30 @@ def detect_face(request):
         'low_light_enhanced': enhanced,
         'message': result['message']
     })
+
+
+@login_required
+@require_POST
+def update_profile_info(request):
+    """AJAX: Update student profile details (roll, branch, contact)."""
+    try:
+        body = json.loads(request.body)
+        roll = body.get('roll_number', '')
+        branch = body.get('branch', '')
+        contact = body.get('contact_number', '')
+        
+        if not all([roll, branch, contact]):
+            return JsonResponse({'status': 'error', 'message': 'All fields are required.'}, status=400)
+            
+        profile = request.user.userprofile
+        profile.roll_number = roll
+        profile.branch = branch
+        profile.contact_number = contact
+        profile.save()
+        
+        return JsonResponse({'status': 'success', 'message': 'Profile updated successfully.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 @login_required

@@ -3,117 +3,156 @@
 
 {% block page_title %}My Classrooms{% endblock %}
 
-{% block title %}My Classrooms - EduMi{% endblock %}
-
 {% block content %}
-<div class="container" style="max-width: 1200px; margin: 30px auto; padding: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <div>
-            <h2 style="color: #2c3e50; margin-bottom: 5px;">🎓 My Classrooms</h2>
-            <p style="color: #7f8c8d;">Access your enrolled classrooms and join meetings</p>
+<style>
+    .classroom-container { max-width: 1400px; margin: 0 auto; padding: 2rem; font-family: 'Inter', sans-serif; }
+    
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+    .header-text h1 { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 0.5rem 0; letter-spacing: -0.025em; }
+    .header-text p { font-size: 1rem; color: #64748b; margin: 0; }
+    
+    .btn-join-main { 
+        background: #4f46e5; 
+        color: white; 
+        padding: 0.875rem 1.75rem; 
+        border-radius: 0.75rem; 
+        text-decoration: none; 
+        font-weight: 700; 
+        display: flex; 
+        align-items: center; 
+        gap: 0.75rem; 
+        box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
+        transition: all 0.2s;
+    }
+    .btn-join-main:hover { background: #4338ca; transform: translateY(-2px); }
+
+    /* Alert / Pending Section */
+    .pending-banner { background: #fffbeb; border: 1px solid #fef3c7; border-radius: 1rem; padding: 1.5rem; margin-bottom: 2rem; }
+    .pending-item { background: white; padding: 1rem 1.25rem; border-radius: 0.75rem; display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border: 1px solid #fde68a; }
+
+    /* Classroom Grid */
+    .classroom-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
+    .course-card { 
+        background: white; 
+        border-radius: 1.25rem; 
+        overflow: hidden; 
+        border: 1px solid #e2e8f0; 
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        display: flex; 
+        flex-direction: column;
+    }
+    .course-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-color: #4f46e5; }
+    
+    .course-banner { height: 100px; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); position: relative; }
+    .live-tag { position: absolute; top: 1rem; right: 1rem; background: #ef4444; color: white; padding: 0.4rem 0.8rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3); animation: pulse 2s infinite; }
+
+    .course-body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; }
+    .course-code { font-size: 0.75rem; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .course-title { font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0 0 0.75rem 0; line-height: 1.3; }
+    .course-desc { font-size: 0.875rem; color: #64748b; line-height: 1.5; margin-bottom: 1.5rem; }
+
+    .teacher-info { display: flex; align-items: center; gap: 0.75rem; margin-top: auto; padding-top: 1rem; border-top: 1px solid #f1f5f9; }
+    .teacher-avatar { width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; object-fit: cover; }
+    .teacher-name { font-size: 0.8125rem; font-weight: 600; color: #1e293b; }
+
+    .card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1.25rem; }
+    .btn-card { padding: 0.75rem; border-radius: 0.6rem; font-size: 0.875rem; font-weight: 700; text-align: center; text-decoration: none; transition: all 0.2s; }
+    .btn-card-outline { border: 1px solid #e2e8f0; color: #475569; }
+    .btn-card-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .btn-card-solid { background: #4f46e5; color: white; border: 1px solid #4f46e5; }
+    .btn-card-solid:hover { background: #4338ca; }
+    .btn-card-live { background: #ef4444; color: white; border: 1px solid #ef4444; }
+    .btn-card-live:hover { background: #dc2626; }
+
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+    .empty-state { text-align: center; padding: 5rem 2rem; background: white; border-radius: 1.5rem; border: 2px dashed #e2e8f0; }
+    .empty-state i { width: 64px; height: 64px; color: #94a3b8; margin-bottom: 1.5rem; }
+</style>
+
+<div class="classroom-container">
+    <div class="page-header">
+        <div class="header-text">
+            <h1>Academic Courses</h1>
+            <p>Access your enrolled classrooms and learning resources.</p>
         </div>
-        <a href="{% url 'join_classroom_request' %}" 
-           style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
-            + Join New Classroom
+        <a href="{% url 'join_classroom_request' %}" class="btn-join-main">
+            <i data-lucide="plus"></i>
+            <span>Join Classroom</span>
         </a>
     </div>
-    
-    {% if messages %}
-        {% for message in messages %}
-            <div style="padding: 15px; margin-bottom: 20px; border-radius: 5px; background: {% if message.tags == 'error' %}#fee{% else %}#efe{% endif %}; border-left: 4px solid {% if message.tags == 'error' %}#e74c3c{% else %}#2ecc71{% endif %};">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-    
-    <!-- Pending Requests -->
+
     {% if pending_memberships %}
-        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 5px; margin-bottom: 30px;">
-            <h3 style="color: #856404; margin-bottom: 15px;">⏳ Pending Approval</h3>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                {% for membership in pending_memberships %}
-                    <div style="background: white; padding: 15px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 600; color: #2c3e50;">{{ membership.classroom.title }}</div>
-                            <div style="font-size: 13px; color: #7f8c8d;">Code: {{ membership.classroom.class_code }} • Requested {{ membership.requested_at|timesince }} ago</div>
-                        </div>
-                        <span style="padding: 6px 12px; background: #ffc107; color: white; border-radius: 15px; font-size: 12px; font-weight: 600;">
-                            Waiting for approval
-                        </span>
-                    </div>
-                {% endfor %}
+    <div class="pending-banner">
+        <div style="display: flex; align-items: center; gap: 0.75rem; color: #92400e;">
+            <i data-lucide="clock" style="width: 20px; height: 20px;"></i>
+            <h3 style="margin: 0; font-size: 1rem; font-weight: 700;">Waiting for Approval</h3>
+        </div>
+        {% for membership in pending_memberships %}
+        <div class="pending-item">
+            <div>
+                <span style="font-weight: 800; color: #1e293b;">{{ membership.classroom.title }}</span>
+                <span style="color: #92400e; font-size: 0.8125rem; margin-left: 0.5rem;">({{ membership.classroom.class_code }})</span>
+            </div>
+            <span style="font-size: 0.75rem; font-weight: 600; color: #b45309;">Sent {{ membership.requested_at|timesince }} ago</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if approved_memberships %}
+    <div class="classroom-grid">
+        {% for membership in approved_memberships %}
+        {% with classroom=membership.classroom %}
+        <div class="course-card">
+            <div class="course-banner">
+                {% if classroom.has_active_meeting %}
+                <div class="live-tag">
+                    <span style="width: 8px; height: 8px; background: white; border-radius: 50%;"></span>
+                    LIVE NOW
+                </div>
+                {% endif %}
+            </div>
+            <div class="course-body">
+                <span class="course-code">{{ classroom.class_code }}</span>
+                <h3 class="course-title">{{ classroom.title }}</h3>
+                <p class="course-desc">{{ classroom.description|default:"No description provided for this course."|truncatewords:20 }}</p>
+                
+                <div class="teacher-info">
+                    <img src="https://ui-avatars.com/api/?name={{ classroom.teacher.get_full_name|default:classroom.teacher.username }}&background=6366f1&color=fff" class="teacher-avatar" alt="">
+                    <span class="teacher-name">{{ classroom.teacher.get_full_name|default:classroom.teacher.username }}</span>
+                </div>
+
+                <div class="card-actions">
+                    <a href="{% url 'classroom_detail' classroom.id %}" class="btn-card btn-card-outline">Dashboard</a>
+                    {% if classroom.has_active_meeting %}
+                    <a href="{% url 'join_meeting' classroom.get_active_meeting.meeting_code %}" class="btn-card btn-card-live">Join Meeting</a>
+                    {% else %}
+                    <button class="btn-card btn-card-outline" disabled style="opacity: 0.5; cursor: not-allowed;">No Session</button>
+                    {% endif %}
+                </div>
             </div>
         </div>
-    {% endif %}
-    
-    <!-- Approved Classrooms -->
-    {% if approved_memberships %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
-            {% for membership in approved_memberships %}
-                {% with classroom=membership.classroom %}
-                    <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s;">
-                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
-                            <div style="flex: 1;">
-                                <h3 style="color: #2c3e50; margin-bottom: 5px;">{{ classroom.title }}</h3>
-                                <div style="display: inline-block; padding: 4px 12px; background: #e8f5e9; color: #2ecc71; border-radius: 15px; font-size: 12px; font-weight: 600; margin-bottom: 10px;">
-                                    {{ classroom.class_code }}
-                                </div>
-                            </div>
-                            {% if classroom.has_active_meeting %}
-                                <span style="padding: 6px 12px; background: #fee; color: #e74c3c; border-radius: 15px; font-size: 11px; font-weight: 600; animation: pulse 2s infinite;">
-                                    🔴 LIVE
-                                </span>
-                            {% endif %}
-                        </div>
-                        
-                        {% if classroom.description %}
-                            <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 15px;">{{ classroom.description|truncatewords:15 }}</p>
-                        {% endif %}
-                        
-                        <div style="padding: 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
-                            <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 5px;">Teacher</div>
-                            <div style="font-weight: 600; color: #2c3e50;">{{ classroom.teacher.get_full_name|default:classroom.teacher.username }}</div>
-                        </div>
-                        
-                        <div style="display: flex; gap: 10px;">
-                            <a href="{% url 'classroom_detail' classroom.id %}" 
-                               style="flex: 1; padding: 10px; background: #667eea; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: 600;">
-                                Open Classroom
-                            </a>
-                            {% if classroom.has_active_meeting %}
-                                <a href="{% url 'join_meeting' classroom.get_active_meeting.meeting_code %}" 
-                                   style="flex: 1; padding: 10px; background: #e74c3c; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: 600;">
-                                    Join Live Meeting
-                                </a>
-                            {% endif %}
-                        </div>
-                        
-                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #95a5a6;">
-                            Joined {{ membership.approved_at|date:"M d, Y" }}
-                        </div>
-                    </div>
-                {% endwith %}
-            {% endfor %}
-        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
     {% else %}
         {% if not pending_memberships %}
-            <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 10px;">
-                <div style="font-size: 64px; margin-bottom: 20px;">🎓</div>
-                <h3 style="color: #2c3e50; margin-bottom: 10px;">No Classrooms Yet</h3>
-                <p style="color: #7f8c8d; margin-bottom: 30px;">Join your first classroom to start learning</p>
-                <a href="{% url 'join_classroom_request' %}" 
-                   style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
-                    Join Your First Classroom
-                </a>
-            </div>
+        <div class="empty-state">
+            <i data-lucide="book-copy"></i>
+            <h2 style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">No Classrooms Found</h2>
+            <p style="color: #64748b; margin-bottom: 2rem;">You haven't joined any classrooms yet. Start your journey by joining a course.</p>
+            <a href="{% url 'join_classroom_request' %}" class="btn-join-main" style="display: inline-flex; width: auto;">
+                Join Your First Classroom
+            </a>
+        </div>
         {% endif %}
     {% endif %}
 </div>
 
-<style>
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-</style>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        lucide.createIcons();
+    });
+</script>
 {% endblock %}

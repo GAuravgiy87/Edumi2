@@ -1,14 +1,27 @@
-"""
-Utility functions for creating notifications
-"""
 from .notification_models import Notification
 from django.contrib.auth.models import User
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 
-def notify_new_message(sender, recipient, conversation_id):
+def notify_new_message(sender, recipient, conversation_id, content="New message received"):
     """Send notification when a new message is sent"""
     if sender != recipient:  # Don't notify yourself
         Notification.create_message_notification(recipient, sender, conversation_id)
+        
+        # Broadcast via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"user_{recipient.id}",
+            {
+                "type": "new_message",
+                "data": {
+                    "sender": sender.username,
+                    "conversation_id": conversation_id,
+                    "message": content
+                }
+            }
+        )
 
 
 def notify_meeting_scheduled(meeting, classroom=None):
@@ -25,17 +38,39 @@ def notify_meeting_scheduled(meeting, classroom=None):
 
 def notify_meeting_started(meeting, classroom=None):
     """Send notification when a meeting starts"""
+    channel_layer = get_channel_layer()
     if classroom:
         # Notify all approved students in the classroom
         students = classroom.get_approved_students()
         for student in students:
             Notification.create_meeting_started_notification(student, meeting)
+            async_to_sync(channel_layer.group_send)(
+                f"user_{student.id}",
+                {
+                    "type": "meeting_started",
+                    "data": {
+                        "meeting_id": meeting.id,
+                        "title": meeting.title,
+                        "classroom": classroom.name
+                    }
+                }
+            )
     else:
         # Notify all participants
         participants = meeting.participants.all()
         for participant in participants:
             if participant.user != meeting.teacher:
                 Notification.create_meeting_started_notification(participant.user, meeting)
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{participant.user.id}",
+                    {
+                        "type": "meeting_started",
+                        "data": {
+                            "meeting_id": meeting.id,
+                            "title": meeting.title
+                        }
+                    }
+                )
 
 
 def notify_meeting_cancelled(meeting, classroom=None):

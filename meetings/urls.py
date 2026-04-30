@@ -33,4 +33,13 @@ urlpatterns = [
     path('sleep/<str:meeting_code>/', views.sleep_meeting, name='sleep_meeting'),
     path('unfreeze/<str:meeting_code>/', views.unfreeze_meeting, name='unfreeze_meeting'),
     path('status/<str:meeting_code>/', views.get_meeting_status, name='get_meeting_status'),
+    path('prep/<str:meeting_code>/', views.pre_join, name='pre_join'),
+    path('verify-prejoin/', views.verify_face_prejoin, name='verify_face_prejoin'),
+    
+    # Teacher Controls
+    path('kick/<int:meeting_id>/<int:user_id>/', views.kick_participant, name='kick_participant'),
+    path('permissions/<int:meeting_id>/<int:user_id>/', views.update_participant_permission, name='update_participant_permission'),
+    path('global-control/<int:meeting_id>/', views.toggle_global_control, name='toggle_global_control'),
+    path('revoke-ban/<int:meeting_id>/<int:user_id>/', views.revoke_ban, name='revoke_ban'),
+    path('banned-users/<int:meeting_id>/', views.get_banned_users, name='get_banned_users'),
 ]

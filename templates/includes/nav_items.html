@@ -13,25 +13,22 @@
             <a href="{% url 'inbox' %}">Inbox</a>
         {% else %}
             <div class="sidebar-nav-section">
-                <div class="sidebar-nav-title">Dashboard</div>
+                <div class="sidebar-nav-title">Management</div>
                 <a href="{% url 'admin_panel' %}" class="sidebar-nav-item {% if '/admin-panel/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="layout-dashboard"></i></span>
                     <span class="sidebar-nav-text">Admin Panel</span>
                 </a>
-            </div>
-            <div class="sidebar-nav-section">
-                <div class="sidebar-nav-title">Management</div>
                 <a href="{% url 'user_management' %}" class="sidebar-nav-item {% if '/users/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="users"></i></span>
-                    <span class="sidebar-nav-text">Users</span>
+                    <span class="sidebar-nav-text">User Manager</span>
                 </a>
                 <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item {% if '/meetings/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
-                    <span class="sidebar-nav-text">Meetings</span>
+                    <span class="sidebar-nav-text">Meeting Logs</span>
                 </a>
                 <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
-                    <span class="sidebar-nav-text">Cameras</span>
+                    <span class="sidebar-nav-text">Camera Fleet</span>
                 </a>
             </div>
         {% endif %}
@@ -39,30 +36,26 @@
         {% if nav_type == 'topbar' %}
             <a href="{% url 'teacher_dashboard' %}">Dashboard</a>
             <a href="{% url 'teacher_classrooms' %}">Classrooms</a>
-            <a href="{% url 'live_monitor' %}">Cameras</a>
             <a href="{% url 'teacher_meetings' %}">Meetings</a>
             <a href="{% url 'inbox' %}">Inbox</a>
         {% else %}
             <div class="sidebar-nav-section">
-                <div class="sidebar-nav-title">Dashboard</div>
+                <div class="sidebar-nav-title">Academic</div>
                 <a href="{% url 'teacher_dashboard' %}" class="sidebar-nav-item {% if '/teacher-dashboard/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="layout-dashboard"></i></span>
                     <span class="sidebar-nav-text">Dashboard</span>
                 </a>
-            </div>
-            <div class="sidebar-nav-section">
-                <div class="sidebar-nav-title">Teaching</div>
                 <a href="{% url 'teacher_classrooms' %}" class="sidebar-nav-item">
-                    <span class="sidebar-nav-icon"><i data-lucide="home"></i></span>
-                    <span class="sidebar-nav-text">Classrooms</span>
+                    <span class="sidebar-nav-icon"><i data-lucide="school"></i></span>
+                    <span class="sidebar-nav-text">My Classrooms</span>
                 </a>
                 <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
-                    <span class="sidebar-nav-text">Meetings</span>
+                    <span class="sidebar-nav-text">Live Sessions</span>
                 </a>
                 <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
-                    <span class="sidebar-nav-text">Cameras</span>
+                    <span class="sidebar-nav-text">AI Monitoring</span>
                 </a>
             </div>
         {% endif %}
@@ -74,25 +67,22 @@
             <a href="{% url 'inbox' %}">Inbox</a>
         {% else %}
             <div class="sidebar-nav-section">
-                <div class="sidebar-nav-title">Dashboard</div>
+                <div class="sidebar-nav-title">Student Portal</div>
                 <a href="{% url 'student_dashboard' %}" class="sidebar-nav-item {% if '/student-dashboard/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="layout-dashboard"></i></span>
-                    <span class="sidebar-nav-text">Dashboard</span>
+                    <span class="sidebar-nav-text">Home</span>
                 </a>
-            </div>
-            <div class="sidebar-nav-section">
-                <div class="sidebar-nav-title">Learning</div>
                 <a href="{% url 'student_classrooms' %}" class="sidebar-nav-item">
-                    <span class="sidebar-nav-icon"><i data-lucide="home"></i></span>
+                    <span class="sidebar-nav-icon"><i data-lucide="book-open"></i></span>
                     <span class="sidebar-nav-text">Classrooms</span>
                 </a>
                 <a href="{% url 'student_meetings' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
-                    <span class="sidebar-nav-text">Meetings</span>
+                    <span class="sidebar-nav-text">Live Classes</span>
                 </a>
                 <a href="{% url 'face_setup' %}" class="sidebar-nav-item">
-                    <span class="sidebar-nav-icon"><i data-lucide="mic"></i></span>
-                    <span class="sidebar-nav-text">Face Setup</span>
+                    <span class="sidebar-nav-icon"><i data-lucide="user-check"></i></span>
+                    <span class="sidebar-nav-text">Face Identity</span>
                 </a>
             </div>
         {% endif %}
@@ -100,18 +90,14 @@
 
     {% if nav_type == 'sidebar' %}
         <div class="sidebar-nav-section">
-            <div class="sidebar-nav-title">Common</div>
+            <div class="sidebar-nav-title">Communication</div>
             <a href="{% url 'inbox' %}" class="sidebar-nav-item">
-                <span class="sidebar-nav-icon"><i data-lucide="mail"></i></span>
+                <span class="sidebar-nav-icon"><i data-lucide="message-square"></i></span>
                 <span class="sidebar-nav-text">Messages</span>
             </a>
             <a href="{% url 'profile_view' user.username %}" class="sidebar-nav-item">
                 <span class="sidebar-nav-icon"><i data-lucide="user"></i></span>
-                <span class="sidebar-nav-text">My Profile</span>
-            </a>
-            <a href="{% url 'settings' %}" class="sidebar-nav-item">
-                <span class="sidebar-nav-icon"><i data-lucide="settings"></i></span>
-                <span class="sidebar-nav-text">Settings</span>
+                <span class="sidebar-nav-text">Profile</span>
             </a>
         </div>
     {% endif %}

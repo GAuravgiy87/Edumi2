@@ -20,7 +20,10 @@ class UserProfile(models.Model):
     display_name = models.CharField(max_length=100, blank=True, null=True)
     
     # Student Specific
-    student_id = models.CharField(max_length=20, blank=True, null=True, db_index=True)
+    student_id = models.CharField(max_length=20, blank=True, null=True, db_index=True, verbose_name="Roll Number")
+    roll_number = models.CharField(max_length=50, blank=True, null=True)
+    branch = models.CharField(max_length=100, blank=True, null=True)
+    contact_number = models.CharField(max_length=20, blank=True, null=True)
     grade = models.CharField(max_length=20, blank=True, null=True)
     enrollment_date = models.DateField(blank=True, null=True)
     

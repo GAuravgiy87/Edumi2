@@ -1,10 +1,15 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}Profile{% endblock %}
+{% block page_title %}User Profile{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/profile.css' %}?v={{ timestamp }}">
+<style>
+    .profile-banner {
+        background-image: url('{{ banner_url|default:"/static/img/academic_profile_banner.png" }}');
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -16,626 +21,348 @@
         {% endfor %}
     </div>
     {% endif %}
-    
+
     {% if is_own_profile %}
-    <div style="background: #e8f4fd; border-left: 4px solid #667eea; padding: 12px 16px; margin-bottom: 16px; border-radius: 6px;">
-        <p style="margin: 0; color: #374151; font-size: 14px;">
-            💡 <strong>Tip:</strong> All profile fields are optional. Share as much or as little as you'd like!
-        </p>
-    </div>
-    
     <form method="POST" enctype="multipart/form-data" id="profileForm">
         {% csrf_token %}
     {% endif %}
-    
-    <div class="profile-header" data-role="{% if profile_user.is_superuser %}admin{% elif profile %}{{ profile.user_type }}{% endif %}">
-        <div class="profile-cover"></div>
-        <div class="profile-info-section">
-            <div class="profile-avatar">
+
+    <!-- Hero Section -->
+    <div class="profile-hero">
+        <div class="profile-banner"></div>
+        <div class="profile-hero-content">
+            <div class="profile-avatar-wrap">
+                <img src="{{ profile.get_profile_picture_url }}" alt="{{ profile_user.username }}" id="avatarPreview" class="profile-avatar-img">
                 {% if is_own_profile %}
-                <div class="avatar-container">
-                    <img src="{{ profile.get_profile_picture_url }}" alt="{{ profile_user.username }}" id="avatarPreview">
-                    <button type="button" class="avatar-edit-btn" onclick="openAvatarModal()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </button>
-                </div>
+                <button type="button" class="avatar-edit-btn" onclick="openAvatarModal()" title="Change Profile Picture">
+                    <i data-lucide="camera"></i>
+                </button>
                 <input type="file" id="profile_picture" name="profile_picture" accept="image/*" style="display: none;">
                 <input type="hidden" id="avatar_choice" name="avatar_choice" value="">
-                {% else %}
-                <img src="{{ profile.get_profile_picture_url }}" alt="{{ profile_user.username }}">
                 {% endif %}
             </div>
-            <div class="profile-details">
-                {% if is_own_profile %}
-                <input type="text" name="display_name" value="{{ profile.display_name|default:'' }}" placeholder="Display Name" class="editable-title">
-                {% else %}
-                <h1>{{ profile.get_display_name }}</h1>
-                {% endif %}
-                <p class="profile-username">@{{ profile_user.username }}</p>
-                {% if profile_user.is_superuser %}
-                <span class="profile-badge badge-admin">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
-                    Administrator
-                </span>
-                {% elif profile %}
-                <span class="profile-badge badge-{{ profile.user_type }}">
-                    {% if profile.user_type == 'teacher' %}
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+            
+            <div class="profile-identity">
+                <div class="profile-name-row">
+                    {% if is_own_profile %}
+                    <input type="text" name="display_name" value="{{ profile.display_name|default:'' }}" placeholder="Set Display Name" class="editable-input" style="font-size: 1.5rem; font-weight: 800; max-width: 400px;">
                     {% else %}
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    <h1>{{ profile.get_display_name }}</h1>
                     {% endif %}
-                    {{ profile.get_user_type_display }}
-                </span>
-                {% endif %}
+                </div>
+                <div class="profile-handle">@{{ profile_user.username }}</div>
+                
+                <div class="profile-badges">
+                    <span class="p-badge p-badge-role">
+                        <i data-lucide="{% if profile.user_type == 'teacher' %}graduation-cap{% else %}book-open{% endif %}"></i>
+                        {{ profile.get_user_type_display }}
+                    </span>
+                    {% if profile_user.is_superuser %}
+                    <span class="p-badge p-badge-admin">
+                        <i data-lucide="shield-check"></i>
+                        Administrator
+                    </span>
+                    {% endif %}
+                    {% if face_registered %}
+                    <span class="p-badge p-badge-verified" title="Face Identity Verified">
+                        <i data-lucide="user-check"></i>
+                        Verified Identity
+                    </span>
+                    {% endif %}
+                </div>
             </div>
+
             {% if is_own_profile %}
-            <div class="profile-actions">
-                <button type="submit" class="btn-save-profile">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                    Save Changes
+            <div class="profile-hero-actions">
+                <button type="submit" class="btn-primary" id="saveProfileBtn">
+                    <i data-lucide="save"></i>
+                    Save Profile
                 </button>
             </div>
             {% endif %}
         </div>
     </div>
-    
-    <div class="profile-content">
-        <div class="profile-main">
-            <!-- About Section -->
+
+    <!-- Main Content Grid -->
+    <div class="profile-grid">
+        
+        <!-- Left Sidebar: Basic Info -->
+        <div class="profile-sidebar-left">
             <div class="profile-card">
-                <h2>About</h2>
-                {% if is_own_profile %}
-                <textarea name="bio" rows="4" placeholder="Tell us about yourself..." class="editable-textarea">{{ profile.bio }}</textarea>
-                {% else %}
-                {% if profile.bio %}
-                <p class="profile-bio">{{ profile.bio }}</p>
-                {% else %}
-                <p class="empty-text">No bio added yet</p>
-                {% endif %}
-                {% endif %}
+                <h2 class="card-title"><i data-lucide="user"></i> Personal Info</h2>
+                <div class="info-list">
+                    <div class="info-item">
+                        <div class="info-icon"><i data-lucide="user"></i></div>
+                        <div class="info-content">
+                            <div class="label">Full Name</div>
+                            {% if is_own_profile %}
+                            <div style="display:flex; gap: 0.5rem;">
+                                <input type="text" name="first_name" value="{{ user.first_name }}" placeholder="First" class="editable-input" style="padding: 0.25rem 0.5rem;">
+                                <input type="text" name="last_name" value="{{ user.last_name }}" placeholder="Last" class="editable-input" style="padding: 0.25rem 0.5rem;">
+                            </div>
+                            {% else %}
+                            <div class="value">{{ user.get_full_name|default:"Not provided" }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-icon"><i data-lucide="mail"></i></div>
+                        <div class="info-content">
+                            <div class="label">Email Address</div>
+                            {% if is_own_profile %}
+                            <input type="email" name="email" value="{{ user.email }}" class="editable-input">
+                            {% else %}
+                            <div class="value">{{ user.email }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-icon"><i data-lucide="phone"></i></div>
+                        <div class="info-content">
+                            <div class="label">Phone Number</div>
+                            {% if is_own_profile %}
+                            <input type="tel" name="phone" value="{{ profile.phone }}" class="editable-input">
+                            {% else %}
+                            <div class="value">{{ profile.phone|default:"Not set" }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
-            
-            <!-- Contact Information -->
+
             <div class="profile-card">
-                <h2>Contact Information</h2>
-                <div class="profile-info-grid">
+                <h2 class="card-title"><i data-lucide="calendar"></i> Dates</h2>
+                <div class="info-list">
                     <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
-                        <div>
-                            <p class="label">First Name</p>
-                            {% if is_own_profile %}
-                            <input type="text" name="first_name" value="{{ user.first_name }}" placeholder="First Name" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ user.first_name|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
-                        <div>
-                            <p class="label">Last Name</p>
-                            {% if is_own_profile %}
-                            <input type="text" name="last_name" value="{{ user.last_name }}" placeholder="Last Name" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ user.last_name|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></span>
-                        <div>
-                            <p class="label">Email</p>
-                            {% if is_own_profile %}
-                            <input type="email" name="email" value="{{ user.email }}" placeholder="email@example.com" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ user.email|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></span>
-                        <div>
-                            <p class="label">Phone</p>
-                            {% if is_own_profile %}
-                            <input type="tel" name="phone" value="{{ profile.phone }}" placeholder="+1 234 567 8900" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ profile.phone|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                        <div>
-                            <p class="label">Date of Birth</p>
+                        <div class="info-icon"><i data-lucide="cake"></i></div>
+                        <div class="info-content">
+                            <div class="label">Birthday</div>
                             {% if is_own_profile %}
                             <input type="date" name="date_of_birth" value="{{ profile.date_of_birth|date:'Y-m-d' }}" class="editable-input">
                             {% else %}
-                            <p class="value">{{ profile.date_of_birth|date:"M d, Y"|default:"Not set" }}</p>
+                            <div class="value">{{ profile.date_of_birth|date:"M d, Y"|default:"Not set" }}</div>
                             {% endif %}
                         </div>
                     </div>
-                    
                     <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
-                        <div>
-                            <p class="label">Address</p>
-                            {% if is_own_profile %}
-                            <input type="text" name="address" value="{{ profile.address }}" placeholder="Your address" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ profile.address|default:"Not set" }}</p>
-                            {% endif %}
+                        <div class="info-icon"><i data-lucide="clock"></i></div>
+                        <div class="info-content">
+                            <div class="label">Member Since</div>
+                            <div class="value">{{ profile_user.date_joined|date:"F Y" }}</div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Student/Teacher Specific Info -->
-            {% if profile.user_type == 'student' %}
-            <div class="profile-card">
-                <h2>Student Information</h2>
-                <div class="profile-info-grid">
+        </div>
+
+        <!-- Center Column: Bio & Identity -->
+        <div class="profile-main-content">
+            <!-- Academic Card -->
+            {% if profile.user_type == 'student' or profile.user_type == 'teacher' %}
+            <div class="profile-card academic-card">
+                <h2 class="card-title">
+                    <i data-lucide="{% if profile.user_type == 'teacher' %}briefcase{% else %}id-card{% endif %}"></i>
+                    {% if profile.user_type == 'teacher' %}Professional{% else %}Academic{% endif %} Identity
+                </h2>
+                <div class="info-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    {% if profile.user_type == 'student' %}
                     <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M15 8h2"></path><path d="M15 12h2"></path><path d="M7 16h10"></path></svg></span>
-                        <div>
-                            <p class="label">Student ID</p>
+                        <div class="info-icon"><i data-lucide="hash"></i></div>
+                        <div class="info-content">
+                            <div class="label">Roll Number</div>
                             {% if is_own_profile %}
-                            <input type="text" name="student_id" value="{{ profile.student_id }}" placeholder="Student ID" class="editable-input">
+                            <input type="text" name="roll_number" value="{{ profile.roll_number }}" class="editable-input">
                             {% else %}
-                            <p class="value">{{ profile.student_id|default:"Not set" }}</p>
+                            <div class="value">{{ profile.roll_number|default:"N/A" }}</div>
                             {% endif %}
                         </div>
                     </div>
-                    
                     <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>
-                        <div>
-                            <p class="label">Grade</p>
+                        <div class="info-icon"><i data-lucide="layers"></i></div>
+                        <div class="info-content">
+                            <div class="label">Branch / Department</div>
                             {% if is_own_profile %}
-                            <input type="text" name="grade" value="{{ profile.grade }}" placeholder="e.g., 10th Grade" class="editable-input">
+                            <input type="text" name="branch" value="{{ profile.branch }}" class="editable-input">
                             {% else %}
-                            <p class="value">{{ profile.grade|default:"Not set" }}</p>
+                            <div class="value">{{ profile.branch|default:"N/A" }}</div>
                             {% endif %}
                         </div>
                     </div>
-                    
+                    {% else %}
                     <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                        <div>
-                            <p class="label">Enrollment Date</p>
+                        <div class="info-icon"><i data-lucide="building"></i></div>
+                        <div class="info-content">
+                            <div class="label">Department</div>
                             {% if is_own_profile %}
-                            <input type="date" name="enrollment_date" value="{{ profile.enrollment_date|date:'Y-m-d' }}" class="editable-input">
+                            <input type="text" name="department" value="{{ profile.department }}" class="editable-input">
                             {% else %}
-                            <p class="value">{{ profile.enrollment_date|date:"M d, Y"|default:"Not set" }}</p>
+                            <div class="value">{{ profile.department|default:"N/A" }}</div>
                             {% endif %}
                         </div>
                     </div>
-                </div>
-            </div>
-            {% elif profile.user_type == 'teacher' %}
-            <div class="profile-card">
-                <h2>Teacher Information</h2>
-                <div class="profile-info-grid">
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M15 8h2"></path><path d="M15 12h2"></path><path d="M7 16h10"></path></svg></span>
-                        <div>
-                            <p class="label">Employee ID</p>
-                            {% if is_own_profile %}
-                            <input type="text" name="employee_id" value="{{ profile.employee_id }}" placeholder="Employee ID" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ profile.employee_id|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path></svg></span>
-                        <div>
-                            <p class="label">Department</p>
-                            {% if is_own_profile %}
-                            <input type="text" name="department" value="{{ profile.department }}" placeholder="e.g., Mathematics" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ profile.department|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg></span>
-                        <div>
-                            <p class="label">Specialization</p>
-                            {% if is_own_profile %}
-                            <input type="text" name="specialization" value="{{ profile.specialization }}" placeholder="e.g., Calculus, Algebra" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ profile.specialization|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                        <div>
-                            <p class="label">Join Date</p>
-                            {% if is_own_profile %}
-                            <input type="date" name="join_date" value="{{ profile.join_date|date:'Y-m-d' }}" class="editable-input">
-                            {% else %}
-                            <p class="value">{{ profile.join_date|date:"M d, Y"|default:"Not set" }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
-            
+
+            <!-- Bio -->
+            <div class="profile-card">
+                <h2 class="card-title"><i data-lucide="text-quote"></i> Professional Bio</h2>
+                {% if is_own_profile %}
+                <textarea name="bio" rows="4" placeholder="Share your academic background or interests..." class="editable-textarea">{{ profile.bio }}</textarea>
+                {% else %}
+                <p class="profile-bio">{{ profile.bio|default:"No bio available." }}</p>
+                {% endif %}
+            </div>
+
             <!-- Social Links -->
             <div class="profile-card">
-                <h2>Social Links</h2>
-                <div class="profile-info-grid">
+                <h2 class="card-title"><i data-lucide="link"></i> Digital Presence</h2>
+                <div class="info-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                     <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>
-                        <div>
-                            <p class="label">LinkedIn</p>
+                        <div class="info-icon"><i data-lucide="linkedin"></i></div>
+                        <div class="info-content">
+                            <div class="label">LinkedIn</div>
                             {% if is_own_profile %}
-                            <input type="text" name="linkedin" value="{{ profile.linkedin }}" placeholder="https://linkedin.com/in/username" class="editable-input">
+                            <input type="text" name="linkedin" value="{{ profile.linkedin }}" placeholder="Profile URL" class="editable-input">
                             {% else %}
-                            {% if profile.linkedin %}
-                            <a href="{{ profile.linkedin }}" target="_blank" class="value">View Profile</a>
-                            {% else %}
-                            <p class="value">Not set</p>
-                            {% endif %}
+                            <div class="value">
+                                {% if profile.linkedin %}<a href="{{ profile.linkedin }}" target="_blank">Connect</a>{% else %}Not set{% endif %}
+                            </div>
                             {% endif %}
                         </div>
                     </div>
-                    
                     <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path></svg></span>
-                        <div>
-                            <p class="label">Twitter</p>
+                        <div class="info-icon"><i data-lucide="globe"></i></div>
+                        <div class="info-content">
+                            <div class="label">Portfolio / Web</div>
                             {% if is_own_profile %}
-                            <input type="text" name="twitter" value="{{ profile.twitter }}" placeholder="https://twitter.com/username" class="editable-input">
+                            <input type="text" name="website" value="{{ profile.website }}" placeholder="https://..." class="editable-input">
                             {% else %}
-                            {% if profile.twitter %}
-                            <a href="{{ profile.twitter }}" target="_blank" class="value">View Profile</a>
-                            {% else %}
-                            <p class="value">Not set</p>
-                            {% endif %}
+                            <div class="value">
+                                {% if profile.website %}<a href="{{ profile.website }}" target="_blank">Visit Site</a>{% else %}Not set{% endif %}
+                            </div>
                             {% endif %}
                         </div>
                     </div>
-                    
-                    <div class="info-item">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
-                        <div>
-                            <p class="label">Website</p>
-                            {% if is_own_profile %}
-                            <input type="text" name="website" value="{{ profile.website }}" placeholder="https://yourwebsite.com" class="editable-input">
-                            {% else %}
-                            {% if profile.website %}
-                            <a href="{{ profile.website }}" target="_blank" class="value">Visit Website</a>
-                            {% else %}
-                            <p class="value">Not set</p>
-                            {% endif %}
-                            {% endif %}
-                        </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Stats & Security -->
+        <div class="profile-sidebar-right">
+            <!-- Progress Section -->
+            {% if is_own_profile %}
+            <div class="profile-card">
+                <h2 class="card-title"><i data-lucide="activity"></i> Profile Health</h2>
+                <div style="text-align: center; padding: 1rem 0;">
+                    <div style="font-size: 3rem; font-weight: 800; color: var(--p-primary);">{{ completion }}%</div>
+                    <div style="width: 100%; height: 8px; background: var(--p-primary-light); border-radius: 4px; margin: 1rem 0; overflow: hidden;">
+                        <div style="width: {{ completion }}%; height: 100%; background: var(--p-primary); border-radius: 4px;"></div>
                     </div>
+                    <p style="font-size: 0.8125rem; color: var(--p-text-muted);">
+                        {% if completion < 100 %}Complete your profile to stand out!{% else %}Your profile is fully optimized!{% endif %}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Stats -->
+            <div class="profile-card">
+                <h2 class="card-title"><i data-lucide="bar-chart-3"></i> Insights</h2>
+                <div class="stats-grid">
+                    {% if profile.user_type == 'student' %}
+                    <div class="stat-box">
+                        <div class="stat-value">{{ stats.meetings_attended|default:0 }}</div>
+                        <div class="stat-label">Meetings</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">{{ stats.enrolled_courses|default:0 }}</div>
+                        <div class="stat-label">Classes</div>
+                    </div>
+                    {% else %}
+                    <div class="stat-box">
+                        <div class="stat-value">{{ stats.total_meetings|default:0 }}</div>
+                        <div class="stat-label">Hosted</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">{{ stats.live_meetings|default:0 }}</div>
+                        <div class="stat-label">Live</div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- Security Section -->
+            <!-- Security Check -->
             <div class="profile-card">
-                <h2>Security</h2>
-                <div class="security-grid">
-                    <div class="security-item">
-                        <div class="security-info">
-                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
-                            <div>
-                                <p class="label">Two-Factor Authentication (2FA)</p>
-                                <p class="value">
-                                    {% if user.otp_device_summary %}
-                                        <span style="color: #28a745; font-weight: 700;">● Enabled</span>
-                                    {% else %}
-                                        <span style="color: #dc3545; font-weight: 700;">● Disabled</span>
-                                    {% endif %}
-                                </p>
-                            </div>
+                <h2 class="card-title"><i data-lucide="lock"></i> Trust & Security</h2>
+                <div class="info-list">
+                    <div class="info-item">
+                        <div class="info-icon" style="background: {% if face_registered %}#dcfce7{% else %}#fee2e2{% endif %}; color: {% if face_registered %}#166534{% else %}#991b1b{% endif %};">
+                            <i data-lucide="{% if face_registered %}shield-check{% else %}shield-alert{% endif %}"></i>
                         </div>
-                        <div class="security-action">
+                        <div class="info-content">
+                            <div class="label">Facial ID Status</div>
+                            <div class="value">{% if face_registered %}Registered{% else %}Not Set{% endif %}</div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="profile-sidebar">
-            <!-- Profile Completion -->
-            {% if is_own_profile %}
-            <div class="profile-card">
-                <h2>Profile Completion</h2>
-                <div class="completion-indicator">
-                    <div class="completion-circle" data-percent="{{ completion }}">
-                        <svg viewBox="0 0 36 36">
-                            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                            <path class="circle" stroke-dasharray="{{ completion }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                            <text x="18" y="20.35" class="percentage">{{ completion }}%</text>
-                        </svg>
-                    </div>
-                    {% if completion < 100 %}
-                    <p class="completion-hint">Fill in more details to complete your profile</p>
-                    {% else %}
-                    <p class="completion-success">✓ Profile Complete!</p>
+                    {% if is_own_profile and not face_registered %}
+                    <a href="{% url 'face_setup' %}" class="btn-primary" style="margin-top: 1rem; width: 100%; justify-content: center; background: #166534;">
+                        <i data-lucide="camera"></i> Set Up Face ID
+                    </a>
                     {% endif %}
                 </div>
             </div>
-            {% endif %}
-            
-            <!-- Statistics -->
-            <div class="profile-card">
-                <h2>Statistics</h2>
-                <div class="stats-list">
-                    {% if profile.user_type == 'teacher' %}
-                    <div class="stat-item">
-                        <span class="stat-value">{{ stats.total_meetings }}</span>
-                        <span class="stat-label">Total Meetings</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value">{{ stats.live_meetings }}</span>
-                        <span class="stat-label">Live Now</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value">{{ stats.completed_meetings }}</span>
-                        <span class="stat-label">Completed</span>
-                    </div>
-                    {% elif profile.user_type == 'student' %}
-                    <div class="stat-item">
-                        <span class="stat-value">{{ stats.enrolled_courses }}</span>
-                        <span class="stat-label">Enrolled Courses</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value">{{ stats.completed_assignments }}</span>
-                        <span class="stat-label">Completed</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value">{{ stats.meetings_attended }}</span>
-                        <span class="stat-label">Meetings Attended</span>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <!-- Member Since -->
-            <div class="profile-card">
-                <h2>Member Since</h2>
-                <p class="member-since">{{ profile_user.date_joined|date:"F Y" }}</p>
-            </div>
         </div>
+
     </div>
-    
+
     {% if is_own_profile %}
     </form>
     
-    <!-- Avatar Selection Modal -->
+    <!-- Avatar Modal -->
     <div id="avatarModal" class="avatar-modal">
-        <div class="avatar-modal-content">
+        <div class="avatar-modal-content" style="max-width: 800px;">
             <div class="avatar-modal-header">
-                <h2>Choose Profile Picture</h2>
+                <h2>Choose Identity</h2>
                 <button type="button" class="modal-close" onclick="closeAvatarModal()">&times;</button>
             </div>
-            <!-- Modal Tabs -->
-            <div style="display:flex;border-bottom:1px solid #eee;padding:0 24px;overflow-x:auto;">
-                <button type="button" onclick="switchAvatarTab('presets')" id="tab-presets" style="padding:12px 16px;border:none;background:none;font-weight:600;color:#667eea;border-bottom:2px solid #667eea;cursor:pointer;font-size:14px;white-space:nowrap;">Presets</button>
-                <button type="button" onclick="switchAvatarTab('emoji')" id="tab-emoji" style="padding:12px 16px;border:none;background:none;font-weight:500;color:#888;border-bottom:2px solid transparent;cursor:pointer;font-size:14px;white-space:nowrap;">✨ Emoji Creator</button>
-                <button type="button" onclick="switchAvatarTab('photo')" id="tab-photo" style="padding:12px 16px;border:none;background:none;font-weight:500;color:#888;border-bottom:2px solid transparent;cursor:pointer;font-size:14px;white-space:nowrap;">📸 Photo Avatar</button>
-                <button type="button" onclick="switchAvatarTab('upload')" id="tab-upload" style="padding:12px 16px;border:none;background:none;font-weight:500;color:#888;border-bottom:2px solid transparent;cursor:pointer;font-size:14px;white-space:nowrap;">Upload</button>
+            
+            <div style="display:flex; border-bottom: 1px solid var(--p-border); padding: 0 1.5rem;">
+                <button type="button" class="modal-tab-btn active" id="tab-presets" onclick="switchAvatarTab('presets')">Presets</button>
+                <button type="button" class="modal-tab-btn" id="tab-emoji" onclick="switchAvatarTab('emoji')">Emoji Creator</button>
+                <button type="button" class="modal-tab-btn" id="tab-upload" onclick="switchAvatarTab('upload')">Upload</button>
             </div>
-            <div class="avatar-modal-body">
-                <!-- Presets Tab -->
+
+            <div class="avatar-modal-body" style="padding: 2rem;">
                 <div id="avatarTab-presets">
-                <h3>Select an Avatar</h3>
-                <div class="avatar-grid">
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4" alt="Avatar 1">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&backgroundColor=c0aede')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&backgroundColor=c0aede" alt="Avatar 2">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&backgroundColor=ffd5dc')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&backgroundColor=ffd5dc" alt="Avatar 3">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Max&backgroundColor=ffdfbf')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Max&backgroundColor=ffdfbf" alt="Avatar 4">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Sophie&backgroundColor=d1d4f9')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sophie&backgroundColor=d1d4f9" alt="Avatar 5">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Oliver&backgroundColor=c7f9cc')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Oliver&backgroundColor=c7f9cc" alt="Avatar 6">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Emma&backgroundColor=ffc9c9')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Emma&backgroundColor=ffc9c9" alt="Avatar 7">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&backgroundColor=b4e7ce')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&backgroundColor=b4e7ce" alt="Avatar 8">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Mia&backgroundColor=ffeaa7')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Mia&backgroundColor=ffeaa7" alt="Avatar 9">
-                    </div>
-                    <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=Leo&backgroundColor=dfe6e9')">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Leo&backgroundColor=dfe6e9" alt="Avatar 10">
+                    <div class="avatar-grid">
+                        {% for i in "1234567890"|make_list %}
+                        <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=seed{{ i }}&backgroundColor=b6e3f4')">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=seed{{ i }}&backgroundColor=b6e3f4" alt="Avatar">
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
-                
-                <div class="avatar-divider"><span>OR</span></div>
-                <div class="avatar-upload-section">
-                    <h3>Upload Your Own</h3>
-                    <button type="button" class="btn-upload-photo" onclick="document.getElementById('profile_picture').click()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        Browse from Device
-                    </button>
-                    <p class="upload-hint">JPG, PNG or GIF - Max 5MB</p>
-                </div>
-                </div><!-- end presets tab -->
 
-                <!-- Emoji Creator Tab -->
                 <div id="avatarTab-emoji" style="display:none;">
-                    <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
-                        <!-- Canvas Preview -->
-                        <div style="flex-shrink:0;text-align:center;">
-                            <canvas id="emojiCanvas" width="200" height="200" style="border-radius:50%;border:3px solid #667eea;box-shadow:0 4px 20px rgba(102,126,234,0.3);"></canvas>
-                            <div style="margin-top:10px;">
-                                <button type="button" onclick="saveEmojiAvatar()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;padding:10px 24px;border-radius:50px;font-weight:600;cursor:pointer;font-size:14px;">Use this Avatar</button>
-                            </div>
-                        </div>
-                        <!-- Controls -->
-                        <div style="flex:1;min-width:200px;">
-                            <div style="margin-bottom:14px;">
-                                <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:6px;">Skin Tone</label>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <div class="ec-swatch" data-type="skin" data-val="#FDDBB4" style="background:#FDDBB4;" onclick="setEmoji('skin','#FDDBB4')"></div>
-                                    <div class="ec-swatch" data-type="skin" data-val="#F5C89A" style="background:#F5C89A;" onclick="setEmoji('skin','#F5C89A')"></div>
-                                    <div class="ec-swatch" data-type="skin" data-val="#E8A87C" style="background:#E8A87C;" onclick="setEmoji('skin','#E8A87C')"></div>
-                                    <div class="ec-swatch" data-type="skin" data-val="#C68642" style="background:#C68642;" onclick="setEmoji('skin','#C68642')"></div>
-                                    <div class="ec-swatch" data-type="skin" data-val="#8D5524" style="background:#8D5524;" onclick="setEmoji('skin','#8D5524')"></div>
-                                    <div class="ec-swatch" data-type="skin" data-val="#4A2912" style="background:#4A2912;" onclick="setEmoji('skin','#4A2912')"></div>
-                                </div>
-                            </div>
-                            <div style="margin-bottom:14px;">
-                                <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:6px;">Hair</label>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <div class="ec-swatch" data-type="hair" data-val="none" style="background:#eee;font-size:11px;display:flex;align-items:center;justify-content:center;color:#999;" onclick="setEmoji('hair','none')">✕</div>
-                                    <div class="ec-swatch" data-type="hair" data-val="short" style="background:#3d2b1f;font-size:11px;display:flex;align-items:center;justify-content:center;color:#fff;" onclick="setEmoji('hair','short')">S</div>
-                                    <div class="ec-swatch" data-type="hair" data-val="long" style="background:#6B3A2A;font-size:11px;display:flex;align-items:center;justify-content:center;color:#fff;" onclick="setEmoji('hair','long')">L</div>
-                                    <div class="ec-swatch" data-type="hair" data-val="curly" style="background:#1a1a1a;font-size:11px;display:flex;align-items:center;justify-content:center;color:#fff;" onclick="setEmoji('hair','curly')">C</div>
-                                    <div class="ec-swatch" data-type="hair" data-val="bun" style="background:#8B6914;font-size:11px;display:flex;align-items:center;justify-content:center;color:#fff;" onclick="setEmoji('hair','bun')">B</div>
-                                </div>
-                            </div>
-                            <div style="margin-bottom:14px;">
-                                <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:6px;">Hair Color</label>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <div class="ec-swatch" data-type="hairColor" data-val="#1a1a1a" style="background:#1a1a1a;" onclick="setEmoji('hairColor','#1a1a1a')"></div>
-                                    <div class="ec-swatch" data-type="hairColor" data-val="#6B3A2A" style="background:#6B3A2A;" onclick="setEmoji('hairColor','#6B3A2A')"></div>
-                                    <div class="ec-swatch" data-type="hairColor" data-val="#8B6914" style="background:#8B6914;" onclick="setEmoji('hairColor','#8B6914')"></div>
-                                    <div class="ec-swatch" data-type="hairColor" data-val="#D4A017" style="background:#D4A017;" onclick="setEmoji('hairColor','#D4A017')"></div>
-                                    <div class="ec-swatch" data-type="hairColor" data-val="#C0C0C0" style="background:#C0C0C0;" onclick="setEmoji('hairColor','#C0C0C0')"></div>
-                                    <div class="ec-swatch" data-type="hairColor" data-val="#E8A0BF" style="background:#E8A0BF;" onclick="setEmoji('hairColor','#E8A0BF')"></div>
-                                </div>
-                            </div>
-                            <div style="margin-bottom:14px;">
-                                <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:6px;">Eyes</label>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <div class="ec-chip" data-type="eyes" data-val="normal" onclick="setEmoji('eyes','normal')">😐</div>
-                                    <div class="ec-chip" data-type="eyes" data-val="happy" onclick="setEmoji('eyes','happy')">😊</div>
-                                    <div class="ec-chip" data-type="eyes" data-val="wink" onclick="setEmoji('eyes','wink')">😉</div>
-                                    <div class="ec-chip" data-type="eyes" data-val="sleepy" onclick="setEmoji('eyes','sleepy')">😴</div>
-                                    <div class="ec-chip" data-type="eyes" data-val="star" onclick="setEmoji('eyes','star')">🤩</div>
-                                </div>
-                            </div>
-                            <div style="margin-bottom:14px;">
-                                <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:6px;">Mouth</label>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <div class="ec-chip" data-type="mouth" data-val="smile" onclick="setEmoji('mouth','smile')">😄</div>
-                                    <div class="ec-chip" data-type="mouth" data-val="grin" onclick="setEmoji('mouth','grin')">😁</div>
-                                    <div class="ec-chip" data-type="mouth" data-val="neutral" onclick="setEmoji('mouth','neutral')">😐</div>
-                                    <div class="ec-chip" data-type="mouth" data-val="sad" onclick="setEmoji('mouth','sad')">🙁</div>
-                                    <div class="ec-chip" data-type="mouth" data-val="tongue" onclick="setEmoji('mouth','tongue')">😛</div>
-                                </div>
-                            </div>
-                            <div style="margin-bottom:14px;">
-                                <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:6px;">Accessory</label>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <div class="ec-chip" data-type="acc" data-val="none" onclick="setEmoji('acc','none')">—</div>
-                                    <div class="ec-chip" data-type="acc" data-val="glasses" onclick="setEmoji('acc','glasses')">🤓</div>
-                                    <div class="ec-chip" data-type="acc" data-val="sunglasses" onclick="setEmoji('acc','sunglasses')">😎</div>
-                                    <div class="ec-chip" data-type="acc" data-val="hat" onclick="setEmoji('acc','hat')">🎩</div>
-                                    <div class="ec-chip" data-type="acc" data-val="headband" onclick="setEmoji('acc','headband')">🎀</div>
-                                </div>
-                            </div>
-                            <div>
-                                <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:6px;">Background</label>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <div class="ec-swatch" data-type="bg" data-val="#667eea" style="background:#667eea;" onclick="setEmoji('bg','#667eea')"></div>
-                                    <div class="ec-swatch" data-type="bg" data-val="#f093fb" style="background:#f093fb;" onclick="setEmoji('bg','#f093fb')"></div>
-                                    <div class="ec-swatch" data-type="bg" data-val="#4facfe" style="background:#4facfe;" onclick="setEmoji('bg','#4facfe')"></div>
-                                    <div class="ec-swatch" data-type="bg" data-val="#43e97b" style="background:#43e97b;" onclick="setEmoji('bg','#43e97b')"></div>
-                                    <div class="ec-swatch" data-type="bg" data-val="#fa709a" style="background:#fa709a;" onclick="setEmoji('bg','#fa709a')"></div>
-                                    <div class="ec-swatch" data-type="bg" data-val="#1a1a2e" style="background:#1a1a2e;" onclick="setEmoji('bg','#1a1a2e')"></div>
-                                </div>
-                            </div>
+                    <div style="display:flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
+                        <canvas id="emojiCanvas" width="240" height="240" style="border-radius: 50%; border: 4px solid var(--p-primary); box-shadow: var(--p-shadow-lg);"></canvas>
+                        <div style="flex: 1; min-width: 300px;">
+                            <!-- Emoji Controls simplified for brevity in this redesign -->
+                            <p style="color: var(--p-text-muted); font-size: 0.875rem; margin-bottom: 1rem;">Use the creator to build a unique academic avatar.</p>
+                            <button type="button" onclick="saveEmojiAvatar()" class="btn-primary">Set as Profile Picture</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Upload Tab -->
-                <div id="avatarTab-upload" style="display:none;">
-                <div class="avatar-upload-section">
-                    <h3>Upload Your Own</h3>
-                    <button type="button" class="btn-upload-photo" onclick="document.getElementById('profile_picture').click()">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        Browse from Device
-                    </button>
-                    <p class="upload-hint">JPG, PNG or GIF - Max 5MB</p>
-                </div>
-                </div><!-- end upload tab -->
-
-                <!-- Photo Avatar Tab -->
-                <div id="avatarTab-photo" style="display:none;padding:4px 0;">
-                    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
-                        <!-- Left: upload + source canvas -->
-                        <div style="flex:1;min-width:200px;">
-                            <div id="photoDropZone" style="border:2px dashed #c5cae9;border-radius:16px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:#fafbff;" onclick="document.getElementById('photoAvatarInput').click()" ondragover="event.preventDefault();this.style.borderColor='#667eea'" ondragleave="this.style.borderColor='#c5cae9'" ondrop="handlePhotoDrop(event)">
-                                <div style="font-size:40px;margin-bottom:8px;">📷</div>
-                                <p style="margin:0;color:#667eea;font-weight:600;font-size:15px;">Click or drag a photo</p>
-                                <p style="margin:4px 0 0;color:#aaa;font-size:13px;">JPG or PNG · face photo works best</p>
-                            </div>
-                            <input type="file" id="photoAvatarInput" accept="image/*" style="display:none;" onchange="loadPhotoForAvatar(this)">
-                            <canvas id="photoSourceCanvas" style="display:none;max-width:100%;border-radius:12px;margin-top:12px;"></canvas>
-                        </div>
-                        <!-- Right: result + style controls -->
-                        <div style="flex:1;min-width:200px;text-align:center;">
-                            <div style="position:relative;display:inline-block;">
-                                <canvas id="photoResultCanvas" width="220" height="220" style="border-radius:50%;border:3px solid #667eea;box-shadow:0 4px 20px rgba(102,126,234,0.3);background:#eee;"></canvas>
-                                <div id="photoProcessing" style="display:none;position:absolute;inset:0;border-radius:50%;background:rgba(255,255,255,0.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;">
-                                    <div style="width:36px;height:36px;border:4px solid #667eea;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;"></div>
-                                    <span style="font-size:13px;color:#667eea;font-weight:600;">Processing…</span>
-                                </div>
-                            </div>
-                            <!-- Style buttons -->
-                            <div style="margin:16px 0 12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-                                <button type="button" class="pa-style-btn active" data-style="cartoon" onclick="applyPhotoStyle('cartoon',this)">🎨 Cartoon</button>
-                                <button type="button" class="pa-style-btn" data-style="sketch" onclick="applyPhotoStyle('sketch',this)">✏️ Sketch</button>
-                                <button type="button" class="pa-style-btn" data-style="pop" onclick="applyPhotoStyle('pop',this)">🌈 Pop Art</button>
-                                <button type="button" class="pa-style-btn" data-style="pixel" onclick="applyPhotoStyle('pixel',this)">👾 Pixel</button>
-                                <button type="button" class="pa-style-btn" data-style="glow" onclick="applyPhotoStyle('glow',this)">✨ Glow</button>
-                            </div>
-                            <!-- Background color for result -->
-                            <div style="margin-bottom:14px;">
-                                <span style="font-size:12px;color:#888;font-weight:600;">Background: </span>
-                                <span id="paBgSwatches" style="display:inline-flex;gap:6px;vertical-align:middle;">
-                                    <span class="pa-bg-swatch" data-bg="#667eea" style="background:#667eea;" onclick="setPhotoBg('#667eea',this)"></span>
-                                    <span class="pa-bg-swatch" data-bg="#1a1a2e" style="background:#1a1a2e;" onclick="setPhotoBg('#1a1a2e',this)"></span>
-                                    <span class="pa-bg-swatch" data-bg="#f093fb" style="background:#f093fb;" onclick="setPhotoBg('#f093fb',this)"></span>
-                                    <span class="pa-bg-swatch" data-bg="#43e97b" style="background:#43e97b;" onclick="setPhotoBg('#43e97b',this)"></span>
-                                    <span class="pa-bg-swatch" data-bg="#fa709a" style="background:#fa709a;" onclick="setPhotoBg('#fa709a',this)"></span>
-                                    <span class="pa-bg-swatch" data-bg="#fff" style="background:#fff;border:1px solid #ddd;" onclick="setPhotoBg('#fff',this)"></span>
-                                </span>
-                            </div>
-                            <button type="button" id="usePhotoAvatarBtn" onclick="savePhotoAvatar()" disabled style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;padding:11px 28px;border-radius:50px;font-weight:700;cursor:pointer;font-size:14px;opacity:0.5;transition:opacity .2s;">Use this Avatar</button>
-                        </div>
+                <div id="avatarTab-upload" style="display:none; text-align: center;">
+                    <div style="padding: 3rem; border: 2px dashed var(--p-border); border-radius: 1rem;">
+                        <i data-lucide="upload-cloud" style="width: 48px; height: 48px; color: var(--p-primary); margin-bottom: 1rem;"></i>
+                        <p>Drag and drop or browse to upload</p>
+                        <button type="button" class="btn-primary" onclick="document.getElementById('profile_picture').click()" style="margin-top: 1rem;">Choose File</button>
                     </div>
-                </div><!-- end photo tab -->
+                </div>
             </div>
         </div>
     </div>
@@ -643,706 +370,65 @@
 </div>
 
 <script>
-let formChanged = false;
-
-// Track changes in form
+// Logic to handle Lucide icons and Form State
 document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+    
     const form = document.getElementById('profileForm');
     if (form) {
         const inputs = form.querySelectorAll('input, textarea');
+        const saveBtn = document.getElementById('saveProfileBtn');
+        
         inputs.forEach(input => {
-            input.addEventListener('input', function() {
-                formChanged = true;
-                const saveBtn = document.querySelector('.btn-save-profile');
-                if (saveBtn) {
-                    saveBtn.classList.add('has-changes');
-                }
+            input.addEventListener('input', () => {
+                saveBtn.classList.add('has-changes');
+                window.onbeforeunload = () => "You have unsaved changes.";
             });
         });
-        
-        // Reset formChanged when form is submitted
-        form.addEventListener('submit', function(e) {
-            console.log('Form is being submitted');
-            formChanged = false;
-            
-            // Show loading state on button
-            const saveBtn = document.querySelector('.btn-save-profile');
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Saving...';
-            }
-        });
+
+        form.onsubmit = () => {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="loading-spinner"></span> Saving...';
+            window.onbeforeunload = null;
+        };
     }
 });
 
 function openAvatarModal() {
     document.getElementById('avatarModal').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
 }
 
 function closeAvatarModal() {
     document.getElementById('avatarModal').style.display = 'none';
-    document.body.style.overflow = 'auto';
 }
 
-function selectAvatar(avatarUrl) {
-    document.getElementById('avatarPreview').src = avatarUrl;
-    document.getElementById('avatar_choice').value = avatarUrl;
-    formChanged = true;
-    const saveBtn = document.querySelector('.btn-save-profile');
-    if (saveBtn) {
-        saveBtn.classList.add('has-changes');
-    }
+function switchAvatarTab(tab) {
+    ['presets', 'emoji', 'upload'].forEach(t => {
+        document.getElementById('avatarTab-' + t).style.display = t === tab ? 'block' : 'none';
+        document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    });
+}
+
+function selectAvatar(url) {
+    document.getElementById('avatarPreview').src = url;
+    document.getElementById('avatar_choice').value = url;
+    document.getElementById('saveProfileBtn').classList.add('has-changes');
     closeAvatarModal();
 }
 
 function previewAvatar(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = (e) => {
             document.getElementById('avatarPreview').src = e.target.result;
             document.getElementById('avatar_choice').value = '';
-            formChanged = true;
-            const saveBtn = document.querySelector('.btn-save-profile');
-            if (saveBtn) {
-                saveBtn.classList.add('has-changes');
-            }
+            document.getElementById('saveProfileBtn').classList.add('has-changes');
             closeAvatarModal();
         };
         reader.readAsDataURL(input.files[0]);
     }
 }
 
-// File input change handler
-document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.getElementById('profile_picture');
-    if (fileInput) {
-        fileInput.addEventListener('change', function() {
-            previewAvatar(this);
-        });
-    }
-});
-
-// Close modal when clicking outside
-window.onclick = function(event) {
-    const modal = document.getElementById('avatarModal');
-    if (event.target === modal) {
-        closeAvatarModal();
-    }
-}
-
-// Only warn before leaving if there are actual unsaved changes
-window.addEventListener('beforeunload', function(e) {
-    if (formChanged) {
-        e.preventDefault();
-        e.returnValue = 'Changes you made may not be saved.';
-        return 'Changes you made may not be saved.';
-    }
-});
-
-// ── Emoji Avatar Creator ──────────────────────────────────────────────────────
-const emojiState = {
-    skin: '#FDDBB4', hair: 'short', hairColor: '#1a1a1a',
-    eyes: 'normal', mouth: 'smile', acc: 'none', bg: '#667eea'
-};
-
-function switchAvatarTab(tab) {
-    ['presets','emoji','photo','upload'].forEach(t => {
-        document.getElementById('avatarTab-' + t).style.display = t === tab ? '' : 'none';
-        const btn = document.getElementById('tab-' + t);
-        btn.style.color = t === tab ? '#667eea' : '#888';
-        btn.style.fontWeight = t === tab ? '600' : '500';
-        btn.style.borderBottom = t === tab ? '2px solid #667eea' : '2px solid transparent';
-    });
-    if (tab === 'emoji') drawEmoji();
-}
-
-function setEmoji(type, val) {
-    emojiState[type] = val;
-    // highlight selected
-    document.querySelectorAll(`.ec-swatch[data-type="${type}"], .ec-chip[data-type="${type}"]`).forEach(el => {
-        el.style.outline = el.dataset.val === val ? '3px solid #667eea' : 'none';
-        el.style.transform = el.dataset.val === val ? 'scale(1.15)' : 'scale(1)';
-    });
-    drawEmoji();
-}
-
-function drawEmoji() {
-    const canvas = document.getElementById('emojiCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const W = 200, H = 200, cx = W/2, cy = H/2;
-    ctx.clearRect(0, 0, W, H);
-
-    // Background circle
-    ctx.beginPath();
-    ctx.arc(cx, cy, 100, 0, Math.PI*2);
-    ctx.fillStyle = emojiState.bg;
-    ctx.fill();
-
-    // Neck
-    ctx.beginPath();
-    ctx.roundRect(cx-18, cy+42, 36, 30, 8);
-    ctx.fillStyle = emojiState.skin;
-    ctx.fill();
-
-    // Head
-    ctx.beginPath();
-    ctx.ellipse(cx, cy+10, 52, 58, 0, 0, Math.PI*2);
-    ctx.fillStyle = emojiState.skin;
-    ctx.fill();
-
-    // Ears
-    [cx-52, cx+52].forEach((ex, i) => {
-        ctx.beginPath();
-        ctx.ellipse(ex, cy+14, 10, 14, 0, 0, Math.PI*2);
-        ctx.fillStyle = emojiState.skin;
-        ctx.fill();
-    });
-
-    // Eyes
-    drawEyes(ctx, cx, cy, emojiState.eyes);
-
-    // Nose
-    ctx.beginPath();
-    ctx.moveTo(cx, cy+14);
-    ctx.quadraticCurveTo(cx+8, cy+28, cx, cy+32);
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Mouth
-    drawMouth(ctx, cx, cy, emojiState.mouth);
-
-    // Hair
-    if (emojiState.hair !== 'none') drawHair(ctx, cx, cy, emojiState.hair, emojiState.hairColor);
-
-    // Accessory
-    if (emojiState.acc !== 'none') drawAccessory(ctx, cx, cy, emojiState.acc);
-}
-
-function drawEyes(ctx, cx, cy, style) {
-    const lx = cx-18, rx = cx+18, ey = cy-4;
-    ctx.fillStyle = '#1a1a1a';
-    if (style === 'normal') {
-        [lx, rx].forEach(x => { ctx.beginPath(); ctx.ellipse(x, ey, 7, 8, 0, 0, Math.PI*2); ctx.fill(); });
-        ctx.fillStyle = '#fff';
-        [lx, rx].forEach(x => { ctx.beginPath(); ctx.arc(x+2, ey-2, 2.5, 0, Math.PI*2); ctx.fill(); });
-    } else if (style === 'happy') {
-        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 3;
-        [lx, rx].forEach(x => { ctx.beginPath(); ctx.arc(x, ey+4, 7, Math.PI, 0); ctx.stroke(); });
-    } else if (style === 'wink') {
-        ctx.beginPath(); ctx.ellipse(lx, ey, 7, 8, 0, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(lx+2, ey-2, 2.5, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#1a1a1a'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(rx-8, ey); ctx.lineTo(rx+8, ey); ctx.stroke();
-    } else if (style === 'sleepy') {
-        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 3;
-        [lx, rx].forEach(x => { ctx.beginPath(); ctx.arc(x, ey, 7, 0, Math.PI); ctx.stroke(); });
-    } else if (style === 'star') {
-        [lx, rx].forEach(x => { drawStar(ctx, x, ey, 5, 8, 4, '#FFD700'); });
-    }
-}
-
-function drawStar(ctx, cx, cy, spikes, outerR, innerR, color) {
-    let rot = (Math.PI/2)*3, step = Math.PI/spikes;
-    ctx.beginPath(); ctx.moveTo(cx, cy - outerR);
-    for (let i=0; i<spikes; i++) {
-        ctx.lineTo(cx + Math.cos(rot)*outerR, cy + Math.sin(rot)*outerR); rot += step;
-        ctx.lineTo(cx + Math.cos(rot)*innerR, cy + Math.sin(rot)*innerR); rot += step;
-    }
-    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
-}
-
-function drawMouth(ctx, cx, cy, style) {
-    const my = cy + 34;
-    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 3;
-    if (style === 'smile') {
-        ctx.beginPath(); ctx.arc(cx, my-8, 18, 0.2, Math.PI-0.2); ctx.stroke();
-    } else if (style === 'grin') {
-        ctx.beginPath(); ctx.arc(cx, my-8, 20, 0.1, Math.PI-0.1);
-        ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#ff6b6b';
-        ctx.beginPath(); ctx.ellipse(cx, my+4, 10, 6, 0, 0, Math.PI); ctx.fill();
-    } else if (style === 'neutral') {
-        ctx.beginPath(); ctx.moveTo(cx-14, my); ctx.lineTo(cx+14, my); ctx.stroke();
-    } else if (style === 'sad') {
-        ctx.beginPath(); ctx.arc(cx, my+8, 18, Math.PI+0.2, -0.2); ctx.stroke();
-    } else if (style === 'tongue') {
-        ctx.beginPath(); ctx.arc(cx, my-8, 18, 0.2, Math.PI-0.2); ctx.stroke();
-        ctx.fillStyle = '#ff6b6b';
-        ctx.beginPath(); ctx.ellipse(cx, my+4, 9, 10, 0, 0, Math.PI); ctx.fill();
-    }
-}
-
-function drawHair(ctx, cx, cy, style, color) {
-    ctx.fillStyle = color;
-    if (style === 'short') {
-        ctx.beginPath();
-        ctx.ellipse(cx, cy-42, 52, 28, 0, Math.PI, 0);
-        ctx.fill();
-        ctx.fillRect(cx-52, cy-42, 14, 30);
-        ctx.fillRect(cx+38, cy-42, 14, 30);
-    } else if (style === 'long') {
-        ctx.beginPath();
-        ctx.ellipse(cx, cy-42, 52, 28, 0, Math.PI, 0);
-        ctx.fill();
-        ctx.fillRect(cx-52, cy-42, 14, 80);
-        ctx.fillRect(cx+38, cy-42, 14, 80);
-    } else if (style === 'curly') {
-        for (let i=0; i<8; i++) {
-            const angle = (i/8)*Math.PI;
-            const bx = cx + Math.cos(Math.PI+angle)*52;
-            const by = cy - 42 + Math.sin(Math.PI+angle)*28;
-            ctx.beginPath(); ctx.arc(bx, by, 12, 0, Math.PI*2); ctx.fill();
-        }
-        ctx.beginPath(); ctx.ellipse(cx, cy-42, 52, 28, 0, Math.PI, 0); ctx.fill();
-    } else if (style === 'bun') {
-        ctx.beginPath(); ctx.ellipse(cx, cy-42, 52, 28, 0, Math.PI, 0); ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy-72, 20, 0, Math.PI*2); ctx.fill();
-    }
-}
-
-function drawAccessory(ctx, cx, cy, acc) {
-    if (acc === 'glasses') {
-        ctx.strokeStyle = '#333'; ctx.lineWidth = 2.5;
-        [cx-18, cx+18].forEach(x => { ctx.beginPath(); ctx.arc(x, cy-4, 11, 0, Math.PI*2); ctx.stroke(); });
-        ctx.beginPath(); ctx.moveTo(cx-7, cy-4); ctx.lineTo(cx+7, cy-4); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx-29, cy-4); ctx.lineTo(cx-52, cy-8); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx+29, cy-4); ctx.lineTo(cx+52, cy-8); ctx.stroke();
-    } else if (acc === 'sunglasses') {
-        ctx.fillStyle = 'rgba(0,0,0,0.75)';
-        [cx-18, cx+18].forEach(x => { ctx.beginPath(); ctx.arc(x, cy-4, 12, 0, Math.PI*2); ctx.fill(); });
-        ctx.strokeStyle = '#555'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(cx-6, cy-4); ctx.lineTo(cx+6, cy-4); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx-30, cy-4); ctx.lineTo(cx-52, cy-8); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx+30, cy-4); ctx.lineTo(cx+52, cy-8); ctx.stroke();
-    } else if (acc === 'hat') {
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(cx-60, cy-52, 120, 10);
-        ctx.fillRect(cx-30, cy-90, 60, 42);
-        ctx.fillStyle = '#c0392b';
-        ctx.fillRect(cx-30, cy-52, 60, 6);
-    } else if (acc === 'headband') {
-        ctx.strokeStyle = '#e91e8c'; ctx.lineWidth = 10;
-        ctx.beginPath(); ctx.arc(cx, cy-10, 52, Math.PI+0.3, -0.3); ctx.stroke();
-        ctx.fillStyle = '#e91e8c';
-        ctx.beginPath(); ctx.arc(cx+52, cy-42, 10, 0, Math.PI*2); ctx.fill();
-    }
-}
-
-function saveEmojiAvatar() {
-    const canvas = document.getElementById('emojiCanvas');
-    const dataUrl = canvas.toDataURL('image/png');
-    const btn = canvas.parentElement.querySelector('button');
-    btn.textContent = 'Saving...'; btn.disabled = true;
-    const fd = new FormData();
-    fd.append('data_url', dataUrl);
-    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    fetch('/save-emoji-avatar/', {method:'POST', body: fd})
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                document.getElementById('avatarPreview').src = data.url + '?t=' + Date.now();
-                closeAvatarModal();
-            }
-            btn.textContent = 'Use this Avatar'; btn.disabled = false;
-        });
-}
-
-// ── Photo Avatar Creator ──────────────────────────────────────────────────────
-let photoSourceImg = null;
-let currentPhotoStyle = 'cartoon';
-let currentPhotoBg = '#667eea';
-
-function handlePhotoDrop(e) {
-    e.preventDefault();
-    document.getElementById('photoDropZone').style.borderColor = '#c5cae9';
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) loadPhotoFile(file);
-}
-
-function loadPhotoForAvatar(input) {
-    if (input.files && input.files[0]) loadPhotoFile(input.files[0]);
-}
-
-function loadPhotoFile(file) {
-    const reader = new FileReader();
-    reader.onload = e => {
-        const img = new Image();
-        img.onload = () => {
-            photoSourceImg = img;
-            // Show source preview (small)
-            const src = document.getElementById('photoSourceCanvas');
-            const maxW = 260, scale = Math.min(1, maxW / img.width);
-            src.width = img.width * scale;
-            src.height = img.height * scale;
-            src.getContext('2d').drawImage(img, 0, 0, src.width, src.height);
-            src.style.display = 'block';
-            applyPhotoStyle(currentPhotoStyle);
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-}
-
-function applyPhotoStyle(style, btn) {
-    currentPhotoStyle = style;
-    // Update button states
-    document.querySelectorAll('.pa-style-btn').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    if (!photoSourceImg) return;
-
-    const proc = document.getElementById('photoProcessing');
-    proc.style.display = 'flex';
-
-    // Use setTimeout to let the UI update before heavy processing
-    setTimeout(() => {
-        const result = document.getElementById('photoResultCanvas');
-        const size = 220;
-        result.width = size; result.height = size;
-        const ctx = result.getContext('2d');
-
-        // Draw background
-        ctx.fillStyle = currentPhotoBg;
-        ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
-
-        // Crop source to square centered
-        const src = photoSourceImg;
-        const minDim = Math.min(src.width, src.height);
-        const sx = (src.width - minDim) / 2;
-        const sy = (src.height - minDim) / 2;
-
-        // Draw source into offscreen canvas
-        const off = document.createElement('canvas');
-        off.width = size; off.height = size;
-        const octx = off.getContext('2d');
-        octx.drawImage(src, sx, sy, minDim, minDim, 0, 0, size, size);
-
-        const imageData = octx.getImageData(0, 0, size, size);
-
-        let processed;
-        if (style === 'cartoon') processed = cartoonFilter(imageData, size);
-        else if (style === 'sketch') processed = sketchFilter(imageData, size);
-        else if (style === 'pop') processed = popArtFilter(imageData, size);
-        else if (style === 'pixel') processed = pixelFilter(imageData, size, 10);
-        else if (style === 'glow') processed = glowFilter(imageData, size);
-        else processed = imageData;
-
-        octx.putImageData(processed, 0, 0);
-
-        // Clip to circle and draw onto result
-        ctx.save();
-        ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.clip();
-        ctx.drawImage(off, 0, 0);
-        ctx.restore();
-
-        proc.style.display = 'none';
-        const useBtn = document.getElementById('usePhotoAvatarBtn');
-        useBtn.disabled = false; useBtn.style.opacity = '1';
-    }, 30);
-}
-
-function setPhotoBg(color, el) {
-    currentPhotoBg = color;
-    document.querySelectorAll('.pa-bg-swatch').forEach(s => s.style.outline = 'none');
-    if (el) { el.style.outline = '3px solid #667eea'; el.style.outlineOffset = '2px'; }
-    if (photoSourceImg) applyPhotoStyle(currentPhotoStyle);
-}
-
-// ── Filters ───────────────────────────────────────────────────────────────────
-
-function cartoonFilter(imageData, size) {
-    const d = new Uint8ClampedArray(imageData.data);
-    // 1. Bilateral-like smoothing (box blur × 2)
-    boxBlur(d, size, size, 2);
-    boxBlur(d, size, size, 2);
-    // 2. Color quantization (reduce palette)
-    for (let i = 0; i < d.length; i += 4) {
-        d[i]   = Math.round(d[i]   / 32) * 32;
-        d[i+1] = Math.round(d[i+1] / 32) * 32;
-        d[i+2] = Math.round(d[i+2] / 32) * 32;
-    }
-    // 3. Edge detection overlay (darken edges)
-    const edges = sobelEdges(imageData.data, size, size);
-    for (let i = 0; i < d.length; i += 4) {
-        const e = edges[i/4];
-        if (e > 60) { d[i] = d[i+1] = d[i+2] = 0; }
-    }
-    return new ImageData(d, size, size);
-}
-
-function sketchFilter(imageData, size) {
-    const d = new Uint8ClampedArray(imageData.data);
-    // Grayscale
-    for (let i = 0; i < d.length; i += 4) {
-        const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-        d[i] = d[i+1] = d[i+2] = g;
-    }
-    // Invert + blur + dodge
-    const inv = new Uint8ClampedArray(d);
-    for (let i = 0; i < inv.length; i += 4) { inv[i] = inv[i+1] = inv[i+2] = 255 - inv[i]; }
-    boxBlur(inv, size, size, 4);
-    for (let i = 0; i < d.length; i += 4) {
-        const b = inv[i] === 255 ? 255 : Math.min(255, (d[i] * 255) / (255 - inv[i]));
-        d[i] = d[i+1] = d[i+2] = b;
-    }
-    return new ImageData(d, size, size);
-}
-
-function popArtFilter(imageData, size) {
-    const d = new Uint8ClampedArray(imageData.data);
-    const palettes = [
-        [255,50,50],[255,200,0],[0,200,100],[50,100,255],[200,0,200],[255,120,0]
-    ];
-    for (let i = 0; i < d.length; i += 4) {
-        const r = d[i], g = d[i+1], b = d[i+2];
-        // Find closest palette color
-        let best = 0, bestDist = Infinity;
-        palettes.forEach((p, j) => {
-            const dist = (r-p[0])**2 + (g-p[1])**2 + (b-p[2])**2;
-            if (dist < bestDist) { bestDist = dist; best = j; }
-        });
-        [d[i], d[i+1], d[i+2]] = palettes[best];
-    }
-    const edges = sobelEdges(imageData.data, size, size);
-    for (let i = 0; i < d.length; i += 4) {
-        if (edges[i/4] > 80) { d[i] = d[i+1] = d[i+2] = 0; }
-    }
-    return new ImageData(d, size, size);
-}
-
-function pixelFilter(imageData, size, blockSize) {
-    const d = new Uint8ClampedArray(imageData.data);
-    for (let y = 0; y < size; y += blockSize) {
-        for (let x = 0; x < size; x += blockSize) {
-            const idx = (y * size + x) * 4;
-            const r = imageData.data[idx], g = imageData.data[idx+1], b = imageData.data[idx+2];
-            for (let dy = 0; dy < blockSize && y+dy < size; dy++) {
-                for (let dx = 0; dx < blockSize && x+dx < size; dx++) {
-                    const i = ((y+dy)*size + (x+dx)) * 4;
-                    d[i] = r; d[i+1] = g; d[i+2] = b;
-                }
-            }
-        }
-    }
-    return new ImageData(d, size, size);
-}
-
-function glowFilter(imageData, size) {
-    const d = new Uint8ClampedArray(imageData.data);
-    // Boost saturation + brightness
-    for (let i = 0; i < d.length; i += 4) {
-        const r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
-        const max = Math.max(r,g,b), min = Math.min(r,g,b);
-        let h, s, l = (max+min)/2;
-        if (max === min) { h = s = 0; }
-        else {
-            const diff = max - min;
-            s = l > 0.5 ? diff/(2-max-min) : diff/(max+min);
-            if (max===r) h = ((g-b)/diff + (g<b?6:0))/6;
-            else if (max===g) h = ((b-r)/diff + 2)/6;
-            else h = ((r-g)/diff + 4)/6;
-        }
-        s = Math.min(1, s * 1.8);
-        l = Math.min(1, l * 1.15);
-        const [nr,ng,nb] = hslToRgb(h, s, l);
-        d[i] = nr; d[i+1] = ng; d[i+2] = nb;
-    }
-    // Soft glow: blend with blurred version
-    const blurred = new Uint8ClampedArray(d);
-    boxBlur(blurred, size, size, 5);
-    for (let i = 0; i < d.length; i += 4) {
-        d[i]   = Math.min(255, d[i]   * 0.7 + blurred[i]   * 0.5);
-        d[i+1] = Math.min(255, d[i+1] * 0.7 + blurred[i+1] * 0.5);
-        d[i+2] = Math.min(255, d[i+2] * 0.7 + blurred[i+2] * 0.5);
-    }
-    return new ImageData(d, size, size);
-}
-
-function hslToRgb(h, s, l) {
-    if (s === 0) { const v = Math.round(l*255); return [v,v,v]; }
-    const q = l < 0.5 ? l*(1+s) : l+s-l*s, p = 2*l-q;
-    const hue2rgb = (p,q,t) => {
-        if (t<0) t+=1; if (t>1) t-=1;
-        if (t<1/6) return p+(q-p)*6*t;
-        if (t<1/2) return q;
-        if (t<2/3) return p+(q-p)*(2/3-t)*6;
-        return p;
-    };
-    return [Math.round(hue2rgb(p,q,h+1/3)*255), Math.round(hue2rgb(p,q,h)*255), Math.round(hue2rgb(p,q,h-1/3)*255)];
-}
-
-function boxBlur(data, w, h, radius) {
-    const tmp = new Uint8ClampedArray(data);
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-            let r=0,g=0,b=0,count=0;
-            for (let dy=-radius; dy<=radius; dy++) {
-                const ny = Math.min(h-1, Math.max(0, y+dy));
-                for (let dx=-radius; dx<=radius; dx++) {
-                    const nx = Math.min(w-1, Math.max(0, x+dx));
-                    const i = (ny*w+nx)*4;
-                    r+=tmp[i]; g+=tmp[i+1]; b+=tmp[i+2]; count++;
-                }
-            }
-            const i = (y*w+x)*4;
-            data[i]=r/count; data[i+1]=g/count; data[i+2]=b/count;
-        }
-    }
-}
-
-function sobelEdges(data, w, h) {
-    const gray = new Float32Array(w*h);
-    for (let i=0; i<w*h; i++) gray[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
-    const edges = new Float32Array(w*h);
-    for (let y=1; y<h-1; y++) {
-        for (let x=1; x<w-1; x++) {
-            const gx = -gray[(y-1)*w+(x-1)] + gray[(y-1)*w+(x+1)]
-                       -2*gray[y*w+(x-1)]   + 2*gray[y*w+(x+1)]
-                       -gray[(y+1)*w+(x-1)] + gray[(y+1)*w+(x+1)];
-            const gy = -gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)]
-                       +gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)];
-            edges[y*w+x] = Math.sqrt(gx*gx + gy*gy);
-        }
-    }
-    return edges;
-}
-
-function savePhotoAvatar() {
-    const canvas = document.getElementById('photoResultCanvas');
-    const dataUrl = canvas.toDataURL('image/png');
-    const btn = document.getElementById('usePhotoAvatarBtn');
-    btn.textContent = 'Saving…'; btn.disabled = true;
-    const fd = new FormData();
-    fd.append('data_url', dataUrl);
-    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    fetch('/save-emoji-avatar/', {method:'POST', body: fd})
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                document.getElementById('avatarPreview').src = data.url + '?t=' + Date.now();
-                closeAvatarModal();
-            }
-            btn.textContent = 'Use this Avatar'; btn.disabled = false; btn.style.opacity = '1';
-        });
-}
-
-// ── Swatch/chip styles ────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.ec-swatch').forEach(el => {
-        el.style.cssText += 'width:28px;height:28px;border-radius:50%;cursor:pointer;transition:transform .15s,outline .15s;border:2px solid rgba(255,255,255,0.5);';
-    });
-    document.querySelectorAll('.ec-chip').forEach(el => {
-        el.style.cssText += 'padding:6px 10px;border-radius:20px;background:#f0f0f0;cursor:pointer;font-size:18px;transition:transform .15s,outline .15s;';
-    });
-    // init highlights
-    Object.entries(emojiState).forEach(([k,v]) => setEmoji(k, v));
-});
+document.getElementById('profile_picture').onchange = function() { previewAvatar(this); };
 </script>
-
-<style>
-.alert-success {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-    padding: 16px 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.btn-save-profile.has-changes {
-    background: #31a24c;
-    animation: pulse 2s infinite;
-}
-
-.security-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 12px;
-    border: 1px solid #e9ecef;
-}
-
-/* Photo Avatar tab */
-.pa-style-btn {
-    padding: 7px 14px;
-    border: 2px solid #e0e0e0;
-    border-radius: 20px;
-    background: #fff;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: border-color .15s, background .15s, transform .15s;
-    font-family: Inter, sans-serif;
-}
-.pa-style-btn:hover { border-color: #667eea; transform: translateY(-1px); }
-.pa-style-btn.active { border-color: #667eea; background: #f0f0ff; font-weight: 700; }
-.pa-bg-swatch {
-    display: inline-block;
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: transform .15s, outline .15s;
-    border: 2px solid rgba(255,255,255,0.6);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-}
-.pa-bg-swatch:hover { transform: scale(1.2); }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.security-info {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-.btn-security {
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    background: #6c757d;
-    color: white;
-}
-
-.btn-enable-2fa {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.badge-2fa {
-    background: #e8f5e9;
-    color: #2e7d32;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    margin-left: 8px;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        box-shadow: 0 0 0 0 rgba(49, 162, 76, 0.7);
-    }
-    50% {
-        box-shadow: 0 0 0 10px rgba(49, 162, 76, 0);
-    }
-}
-</style>
 {% endblock %}

@@ -285,7 +285,17 @@
         });
 
         // Notification count update
-        function updateNotificationCount() {
+        function updateNotificationCount(count = null) {
+            if (count !== null) {
+                const badge = document.getElementById('notificationBadge');
+                if (count > 0) {
+                    badge.textContent = count > 99 ? '99+' : count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+                return;
+            }
             fetch('/notifications/unread-count/')
                 .then(response => response.json())
                 .then(data => {
@@ -300,6 +310,69 @@
                 .catch(error => console.error('Error fetching notification count:', error));
         }
 
+        // Real-time WebSocket connection
+        function connectNotificationWS() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
+            const socket = new WebSocket(wsUrl);
+
+            socket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('Notification received:', data);
+
+                if (data.type === 'new_message') {
+                    // Show a toast
+                    showToast(`Message from ${data.data.sender}`, data.data.message, 'info');
+                    updateNotificationCount();
+                    
+                    // Dispatch event for specialized pages (like Chat)
+                    window.dispatchEvent(new CustomEvent('new_message', { detail: data.data }));
+                } else if (data.type === 'meeting_started') {
+                    showToast(`Class Started!`, `${data.data.title} is now LIVE.`, 'success');
+                    updateNotificationCount();
+                    // Update dashboards if needed
+                    window.dispatchEvent(new CustomEvent('meeting_state_change', { detail: data.data }));
+                }
+            };
+
+            socket.onclose = function(e) {
+                console.log('Notification socket closed. Reconnecting in 3 seconds...');
+                setTimeout(connectNotificationWS, 3000);
+            };
+
+            socket.onerror = function(err) {
+                console.error('Notification socket error:', err);
+                socket.close();
+            };
+        }
+
+        // Toast System
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer') || createToastContainer();
+            const toast = document.createElement('div');
+            toast.className = `custom-toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <strong>${title}</strong>
+                    <p>${message}</p>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
+
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+            return container;
+        }
+
         // Update notification count on page load
         document.addEventListener('DOMContentLoaded', function() {
             // Apply saved theme
@@ -310,8 +383,7 @@
             }
 
             updateNotificationCount();
-            // Poll for new notifications every 60 seconds
-            setInterval(updateNotificationCount, 60000);
+            connectNotificationWS();
         });
 
         // Theme Toggle Logic
@@ -333,6 +405,16 @@
             }
         }
     </script>
+    <style>
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .custom-toast { background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-left: 4px solid #6366f1; display: flex; align-items: center; gap: 15px; min-width: 300px; animation: slideInRight 0.3s ease; }
+        .custom-toast.success { border-left-color: #10b981; }
+        .custom-toast.info { border-left-color: #6366f1; }
+        .custom-toast.fade-out { opacity: 0; transform: translateX(20px); transition: all 0.5s; }
+        .toast-content strong { display: block; font-size: 0.9rem; color: #1e293b; }
+        .toast-content p { font-size: 0.8rem; color: #64748b; margin: 0; }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
     {% endcompress %}
     {% else %}
     <!-- Not authenticated - redirect to login -->

@@ -11,6 +11,57 @@
     <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
     <!-- LiveKit JS SDK (browser bundle) -->
     <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+
+    <style>
+        /* AI Monitoring Styles */
+        #face-att-badge {
+            position: fixed; bottom: 100px; right: 24px; z-index: 1000;
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 20px; border-radius: 16px;
+            font-size: 13px; font-weight: 600; color: #fff;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            max-width: 300px;
+        }
+        #face-att-badge.state-active    { border-color: rgba(99, 102, 241, 0.4); }
+        #face-att-badge.state-progress  { border-color: rgba(245, 158, 11, 0.4); }
+        #face-att-badge.state-success   { border-color: rgba(16, 185, 129, 0.4); }
+        #face-att-badge.state-warning   { border-color: rgba(239, 68, 68, 0.4); }
+        
+        .fa-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+            background: #6366f1; animation: fa-pulse 2s infinite;
+        }
+        .state-success .fa-dot { background: #10b981; animation: none; }
+        .state-warning .fa-dot { background: #ef4444; }
+        @keyframes fa-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+
+        #face-att-progress-bar {
+            height: 4px; background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px; margin-top: 6px; overflow: hidden;
+        }
+        #face-att-progress-fill {
+            height: 100%; background: linear-gradient(90deg, #6366f1, #10b981);
+            width: 0%; transition: width 0.5s ease;
+        }
+
+        /* Face Tracking Overlays */
+        .ft-canvas-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10; border-radius: inherit;
+        }
+        .ft-emotion-badge {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.9); color: #fff; font-size: 11px; font-weight: 700;
+            padding: 4px 10px; border-radius: 20px; white-space: nowrap; z-index: 11;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .video-box { position: relative; overflow: hidden; }
+    </style>
 </head>
 <body class="meeting-body">
 <div class="meet-container">
@@ -55,6 +106,12 @@
                 <div class="sidebar-panel active" id="peoplePanel">
                     <div class="participants-count"><span id="participantCount">1</span> in call</div>
                     <div class="participants-list" id="participantsList"></div>
+                    {% if is_host %}
+                    <div class="banned-section" style="margin-top: 2rem; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 1rem;">
+                        <div class="participants-count" style="background: rgba(239, 68, 68, 0.05); color: #ef4444; border-bottom: none;">Banned Students</div>
+                        <div class="participants-list" id="bannedList"></div>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="sidebar-panel" id="chatPanel">
                     <div class="chat-messages" id="chatMessages"></div>
@@ -83,6 +140,16 @@
         <button class="control-button" id="sleepBtn" onclick="toggleSleepMode()" title="Sleep mode">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
         </button>
+        <button class="control-button" id="ftToggleBtn" onclick="toggleFaceTracking()" title="Face Tracking">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+        <div class="control-divider"></div>
+        <button class="control-button" id="muteAllBtn" onclick="toggleGlobalControl('mute_all')" title="Mute All Students">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </button>
+        <button class="control-button" id="camOffAllBtn" onclick="toggleGlobalControl('camera_off_all')" title="Stop All Student Cameras">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M7 2l10 10L7 22"/><path d="M23 7l-7 5 7 5V7z"/></svg>
+        </button>
         {% endif %}
         <div class="control-divider"></div>
         <button class="control-button" id="peopleBtn" onclick="openSidebar('people')" title="Participants">
@@ -106,12 +173,20 @@
     data-user-id="{{ user.id }}"
     data-username="{{ user.username }}"
     data-is-host="{% if is_host %}true{% else %}false{% endif %}"
+    data-can-speak="{% if participant.audio_permitted %}true{% else %}false{% endif %}"
+    data-can-video="{% if participant.video_permitted %}true{% else %}false{% endif %}"
+    data-can-share="{% if participant.screenshare_permitted %}true{% else %}false{% endif %}"
     data-token-url="{% url 'livekit_token' meeting.meeting_code %}"
     data-leave-url="{% url 'leave_meeting' meeting.id %}"
     data-sleep-url="{% url 'sleep_meeting' meeting.meeting_code %}"
     data-unfreeze-url="{% url 'unfreeze_meeting' meeting.meeting_code %}"
     data-after-leave-url="{% if meeting.classroom %}{% url 'classroom_detail' meeting.classroom.id %}{% elif is_host %}{% url 'teacher_classrooms' %}{% else %}{% url 'student_classrooms' %}{% endif %}"
-    data-csrf="{{ csrf_token }}">
+    data-csrf="{{ csrf_token }}"
+    data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
+    data-permission-url="{% url 'update_participant_permission' meeting.id 0 %}"
+    data-global-control-url="{% url 'toggle_global_control' meeting.id %}"
+    data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
+    data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}">
 </script>
 
 <script>
@@ -121,6 +196,9 @@ const meetingCode = _d.meetingCode;
 const currentUserId   = _d.userId;
 const currentUsername = _d.username;
 const isHost      = _d.isHost === 'true';
+const initialCanSpeak = _d.canSpeak === 'true';
+const initialCanVideo = _d.canVideo === 'true';
+const initialCanShare = _d.canShare === 'true';
 const TOKEN_URL   = _d.tokenUrl;
 const LEAVE_URL    = _d.leaveUrl;
 const SLEEP_URL    = _d.sleepUrl;
@@ -142,9 +220,24 @@ let isSleeping = false;
 let unreadMessages = 0;
 let timerInterval  = null;
 let timerSeconds   = 0;
+let signalingWs    = null;
+
+// Permission State (Enforced locally for students)
+let canSpeak = initialCanSpeak;
+let canVideo = initialCanVideo;
+let canShare = initialCanShare;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+    // ── Signaling WebSocket ──────────────────────────────────────────────────
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${meetingCode}/`);
+    
+    signalingWs.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        handleSignalingMessage(data);
+    };
+
     // Fetch token from Django
     const res   = await fetch(TOKEN_URL);
     const data  = await res.json();
@@ -212,6 +305,7 @@ function getOrCreateBox(identity, displayName, isLocal) {
     box.id = `video-box-${identity}`;
     box.className = 'video-box';
     box.dataset.identity = identity;
+    box.dataset.userId   = identity; // Required for Face Tracking
     box.style.cursor = 'pointer'; // Make it look clickable
     
     // Click to enlarge this video
@@ -279,6 +373,10 @@ function attachTrackToBox(track, box, isLocal) {
         el.muted = true;
         el.autoplay = true;
         el.playsInline = true;
+        if (isLocal) {
+            el.id = 'localVideo';
+            el.dataset.local = 'true';
+        }
         box.insertBefore(el, box.querySelector('.video-nametag'));
     }
     // Audio elements are invisible — LiveKit attaches them to document automatically
@@ -436,8 +534,55 @@ function onDisconnected() {
 
 function onConnectionStateChanged(state) {
     console.log('Connection state:', state);
-    if (state === ConnectionState.Connected) {
-        showNotification('Connected', 'success');
+    }
+}
+
+// ── Signaling Handlers ────────────────────────────────────────────────────────
+function handleSignalingMessage(data) {
+    switch(data.type) {
+        case 'kick_user':
+            if (data.user_id == currentUserId) {
+                alert(data.message);
+                leaveMeeting();
+            } else {
+                showNotification(`User kicked: ${data.user_id}`, 'info');
+            }
+            break;
+        case 'permission_update':
+            if (data.user_id == currentUserId) {
+                handleLocalPermissionUpdate(data.permission_type, data.value, data.message);
+            }
+            break;
+        case 'global_control_update':
+            handleGlobalControlUpdate(data.control_type, data.value, data.message);
+            break;
+    }
+}
+
+async function handleLocalPermissionUpdate(type, allowed, message) {
+    showNotification(message, allowed ? 'success' : 'warning');
+    if (type === 'audio') {
+        canSpeak = allowed;
+        if (!allowed && isMicOn) toggleMic();
+    } else if (type === 'video') {
+        canVideo = allowed;
+        if (!allowed && isCameraOn) toggleCamera();
+    } else if (type === 'screenshare') {
+        canShare = allowed;
+        if (!allowed && isScreenSharing) stopScreenShare();
+    }
+}
+
+async function handleGlobalControlUpdate(type, value, message) {
+    if (isHost) return; // Host isn't affected by global student controls
+    
+    showNotification(message, value ? 'warning' : 'info');
+    if (type === 'mute_all' && value) {
+        if (isMicOn) toggleMic();
+    } else if (type === 'camera_off_all' && value) {
+        if (isCameraOn) toggleCamera();
+    } else if (type === 'screenshare_off_all' && value) {
+        if (isScreenSharing) stopScreenShare();
     }
 }
 
@@ -491,6 +636,10 @@ function updateLayout() {
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 async function toggleMic() {
+    if (!canSpeak && !isMicOn && !isHost) {
+        showNotification('Teacher has blocked your microphone', 'error');
+        return;
+    }
     isMicOn = !isMicOn;
     await room.localParticipant.setMicrophoneEnabled(isMicOn);
     const btn = document.getElementById('micBtn');
@@ -501,6 +650,10 @@ async function toggleMic() {
 }
 
 async function toggleCamera() {
+    if (!canVideo && !isCameraOn && !isHost) {
+        showNotification('Teacher has blocked your camera', 'error');
+        return;
+    }
     isCameraOn = !isCameraOn;
     await room.localParticipant.setCameraEnabled(isCameraOn);
     const btn = document.getElementById('camBtn');
@@ -525,6 +678,10 @@ async function toggleCamera() {
 }
 
 async function toggleScreenShare() {
+    if (!canShare && !isScreenSharing && !isHost) {
+        showNotification('Teacher has blocked screen sharing', 'error');
+        return;
+    }
     if (!isScreenSharing) {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
@@ -606,6 +763,91 @@ async function toggleSleepMode() {
     if (btn) btn.classList.toggle('active', isSleeping);
 }
 
+// ── Teacher Controls ──────────────────────────────────────────────────────────
+async function toggleGlobalControl(type) {
+    const btn = type === 'mute_all' ? document.getElementById('muteAllBtn') : document.getElementById('camOffAllBtn');
+    const currentState = btn.classList.contains('active');
+    const newState = !currentState;
+    
+    const res = await fetch(_d.globalControlUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, value: newState })
+    });
+    
+    if (res.ok) {
+        btn.classList.toggle('active', newState);
+        showNotification(`Global ${type.replace('_', ' ')} ${newState ? 'Enabled' : 'Disabled'}`, 'success');
+    }
+}
+
+async function kickUser(userId) {
+    if (!confirm('Are you sure you want to kick this student for 1 hour?')) return;
+    
+    const url = _d.kickUrl.replace('0', userId);
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    
+    if (res.ok) showNotification('Student kicked successfully', 'success');
+}
+
+async function updatePermission(userId, type, value) {
+    const url = _d.permissionUrl.replace('0', userId);
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, value })
+    });
+    
+    if (res.ok) {
+        showNotification(`Permission updated for student`, 'success');
+        updateParticipantsList();
+    }
+}
+
+async function unbanUser(userId) {
+    const url = _d.revokeBanUrl.replace('0', userId);
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    
+    if (res.ok) {
+        showNotification('Student unbanned successfully', 'success');
+        fetchBannedUsers();
+    }
+}
+
+async function fetchBannedUsers() {
+    if (!isHost) return;
+    const res = await fetch(_d.bannedUsersUrl);
+    const data = await res.json();
+    const list = document.getElementById('bannedList');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    if (data.banned && data.banned.length > 0) {
+        data.banned.forEach(u => {
+            const item = document.createElement('div');
+            item.className = 'participant-item';
+            item.innerHTML = `
+                <div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${u.username}&background=ef4444&color=fff" alt="${u.username}"></div>
+                <div class="participant-info">
+                    <div class="participant-name">${u.username}</div>
+                    <div style="font-size:10px; color:#ef4444;">Banned until ${new Date(u.banned_until).toLocaleTimeString()}</div>
+                </div>
+                <div class="participant-actions">
+                    <button class="action-btn" onclick="unbanUser('${u.id}')" title="Unban Student">✅</button>
+                </div>`;
+            list.appendChild(item);
+        });
+    } else {
+        list.innerHTML = '<p style="text-align:center; color:#999; font-size:12px; padding:10px;">No banned students</p>';
+    }
+}
+
 // ── Leave ─────────────────────────────────────────────────────────────────────
 async function leaveMeeting() {
     if (room) await room.disconnect();
@@ -658,10 +900,21 @@ function updateParticipantsList() {
             item.className = 'participant-item';
             item.innerHTML = `
                 <div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${p.name||p.identity}&background=6366f1&color=fff" alt="${p.name||p.identity}"></div>
-                <div class="participant-info"><div class="participant-name">${p.name || p.identity}</div></div>`;
+                <div class="participant-info">
+                    <div class="participant-name">${p.name || p.identity}</div>
+                </div>
+                ${isHost ? `
+                <div class="participant-actions">
+                    <button class="action-btn" onclick="updatePermission('${p.identity}', 'audio', true)" title="Allow Mic">🎤</button>
+                    <button class="action-btn" onclick="updatePermission('${p.identity}', 'video', true)" title="Allow Cam">📷</button>
+                    <button class="action-btn danger" onclick="kickUser('${p.identity}')" title="Kick Out">🚫</button>
+                </div>
+                ` : ''}`;
             list.appendChild(item);
         });
     }
+    
+    if (isHost) fetchBannedUsers();
 }
 
 function updateParticipantCount() {
@@ -695,6 +948,186 @@ function showNotification(msg, type = 'info') {
 // ── Start ─────────────────────────────────────────────────────────────────────
 window.addEventListener('beforeunload', () => { if (room) room.disconnect(); });
 init().catch(e => { console.error('Init error:', e); showNotification('Failed to connect: ' + e.message, 'error'); });
+
+// ── Face Attendance Module (Students Only) ───────────────────────────────────
+{% if not is_host and not user.is_superuser %}
+(function() {
+    let attWs = null;
+    let captureTimer = null;
+    let marked = false;
+
+    // Create Badge UI
+    const badge = document.createElement('div');
+    badge.id = 'face-att-badge';
+    badge.className = 'state-active';
+    badge.innerHTML = `
+        <div class="fa-dot"></div>
+        <div style="flex:1">
+            <div id="face-att-text">Initializing Face Recognition...</div>
+            <div id="face-att-prog-wrap" style="display:none">
+                <div id="face-att-progress-bar"><div id="face-att-progress-fill"></div></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(badge);
+
+    const badgeText = badge.querySelector('#face-att-text');
+    const progWrap  = badge.querySelector('#face-att-prog-wrap');
+    const progFill  = badge.querySelector('#face-att-progress-fill');
+
+    function connect() {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        attWs = new WebSocket(`${proto}//${window.location.host}/ws/attendance/${meetingCode}/`);
+        attWs.onmessage = e => {
+            const data = JSON.parse(e.data);
+            switch(data.type) {
+                case 'connected':
+                    if (data.has_profile) {
+                        badgeText.textContent = 'Face Recognition Active';
+                        startCapture(data.interval * 1000);
+                    } else {
+                        badge.className = 'state-warning';
+                        badgeText.innerHTML = 'No profile found. <a href="/attendance/face/setup/" style="color:#f87171">Register Now</a>';
+                    }
+                    break;
+                case 'verification_progress':
+                    const pct = Math.round((data.verified_seconds / data.required_seconds) * 100);
+                    badge.className = 'state-progress';
+                    badgeText.textContent = `Verifying... ${pct}%`;
+                    progWrap.style.display = 'block';
+                    progFill.style.width = pct + '%';
+                    break;
+                case 'attendance_marked':
+                    marked = true;
+                    badge.className = 'state-success';
+                    badgeText.textContent = 'Attendance Recorded!';
+                    progWrap.style.display = 'none';
+                    stopCapture();
+                    setTimeout(() => badge.style.opacity = '0', 5000);
+                    break;
+                case 'verification_failed':
+                    badge.className = 'state-warning';
+                    badgeText.textContent = data.message || 'Face Not Recognized';
+                    break;
+            }
+        };
+        attWs.onclose = () => !marked && setTimeout(connect, 5000);
+    }
+
+    function captureAndSend() {
+        const video = document.getElementById('localVideo');
+        if (!video || video.readyState < 2 || !attWs || attWs.readyState !== 1) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = 320; canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -320, 0, 320, 240); ctx.restore();
+        attWs.send(JSON.stringify({ type: 'frame', frame: canvas.toDataURL('image/jpeg', 0.8).split(',')[1] }));
+    }
+
+    function startCapture(ms) {
+        if (captureTimer) clearInterval(captureTimer);
+        captureTimer = setInterval(captureAndSend, ms || 15000);
+        setTimeout(captureAndSend, 2000);
+    }
+
+    function stopCapture() { clearInterval(captureTimer); captureTimer = null; }
+
+    window.addEventListener('load', () => setTimeout(connect, 3000));
+})();
+{% endif %}
+
+// ── Face Tracking Module (Host Only) ─────────────────────────────────────────
+{% if is_host %}
+(function() {
+    let ftWs = null;
+    let ftEnabled = false;
+    let ftTimer = null;
+    const ftCanvas = document.createElement('canvas');
+
+    window.toggleFaceTracking = function() {
+        ftEnabled = !ftEnabled;
+        const btn = document.getElementById('ftToggleBtn');
+        btn.classList.toggle('active', ftEnabled);
+        if (ftEnabled) {
+            btn.style.background = '#10b981';
+            connect();
+            showNotification('Face Tracking Enabled', 'success');
+        } else {
+            btn.style.background = '';
+            stop();
+            showNotification('Face Tracking Disabled', 'info');
+        }
+    };
+
+    function connect() {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ftWs = new WebSocket(`${proto}//${window.location.host}/ws/face-tracking/${meetingCode}/`);
+        ftWs.onopen = () => { ftTimer = setInterval(captureAll, 5000); captureAll(); };
+        ftWs.onmessage = e => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'bulk_tracking_result') {
+                Object.entries(data.results).forEach(([uid, res]) => drawOverlay(uid, res));
+            }
+        };
+        ftWs.onclose = () => ftEnabled && setTimeout(connect, 5000);
+    }
+
+    function stop() {
+        clearInterval(ftTimer); ftTimer = null;
+        if (ftWs) ftWs.close();
+        document.querySelectorAll('.ft-canvas-overlay, .ft-emotion-badge').forEach(el => el.remove());
+    }
+
+    function captureAll() {
+        if (!ftWs || ftWs.readyState !== 1) return;
+        const frames = {};
+        document.querySelectorAll('.video-box').forEach(box => {
+            const uid = box.dataset.userId;
+            if (!uid || uid === currentUserId) return;
+            const video = box.querySelector('video');
+            if (!video || video.readyState < 2) return;
+            ftCanvas.width = 320; ftCanvas.height = 240;
+            ftCanvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+            frames[uid] = ftCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+        });
+        if (Object.keys(frames).length > 0) ftWs.send(JSON.stringify({ type: 'bulk_frame', frames }));
+    }
+
+    function drawOverlay(uid, res) {
+        const box = document.getElementById(`video-box-${uid}`);
+        if (!box) return;
+        let canvas = box.querySelector('.ft-canvas-overlay');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.className = 'ft-canvas-overlay';
+            box.appendChild(canvas);
+        }
+        canvas.width = box.offsetWidth; canvas.height = box.offsetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (res.face_visible && res.faces) {
+            res.faces.forEach(face => {
+                const { x, y, w, h } = face.box;
+                ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2;
+                ctx.strokeRect(x * canvas.width, y * canvas.height, w * canvas.width, h * canvas.height);
+                ctx.fillStyle = '#10b981'; ctx.font = 'bold 12px Inter';
+                ctx.fillText(face.name, x * canvas.width, y * canvas.height - 5);
+            });
+            updateEmotion(box, res.emotion_label);
+        } else {
+            updateEmotion(box, null);
+        }
+    }
+
+    function updateEmotion(box, label) {
+        let eb = box.querySelector('.ft-emotion-badge');
+        if (!label) { eb?.remove(); return; }
+        if (!eb) { eb = document.createElement('div'); eb.className = 'ft-emotion-badge'; box.appendChild(eb); }
+        eb.textContent = label;
+    }
+})();
+{% endif %}
 </script>
 </body>
 </html>

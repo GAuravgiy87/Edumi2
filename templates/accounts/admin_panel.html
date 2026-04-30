@@ -4,848 +4,259 @@
 {% block page_title %}Admin Panel{% endblock %}
 
 {% block content %}
+<style>
+    .admin-container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; font-family: 'Inter', sans-serif; }
+    
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .admin-header h1 { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0; }
+    
+    /* Service Health */
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .health-card { background: white; border-radius: 1rem; padding: 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .indicator { width: 10px; height: 10px; border-radius: 50%; position: relative; }
+    .indicator.online { background: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); }
+    .indicator.online::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: inherit; animation: pulse 2s infinite; }
+    .indicator.offline { background: #ef4444; }
+    .health-info .label { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
+    .health-info .value { font-size: 0.9375rem; font-weight: 700; color: #0f172a; }
+
+    /* Admin Tabs */
+    .admin-tabs { display: flex; gap: 0.5rem; background: #f1f5f9; padding: 0.4rem; border-radius: 0.75rem; margin-bottom: 2rem; width: fit-content; }
+    .tab-btn { 
+        padding: 0.75rem 1.5rem; 
+        border-radius: 0.5rem; 
+        border: none; 
+        background: transparent; 
+        color: #64748b; 
+        font-weight: 600; 
+        cursor: pointer; 
+        display: flex; 
+        align-items: center; 
+        gap: 0.5rem; 
+        transition: all 0.2s; 
+    }
+    .tab-btn.active { background: white; color: #4f46e5; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .tab-btn i { width: 18px; height: 18px; }
+
+    /* Stats Row */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .stat-mini-card { background: white; padding: 1.5rem; border-radius: 1rem; border: 1px solid #e2e8f0; text-align: center; }
+    .stat-mini-card .val { font-size: 1.75rem; font-weight: 800; color: #4f46e5; }
+    .stat-mini-card .lab { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
+
+    /* Tables */
+    .table-card { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .table-header { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .table-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+    
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { background: #f8fafc; padding: 1rem 1.5rem; text-align: left; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+    .data-table td { padding: 1rem 1.5rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
+    .data-table tr:last-child td { border-bottom: none; }
+    
+    .user-pill { display: flex; align-items: center; gap: 0.75rem; }
+    .user-pill img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+    
+    .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-admin { background: #fee2e2; color: #991b1b; }
+    .badge-teacher { background: #e0f2fe; color: #075985; }
+    .badge-student { background: #dcfce7; color: #166534; }
+
+    @keyframes pulse { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(2.5); opacity: 0; } }
+
+    .btn-action { padding: 0.5rem 1rem; border-radius: 0.5rem; background: #f1f5f9; color: #475569; font-weight: 600; text-decoration: none; font-size: 0.8125rem; }
+    .btn-action:hover { background: #e2e8f0; }
+</style>
+
 <div class="admin-container">
     <div class="admin-header">
         <h1>Admin Control Panel</h1>
-        <div class="header-actions">
-            <button onclick="toggleGlobalMessage()" class="btn-secondary"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg></span> Broadcast</button>
-            <a href="{% url 'user_management' %}" class="btn-add-camera"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span> Manage Users</a>
+        <div style="display: flex; gap: 1rem;">
+            <a href="{% url 'user_management' %}" class="btn-action" style="background: #4f46e5; color: white;">Manage Users</a>
+            <button onclick="toggleBroadcast()" class="btn-action">Broadcast Message</button>
         </div>
     </div>
 
-    <!-- System Health Status -->
-    <div class="system-status-container">
-        <div class="status-card">
-            <div class="status-indicator {% if True %}online{% else %}offline{% endif %}"></div>
-            <div class="status-info">
-                <span class="status-label">Main App Service</span>
-                <span class="status-value">Online (Port 8000)</span>
+    <!-- System Health -->
+    <div class="health-grid">
+        <div class="health-card">
+            <div class="indicator online"></div>
+            <div class="health-info">
+                <p class="label">App Server</p>
+                <p class="value">Active (Port 8000)</p>
             </div>
         </div>
-        <div class="status-card">
-            <div class="status-indicator {% if camera_service_online %}online{% else %}offline{% endif %}"></div>
-            <div class="status-info">
-                <span class="status-label">Camera Microservice</span>
-                <span class="status-value">{% if camera_service_online %}Active (Port 8001){% else %}Disconnected{% endif %}</span>
+        <div class="health-card">
+            <div class="indicator {% if camera_service_online %}online{% else %}offline{% endif %}"></div>
+            <div class="health-info">
+                <p class="label">AI Microservice</p>
+                <p class="value">{% if camera_service_online %}Running{% else %}Offline{% endif %}</p>
             </div>
         </div>
-        <div class="status-card">
-            <div class="status-indicator online"></div>
-            <div class="status-info">
-                <span class="status-label">Database Status</span>
-                <span class="status-value">Connected (SQLite)</span>
+        <div class="health-card">
+            <div class="indicator online"></div>
+            <div class="health-info">
+                <p class="label">Database</p>
+                <p class="value">SQLite Connected</p>
             </div>
         </div>
-        <div class="status-card">
-            <div class="status-indicator online"></div>
-            <div class="status-info">
-                <span class="status-label">WebSocket Engine</span>
-                <span class="status-value">Live (Channels)</span>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Statistics Overview -->
-    <div class="dashboard-grid">
-        <div class="stat-card" onclick="toggleSection('users-section')" style="cursor: pointer; transition: transform 0.2s;">
-            <div class="stat-icon" style="background: #1877f2;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
-            </div>
-            <div class="stat-info">
-                <h3>Total Users</h3>
-                <p class="stat-number">{{ total_users }}</p>
-            </div>
-        </div>
-        
-        <div class="stat-card" onclick="toggleSection('students-section')" style="cursor: pointer; transition: transform 0.2s;">
-            <div class="stat-icon" style="background: #31a24c;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg></span>
-            </div>
-            <div class="stat-info">
-                <h3>Students</h3>
-                <p class="stat-number">{{ total_students }}</p>
-            </div>
-        </div>
-        
-        <div class="stat-card" onclick="toggleSection('teachers-section')" style="cursor: pointer; transition: transform 0.2s;">
-            <div class="stat-icon" style="background: #f59e0b;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
-            </div>
-            <div class="stat-info">
-                <h3>Teachers</h3>
-                <p class="stat-number">{{ total_teachers }}</p>
-            </div>
-        </div>
-        
-        <div class="stat-card" onclick="toggleSection('meetings-section')" style="cursor: pointer; transition: transform 0.2s;">
-            <div class="stat-icon" style="background: #8b5cf6;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></span>
-            </div>
-            <div class="stat-info">
-                <h3>Total Meetings</h3>
-                <p class="stat-number">{{ total_meetings }}</p>
-            </div>
-        </div>
-        
-        <div class="stat-card" onclick="toggleSection('live-meetings-section')" style="cursor: pointer; transition: transform 0.2s;">
-            <div class="stat-icon" style="background: #e4294b;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"></circle></svg></span>
-            </div>
-            <div class="stat-info">
-                <h3>Live Meetings</h3>
-                <p class="stat-number">{{ live_meetings_count }}</p>
-            </div>
-        </div>
-        
-        <div class="stat-card" onclick="toggleSection('cameras-section')" style="cursor: pointer; transition: transform 0.2s;">
-            <div class="stat-icon" style="background: #06b6d4;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
-            </div>
-            <div class="stat-info">
-                <h3>Cameras</h3>
-                <p class="stat-number">{{ total_cameras }}</p>
+        <div class="health-card">
+            <div class="indicator online"></div>
+            <div class="health-info">
+                <p class="label">WebSockets</p>
+                <p class="value">Engine Live</p>
             </div>
         </div>
     </div>
-    
-    <!-- All Users Section -->
-    <div id="users-section" class="detail-section" style="display: none;">
-        <div class="section-header">
-            <h2>👥 All Users ({{ total_users }})</h2>
-            <button onclick="toggleSection('users-section')" class="btn-close">✕ Close</button>
+
+    <!-- Quick Stats -->
+    <div class="stats-row">
+        <div class="stat-mini-card">
+            <p class="val">{{ total_users }}</p>
+            <p class="lab">Total Users</p>
         </div>
-        <div class="table-container">
+        <div class="stat-mini-card">
+            <p class="val">{{ total_students }}</p>
+            <p class="lab">Students</p>
+        </div>
+        <div class="stat-mini-card">
+            <p class="val">{{ total_teachers }}</p>
+            <p class="lab">Teachers</p>
+        </div>
+        <div class="stat-mini-card">
+            <p class="val">{{ live_meetings_count }}</p>
+            <p class="lab">Live Sessions</p>
+        </div>
+    </div>
+
+    <!-- Tabbed Content -->
+    <div class="admin-tabs">
+        <button class="tab-btn active" onclick="switchTab('users')"><i data-lucide="users"></i> Users</button>
+        <button class="tab-btn" onclick="switchTab('meetings')"><i data-lucide="video"></i> Meetings</button>
+        <button class="tab-btn" onclick="switchTab('cameras')"><i data-lucide="camera"></i> Cameras</button>
+    </div>
+
+    <div id="tab-users" class="tab-content">
+        <div class="table-card">
+            <div class="table-header">
+                <h2>Recent Registered Users</h2>
+            </div>
             <table class="data-table">
                 <thead>
                     <tr>
                         <th>User</th>
-                        <th>Full Name</th>
-                        <th>Email</th>
-                        <th>User Type</th>
-                        <th>Date Joined</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in all_users %}
-                        <tr>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <img src="{% if user.userprofile %}{{ user.userprofile.get_profile_picture_url }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff{% endif %}" 
-                                         alt="{{ user.username }}" 
-                                         onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff'"
-                                         style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
-                                    <a href="{% url 'profile_view' user.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ user.username }}</a>
-                                </div>
-                            </td>
-                            <td>{{ user.get_full_name|default:"-" }}</td>
-                            <td>{{ user.email|default:"-" }}</td>
-                            <td>
-                                {% if user.is_superuser %}
-                                    <span class="badge badge-admin">Admin</span>
-                                {% elif user.userprofile.user_type == 'teacher' %}
-                                    <span class="badge badge-teacher">Teacher</span>
-                                {% elif user.userprofile.user_type == 'student' %}
-                                    <span class="badge badge-student">Student</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ user.date_joined|date:"M d, Y" }}</td>
-                            <td>
-                                {% if user.is_active %}
-                                    <span style="color: #2ecc71;">● Active</span>
-                                {% else %}
-                                    <span style="color: #e74c3c;">● Inactive</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Students Section -->
-    <div id="students-section" class="detail-section" style="display: none;">
-        <div class="section-header">
-            <h2>🎓 All Students ({{ total_students }})</h2>
-            <button onclick="toggleSection('students-section')" class="btn-close">✕ Close</button>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Student</th>
-                        <th>Full Name</th>
-                        <th>Email</th>
-                        <th>Student ID</th>
-                        <th>Grade</th>
-                        <th>Date Joined</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for student in students %}
-                        <tr>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <img src="{{ student.userprofile.get_profile_picture_url }}" 
-                                         alt="{{ student.username }}" 
-                                         onerror="this.src='https://ui-avatars.com/api/?name={{ student.username }}&background=10b981&color=fff'"
-                                         style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
-                                    <a href="{% url 'profile_view' student.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ student.username }}</a>
-                                </div>
-                            </td>
-                            <td>{{ student.get_full_name|default:"-" }}</td>
-                            <td>{{ student.email|default:"-" }}</td>
-                            <td>{{ student.userprofile.student_id|default:"-" }}</td>
-                            <td>{{ student.userprofile.grade|default:"-" }}</td>
-                            <td>{{ student.date_joined|date:"M d, Y" }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Teachers Section -->
-    <div id="teachers-section" class="detail-section" style="display: none;">
-        <div class="section-header">
-            <h2>👨‍🏫 All Teachers ({{ total_teachers }})</h2>
-            <button onclick="toggleSection('teachers-section')" class="btn-close">✕ Close</button>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Teacher</th>
-                        <th>Full Name</th>
-                        <th>Email</th>
-                        <th>Employee ID</th>
-                        <th>Department</th>
-                        <th>Date Joined</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for teacher in teachers %}
-                        <tr>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <img src="{{ teacher.userprofile.get_profile_picture_url }}" 
-                                         alt="{{ teacher.username }}" 
-                                         onerror="this.src='https://ui-avatars.com/api/?name={{ teacher.username }}&background=f59e0b&color=fff'"
-                                         style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
-                                    <a href="{% url 'profile_view' teacher.username %}" style="color: #667eea; text-decoration: none; font-weight: 600;">{{ teacher.username }}</a>
-                                </div>
-                            </td>
-                            <td>{{ teacher.get_full_name|default:"-" }}</td>
-                            <td>{{ teacher.email|default:"-" }}</td>
-                            <td>{{ teacher.userprofile.employee_id|default:"-" }}</td>
-                            <td>{{ teacher.userprofile.department|default:"-" }}</td>
-                            <td>{{ teacher.date_joined|date:"M d, Y" }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- All Meetings Section -->
-    <div id="meetings-section" class="detail-section" style="display: none;">
-        <div class="section-header">
-            <h2>🎥 All Meetings ({{ total_meetings }})</h2>
-            <button onclick="toggleSection('meetings-section')" class="btn-close">✕ Close</button>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Teacher</th>
-                        <th>Classroom</th>
-                        <th>Meeting Code</th>
-                        <th>Scheduled Time</th>
-                        <th>Status</th>
-                        <th>Participants</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for meeting in all_meetings %}
-                        <tr>
-                            <td style="font-weight: 600;">{{ meeting.title }}</td>
-                            <td><a href="{% url 'profile_view' meeting.teacher.username %}" style="color: #667eea; text-decoration: none;">{{ meeting.teacher.username }}</a></td>
-                            <td>
-                                {% if meeting.classroom %}
-                                    <a href="{% url 'classroom_detail' meeting.classroom.id %}" style="color: #667eea; text-decoration: none;">{{ meeting.classroom.title }}</a>
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td style="font-family: monospace; font-size: 13px;">{{ meeting.meeting_code }}</td>
-                            <td>{{ meeting.scheduled_time|date:"M d, Y g:i A" }}</td>
-                            <td>
-                                {% if meeting.status == 'live' %}
-                                    <span class="badge badge-live">🔴 Live</span>
-                                {% elif meeting.status == 'ended' %}
-                                    <span class="badge badge-ended">Ended</span>
-                                {% elif meeting.status == 'scheduled' %}
-                                    <span class="badge badge-scheduled">Scheduled</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ meeting.participants.count }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Live Meetings Section -->
-    <div id="live-meetings-section" class="detail-section" style="display: none;">
-        <div class="section-header">
-            <h2>🔴 Live Meetings ({{ live_meetings_count }})</h2>
-            <button onclick="toggleSection('live-meetings-section')" class="btn-close">✕ Close</button>
-        </div>
-        {% if live_meetings %}
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; padding: 20px;">
-                {% for meeting in live_meetings %}
-                    <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-left: 4px solid #e74c3c;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                            <h3 style="margin: 0;">{{ meeting.title }}</h3>
-                            <span class="badge badge-live" style="animation: pulse 2s infinite;">🔴 LIVE</span>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <strong>Teacher:</strong> {{ meeting.teacher.get_full_name|default:meeting.teacher.username }}
-                        </div>
-                        {% if meeting.classroom %}
-                            <div style="margin-bottom: 10px;">
-                                <strong>Classroom:</strong> {{ meeting.classroom.title }}
-                            </div>
-                        {% endif %}
-                        <div style="display: flex; gap: 15px; margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-                            <div>
-                                <div style="font-size: 20px; font-weight: 700; color: #667eea;">{{ meeting.active_participants_count }}</div>
-                                <div style="font-size: 11px; color: #7f8c8d;">Active</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 20px; font-weight: 700; color: #2ecc71;">{{ meeting.duration_minutes }}</div>
-                                <div style="font-size: 11px; color: #7f8c8d;">Minutes</div>
-                            </div>
-                        </div>
-                        <a href="{% url 'join_meeting' meeting.meeting_code %}" style="display: block; padding: 10px; background: #e74c3c; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-weight: 600;">Join Meeting</a>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div style="text-align: center; padding: 40px; color: #95a5a6;">
-                <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
-                <p>No live meetings at the moment</p>
-            </div>
-        {% endif %}
-    </div>
-    
-    <!-- Cameras Section -->
-    <div id="cameras-section" class="detail-section" style="display: none;">
-        <div class="section-header">
-            <h2>📹 All Cameras ({{ total_cameras }})</h2>
-            <button onclick="toggleSection('cameras-section')" class="btn-close">✕ Close</button>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>IP Address</th>
-                        <th>Port</th>
-                        <th>Stream Path</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for camera in all_cameras %}
-                        <tr>
-                            <td style="font-weight: 600;">{{ camera.name }}</td>
-                            <td style="font-family: monospace;">{{ camera.ip_address }}</td>
-                            <td>{{ camera.port }}</td>
-                            <td style="font-family: monospace; font-size: 13px;">{{ camera.stream_path }}</td>
-                            <td>
-                                {% if camera.is_active %}
-                                    <span class="badge badge-active">● Active</span>
-                                {% else %}
-                                    <span class="badge badge-inactive">● Inactive</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ camera.created_at|date:"M d, Y" }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Quick Actions -->
-    <div class="admin-section">
-        <h2>Quick Actions</h2>
-        <div class="action-buttons">
-            <a href="{% url 'user_management' %}" class="action-btn" style="text-decoration: none;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
-                <p>Manage Users</p>
-            </a>
-            <a href="{% url 'admin_dashboard' %}" class="action-btn" style="text-decoration: none;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
-                <p>Manage Cameras</p>
-            </a>
-            <a href="{% url 'teacher_meetings' %}" class="action-btn" style="text-decoration: none;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></span>
-                <p>View Meetings</p>
-            </a>
-            <a href="/admin/" class="action-btn" style="text-decoration: none;">
-                <span class="icon icon-xl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2M23 12h-6m-6 0H1m18.2-5.2l-4.2 4.2m0 6l4.2 4.2"></path></svg></span>
-                <p>Django Admin</p>
-            </a>
-        </div>
-    </div>
-    
-    <!-- Recent Users -->
-    <div class="admin-section">
-        <h2>Recent Users</h2>
-        <div class="users-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Name</th>
-                        <th>Email</th>
                         <th>Type</th>
                         <th>Joined</th>
+                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for user in recent_users %}
                     <tr>
-                        <td><strong>{{ user.username }}</strong></td>
-                        <td>{{ user.first_name }} {{ user.last_name }}</td>
-                        <td>{{ user.email|default:"—" }}</td>
                         <td>
-                            {% if user.is_superuser %}
-                            <span class="badge badge-admin">Admin</span>
-                            {% elif user.userprofile %}
-                            <span class="badge badge-{{ user.userprofile.user_type }}">{{ user.userprofile.get_user_type_display }}</span>
-                            {% else %}
-                            <span class="badge badge-admin">Admin</span>
-                            {% endif %}
+                            <div class="user-pill">
+                                <img src="{{ user.userprofile.get_profile_picture_url }}" alt="">
+                                <div>
+                                    <div style="font-weight: 700;">{{ user.get_full_name|default:user.username }}</div>
+                                    <div style="font-size: 0.75rem; color: #64748b;">{{ user.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge badge-{{ user.userprofile.user_type }}">
+                                {{ user.userprofile.get_user_type_display }}
+                            </span>
                         </td>
                         <td>{{ user.date_joined|date:"M d, Y" }}</td>
-                        <td>
-                            <a href="{% url 'profile_view' user.username %}" class="btn-small">View</a>
-                        </td>
+                        <td><span style="color: #10b981;">● Active</span></td>
+                        <td><a href="{% url 'profile_view' user.username %}" class="btn-action">View</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-    
-    <!-- Recent Meetings -->
-    <div class="admin-section">
-        <h2>Recent Meetings</h2>
-        <div class="meetings-list">
-            {% for meeting in all_meetings|slice:":5" %}
-            <div class="meeting-card status-{{ meeting.status }}">
-                <div class="meeting-header-info">
-                    <h3>{{ meeting.title }}</h3>
-                    <span class="meeting-status status-{{ meeting.status }}">{{ meeting.get_status_display }}</span>
-                </div>
-                
-                <div class="meeting-details-grid">
-                    <div class="detail-item-small">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
-                        <div>
-                            <p class="label">Teacher</p>
-                            <p class="value">{{ meeting.teacher.username }}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="detail-item-small">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                        <div>
-                            <p class="label">Scheduled</p>
-                            <p class="value">{{ meeting.scheduled_time|date:"M d, h:i A" }}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="detail-item-small">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg></span>
-                        <div>
-                            <p class="label">Code</p>
-                            <p class="value code">{{ meeting.meeting_code }}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="detail-item-small">
-                        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
-                        <div>
-                            <p class="label">Participants</p>
-                            <p class="value">{{ meeting.participants.count }}</p>
-                        </div>
-                    </div>
-                </div>
+
+    <div id="tab-meetings" class="tab-content" style="display: none;">
+        <div class="table-card">
+            <div class="table-header">
+                <h2>Live & Recent Meetings</h2>
             </div>
-            {% endfor %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Meeting</th>
+                        <th>Teacher</th>
+                        <th>Status</th>
+                        <th>Participants</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for meeting in all_meetings|slice:":10" %}
+                    <tr>
+                        <td>
+                            <div style="font-weight: 700;">{{ meeting.title }}</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">Code: {{ meeting.meeting_code }}</div>
+                        </td>
+                        <td>{{ meeting.teacher.username }}</td>
+                        <td>
+                            {% if meeting.status == 'live' %}
+                            <span style="color: #ef4444; font-weight: 700;">🔴 LIVE</span>
+                            {% else %}
+                            <span style="color: #64748b;">{{ meeting.get_status_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ meeting.participants.count }}</td>
+                        <td><a href="{% url 'join_meeting' meeting.meeting_code %}" class="btn-action">Join</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-cameras" class="tab-content" style="display: none;">
+        <div class="table-card">
+            <div class="table-header">
+                <h2>Connected Cameras</h2>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Camera Name</th>
+                        <th>Address</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camera in all_cameras %}
+                    <tr>
+                        <td style="font-weight: 700;">{{ camera.name }}</td>
+                        <td style="font-family: monospace;">{{ camera.ip_address }}:{{ camera.port }}</td>
+                        <td>{% if camera.is_active %}<span style="color: #10b981;">Online</span>{% else %}Offline{% endif %}</td>
+                        <td><a href="#" class="btn-action">Config</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
-
-<style>
-    .admin-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 25px;
-    }
-    
-    .header-actions {
-        display: flex;
-        gap: 12px;
-    }
-    
-    .btn-secondary {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 20px;
-        background: white;
-        color: #4a5568;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    
-    .btn-secondary:hover {
-        background: #f7fafc;
-        border-color: #cbd5e0;
-    }
-
-    /* System Status Styles */
-    .system-status-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 15px;
-        margin-bottom: 30px;
-    }
-    
-    .status-card {
-        background: white;
-        border-radius: 12px;
-        padding: 15px 20px;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border: 1px solid #edf2f7;
-    }
-    
-    .status-indicator {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        position: relative;
-    }
-    
-    .status-indicator.online {
-        background: #2ecc71;
-        box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
-    }
-    
-    .status-indicator.online::after {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
-        border-radius: 50%;
-        background: inherit;
-        animation: pulse-status 2s infinite;
-    }
-    
-    .status-indicator.offline {
-        background: #e74c3c;
-        box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
-    }
-    
-    @keyframes pulse-status {
-        0% { transform: scale(1); opacity: 0.8; }
-        100% { transform: scale(2.5); opacity: 0; }
-    }
-    
-    .status-info {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .status-label {
-        font-size: 12px;
-        color: #718096;
-        font-weight: 500;
-    }
-    
-    .status-value {
-        font-size: 14px;
-        color: #2d3748;
-        font-weight: 700;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-    }
-    
-    /* Detail Section Styles */
-    .detail-section {
-        background: white;
-        border-radius: 12px;
-        padding: 0;
-        margin: 30px 0;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        overflow: hidden;
-    }
-    
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px 30px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-    }
-    
-    .section-header h2 {
-        margin: 0;
-        font-size: 22px;
-        font-weight: 600;
-    }
-    
-    .btn-close {
-        background: rgba(255,255,255,0.2);
-        border: 1px solid rgba(255,255,255,0.3);
-        color: white;
-        padding: 8px 16px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-        transition: all 0.2s;
-    }
-    
-    .btn-close:hover {
-        background: rgba(255,255,255,0.3);
-        transform: scale(1.05);
-    }
-    
-    .table-container {
-        padding: 20px 30px;
-        overflow-x: auto;
-    }
-    
-    .data-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 14px;
-    }
-    
-    .data-table thead {
-        background: #f8f9fa;
-    }
-    
-    .data-table th {
-        padding: 12px 15px;
-        text-align: left;
-        font-weight: 600;
-        color: #495057;
-        border-bottom: 2px solid #dee2e6;
-    }
-    
-    .data-table td {
-        padding: 12px 15px;
-        border-bottom: 1px solid #e9ecef;
-    }
-    
-    .data-table tbody tr:hover {
-        background: #f8f9fa;
-    }
-    
-    /* Badge Styles */
-    .badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-    
-    .badge-admin {
-        background: #e74c3c;
-        color: white;
-    }
-    
-    .badge-teacher {
-        background: #f39c12;
-        color: white;
-    }
-    
-    .badge-student {
-        background: #3498db;
-        color: white;
-    }
-    
-    .badge-live {
-        background: #e74c3c;
-        color: white;
-    }
-    
-    .badge-ended {
-        background: #95a5a6;
-        color: white;
-    }
-    
-    .badge-scheduled {
-        background: #3498db;
-        color: white;
-    }
-    
-    .badge-active {
-        background: #2ecc71;
-        color: white;
-    }
-    
-    .badge-inactive {
-        background: #95a5a6;
-        color: white;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-    }
-</style>
 
 <script>
-    console.log('Admin panel script loaded');
-    
-    function toggleSection(sectionId) {
-        const section = document.getElementById(sectionId);
-        if (!section) return;
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         
-        if (section.style.display === 'none' || section.style.display === '') {
-            section.style.display = 'block';
-            setTimeout(() => {
-                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-        } else {
-            section.style.display = 'none';
-        }
+        document.getElementById('tab-' + tabId).style.display = 'block';
+        event.currentTarget.classList.add('active');
     }
 
-    function toggleGlobalMessage() {
-        const modal = document.getElementById('broadcast-modal');
-        modal.style.display = 'flex';
-    }
-    
-    async function sendBroadcast() {
-        const titleInput = document.getElementById('broadcast-title');
-        const messageInput = document.getElementById('broadcast-message');
-        const statusDiv = document.getElementById('broadcast-status');
-        const sendBtn = document.getElementById('broadcast-send-btn');
-        
-        const title = titleInput.value.trim() || 'Broadcast Message';
-        const message = messageInput.value.trim();
-        
-        if (!message) {
-            statusDiv.textContent = 'Please enter a message';
-            statusDiv.style.color = '#e53e3e';
-            return;
-        }
-        
-        // Disable button and show loading
-        sendBtn.disabled = true;
-        sendBtn.textContent = 'Sending...';
-        statusDiv.textContent = '';
-        
-        try {
-            const response = await fetch('/notifications/broadcast/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({ title, message })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                statusDiv.textContent = `✅ ${data.message}`;
-                statusDiv.style.color = '#38a169';
-                
-                // Clear inputs after success
-                setTimeout(() => {
-                    titleInput.value = '';
-                    messageInput.value = '';
-                    document.getElementById('broadcast-modal').style.display = 'none';
-                    statusDiv.textContent = '';
-                }, 2000);
-            } else {
-                statusDiv.textContent = `❌ ${data.error || 'Failed to send'}`;
-                statusDiv.style.color = '#e53e3e';
-            }
-        } catch (error) {
-            statusDiv.textContent = '❌ Network error. Please try again.';
-            statusDiv.style.color = '#e53e3e';
-        } finally {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send Now';
-        }
-    }
-    
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
+    document.addEventListener('DOMContentLoaded', () => {
+        lucide.createIcons();
+    });
 </script>
-
-<!-- Broadcast Modal -->
-<div id="broadcast-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-    <div style="background: white; border-radius: 16px; padding: 30px; width: 450px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
-        <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600;">📢 Send Global Broadcast</h3>
-        <p style="font-size: 14px; color: #718096; margin-bottom: 20px;">Message will be sent as notification to all active users.</p>
-        
-        <div style="margin-bottom: 16px;">
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 6px;">Title (Optional)</label>
-            <input type="text" id="broadcast-title" style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; box-sizing: border-box;" placeholder="Broadcast Message">
-        </div>
-        
-        <div style="margin-bottom: 16px;">
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 6px;">Message *</label>
-            <textarea id="broadcast-message" style="width: 100%; height: 100px; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; resize: vertical; box-sizing: border-box;" placeholder="Enter your broadcast message..."></textarea>
-        </div>
-        
-        <div id="broadcast-status" style="margin-bottom: 16px; font-size: 14px; min-height: 20px;"></div>
-        
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-            <button onclick="document.getElementById('broadcast-modal').style.display='none'" style="padding: 10px 20px; background: #edf2f7; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; color: #4a5568;">Cancel</button>
-            <button id="broadcast-send-btn" onclick="sendBroadcast()" style="padding: 10px 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Send Now</button>
-        </div>
-    </div>
-</div>
-
 {% endblock %}

@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.hashers import make_password, check_password
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from meetings.models import Meeting, MeetingParticipant, Classroom, ClassroomMembership, MeetingAttendanceLog, MeetingChat, MeetingSummary
+from meetings.models import Meeting, MeetingParticipant, Classroom, ClassroomMembership, MeetingAttendanceLog, MeetingChat, MeetingSummary, KickedParticipant
 from meetings.tasks import generate_meeting_summary
 from accounts.notification_utils import (
     notify_classroom_join_request, 
@@ -22,6 +22,10 @@ from django.conf import settings
 from livekit.api import AccessToken, VideoGrants
 import random
 import string
+import base64
+from django.core.files.base import ContentFile
+from attendance.face_service import get_face_service
+from attendance.models import StudentFaceProfile
 
 def generate_meeting_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
@@ -408,6 +412,14 @@ def join_meeting(request, meeting_code):
         user_type = request.user.userprofile.user_type if hasattr(request.user, 'userprofile') else None
         return redirect('student_dashboard' if user_type == 'student' else 'teacher_dashboard')
     
+    # Check if user is kicked/banned
+    from .models import KickedParticipant
+    kick_record = KickedParticipant.objects.filter(meeting=meeting, user=request.user).first()
+    if kick_record and kick_record.is_banned():
+        messages.error(request, f'You have been kicked from this meeting. You can rejoin at {kick_record.banned_until.strftime("%H:%M")}.')
+        user_type = request.user.userprofile.user_type if hasattr(request.user, 'userprofile') else None
+        return redirect('student_dashboard' if user_type == 'student' else 'teacher_dashboard')
+    
     # Check if meeting is in a classroom
     if meeting.classroom:
         # Verify user is approved member or teacher
@@ -442,11 +454,85 @@ def join_meeting(request, meeting_code):
         # Send notification to all participants that meeting has started
         notify_meeting_started(meeting, meeting.classroom)
     
+    # Ensure host has permissions
+    if meeting.teacher == request.user or request.user.is_superuser:
+        participant.audio_permitted = True
+        participant.video_permitted = True
+        participant.screenshare_permitted = True
+        participant.save()
+    
+    # Redirect students to pre-join if not verified for this session
+    is_student = hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'student'
+    is_host = meeting.teacher == request.user or request.user.is_superuser
+    
+    if is_student and not is_host:
+        # Check if verified in current session
+        if not request.session.get(f'verified_meeting_{meeting.meeting_code}'):
+            return redirect('pre_join', meeting_code=meeting.meeting_code)
+
     return render(request, 'meetings/meeting_room.html', {
         'meeting': meeting,
-        'is_host': meeting.teacher == request.user or request.user.is_superuser,
+        'participant': participant,
+        'is_host': is_host,
         'livekit_url': settings.LIVEKIT_URL,
     })
+
+@login_required
+def pre_join(request, meeting_code):
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+    
+    # If host, skip pre-join
+    if meeting.teacher == request.user or request.user.is_superuser:
+        return redirect('join_meeting', meeting_code=meeting_code)
+    
+    # Check if student has a face profile registered
+    face_registered = StudentFaceProfile.objects.filter(student=request.user).exists()
+    if not face_registered:
+        messages.error(request, 'You must register your face identity before joining meetings.')
+        return redirect('face_setup')
+
+    return render(request, 'meetings/pre_join.html', {
+        'meeting': meeting,
+        'profile': request.user.userprofile,
+    })
+
+@login_required
+@require_http_methods(["POST"])
+def verify_face_prejoin(request):
+    import json
+    data = json.loads(request.body)
+    image_data = data.get('image')
+    meeting_code = data.get('meeting_code')
+    
+    if not image_data:
+        return JsonResponse({'success': False, 'message': 'No image provided'})
+
+    # Decode base64 image
+    format, imgstr = image_data.split(';base64,')
+    image_bytes = base64.b64decode(imgstr)
+    
+    # Get stored profile
+    try:
+        profile = StudentFaceProfile.objects.get(student=request.user)
+    except StudentFaceProfile.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'No face profile found'})
+
+    # Use FaceService to compare
+    fs = get_face_service()
+    result = fs.compare_frame_to_stored(
+        frame_bytes=image_bytes,
+        encrypted_embedding=profile.face_embedding_encrypted,
+        threshold=0.55
+    )
+
+    if result['match']:
+        # Mark this specific meeting as verified in the session
+        if meeting_code:
+            request.session[f'verified_meeting_{meeting_code}'] = True
+        
+        return JsonResponse({'success': True})
+    else:
+        return JsonResponse({'success': False, 'message': result['message']})
 
 @login_required
 def livekit_token(request, meeting_code):
@@ -708,3 +794,135 @@ def get_meeting_status(request, meeting_code):
 
 
 
+
+@login_required
+@require_http_methods(["POST"])
+def kick_participant(request, meeting_id, user_id):
+    """Teacher kicks a student from a meeting with a 1-hour ban"""
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
+    
+    user_to_kick = get_object_or_404(User, id=user_id)
+    ban_until = timezone.now() + timezone.timedelta(hours=1)
+    
+    KickedParticipant.objects.update_or_create(
+        meeting=meeting,
+        user=user_to_kick,
+        defaults={'banned_until': ban_until}
+    )
+    
+    # Notify through websocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'meeting_{meeting.meeting_code}',
+        {
+            'type': 'kick_user',
+            'user_id': user_to_kick.id,
+            'message': 'You have been kicked by the teacher. You cannot rejoin for 1 hour.'
+        }
+    )
+    
+    return JsonResponse({'status': 'success', 'message': f'{user_to_kick.username} kicked successfully'})
+
+@login_required
+@require_http_methods(["POST"])
+def update_participant_permission(request, meeting_id, user_id):
+    """Grant or revoke specific permissions for a participant"""
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
+    
+    participant = get_object_or_404(MeetingParticipant, meeting=meeting, user_id=user_id)
+    
+    import json
+    data = json.loads(request.body)
+    perm_type = data.get('type') # 'audio', 'video', 'screenshare'
+    value = data.get('value') # True/False
+    
+    if perm_type == 'audio':
+        participant.audio_permitted = value
+    elif perm_type == 'video':
+        participant.video_permitted = value
+    elif perm_type == 'screenshare':
+        participant.screenshare_permitted = value
+    
+    participant.save()
+    
+    # Notify through websocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'meeting_{meeting.meeting_code}',
+        {
+            'type': 'permission_update',
+            'user_id': user_id,
+            'permission_type': perm_type,
+            'value': value,
+            'message': f'Teacher has {"granted" if value else "revoked"} your {perm_type} permission.'
+        }
+    )
+    
+    return JsonResponse({'status': 'success'})
+
+@login_required
+@require_http_methods(["POST"])
+def toggle_global_control(request, meeting_id):
+    """Enable or disable global controls (mute all, camera off all, etc.)"""
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
+    
+    import json
+    data = json.loads(request.body)
+    control_type = data.get('type') # 'mute_all', 'camera_off_all', 'screenshare_off_all'
+    value = data.get('value')
+    
+    if control_type == 'mute_all':
+        meeting.global_mute = value
+    elif control_type == 'camera_off_all':
+        meeting.global_camera_off = value
+    elif control_type == 'screenshare_off_all':
+        meeting.global_screenshare_off = value
+    
+    meeting.save()
+    
+    # Notify through websocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'meeting_{meeting.meeting_code}',
+        {
+            'type': 'global_control_update',
+            'control_type': control_type,
+            'value': value,
+            'message': f'Teacher has {"enabled" if value else "disabled"} global {control_type.replace("_", " ")}.'
+        }
+    )
+    
+    return JsonResponse({'status': 'success'})
+
+@login_required
+@require_http_methods(["POST"])
+def revoke_ban(request, meeting_id, user_id):
+    """Teacher unbans a student before the 1-hour limit"""
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
+    
+    KickedParticipant.objects.filter(meeting=meeting, user_id=user_id).delete()
+    return JsonResponse({'status': 'success', 'message': 'Ban revoked'})
+
+@login_required
+def get_banned_users(request, meeting_id):
+    """Get list of banned users for a meeting"""
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
+    
+    banned = KickedParticipant.objects.filter(meeting=meeting).select_related('user')
+    data = [{
+        'id': b.user.id,
+        'username': b.user.username,
+        'banned_until': b.banned_until.isoformat()
+    } for b in banned if b.is_banned()]
+    
+    return JsonResponse({'banned': data})

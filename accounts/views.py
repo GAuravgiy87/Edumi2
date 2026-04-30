@@ -822,7 +822,7 @@ def send_message(request, conversation_id):
     from .notification_utils import notify_new_message
     other_user = conversation.get_other_user(request.user)
     if other_user:
-        notify_new_message(request.user, other_user, conversation_id)
+        notify_new_message(request.user, other_user, conversation_id, content=content)
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({

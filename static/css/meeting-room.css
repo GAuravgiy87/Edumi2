@@ -1105,3 +1105,60 @@
         height: 14px;
     }
 }
+
+/* Teacher Controls & Participant Actions */
+.participant-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.participant-item:hover .participant-actions {
+    opacity: 1;
+}
+
+.action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    transform: scale(1.1);
+}
+
+.action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.control-button.active {
+    background: #6366f1 !important;
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+}
+
+/* Video Box States */
+.video-box.muted::after {
+    content: '🔇';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 14px;
+    background: rgba(0,0,0,0.5);
+    padding: 4px;
+    border-radius: 50%;
+}
+
+.video-box.cam-off {
+    background: #2d2d2d url('https://ui-avatars.com/api/?name=User&background=334155&color=fff') center/30% no-repeat;
+}

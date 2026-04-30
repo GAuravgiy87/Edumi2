@@ -8,6 +8,7 @@ urlpatterns = [
     path('face/capture/', views.capture_face_photo,      name='capture_face_photo'),
     path('face/detect/',  views.detect_face,             name='detect_face'),
     path('face/status/',  views.face_registration_status, name='face_status'),
+    path('face/update-profile/', views.update_profile_info, name='update_profile_info'),
 
     # ── Student: My Attendance ──────────────────────────────────
     path('my/', views.my_attendance, name='my_attendance'),

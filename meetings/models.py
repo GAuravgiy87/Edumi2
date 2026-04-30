@@ -98,6 +98,9 @@ class Meeting(models.Model):
     allow_screen_share = models.BooleanField(default=True)
     allow_chat = models.BooleanField(default=True)
     record_meeting = models.BooleanField(default=False)
+    global_mute = models.BooleanField(default=False)
+    global_camera_off = models.BooleanField(default=False)
+    global_screenshare_off = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     ended_at = models.DateTimeField(null=True, blank=True)
@@ -148,6 +151,11 @@ class MeetingParticipant(models.Model):
     is_active = models.BooleanField(default=False)
     total_duration_seconds = models.IntegerField(default=0)
     
+    # Per-participant permissions (managed by teacher)
+    audio_permitted = models.BooleanField(default=False)
+    video_permitted = models.BooleanField(default=False)
+    screenshare_permitted = models.BooleanField(default=False)
+    
     class Meta:
         unique_together = ['meeting', 'user']
     
@@ -189,3 +197,19 @@ class MeetingSummary(models.Model):
 
     def __str__(self):
         return f"Summary for {self.meeting.title}"
+
+class KickedParticipant(models.Model):
+    """Tracks students kicked from meetings and their ban duration"""
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='kicked_users')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    kicked_at = models.DateTimeField(auto_now_add=True)
+    banned_until = models.DateTimeField()
+    
+    class Meta:
+        unique_together = ['meeting', 'user']
+    
+    def is_banned(self):
+        return timezone.now() < self.banned_until
+    
+    def __str__(self):
+        return f"{self.user.username} kicked from {self.meeting.meeting_code}"

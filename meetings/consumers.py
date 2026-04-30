@@ -289,6 +289,35 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             'message': event.get('message', 'Meeting is now active')
         }))
     
+    async def kick_user(self, event):
+        """Handle user kick notification"""
+        await self.send(text_data=json.dumps({
+            'type': 'kick_user',
+            'user_id': event['user_id'],
+            'message': event['message']
+        }))
+        if self.user.id == event['user_id']:
+            await self.close()
+
+    async def permission_update(self, event):
+        """Handle participant permission update"""
+        await self.send(text_data=json.dumps({
+            'type': 'permission_update',
+            'user_id': event['user_id'],
+            'permission_type': event['permission_type'],
+            'value': event['value'],
+            'message': event['message']
+        }))
+
+    async def global_control_update(self, event):
+        """Handle global control update (mute all, etc.)"""
+        await self.send(text_data=json.dumps({
+            'type': 'global_control_update',
+            'control_type': event['control_type'],
+            'value': event['value'],
+            'message': event['message']
+        }))
+    
     @database_sync_to_async
     def get_meeting(self):
         return Meeting.objects.get(meeting_code=self.meeting_code)

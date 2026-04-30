@@ -1,104 +1,135 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}My Classrooms{% endblock %}
-
-{% block title %}My Classrooms - EduMi{% endblock %}
+{% block page_title %}Teaching Classrooms{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1200px; margin: 30px auto; padding: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <div>
-            <h2 style="color: #2c3e50; margin-bottom: 5px;">🏫 My Classrooms</h2>
-            <p style="color: #7f8c8d;">Manage your virtual classrooms and meetings</p>
+<style>
+    .classroom-container { max-width: 1400px; margin: 0 auto; padding: 2rem; font-family: 'Inter', sans-serif; }
+    
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+    .header-text h1 { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 0.5rem 0; letter-spacing: -0.025em; }
+    .header-text p { font-size: 1rem; color: #64748b; margin: 0; }
+    
+    .btn-create-main { 
+        background: #1e293b; 
+        color: white; 
+        padding: 0.875rem 1.75rem; 
+        border-radius: 0.75rem; 
+        text-decoration: none; 
+        font-weight: 700; 
+        display: flex; 
+        align-items: center; 
+        gap: 0.75rem; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s;
+    }
+    .btn-create-main:hover { background: #0f172a; transform: translateY(-2px); }
+
+    /* Classroom Grid */
+    .classroom-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.5rem; }
+    .teacher-course-card { 
+        background: white; 
+        border-radius: 1.5rem; 
+        overflow: hidden; 
+        border: 1px solid #e2e8f0; 
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+    }
+    .teacher-course-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-color: #4f46e5; }
+    
+    .card-top { padding: 2rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; position: relative; }
+    .live-status { position: absolute; top: 1.5rem; right: 1.5rem; background: #fef2f2; color: #ef4444; padding: 0.4rem 0.8rem; border-radius: 2rem; font-size: 0.7rem; font-weight: 800; border: 1px solid #fee2e2; animation: pulse 2s infinite; }
+
+    .card-title { font-size: 1.375rem; font-weight: 800; color: #0f172a; margin: 0 0 0.5rem 0; }
+    .card-code { font-size: 0.75rem; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .card-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 1.5rem 2rem; background: white; }
+    .stat-item { text-align: center; }
+    .stat-val { font-size: 1.25rem; font-weight: 800; color: #1e293b; display: block; }
+    .stat-lab { font-size: 0.65rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; }
+
+    .card-footer { padding: 1.5rem 2rem; border-top: 1px solid #f1f5f9; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .btn-action { padding: 0.75rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 700; text-align: center; text-decoration: none; transition: all 0.2s; }
+    .btn-manage { background: #f1f5f9; color: #475569; }
+    .btn-manage:hover { background: #e2e8f0; }
+    .btn-start { background: #4f46e5; color: white; }
+    .btn-start:hover { background: #4338ca; }
+
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+    .empty-state { text-align: center; padding: 6rem 2rem; background: white; border-radius: 2rem; border: 2px dashed #cbd5e1; }
+</style>
+
+<div class="classroom-container">
+    <div class="page-header">
+        <div class="header-text">
+            <h1>Teacher Console</h1>
+            <p>Manage your classrooms, student requests, and live sessions.</p>
         </div>
-        <a href="{% url 'create_classroom' %}" 
-           style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
-            + Create New Classroom
+        <a href="{% url 'create_classroom' %}" class="btn-create-main">
+            <i data-lucide="plus-square"></i>
+            <span>Create New Course</span>
         </a>
     </div>
-    
-    {% if messages %}
-        {% for message in messages %}
-            <div style="padding: 15px; margin-bottom: 20px; border-radius: 5px; background: {% if message.tags == 'error' %}#fee{% else %}#efe{% endif %}; border-left: 4px solid {% if message.tags == 'error' %}#e74c3c{% else %}#2ecc71{% endif %};">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-    
+
     {% if classrooms %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
-            {% for classroom in classrooms %}
-                <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s;">
-                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
-                        <div style="flex: 1;">
-                            <h3 style="color: #2c3e50; margin-bottom: 5px;">{{ classroom.title }}</h3>
-                            <div style="display: inline-block; padding: 4px 12px; background: #e8f5e9; color: #2ecc71; border-radius: 15px; font-size: 12px; font-weight: 600; margin-bottom: 10px;">
-                                {{ classroom.class_code }}
-                            </div>
-                        </div>
-                        {% if classroom.has_active_meeting %}
-                            <span style="padding: 6px 12px; background: #fee; color: #e74c3c; border-radius: 15px; font-size: 11px; font-weight: 600; animation: pulse 2s infinite;">
-                                🔴 LIVE
-                            </span>
-                        {% endif %}
-                    </div>
-                    
-                    {% if classroom.description %}
-                        <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 15px;">{{ classroom.description|truncatewords:15 }}</p>
-                    {% endif %}
-                    
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-                        <div style="flex: 1; text-align: center;">
-                            <div style="font-size: 24px; font-weight: 700; color: #667eea;">{{ classroom.get_approved_students.count }}</div>
-                            <div style="font-size: 12px; color: #7f8c8d;">Students</div>
-                        </div>
-                        <div style="flex: 1; text-align: center;">
-                            <div style="font-size: 24px; font-weight: 700; color: #e74c3c;">{{ classroom.get_pending_requests.count }}</div>
-                            <div style="font-size: 12px; color: #7f8c8d;">Pending</div>
-                        </div>
-                        <div style="flex: 1; text-align: center;">
-                            <div style="font-size: 24px; font-weight: 700; color: #2ecc71;">{{ classroom.meetings.count }}</div>
-                            <div style="font-size: 12px; color: #7f8c8d;">Meetings</div>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px;">
-                        <a href="{% url 'classroom_detail' classroom.id %}" 
-                           style="flex: 1; padding: 10px; background: #667eea; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: 600;">
-                            Open Classroom
-                        </a>
-                        {% if classroom.has_active_meeting %}
-                            <a href="{% url 'join_meeting' classroom.get_active_meeting.meeting_code %}" 
-                               style="flex: 1; padding: 10px; background: #e74c3c; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: 600;">
-                                Join Live Meeting
-                            </a>
-                        {% endif %}
-                    </div>
-                    
-                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #95a5a6;">
-                        Created {{ classroom.created_at|date:"M d, Y" }}
-                    </div>
+    <div class="classroom-grid">
+        {% for classroom in classrooms %}
+        <div class="teacher-course-card">
+            <div class="card-top">
+                {% if classroom.has_active_meeting %}
+                <div class="live-status">LIVE SESSION</div>
+                {% endif %}
+                <span class="card-code">{{ classroom.class_code }}</span>
+                <h3 class="card-title">{{ classroom.title }}</h3>
+                <p style="font-size: 0.8125rem; color: #64748b; margin: 0;">Created on {{ classroom.created_at|date:"M d, Y" }}</p>
+            </div>
+            
+            <div class="card-stats">
+                <div class="stat-item">
+                    <span class="stat-val">{{ classroom.get_approved_students.count }}</span>
+                    <span class="stat-lab">Students</span>
                 </div>
-            {% endfor %}
+                <div class="stat-item">
+                    <span class="stat-val" style="color: {% if classroom.get_pending_requests.count > 0 %}#f59e0b{% else %}#1e293b{% endif %};">
+                        {{ classroom.get_pending_requests.count }}
+                    </span>
+                    <span class="stat-lab">Pending</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val">{{ classroom.meetings.count }}</span>
+                    <span class="stat-lab">Sessions</span>
+                </div>
+            </div>
+
+            <div class="card-footer">
+                <a href="{% url 'classroom_detail' classroom.id %}" class="btn-action btn-manage">Manage</a>
+                {% if classroom.has_active_meeting %}
+                <a href="{% url 'join_meeting' classroom.get_active_meeting.meeting_code %}" class="btn-action btn-start">Enter Live</a>
+                {% else %}
+                <a href="{% url 'start_classroom_meeting' classroom.id %}" class="btn-action btn-start" style="background: #10b981;">Start Class</a>
+                {% endif %}
+            </div>
         </div>
+        {% endfor %}
+    </div>
     {% else %}
-        <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 10px;">
-            <div style="font-size: 64px; margin-bottom: 20px;">🏫</div>
-            <h3 style="color: #2c3e50; margin-bottom: 10px;">No Classrooms Yet</h3>
-            <p style="color: #7f8c8d; margin-bottom: 30px;">Create your first classroom to start teaching online</p>
-            <a href="{% url 'create_classroom' %}" 
-               style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: 600;">
-                Create Your First Classroom
-            </a>
-        </div>
+    <div class="empty-state">
+        <i data-lucide="layout" style="width: 64px; height: 64px; color: #94a3b8; margin-bottom: 1.5rem;"></i>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">No Active Classrooms</h2>
+        <p style="color: #64748b; margin-bottom: 2rem;">You haven't created any virtual classrooms yet. Ready to start teaching?</p>
+        <a href="{% url 'create_classroom' %}" class="btn-create-main" style="display: inline-flex; width: auto;">
+            Create Your First Classroom
+        </a>
+    </div>
     {% endif %}
 </div>
 
-<style>
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-</style>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        lucide.createIcons();
+    });
+</script>
 {% endblock %}

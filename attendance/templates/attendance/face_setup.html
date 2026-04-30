@@ -180,6 +180,26 @@
 .face-panel-message { margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-weight: 500; }
 .face-panel-message.error   { background: rgba(239, 68, 68, .12); color: #ef4444; border: 1px solid rgba(239, 68, 68, .2); }
 .face-panel-message.success { background: rgba(16, 185, 129, .12); color: #10b981; border: 1px solid rgba(16, 185, 129, .2); }
+/* ── Info Modal ─────────────────────────────────────────── */
+.info-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;
+}
+.info-modal.active { display: flex; }
+.info-modal-content {
+    background: #fff; border-radius: 24px; max-width: 450px; width: 100%; padding: 32px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3); animation: modalIn 0.3s ease-out;
+}
+.info-modal-header { text-align: center; margin-bottom: 24px; }
+.info-modal-header h2 { margin: 0 0 8px; font-size: 1.25rem; font-weight: 700; color: #1a1a2e; }
+.info-modal-header p { margin: 0; font-size: 0.9rem; opacity: 0.6; line-height: 1.5; }
+.info-form-group { margin-bottom: 18px; }
+.info-form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: #666; }
+.info-form-control {
+    width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid rgba(0,0,0,0.08);
+    font-size: 0.9rem; transition: all 0.2s;
+}
+.info-form-control:focus { border-color: #667eea; outline: none; box-shadow: 0 0 0 4px rgba(102,126,234,0.1); }
 </style>
 {% endblock %}
 
@@ -240,28 +260,18 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </div>
                     <h3>Drop your photo here</h3>
-                    <p>JPEG, PNG, or WebP · Max 10 MB · One clear, front-facing face</p>
+                    <p>JPEG, PNG, or WebP · Max 10 MB</p>
                     <img id="previewImg" class="upload-preview" alt="Preview">
                 </div>
 
                 <div class="btn-group">
-                    <button type="submit" class="btn-primary" id="uploadBtn" disabled>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                        Register Face
-                    </button>
+                    <button type="submit" class="btn-primary" id="uploadBtn" disabled>Register Face</button>
                     <button type="button" class="btn-secondary" onclick="document.getElementById('photoInput').click()">
                         Choose File
                     </button>
                 </div>
             </form>
-
-            {% if messages %}
-            {% for message in messages %}
-            <div class="face-panel-message {{ message.tags }}">
-                {{ message }}
-            </div>
-            {% endfor %}
-            {% endif %}
+            <!-- ... -->
         </div>
 
         <!-- Camera Panel -->
@@ -301,7 +311,76 @@
     </div>
 </div>
 
+<!-- Info Modal -->
+<div class="info-modal" id="infoModal">
+    <div class="info-modal-content">
+        <div class="info-modal-header">
+            <h2>Complete Your Profile</h2>
+            <p>We need a few more details before you can register your face for attendance.</p>
+        </div>
+        <div id="infoModalError" style="color:#ef4444; font-size:0.8rem; margin-bottom:12px; text-align:center; display:none;"></div>
+        <div class="info-form-group">
+            <label>Roll Number</label>
+            <input type="text" id="modal_roll" class="info-form-control" placeholder="e.g. 21CS045" value="{{ u_profile.roll_number|default:'' }}">
+        </div>
+        <div class="info-form-group">
+            <label>Branch / Department</label>
+            <input type="text" id="modal_branch" class="info-form-control" placeholder="e.g. Computer Science" value="{{ u_profile.branch|default:'' }}">
+        </div>
+        <div class="info-form-group">
+            <label>Contact Number</label>
+            <input type="text" id="modal_contact" class="info-form-control" placeholder="e.g. +91 98765 43210" value="{{ u_profile.contact_number|default:'' }}">
+        </div>
+        <button class="btn-primary" style="width:100%; justify-content:center; margin-top:12px;" onclick="saveProfileInfo()">
+            Save & Continue
+        </button>
+    </div>
+</div>
+
 <script>
+// ── Info Modal & Profile Completeness ─────────────────────
+const infoComplete = {{ info_complete|yesno:"true,false" }};
+
+window.addEventListener('DOMContentLoaded', () => {
+    if (!infoComplete) {
+        document.getElementById('infoModal').classList.add('active');
+    }
+});
+
+async function saveProfileInfo() {
+    const roll = document.getElementById('modal_roll').value.trim();
+    const branch = document.getElementById('modal_branch').value.trim();
+    const contact = document.getElementById('modal_contact').value.trim();
+    const errorEl = document.getElementById('infoModalError');
+    
+    if (!roll || !branch || !contact) {
+        errorEl.textContent = "Please fill in all fields.";
+        errorEl.style.display = "block";
+        return;
+    }
+    
+    try {
+        const resp = await fetch("{% url 'update_profile_info' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify({ roll_number: roll, branch: branch, contact_number: contact })
+        });
+        const data = await resp.json();
+        
+        if (data.status === 'success') {
+            document.getElementById('infoModal').classList.remove('active');
+            // Allow registration to proceed
+            window.location.reload(); // Reload to refresh infoComplete status
+        } else {
+            errorEl.textContent = data.message;
+            errorEl.style.display = "block";
+        }
+    } catch(e) {
+        errorEl.textContent = "Failed to update profile. Try again.";
+        errorEl.style.display = "block";
+    }
+}
+
 // ── Tab switcher ───────────────────────────────────────────
 function switchTab(tab) {
     document.querySelectorAll('.face-tab').forEach(t => t.classList.remove('active'));
@@ -466,7 +545,10 @@ async function capturePhoto() {
         const resp = await fetch("{% url 'capture_face_photo' %}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-            body: JSON.stringify({ frame_b64: frameB64 }),
+            body: JSON.stringify({ 
+                frame_b64: frameB64
+                // Student info is now pulled from profile on server side
+            }),
             signal: controller.signal
         });
         clearTimeout(timeoutId);
