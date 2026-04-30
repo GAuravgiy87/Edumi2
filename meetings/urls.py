@@ -20,6 +20,7 @@ urlpatterns = [
     path('teacher/', views.teacher_meetings, name='teacher_meetings'),
     path('student/', views.student_meetings, name='student_meetings'),
     path('join/<str:meeting_code>/', views.join_meeting, name='join_meeting'),
+    path('token/<str:meeting_code>/', views.livekit_token, name='livekit_token'),
     path('end/<int:meeting_id>/', views.end_meeting, name='end_meeting'),
     path('leave/<int:meeting_id>/', views.leave_meeting, name='leave_meeting'),
     path('participants/<int:meeting_id>/', views.get_participants, name='get_participants'),

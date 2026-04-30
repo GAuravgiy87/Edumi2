@@ -1,0 +1,13 @@
+version: "3"
+agent:
+  authtoken: 3Cyj0XsReXGd9C2Nww5Xr03iexV_2CtxYGFbUapetBGZLC2XE
+
+tunnels:
+  django:
+    proto: http
+    addr: 8000
+    inspect: false
+    # Skip ngrok browser warning for all requests (needed for WebSocket + API calls)
+    request_header:
+      add:
+        - "ngrok-skip-browser-warning: true"

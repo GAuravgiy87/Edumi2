@@ -18,6 +18,8 @@ from accounts.notification_utils import (
     notify_meeting_started,
     notify_meeting_cancelled
 )
+from django.conf import settings
+from livekit.api import AccessToken, VideoGrants
 import random
 import string
 
@@ -287,12 +289,21 @@ def start_classroom_meeting(request, classroom_id):
         return redirect('join_meeting', meeting_code=active_meeting.meeting_code)
     
     if request.method == 'POST':
-        title = request.POST.get('title', classroom.title)
+        title = request.POST.get('title', classroom.title).strip()
         duration_minutes = int(request.POST.get('duration_minutes', 60))
         allow_screen_share = request.POST.get('allow_screen_share', 'on') == 'on'
         allow_chat = request.POST.get('allow_chat', 'on') == 'on'
         record_meeting = request.POST.get('record_meeting') == 'on'
-        
+
+        if not title:
+            messages.error(request, 'Meeting title cannot be empty.')
+            return render(request, 'meetings/start_classroom_meeting.html', {'classroom': classroom})
+
+        # Prevent duplicate title within the same classroom (across non-ended meetings)
+        if Meeting.objects.filter(classroom=classroom, title__iexact=title).exclude(status__in=['ended', 'cancelled']).exists():
+            messages.error(request, f'A meeting named "{title}" already exists in this classroom. Please use a different title.')
+            return render(request, 'meetings/start_classroom_meeting.html', {'classroom': classroom})
+
         meeting_code = generate_meeting_code()
         
         meeting = Meeting.objects.create(
@@ -325,13 +336,22 @@ def create_meeting(request):
         return redirect('login')
     
     if request.method == 'POST':
-        title = request.POST.get('title')
+        title = request.POST.get('title', '').strip()
         description = request.POST.get('description', '')
         scheduled_time = request.POST.get('scheduled_time')
         duration_minutes = int(request.POST.get('duration_minutes', 60))
         allow_screen_share = request.POST.get('allow_screen_share') == 'on'
         allow_chat = request.POST.get('allow_chat') == 'on'
-        
+
+        if not title:
+            messages.error(request, 'Meeting title cannot be empty.')
+            return render(request, 'meetings/create_meeting.html')
+
+        # Prevent duplicate title for the same teacher (across non-ended standalone meetings)
+        if Meeting.objects.filter(teacher=request.user, title__iexact=title, classroom__isnull=True).exclude(status__in=['ended', 'cancelled']).exists():
+            messages.error(request, f'You already have a meeting named "{title}". Please use a different title.')
+            return render(request, 'meetings/create_meeting.html')
+
         meeting_code = generate_meeting_code()
         
         meeting = Meeting.objects.create(
@@ -424,8 +444,44 @@ def join_meeting(request, meeting_code):
     
     return render(request, 'meetings/meeting_room.html', {
         'meeting': meeting,
-        'is_host': meeting.teacher == request.user or request.user.is_superuser
+        'is_host': meeting.teacher == request.user or request.user.is_superuser,
+        'livekit_url': settings.LIVEKIT_URL,
     })
+
+@login_required
+def livekit_token(request, meeting_code):
+    """Generate a LiveKit access token for the requesting user."""
+    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
+
+    # Same access check as join_meeting
+    if meeting.classroom:
+        is_teacher = meeting.classroom.teacher == request.user
+        is_approved = ClassroomMembership.objects.filter(
+            classroom=meeting.classroom,
+            student=request.user,
+            status='approved'
+        ).exists()
+        if not (is_teacher or is_approved):
+            return JsonResponse({'error': 'Access denied'}, status=403)
+
+    is_host = meeting.teacher == request.user or request.user.is_superuser
+
+    token = (
+        AccessToken(settings.LIVEKIT_API_KEY, settings.LIVEKIT_API_SECRET)
+        .with_identity(str(request.user.id))
+        .with_name(request.user.username)
+        .with_grants(VideoGrants(
+            room_join=True,
+            room=meeting_code,
+            can_publish=True,
+            can_subscribe=True,
+            can_publish_data=True,
+            room_admin=is_host,
+        ))
+        .to_jwt()
+    )
+
+    return JsonResponse({'token': token, 'url': settings.LIVEKIT_URL})
 
 @login_required
 def meeting_attendance(request, meeting_code):

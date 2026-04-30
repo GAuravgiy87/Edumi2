@@ -107,6 +107,20 @@ class Meeting(models.Model):
     
     class Meta:
         ordering = ['-scheduled_time']
+        constraints = [
+            # No two active/live/scheduled meetings with the same title in the same classroom
+            models.UniqueConstraint(
+                fields=['classroom', 'title'],
+                condition=models.Q(status__in=['scheduled', 'live']),
+                name='unique_active_meeting_title_per_classroom'
+            ),
+            # No two active/live/scheduled standalone meetings with the same title per teacher
+            models.UniqueConstraint(
+                fields=['teacher', 'title'],
+                condition=models.Q(status__in=['scheduled', 'live'], classroom__isnull=True),
+                name='unique_active_standalone_meeting_title_per_teacher'
+            ),
+        ]
     
     def is_sleeping(self):
         """Check if meeting is in sleep mode"""

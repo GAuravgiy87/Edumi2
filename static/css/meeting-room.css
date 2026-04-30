@@ -154,13 +154,14 @@
 .main-video-area {
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
     background: #000;
     border-radius: 16px;
     overflow: hidden;
     position: relative;
     min-width: 0;
+    min-height: 0;
 }
 
 .sidebar-video-area {
@@ -178,10 +179,15 @@
 /* Sidebar Layout adjustments */
 .sidebar-view .main-video-area {
     display: flex;
+    flex: 1;
+    min-width: 0;
 }
 
 .sidebar-view .sidebar-video-area {
-    width: 240px; /* More compact sidebar */
+    width: 200px;
+    min-width: 160px;
+    max-width: 220px;
+    flex-shrink: 0;
     flex-direction: column;
     flex-wrap: nowrap;
     justify-content: flex-start;
@@ -198,15 +204,22 @@
     flex-shrink: 0;
 }
 
-/* Speaker/Main highlighted video */
+/* Speaker/Main highlighted video — fills the entire main area */
 .video-box.main-presents {
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    aspect-ratio: unset !important;
     border: 3px solid #6366f1;
     box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+    contain: layout style; /* remove paint so video fills properly */
 }
 
 .video-box.main-presents video {
+    width: 100%;
+    height: 100%;
     object-fit: contain;
     background: #000;
 }
@@ -316,21 +329,6 @@
 
 .video-box {
     position: relative;
-    background: #000;
-    border-radius: clamp(8px, 1.2vw, 16px);
-    overflow: hidden;
-    aspect-ratio: 16/9;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 2px solid rgba(255, 255, 255, 0.05);
-}
-
-.video-box:hover {
-    border-color: rgba(99, 102, 241, 0.3);
-    transform: scale(1.02);
-}
-
-.video-box {
-    position: relative;
     background: #1e1e1e;
     border-radius: 12px;
     overflow: hidden;
@@ -341,7 +339,6 @@
     height: auto;
     max-width: 100%;
     min-width: 0;
-    contain: strict;
 }
 
 .video-box:hover {
@@ -944,6 +941,41 @@
     .meet-sidebar {
         width: 100%;
         max-width: 100vw;
+    }
+    
+    /* On mobile, stack screen share vertically */
+    .video-grid-container.sidebar-view {
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .sidebar-view .main-video-area {
+        flex: 1;
+        min-height: 0;
+        border-radius: 12px;
+    }
+
+    .sidebar-view .sidebar-video-area {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        height: 100px;
+        flex-shrink: 0;
+        gap: 8px;
+        padding: 4px;
+    }
+
+    .sidebar-view .sidebar-video-area .video-box {
+        width: 140px;
+        min-width: 120px;
+        height: 100%;
+        aspect-ratio: unset;
+        flex-shrink: 0;
     }
     
     .video-grid-container.grid-view {

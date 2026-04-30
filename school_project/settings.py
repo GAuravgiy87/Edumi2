@@ -43,6 +43,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://localhost:8443',
     'https://127.0.0.1',
     'https://127.0.0.1:8443',
+    'https://10.7.32.175',
+    'https://10.7.32.175:8443',
     'https://10.17.2.47',
     'https://10.17.2.47:8443',
     'https://*.ngrok.io',
@@ -116,14 +118,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'school_project.wsgi.application'
 ASGI_APPLICATION = 'school_project.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379/0')],
-        },
+REDIS_URL = os.environ.get('REDIS_URL', '')
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [REDIS_URL],
+            },
+        }
     }
-}
+else:
+    # No Redis available — use in-memory channel layer (single-process only)
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
 
 
 # Database
@@ -234,14 +245,21 @@ LOGGING = {
 }
 
 # Celery Configuration Options
-CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'memory://')
+CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'cache+memory://')
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-# ─── Face Recognition Attendance ────────────────────────────────────────────
+# ─── LiveKit SFU ────────────────────────────────────────────────────────────
+# LIVEKIT_URL: what the *browser* connects to.
+# When running behind ngrok, set this to your ngrok URL + /livekit-proxy
+# e.g.  wss://xxxx.ngrok-free.app/livekit-proxy
+# The proxy in asgi.py forwards it to ws://localhost:7880 internally.
+LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:7880')
+LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey')
+LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_characters_long_1234')
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>
 FACE_ENCRYPTION_KEY = os.environ.get('FACE_ENCRYPTION_KEY', '')

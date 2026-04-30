@@ -1,29 +1,32 @@
-"""
+﻿"""
 ASGI config for school_project project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/4.2/howto/deployment/asgi/
 """
 
 import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'school_project.settings')
 
 from django.core.asgi import get_asgi_application
+django_asgi_app = get_asgi_application()
+
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
+from django.urls import re_path
 from meetings.routing import websocket_urlpatterns as meeting_ws
 from attendance.routing import websocket_urlpatterns as attendance_ws
+from meetings.livekit_proxy import LiveKitProxyConsumer
 
-# Combine all WebSocket URL patterns
-all_websocket_urlpatterns = meeting_ws + attendance_ws
+livekit_patterns = [
+    re_path(r'^livekit-proxy(?P<lk_path>/.+)$', LiveKitProxyConsumer.as_asgi()),
+    re_path(r'^livekit-proxy/?$', LiveKitProxyConsumer.as_asgi()),
+]
 
 application = ProtocolTypeRouter({
-    "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            all_websocket_urlpatterns
-        )
+    "http": django_asgi_app,
+    "websocket": URLRouter(
+        livekit_patterns + [
+            re_path(r'', AuthMiddlewareStack(
+                URLRouter(meeting_ws + attendance_ws)
+            )),
+        ]
     ),
 })
