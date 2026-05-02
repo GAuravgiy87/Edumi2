@@ -6,67 +6,54 @@
 {% block content %}
 <style>
     .prejoin-container { max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem; }
-    
     .prejoin-grid { display: grid; grid-template-columns: 1fr 380px; gap: 2rem; }
-    
-    .camera-preview-wrap { 
-        background: #0f172a; 
-        border-radius: 1.5rem; 
-        overflow: hidden; 
-        aspect-ratio: 16/9; 
-        position: relative; 
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    .camera-preview-wrap {
+        background: #0f172a;
+        border-radius: 1.5rem;
+        overflow: hidden;
+        aspect-ratio: 16/9;
+        position: relative;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
     }
-    
     #videoPreview { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-    
-    .preview-overlay { 
-        position: absolute; 
-        inset: 0; 
-        background: rgba(0,0,0,0.4); 
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: center; 
-        color: white;
-        transition: opacity 0.3s;
+    .preview-overlay {
+        position: absolute; inset: 0;
+        background: rgba(0,0,0,0.4);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        color: white; transition: opacity 0.3s;
     }
-    
-    .status-card { background: white; border-radius: 1.25rem; padding: 2rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
-    
+    .status-card { background: white; border-radius: 1.25rem; padding: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
     .status-item { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; border-radius: 0.75rem; background: #f8fafc; }
     .status-item.success { background: #ecfdf5; color: #065f46; }
     .status-item.error { background: #fef2f2; color: #991b1b; }
-    
     .status-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: white; flex-shrink: 0; }
-    
-    .btn-join { 
-        width: 100%; 
-        padding: 1rem; 
-        background: #4f46e5; 
-        color: white; 
-        border: none; 
-        border-radius: 0.75rem; 
-        font-size: 1.125rem; 
-        font-weight: 700; 
-        cursor: pointer; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        gap: 0.75rem;
-        transition: all 0.2s;
-        margin-top: 1rem;
+    .btn-join {
+        width: 100%; padding: 1rem;
+        background: #4f46e5; color: white;
+        border: none; border-radius: 0.75rem;
+        font-size: 1.125rem; font-weight: 700;
+        cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+        transition: all 0.2s; margin-top: 1rem; text-decoration: none;
     }
-    
     .btn-join:disabled { background: #94a3b8; cursor: not-allowed; transform: none !important; }
-    .btn-join:hover { background: #4338ca; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3); }
-
-    .identity-check { text-align: center; margin-top: 1.5rem; }
-    .identity-check i { width: 48px; height: 48px; margin-bottom: 0.5rem; }
-
-    @media (max-width: 900px) {
-        .prejoin-grid { grid-template-columns: 1fr; }
+    .btn-join:hover:not(:disabled) { background: #4338ca; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(79,70,229,0.3); }
+    .btn-skip {
+        width: 100%; padding: 0.75rem;
+        background: transparent; color: #64748b;
+        border: 2px solid #e2e8f0; border-radius: 0.75rem;
+        font-size: 0.9rem; font-weight: 600;
+        cursor: pointer; margin-top: 0.75rem; transition: all 0.2s;
     }
+    .btn-skip:hover { border-color: #94a3b8; color: #374151; }
+    .warning-banner {
+        background: #fffbeb; border: 1px solid #f59e0b;
+        border-radius: 0.75rem; padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: flex-start;
+    }
+    .warning-banner svg { flex-shrink: 0; color: #d97706; margin-top: 2px; }
+    .warning-banner p { font-size: 0.875rem; color: #92400e; margin: 0; line-height: 1.5; }
+    @media (max-width: 900px) { .prejoin-grid { grid-template-columns: 1fr; } }
 </style>
 
 <div class="prejoin-container">
@@ -75,6 +62,33 @@
         <p style="color: #64748b;">Prepare your hardware and verify your identity before entering.</p>
     </div>
 
+    {% if not face_registered %}
+    <!-- === UNREGISTERED USER: warn and allow direct entry === -->
+    <div class="warning-banner">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <p>
+            <strong>Face identity not registered.</strong><br>
+            You can still join this meeting. Your join time has been recorded for attendance.
+            Please <a href="{% url 'face_setup' %}" style="color: #d97706; font-weight: 600;">register your face</a> soon to enable full attendance features.
+        </p>
+    </div>
+    <div class="status-card" style="max-width: 460px; margin: 0 auto; text-align: center;">
+        <div style="width: 72px; height: 72px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3 style="font-size: 1.2rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">No Face Profile Found</h3>
+        <p style="color: #64748b; font-size: 0.875rem; margin-bottom: 1.5rem;">
+            Your attendance has been automatically logged. You may enter the meeting directly.
+        </p>
+        <a href="{% url 'join_meeting' meeting.meeting_code %}?skip_verify=1" class="btn-join">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Enter Meeting Room
+        </a>
+        <a href="{% url 'face_setup' %}" class="btn-skip">Register Face First (Recommended)</a>
+    </div>
+
+    {% else %}
+    <!-- === REGISTERED USER: full face verification === -->
     <div class="prejoin-grid">
         <div class="camera-preview-wrap">
             <video id="videoPreview" autoplay playsinline muted></video>
@@ -86,8 +100,8 @@
         </div>
 
         <div class="status-card">
-            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Ready Checklist</h2>
-            
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Identity Check</h2>
+
             <div class="status-item" id="camStatus">
                 <div class="status-icon"><i data-lucide="video"></i></div>
                 <div style="flex:1;">
@@ -106,106 +120,99 @@
                 <div class="check-mark" style="display:none;"><i data-lucide="check-circle-2" style="color:#10b981;"></i></div>
             </div>
 
-            <div id="identityVerify" class="identity-check" style="display:none;">
-                <i data-lucide="user-check" style="color: #10b981;"></i>
-                <p style="font-weight: 700; color: #065f46;">Identity Verified</p>
-                <p style="font-size: 0.8125rem; color: #065f46;">Welcome, {{ profile.get_display_name }}</p>
+            <div id="identityVerify" style="text-align: center; margin-top: 1.5rem; display:none;">
+                <i data-lucide="user-check" style="color: #10b981; width: 48px; height: 48px;"></i>
+                <p style="font-weight: 700; color: #065f46; margin-top: 0.5rem;">Identity Verified</p>
+                {% if profile %}<p style="font-size: 0.8125rem; color: #065f46;">Welcome, {{ profile.get_display_name }}</p>{% endif %}
             </div>
 
             <button id="joinBtn" class="btn-join" disabled onclick="redirectToMeeting()">
                 <span>Enter Room</span>
                 <i data-lucide="arrow-right"></i>
             </button>
-            
+
+            <button class="btn-skip" onclick="skipVerify()">Skip Verification &amp; Enter Anyway</button>
+
             <p style="font-size: 0.75rem; color: #94a3b8; text-align: center; margin-top: 1rem;">
                 By joining, you agree to our academic integrity policy.
             </p>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <script>
-    let stream = null;
-    const video = document.getElementById('videoPreview');
-    const canvas = document.getElementById('identityCanvas');
-    const overlay = document.getElementById('cameraOverlay');
-    const joinBtn = document.getElementById('joinBtn');
+{% if face_registered %}
+let stream = null;
+const video = document.getElementById('videoPreview');
+const canvas = document.getElementById('identityCanvas');
+const overlay = document.getElementById('cameraOverlay');
+const joinBtn = document.getElementById('joinBtn');
 
-    async function initCamera() {
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            overlay.style.opacity = '0';
-            updateStatus('cam', true, 'Camera active');
-            
-            // Wait for video to be ready
-            video.onloadedmetadata = () => {
-                setTimeout(performFaceCheck, 1000);
-            };
-        } catch (err) {
-            updateStatus('cam', false, 'Access denied or no camera found');
-            console.error(err);
+async function initCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        overlay.style.opacity = '0';
+        updateStatus('cam', true, 'Camera active');
+        video.onloadedmetadata = () => { setTimeout(performFaceCheck, 1000); };
+    } catch (err) {
+        updateStatus('cam', false, 'Access denied or no camera found');
+    }
+}
+
+function updateStatus(type, success, text) {
+    const item = document.getElementById(type + 'Status');
+    const textEl = document.getElementById(type + 'Text');
+    const mark = item.querySelector('.check-mark');
+    item.className = 'status-item ' + (success ? 'success' : 'error');
+    textEl.textContent = text;
+    mark.style.display = success ? 'block' : 'none';
+    checkReady();
+}
+
+async function performFaceCheck() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const imageData = canvas.toDataURL('image/jpeg');
+    try {
+        const response = await fetch('{% url "verify_face_prejoin" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ image: imageData, meeting_code: '{{ meeting.meeting_code }}' })
+        });
+        const data = await response.json();
+        if (data.success) {
+            updateStatus('face', true, 'Identity confirmed');
+            document.getElementById('identityVerify').style.display = 'block';
+        } else {
+            updateStatus('face', false, 'Not recognized — retrying...');
+            setTimeout(performFaceCheck, 3000);
         }
+    } catch (err) {
+        updateStatus('face', false, 'Verification error — retrying...');
+        setTimeout(performFaceCheck, 4000);
     }
+}
 
-    function updateStatus(type, success, text) {
-        const item = document.getElementById(type + 'Status');
-        const textEl = document.getElementById(type + 'Text');
-        const mark = item.querySelector('.check-mark');
-        
-        item.className = 'status-item ' + (success ? 'success' : 'error');
-        textEl.textContent = text;
-        mark.style.display = success ? 'block' : 'none';
-        
-        checkReady();
-    }
+function checkReady() {
+    const camOk = document.getElementById('camStatus').classList.contains('success');
+    const faceOk = document.getElementById('faceStatus').classList.contains('success');
+    joinBtn.disabled = !(camOk && faceOk);
+}
 
-    async function performFaceCheck() {
-        // Capture frame for face verification
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const imageData = canvas.toDataURL('image/jpeg');
+function redirectToMeeting() {
+    window.location.href = "{% url 'join_meeting' meeting.meeting_code %}";
+}
 
-        try {
-            const response = await fetch('{% url "verify_face_prejoin" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({ 
-                    image: imageData,
-                    meeting_code: '{{ meeting.meeting_code }}'
-                })
-            });
-            const data = await response.json();
-            
-            if (data.success) {
-                updateStatus('face', true, 'Identity confirmed');
-                document.getElementById('identityVerify').style.display = 'block';
-            } else {
-                updateStatus('face', false, 'Face not recognized. Try again.');
-                setTimeout(performFaceCheck, 3000); // Retry
-            }
-        } catch (err) {
-            updateStatus('face', false, 'Verification service error');
-        }
-    }
+function skipVerify() {
+    window.location.href = "{% url 'join_meeting' meeting.meeting_code %}?skip_verify=1";
+}
 
-    function checkReady() {
-        const camOk = document.getElementById('camStatus').classList.contains('success');
-        const faceOk = document.getElementById('faceStatus').classList.contains('success');
-        joinBtn.disabled = !(camOk && faceOk);
-    }
-
-    function redirectToMeeting() {
-        window.location.href = "{% url 'meeting_room' meeting.meeting_code %}";
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        lucide.createIcons();
-        initCamera();
-    });
+document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); initCamera(); });
+{% else %}
+document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+{% endif %}
 </script>
 {% endblock %}

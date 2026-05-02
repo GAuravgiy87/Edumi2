@@ -1162,3 +1162,100 @@
 .video-box.cam-off {
     background: #2d2d2d url('https://ui-avatars.com/api/?name=User&background=334155&color=fff') center/30% no-repeat;
 }
+
+/* --- MORE OPTIONS MENU --- */
+.more-options-container {
+    position: relative;
+    display: flex;
+}
+
+.more-options-menu {
+    position: absolute;
+    bottom: calc(100% + 20px);
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(26, 26, 26, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 200px;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    z-index: 101;
+}
+
+.more-options-menu.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Triangle pointer for menu */
+.more-options-menu::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 8px 8px 0;
+    border-style: solid;
+    border-color: rgba(26, 26, 26, 0.95) transparent transparent transparent;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-align: left;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-item svg {
+    width: 18px;
+    height: 18px;
+    stroke: #fff;
+    fill: none;
+    opacity: 0.8;
+}
+
+.menu-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 6px 0;
+}
+
+/* --- FULL SCREEN SIDEBAR FOR MOBILE --- */
+@media (max-width: 768px) {
+    .meet-sidebar {
+        width: 100% !important;
+        position: fixed;
+        inset: 0;
+        z-index: 200; /* Ensure it covers everything on mobile */
+        border-left: none;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .meet-main.sidebar-open {
+        padding-right: 0 !important; /* Don't squash video area on mobile */
+    }
+}

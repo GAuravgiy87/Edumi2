@@ -29,6 +29,50 @@ If you just want to run the system immediately:
 
 </div>
 
+### 🏗️ System Architecture & Data Flow
+
+```text
++-----------------------------------------------------------------------------+
+|                     LAYER 1: PRESENTATION & CLIENTS                         |
+|  [ Student & Teacher Web Browsers ]        [ External IP Cameras in Rooms ] |
++-----------------------------------------------------------------------------+
+              |                                        |
+     (HTTPS / WSS / WebRTC)                  (RTSP / HTTP Media Streams)
+              |                                        |
+              v                                        v
++-----------------------------------------------------------------------------+
+|                     LAYER 2: GATEWAY & ROUTING                              |
+|  [ Ngrok Tunnel ] ---> Secure Entry Point for External WebRTC / WebSockets  |
+|  [ Nginx Proxy  ] ---> Routes HTTP to Django / WebSockets to Daphne         |
++-----------------------------------------------------------------------------+
+              |                                        |
+       (Routing)                                 (Signaling)
+              v                                        v
++-----------------------------------------------------------------------------+
+|                     LAYER 3: APPLICATION & AI CORE                          |
+|  +--------------------+    +--------------------+    +--------------------+ |
+|  |     Main App       |    |   Camera Service   |    |    LiveKit SFU     | |
+|  |   (Django/ASGI)    |<-->|   (OpenCV / AI)    |    |  (WebRTC Engine)   | |
+|  | - Auth & Routing   |    | - Face Recognition |    | - Video Routing    | |
+|  | - WebSockets Hub   |    | - Attention Track  |    | - Simulcasting     | |
+|  +---------|----------+    +---------|----------+    +---------|----------+ |
+|            |                         |                         |            |
+|            +-----------+-------------+-------------------------+            |
+|                        v                                                    |
+|            +-----------------------+                                        |
+|            |     Celery Worker     | ---> Background Tasks / Analytics      |
+|            +-----------------------+                                        |
++-----------------------------------------------------------------------------+
+              |                                        |
+       (Queries)                                (Pub/Sub)
+              v                                        v
++-----------------------------------------------------------------------------+
+|                     LAYER 4: DATA & PERSISTENCE                             |
+|  [ SQLite DB ] ----> Stores Users, Meetings, Logs, Profiles                 |
+|  [ Redis     ] ----> Real-time Message Broker (Channels) & Celery Queue     |
++-----------------------------------------------------------------------------+
+```
+
 ---
 
-<sub>For developer notes and system architecture, please refer to the [Master Guide](PROJECT_COMPLETE_GUIDE.md).</sub>
+<sub>For developer notes and a complete module deep-dive, please refer to the [Master Guide](PROJECT_COMPLETE_GUIDE.md).</sub>

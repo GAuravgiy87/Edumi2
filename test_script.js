@@ -1,211 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ meeting.title }} - Edumi Meet</title>
-    {% load static %}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/base.css' %}">
-    <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
-    <!-- LiveKit JS SDK (browser bundle) -->
-    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
 
-    <style>
-        /* AI Monitoring Styles */
-        #face-att-badge {
-            position: fixed; bottom: 100px; right: 24px; z-index: 1000;
-            display: flex; align-items: center; gap: 10px;
-            padding: 12px 20px; border-radius: 16px;
-            font-size: 13px; font-weight: 600; color: #fff;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 300px;
-        }
-        #face-att-badge.state-active    { border-color: rgba(99, 102, 241, 0.4); }
-        #face-att-badge.state-progress  { border-color: rgba(245, 158, 11, 0.4); }
-        #face-att-badge.state-success   { border-color: rgba(16, 185, 129, 0.4); }
-        #face-att-badge.state-warning   { border-color: rgba(239, 68, 68, 0.4); }
-        
-        .fa-dot {
-            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-            background: #6366f1; animation: fa-pulse 2s infinite;
-        }
-        .state-success .fa-dot { background: #10b981; animation: none; }
-        .state-warning .fa-dot { background: #ef4444; }
-        @keyframes fa-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
-
-        #face-att-progress-bar {
-            height: 4px; background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px; margin-top: 6px; overflow: hidden;
-        }
-        #face-att-progress-fill {
-            height: 100%; background: linear-gradient(90deg, #6366f1, #10b981);
-            width: 0%; transition: width 0.5s ease;
-        }
-
-        /* Face Tracking Overlays */
-        .ft-canvas-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 10; border-radius: inherit;
-        }
-        .ft-emotion-badge {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.9); color: #fff; font-size: 11px; font-weight: 700;
-            padding: 4px 10px; border-radius: 20px; white-space: nowrap; z-index: 11;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        .video-box { position: relative; overflow: hidden; }
-    </style>
-</head>
-<body class="meeting-body">
-<div class="meet-container">
-
-    <!-- Top Bar -->
-    <div class="meet-topbar">
-        <div class="meet-info">
-            <h3>{{ meeting.title }}</h3>
-            <span class="meet-code">{{ meeting.meeting_code }}</span>
-        </div>
-        <div class="recording-indicator" id="recordingIndicator" style="display:none;">
-            <span class="recording-dot"></span>
-            <span class="recording-text">Recording</span>
-            <span class="recording-timer" id="recordingTimer">00:00</span>
-        </div>
-        <div class="meet-timer" id="meetTimer">00:00</div>
-    </div>
-
-    <!-- Video Area -->
-    <div class="meet-main" id="meetMain">
-        <div class="video-grid-container grid-view count-1" id="videoGridContainer">
-            <div id="mainVideoArea" class="main-video-area"></div>
-            <div id="sidebarVideoArea" class="sidebar-video-area"></div>
-        </div>
-
-        <!-- People / Chat Sidebar -->
-        <div class="meet-sidebar" id="meetSidebar" style="display:none;">
-            <div class="sidebar-header">
-                <div class="sidebar-tabs">
-                    <button class="sidebar-tab active" onclick="switchSidebarTab('people')">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                        <span>People</span>
-                    </button>
-                    <button class="sidebar-tab" onclick="switchSidebarTab('chat')">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                        <span>Chat</span>
-                    </button>
-                </div>
-                <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
-            </div>
-            <div class="sidebar-content">
-                <div class="sidebar-panel active" id="peoplePanel">
-                    <div class="participants-count"><span id="participantCount">1</span> in call</div>
-                    <div class="participants-list" id="participantsList"></div>
-                    {% if is_host %}
-                    <div class="banned-section" style="margin-top: 2rem; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 1rem;">
-                        <div class="participants-count" style="background: rgba(239, 68, 68, 0.05); color: #ef4444; border-bottom: none;">Banned Students</div>
-                        <div class="participants-list" id="bannedList"></div>
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="sidebar-panel" id="chatPanel">
-                    <div class="chat-messages" id="chatMessages"></div>
-                    <div class="chat-input-box">
-                        <input type="text" id="chatInput" placeholder="Send a message to everyone"
-                               onkeydown="if(event.key==='Enter') sendChatMessage()"/>
-                        <button onclick="sendChatMessage()" class="send-btn">Send</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Controls -->
-    <div class="meet-controls">
-        <button class="control-button" id="micBtn" onclick="toggleMic()" title="Microphone">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        </button>
-        <button class="control-button" id="camBtn" onclick="toggleCamera()" title="Camera">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-        </button>
-
-        <div class="more-options-container">
-            <button class="control-button" id="moreBtn" onclick="toggleMoreOptions()" title="More Options">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-            </button>
-            <div class="more-options-menu" id="moreOptionsMenu">
-                <button class="menu-item" id="screenBtn" onclick="toggleScreenShare(); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                    <span>Share Screen</span>
-                </button>
-                <button class="menu-item" id="peopleBtn" onclick="openSidebar('people'); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <span>Participants</span>
-                </button>
-                <button class="menu-item" id="chatBtn" onclick="openSidebar('chat'); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    <span>Chat</span>
-                    <span class="notification-badge" id="chatBadge" style="display:none; margin-left:auto;">0</span>
-                </button>
-                
-                {% if is_host %}
-                <div class="menu-divider"></div>
-                <button class="menu-item" id="sleepBtn" onclick="toggleSleepMode(); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-                    <span>Sleep Mode</span>
-                </button>
-                <button class="menu-item" id="ftToggleBtn" onclick="toggleFaceTracking(); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    <span>Face Tracking</span>
-                </button>
-                <div class="menu-divider"></div>
-                <button class="menu-item" id="muteAllBtn" onclick="toggleGlobalControl('mute_all'); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                    <span>Mute All</span>
-                </button>
-                <button class="menu-item" id="camOffAllBtn" onclick="toggleGlobalControl('camera_off_all'); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M7 2l10 10L7 22"/><path d="M23 7l-7 5 7 5V7z"/></svg>
-                    <span>Stop All Cams</span>
-                </button>
-                {% endif %}
-            </div>
-        </div>
-
-        <button class="control-button danger" onclick="leaveMeeting()" title="Leave call">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-        </button>
-    </div>
-</div>
-
-<!-- Meeting metadata -->
-<script id="meeting-data"
-    data-meeting-id="{{ meeting.id }}"
-    data-meeting-code="{{ meeting.meeting_code }}"
-    data-user-id="{{ user.id }}"
-    data-username="{{ user.username }}"
-    data-is-host="{% if is_host %}true{% else %}false{% endif %}"
-    data-can-speak="{% if participant.audio_permitted %}true{% else %}false{% endif %}"
-    data-can-video="{% if participant.video_permitted %}true{% else %}false{% endif %}"
-    data-can-share="{% if participant.screenshare_permitted %}true{% else %}false{% endif %}"
-    data-token-url="{% url 'livekit_token' meeting.meeting_code %}"
-    data-leave-url="{% url 'leave_meeting' meeting.id %}"
-    data-sleep-url="{% url 'sleep_meeting' meeting.meeting_code %}"
-    data-unfreeze-url="{% url 'unfreeze_meeting' meeting.meeting_code %}"
-    data-after-leave-url="{% if meeting.classroom %}{% url 'classroom_detail' meeting.classroom.id %}{% elif is_host %}{% url 'teacher_classrooms' %}{% else %}{% url 'student_classrooms' %}{% endif %}"
-    data-csrf="{{ csrf_token }}"
-    data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
-    data-permission-url="{% url 'update_participant_permission' meeting.id 0 %}"
-    data-global-control-url="{% url 'toggle_global_control' meeting.id %}"
-    data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
-    data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}">
-</script>
-
-<script>
 // ── Config ────────────────────────────────────────────────────────────────────
 const _d          = document.getElementById('meeting-data').dataset;
 const meetingCode = _d.meetingCode;
@@ -250,18 +43,14 @@ async function init() {
     signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${meetingCode}/`);
     
     signalingWs.onmessage = (e) => {
-        try {
-            const data = JSON.parse(e.data);
-            handleSignalingMessage(data);
-        } catch(err) {
-            console.error('Signaling parse error:', err);
-        }
+        const data = JSON.parse(e.data);
+        handleSignalingMessage(data);
     };
 
     // Fetch token from Django
     const res   = await fetch(TOKEN_URL);
     const data  = await res.json();
-    if (data.error) { showNotification('Access denied: ' + data.error, 'error'); return; }
+    if (data.error) { alert('Access denied: ' + data.error); return; }
 
     const { token, url } = data;
 
@@ -293,31 +82,18 @@ async function init() {
     await room.connect(url, token);
     console.log('Connected to LiveKit room:', room.name);
 
-    // Initial state based on permissions
-    isMicOn = isHost ? true : canSpeak;
-    isCameraOn = isHost ? true : canVideo;
-
-    // Publish local camera + mic if permitted
+    // Publish local camera + mic
     try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             showNotification('Camera/Mic blocked! Please use HTTPS or localhost.', 'error');
             console.warn('mediaDevices API is missing. Usually happens on non-HTTPS connections.');
         } else {
-            if (isMicOn) await room.localParticipant.setMicrophoneEnabled(true);
-            if (isCameraOn) await room.localParticipant.setCameraEnabled(true);
+            await room.localParticipant.enableCameraAndMicrophone();
         }
     } catch (e) {
         console.error('Camera/Mic error:', e);
         showNotification('Could not start camera/mic: ' + e.message, 'warning');
     }
-
-    // Update UI buttons to reflect actual initial state
-    document.getElementById('micBtn').classList.toggle('off', !isMicOn);
-    document.getElementById('camBtn').classList.toggle('off', !isCameraOn);
-    const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-    const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
-    if (!isMicOn) document.getElementById('micBtn').innerHTML = micOffIcon;
-    if (!isCameraOn) document.getElementById('camBtn').innerHTML = camOffIcon;
 
     // Render local participant
     renderLocalParticipant();
@@ -668,7 +444,7 @@ function updateLayout() {
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 async function toggleMic() {
-    if (!canSpeak && !isHost) {
+    if (!canSpeak && !isMicOn && !isHost) {
         showNotification('Teacher has blocked your microphone', 'error');
         return;
     }
@@ -682,7 +458,7 @@ async function toggleMic() {
 }
 
 async function toggleCamera() {
-    if (!canVideo && !isHost) {
+    if (!canVideo && !isCameraOn && !isHost) {
         showNotification('Teacher has blocked your camera', 'error');
         return;
     }
@@ -710,7 +486,7 @@ async function toggleCamera() {
 }
 
 async function toggleScreenShare() {
-    if (!canShare && !isHost) {
+    if (!canShare && !isScreenSharing && !isHost) {
         showNotification('Teacher has blocked screen sharing', 'error');
         return;
     }
@@ -901,21 +677,6 @@ function toggleSidebar() {
     document.getElementById('meetMain').classList.toggle('sidebar-open', !isOpen);
 }
 
-// ── More Options ──────────────────────────────────────────────────────────────
-function toggleMoreOptions() {
-    const menu = document.getElementById('moreOptionsMenu');
-    menu.classList.toggle('show');
-}
-
-// Close menu when clicking outside
-document.addEventListener('click', function(e) {
-    const container = document.querySelector('.more-options-container');
-    const menu = document.getElementById('moreOptionsMenu');
-    if (menu && container && !container.contains(e.target)) {
-        menu.classList.remove('show');
-    }
-});
-
 function switchSidebarTab(tab) {
     document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.sidebar-panel').forEach(p => p.style.display = 'none');
@@ -997,7 +758,7 @@ window.addEventListener('beforeunload', () => { if (room) room.disconnect(); });
 init().catch(e => { console.error('Init error:', e); showNotification('Failed to connect: ' + e.message, 'error'); });
 
 // ── Face Attendance Module (Students Only) ───────────────────────────────────
-{% if not is_host and not user.is_superuser %}
+
 (function() {
     let attWs = null;
     let captureTimer = null;
@@ -1081,10 +842,10 @@ init().catch(e => { console.error('Init error:', e); showNotification('Failed to
 
     window.addEventListener('load', () => setTimeout(connect, 3000));
 })();
-{% endif %}
+
 
 // ── Face Tracking Module (Host Only) ─────────────────────────────────────────
-{% if is_host %}
+
 (function() {
     let ftWs = null;
     let ftEnabled = false;
@@ -1174,7 +935,4 @@ init().catch(e => { console.error('Init error:', e); showNotification('Failed to
         eb.textContent = label;
     }
 })();
-{% endif %}
-</script>
-</body>
-</html>
+

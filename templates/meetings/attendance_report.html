@@ -4,134 +4,283 @@
 {% block page_title %}Attendance Report - {{ meeting.title }}{% endblock %}
 
 {% block content %}
-<div class="admin-container">
-    <div class="admin-header">
-        <div>
-            <h1>Attendance Report</h1>
-            <p>{{ meeting.title }} ({{ meeting.meeting_code }})</p>
+<style>
+    .att-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem; }
+    .att-header h1 { font-size: 1.875rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem; }
+    .att-header p { color: #64748b; font-size: 0.95rem; }
+    .att-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: white; border-radius: 1rem; padding: 1.25rem 1.5rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-icon svg { width: 22px; height: 22px; stroke: white; }
+    .stat-info h3 { font-size: 0.8rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+    .stat-number { font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1; }
+
+    .section-card { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 1.5rem; }
+    .section-card-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+    .section-card-header h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
+
+    .participant-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid #f8fafc; gap: 1rem; transition: background 0.15s; }
+    .participant-row:last-child { border-bottom: none; }
+    .participant-row:hover { background: #f8fafc; }
+    .participant-row-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; padding: 0.75rem 1.5rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; gap: 1rem; }
+    .participant-row-header span { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .user-info { display: flex; align-items: center; gap: 0.75rem; }
+    .user-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .user-name { font-weight: 600; color: #0f172a; font-size: 0.9rem; }
+    .user-meta { font-size: 0.75rem; color: #94a3b8; }
+
+    .badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-live { background: #dcfce7; color: #166534; }
+    .badge-offline { background: #f1f5f9; color: #64748b; }
+    .badge-join { background: #dcfce7; color: #166534; }
+    .badge-leave { background: #fee2e2; color: #991b1b; }
+    .badge-active { background: #dbeafe; color: #1e40af; }
+
+    .time-val { font-size: 0.875rem; font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }
+    .total-time { font-size: 0.875rem; font-weight: 700; color: #4f46e5; }
+
+    .sessions-panel { display: none; background: #fafbff; border-top: 1px solid #e8edf5; padding: 1rem 1.5rem 1.25rem; }
+    .sessions-panel.open { display: block; }
+    .sessions-title { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem; }
+    .session-timeline { display: flex; flex-direction: column; gap: 0.5rem; }
+    .session-item { display: grid; grid-template-columns: 24px 1fr 1fr 1fr; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; background: white; border-radius: 0.5rem; border: 1px solid #e2e8f0; font-size: 0.8rem; }
+    .session-num { width: 24px; height: 24px; border-radius: 50%; background: #4f46e5; color: white; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .session-item.in-progress { border-color: #93c5fd; background: #eff6ff; }
+    .session-item.in-progress .session-num { background: #3b82f6; }
+    .sess-field { display: flex; flex-direction: column; gap: 0.15rem; }
+    .sess-field label { font-size: 0.68rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+    .sess-field span { font-weight: 600; color: #1e293b; font-variant-numeric: tabular-nums; }
+    .sess-duration { font-weight: 700; color: #4f46e5; }
+
+    .btn-primary { padding: 0.6rem 1.25rem; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-secondary { padding: 0.6rem 1.25rem; background: white; color: #374151; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.875rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; }
+    .btn-secondary:hover { background: #f8fafc; }
+    .btn-sm { padding: 0.35rem 0.8rem; background: #f1f5f9; color: #374151; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .btn-sm:hover { background: #e2e8f0; }
+
+    .empty-state { padding: 3rem; text-align: center; color: #94a3b8; }
+    .empty-state svg { margin: 0 auto 1rem; display: block; opacity: 0.4; }
+
+    @media print {
+        .att-actions, .btn-sm, .sidebar, .topbar, .sidebar-overlay { display: none !important; }
+        .main-content { margin-left: 0 !important; }
+        .sessions-panel { display: block !important; }
+    }
+    @media (max-width: 900px) {
+        .participant-row, .participant-row-header { grid-template-columns: 1fr 1fr 1fr; }
+        .participant-row > *:nth-child(3),
+        .participant-row > *:nth-child(4),
+        .participant-row-header > *:nth-child(3),
+        .participant-row-header > *:nth-child(4) { display: none; }
+        .session-item { grid-template-columns: 24px 1fr 1fr; }
+        .session-item > .sess-field:last-child { display: none; }
+    }
+</style>
+
+<div class="att-header">
+    <div>
+        <h1>Attendance Report</h1>
+        <p>{{ meeting.title }} &mdash; Code: <strong>{{ meeting.meeting_code }}</strong>
+            &mdash; {{ meeting.scheduled_time|date:"d M Y, H:i" }}</p>
+    </div>
+    <div class="att-actions">
+        <button onclick="window.print()" class="btn-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print
+        </button>
+        <a href="{% url 'teacher_classrooms' %}" class="btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+        </a>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #4f46e5;">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
-        <div class="header-actions">
-            <button onclick="window.print()" class="btn-secondary">
-                <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></span>
-                Print Report
-            </button>
-            <a href="{% url 'teacher_meetings' %}" class="btn-primary">Back to Meetings</a>
+        <div class="stat-info">
+            <h3>Participants</h3>
+            <p class="stat-number">{{ participants.count }}</p>
         </div>
     </div>
-
-    <div class="dashboard-grid">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: var(--primary);">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            </div>
-            <div class="stat-info">
-                <h3>Total Participants</h3>
-                <p class="stat-number">{{ participants.count }}</p>
-            </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #10b981;">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: var(--success);">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            </div>
-            <div class="stat-info">
-                <h3>Meeting Duration</h3>
-                <p class="stat-number">{{ meeting.duration_minutes }}m</p>
-            </div>
+        <div class="stat-info">
+            <h3>Duration</h3>
+            <p class="stat-number">{{ meeting.duration_minutes }}m</p>
         </div>
     </div>
-
-    <div class="content-section">
-        <h2>Student Attendance Details</h2>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Student</th>
-                        <th>Status</th>
-                        <th>First Joined</th>
-                        <th>Last Left</th>
-                        <th>Total Time</th>
-                        <th>Logs</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in participants %}
-                    <tr>
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <img src="https://ui-avatars.com/api/?name={{ p.user.username }}&background=random" style="width: 32px; height: 32px; border-radius: 50%;">
-                                <strong>{{ p.user.get_full_name|default:p.user.username }}</strong>
-                            </div>
-                        </td>
-                        <td>
-                            {% if p.is_active %}
-                                <span class="badge badge-success">Live Now</span>
-                            {% else %}
-                                <span class="badge badge-ended">Offline</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ p.joined_at|date:"H:i:s"|default:"-" }}</td>
-                        <td>{{ p.left_at|date:"H:i:s"|default:"-" }}</td>
-                        <td>
-                            <span style="font-weight: 700; color: var(--primary);">
-                                {{ p.get_duration_formatted }}
-                            </span>
-                        </td>
-                        <td>
-                            <button onclick="toggleLogs('logs-{{ p.id }}')" class="btn-small">View Logs</button>
-                        </td>
-                    </tr>
-                    <tr id="logs-{{ p.id }}" style="display: none; background: var(--gray-50);">
-                        <td colspan="6">
-                            <div style="padding: 10px; font-size: 12px;">
-                                <strong>Session History:</strong>
-                                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px;">
-                                    {% for log in p.attendance_logs.all %}
-                                        <div class="badge {% if log.event_type == 'join' %}badge-success{% else %}badge-danger{% endif %}" style="opacity: 0.8;">
-                                            {{ log.get_event_type_display }}: {{ log.timestamp|date:"H:i:s" }}
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                            No attendance data recorded yet.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #f59e0b;">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div class="stat-info">
+            <h3>Status</h3>
+            <p class="stat-number" style="font-size: 1.1rem; margin-top: 4px;">
+                {% if meeting.status == 'live' %}<span class="badge badge-live">&#9679; Live</span>
+                {% elif meeting.status == 'ended' %}<span class="badge badge-offline">Ended</span>
+                {% else %}<span class="badge badge-offline">{{ meeting.status|capfirst }}</span>{% endif %}
+            </p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #3b82f6;">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </div>
+        <div class="stat-info">
+            <h3>Currently Live</h3>
+            <p class="stat-number">{{ participants.filter.is_active.count|default:0 }}
+                {% with live_count=participants|length %}{{ live_count }}{% endwith %}
+            </p>
         </div>
     </div>
 </div>
 
+<!-- Attendance Table -->
+<div class="section-card">
+    <div class="section-card-header">
+        <h2>Session Details</h2>
+        <button class="btn-sm" onclick="expandAll()">Expand All</button>
+    </div>
+
+    {% if participant_data %}
+    <div class="participant-row-header">
+        <span>Student</span>
+        <span>Status</span>
+        <span>First Joined</span>
+        <span>Last Left</span>
+        <span>Total Time</span>
+        <span>Sessions</span>
+    </div>
+
+    {% for pd in participant_data %}
+    {% with p=pd.participant %}
+    <div id="row-{{ p.id }}">
+        <div class="participant-row">
+            <!-- Student Info -->
+            <div class="user-info">
+                <img src="https://ui-avatars.com/api/?name={{ p.user.username }}&background=6366f1&color=fff&size=36"
+                     class="user-avatar" alt="{{ p.user.username }}">
+                <div>
+                    <div class="user-name">{{ p.user.get_full_name|default:p.user.username }}</div>
+                    <div class="user-meta">@{{ p.user.username }}</div>
+                </div>
+            </div>
+
+            <!-- Live / Offline -->
+            <div>
+                {% if p.is_active %}
+                    <span class="badge badge-live">&#9679; Live Now</span>
+                {% else %}
+                    <span class="badge badge-offline">Offline</span>
+                {% endif %}
+            </div>
+
+            <!-- First Joined -->
+            <div class="time-val">
+                {% if pd.sessions %}
+                    {{ pd.sessions.0.joined|date:"H:i:s" }}
+                {% else %}—{% endif %}
+            </div>
+
+            <!-- Last Left -->
+            <div class="time-val">
+                {% if p.left_at and not p.is_active %}
+                    {{ p.left_at|date:"H:i:s" }}
+                {% elif p.is_active %}
+                    <span style="color:#3b82f6; font-style: italic;">In meeting</span>
+                {% else %}—{% endif %}
+            </div>
+
+            <!-- Total Time -->
+            <div class="total-time">{{ pd.total_fmt }}</div>
+
+            <!-- Expand sessions -->
+            <div>
+                <button class="btn-sm" onclick="toggleSessions('{{ p.id }}')">
+                    {{ pd.session_count }} Session{{ pd.session_count|pluralize }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Expandable Session Timeline -->
+        <div id="sessions-{{ p.id }}" class="sessions-panel">
+            <div class="sessions-title">Session Timeline</div>
+            {% if pd.sessions %}
+            <div class="session-timeline">
+                {% for sess in pd.sessions %}
+                <div class="session-item {% if sess.active %}in-progress{% endif %}">
+                    <div class="session-num">{{ forloop.counter }}</div>
+                    <div class="sess-field">
+                        <label>Joined</label>
+                        <span>{{ sess.joined|date:"H:i:s" }}</span>
+                    </div>
+                    <div class="sess-field">
+                        <label>Left</label>
+                        {% if sess.left %}
+                            <span>{{ sess.left|date:"H:i:s" }}</span>
+                        {% else %}
+                            <span class="badge badge-active" style="font-size:0.7rem;">In Meeting</span>
+                        {% endif %}
+                    </div>
+                    <div class="sess-field">
+                        <label>Duration</label>
+                        <span class="sess-duration">{{ sess.duration_fmt }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color:#94a3b8; font-size:0.85rem;">No session logs recorded yet.</p>
+            {% endif %}
+
+            <!-- Raw log events -->
+            {% if pd.logs %}
+            <div style="margin-top: 1rem;">
+                <div class="sessions-title">Raw Events</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem;">
+                    {% for log in pd.logs %}
+                    <span class="badge {% if log.event_type == 'join' %}badge-join{% else %}badge-leave{% endif %}">
+                        {{ log.get_event_type_display }}: {{ log.timestamp|date:"H:i:s" }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+
+    {% else %}
+    <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <p style="font-weight: 600; font-size: 1rem;">No attendance data recorded yet.</p>
+        <p style="font-size: 0.875rem; margin-top: 0.25rem;">Attendance is automatically tracked when students join and leave.</p>
+    </div>
+    {% endif %}
+</div>
+
 <script>
-function toggleLogs(id) {
-    const el = document.getElementById(id);
-    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+function toggleSessions(id) {
+    const panel = document.getElementById('sessions-' + id);
+    panel.classList.toggle('open');
+}
+
+function expandAll() {
+    document.querySelectorAll('.sessions-panel').forEach(p => p.classList.add('open'));
 }
 </script>
-
-<style>
-    @media print {
-        .sidebar, .topbar, .btn-small, .header-actions, .sidebar-overlay {
-            display: none !important;
-        }
-        .main-content {
-            margin-left: 0 !important;
-        }
-        .admin-container {
-            padding: 0 !important;
-        }
-        .content-section {
-            border: none !important;
-        }
-        .stat-card {
-            border: 1px solid #eee !important;
-        }
-    }
-</style>
 {% endblock %}

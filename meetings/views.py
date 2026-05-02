@@ -434,24 +434,45 @@ def join_meeting(request, meeting_code):
             messages.error(request, 'You must be an approved member of this classroom to join')
             return redirect('student_classrooms')
     
-    # Create or get participant
+    is_student = hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'student'
+    is_host = meeting.teacher == request.user or request.user.is_superuser
+
+    # --- Face registration check: WARN but do NOT block ---
+    face_not_registered = False
+    if is_student and not is_host:
+        face_not_registered = not StudentFaceProfile.objects.filter(student=request.user).exists()
+        if face_not_registered:
+            messages.warning(
+                request,
+                '⚠️ You have not registered your face identity. '
+                'Your attendance will still be recorded but face verification is unavailable. '
+                'Please complete Face Setup soon.'
+            )
+
+    # Create or get participant record (unique_together = meeting + user)
     participant, created = MeetingParticipant.objects.get_or_create(
         meeting=meeting,
         user=request.user,
         defaults={'joined_at': timezone.now(), 'is_active': True}
     )
-    
+
+    join_time = timezone.now()
     if not created:
-        participant.joined_at = timezone.now()
+        # Re-joining: update join timestamp and mark active again
+        participant.joined_at = join_time
         participant.is_active = True
-        participant.save()
-    
+        participant.save(update_fields=['joined_at', 'is_active'])
+
+    # --- Log every JOIN event for detailed attendance tracking ---
+    MeetingAttendanceLog.objects.create(
+        participant=participant,
+        event_type='join'
+    )
+
     # Update meeting status to live if teacher joins
     if meeting.teacher == request.user and meeting.status == 'scheduled':
         meeting.status = 'live'
         meeting.save()
-        
-        # Send notification to all participants that meeting has started
         notify_meeting_started(meeting, meeting.classroom)
     
     # Ensure host has permissions
@@ -461,12 +482,10 @@ def join_meeting(request, meeting_code):
         participant.screenshare_permitted = True
         participant.save()
     
-    # Redirect students to pre-join if not verified for this session
-    is_student = hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'student'
-    is_host = meeting.teacher == request.user or request.user.is_superuser
-    
-    if is_student and not is_host:
-        # Check if verified in current session
+    # Redirect registered students to face-verification pre-join
+    # Skip if: user not registered, user is host, already verified, or explicitly skipped
+    skip_verify = request.GET.get('skip_verify') == '1'
+    if is_student and not is_host and not face_not_registered and not skip_verify:
         if not request.session.get(f'verified_meeting_{meeting.meeting_code}'):
             return redirect('pre_join', meeting_code=meeting.meeting_code)
 
@@ -475,6 +494,7 @@ def join_meeting(request, meeting_code):
         'participant': participant,
         'is_host': is_host,
         'livekit_url': settings.LIVEKIT_URL,
+        'face_not_registered': face_not_registered,
     })
 
 @login_required
@@ -487,13 +507,14 @@ def pre_join(request, meeting_code):
     
     # Check if student has a face profile registered
     face_registered = StudentFaceProfile.objects.filter(student=request.user).exists()
-    if not face_registered:
-        messages.error(request, 'You must register your face identity before joining meetings.')
-        return redirect('face_setup')
+    # NOTE: If not registered we still show the page with a 'Skip' option — attendance
+    # was already logged in join_meeting, so they are not blocked.
 
+    profile = getattr(request.user, 'userprofile', None)
     return render(request, 'meetings/pre_join.html', {
         'meeting': meeting,
-        'profile': request.user.userprofile,
+        'profile': profile,
+        'face_registered': face_registered,
     })
 
 @login_required
@@ -579,19 +600,54 @@ def meeting_attendance(request, meeting_code):
     
     participants = meeting.participants.all().select_related('user').prefetch_related('attendance_logs')
     
-    # Prepare logs for each participant
-    logs = []
+    # Build detailed session data for each participant
+    participant_data = []
     for p in participants:
-        participant_logs = p.attendance_logs.order_by('timestamp')
-        logs.append({
+        logs_list = list(p.attendance_logs.order_by('timestamp'))
+
+        # Pair join/leave into individual sessions
+        sessions = []
+        pending_join = None
+        accumulated_secs = 0
+
+        for log in logs_list:
+            if log.event_type == 'join':
+                pending_join = log.timestamp
+            elif log.event_type == 'leave' and pending_join:
+                secs = max(0, int((log.timestamp - pending_join).total_seconds()))
+                sessions.append({
+                    'joined': pending_join,
+                    'left': log.timestamp,
+                    'duration_secs': secs,
+                    'duration_fmt': f"{secs // 60}m {secs % 60}s",
+                    'active': False,
+                })
+                accumulated_secs += secs
+                pending_join = None
+
+        # Still active — join without a matching leave
+        if pending_join:
+            sessions.append({
+                'joined': pending_join,
+                'left': None,
+                'duration_secs': None,
+                'duration_fmt': 'In progress',
+                'active': True,
+            })
+
+        participant_data.append({
             'participant': p,
-            'logs': participant_logs
+            'logs': logs_list,
+            'sessions': sessions,
+            'session_count': len(sessions),
+            'total_secs': accumulated_secs,
+            'total_fmt': f"{accumulated_secs // 60}m {accumulated_secs % 60}s" if accumulated_secs else '—',
         })
     
     return render(request, 'meetings/attendance_report.html', {
         'meeting': meeting,
         'participants': participants,
-        'logs': logs
+        'participant_data': participant_data,
     })
 
 @login_required
@@ -625,15 +681,23 @@ def end_meeting(request, meeting_id):
     if meeting.teacher != request.user and request.user.username != 'Admin' and not request.user.is_superuser:
         return JsonResponse({'status': 'error', 'message': 'Permission denied'})
     
+    end_time = timezone.now()
     meeting.status = 'ended'
-    meeting.ended_at = timezone.now()
+    meeting.ended_at = end_time
     meeting.save()
     
-    # Mark all participants as inactive
-    MeetingParticipant.objects.filter(meeting=meeting, is_active=True).update(
-        is_active=False,
-        left_at=timezone.now()
-    )
+    # Log LEAVE for all still-active participants and accumulate duration
+    active_participants = MeetingParticipant.objects.filter(meeting=meeting, is_active=True).select_related('user')
+    for p in active_participants:
+        # Log the leave event
+        MeetingAttendanceLog.objects.create(participant=p, event_type='leave')
+        # Accumulate session time
+        if p.joined_at:
+            session_secs = max(0, int((end_time - p.joined_at).total_seconds()))
+            p.total_duration_seconds = (p.total_duration_seconds or 0) + session_secs
+        p.is_active = False
+        p.left_at = end_time
+        p.save(update_fields=['is_active', 'left_at', 'total_duration_seconds'])
     
     # Trigger AI Summary Generation (Background Task)
     generate_meeting_summary.delay(meeting.id)
@@ -661,9 +725,22 @@ def leave_meeting(request, meeting_id):
     
     try:
         participant = MeetingParticipant.objects.get(meeting=meeting, user=request.user)
+        leave_time = timezone.now()
+
+        # --- Log every LEAVE event for detailed attendance tracking ---
+        MeetingAttendanceLog.objects.create(
+            participant=participant,
+            event_type='leave'
+        )
+
+        # Accumulate session duration into total
+        if participant.joined_at and participant.is_active:
+            session_secs = max(0, int((leave_time - participant.joined_at).total_seconds()))
+            participant.total_duration_seconds = (participant.total_duration_seconds or 0) + session_secs
+
         participant.is_active = False
-        participant.left_at = timezone.now()
-        participant.save()
+        participant.left_at = leave_time
+        participant.save(update_fields=['is_active', 'left_at', 'total_duration_seconds'])
         return JsonResponse({'status': 'success'})
     except MeetingParticipant.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Not a participant'})
