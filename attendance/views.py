@@ -64,7 +64,7 @@ def upload_face_photo(request):
     photo = request.FILES.get('photo')
     if not photo:
         messages.error(request, 'Please select a photo.')
-        return redirect('face_setup')
+        return render(request, 'attendance/face_setup.html', {'error': 'Please select a photo.'}, status=422)
 
     image_bytes = photo.read()
     svc = get_face_service()
@@ -72,7 +72,7 @@ def upload_face_photo(request):
 
     if result['status'] != 'success':
         messages.error(request, f"Face detection failed: {result['message']}")
-        return redirect('face_setup')
+        return render(request, 'attendance/face_setup.html', {'error': result['message']}, status=422)
 
     # Ensure profile info is present
     u_profile = request.user.userprofile
@@ -82,7 +82,7 @@ def upload_face_photo(request):
 
     if not all([roll, branch, contact]):
         messages.error(request, 'Student details (Roll, Branch, Contact) are missing. Please complete your profile.')
-        return redirect('face_setup')
+        return render(request, 'attendance/face_setup.html', {'error': 'Profile info missing.'}, status=422)
 
     # Update profile if provided in request
     u_profile.roll_number = roll

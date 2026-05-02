@@ -40,7 +40,7 @@ def login_view(request):
                     return redirect('student_dashboard')
             return redirect('home')
         else:
-            return render(request, 'accounts/login.html', {'error': 'Invalid username or password'})
+            return render(request, 'accounts/login.html', {'error': 'Invalid username or password'}, status=422)
     
     return render(request, 'accounts/login.html')
 
@@ -54,11 +54,25 @@ def register(request):
         password2 = request.POST.get('password2')
         user_type = request.POST.get('user_type')
         
+        first_name = request.POST.get('first_name', '')
+        last_name = request.POST.get('last_name', '')
+        email = request.POST.get('email', '')
+        
         if password1 == password2:
             from django.contrib.auth.models import User
             try:
-                user = User.objects.create_user(username=username, password=password1)
-                UserProfile.objects.create(user=user, user_type=user_type)
+                user = User.objects.create_user(
+                    username=username, 
+                    password=password1,
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=email
+                )
+                UserProfile.objects.create(
+                    user=user, 
+                    user_type=user_type,
+                    display_name=f"{first_name} {last_name}".strip() or username
+                )
                 login(request, user)
                 request.session['show_welcome'] = True
                 if user_type == 'teacher':
@@ -67,9 +81,9 @@ def register(request):
                     return redirect('student_dashboard')
                 return redirect('home')
             except:
-                return render(request, 'accounts/register.html', {'error': 'Username already exists'})
+                return render(request, 'accounts/register.html', {'error': 'Username already exists'}, status=422)
         else:
-            return render(request, 'accounts/register.html', {'error': 'Passwords do not match'})
+            return render(request, 'accounts/register.html', {'error': 'Passwords do not match'}, status=422)
     
     return render(request, 'accounts/register.html')
 

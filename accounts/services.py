@@ -25,12 +25,26 @@ def get_profile_completion(user):
     return completion
 
 def get_teacher_stats(user):
-    """Get statistics for the teacher dashboard."""
+    """Get statistics and actual meetings for the teacher dashboard."""
+    meetings = Meeting.objects.filter(teacher=user).order_by('scheduled_time')
+    
+    from .models import UserProfile
+    from meetings.models import ClassroomMembership
+    
+    # Count unique approved students in all classrooms owned by this teacher
+    total_students = ClassroomMembership.objects.filter(
+        classroom__teacher=user,
+        status='approved'
+    ).values('student').distinct().count()
+
     return {
-        'total_meetings': Meeting.objects.filter(teacher=user, classroom__isnull=True).count(),
-        'live_meetings': Meeting.objects.filter(teacher=user, status='live', classroom__isnull=True).count(),
-        'scheduled_meetings': Meeting.objects.filter(teacher=user, status='scheduled', classroom__isnull=True).count(),
-        'completed_meetings': Meeting.objects.filter(teacher=user, status='ended', classroom__isnull=True).count(),
+        'total_meetings': meetings.count(),
+        'live_meetings': meetings.filter(status='live').count(),
+        'scheduled_meetings': meetings.filter(status='scheduled').count(),
+        'completed_meetings': meetings.filter(status='ended').count(),
+        'live_meetings_list': meetings.filter(status='live'),
+        'upcoming_meetings': meetings.filter(status='scheduled')[:5],
+        'total_students': total_students,
     }
 
 def get_student_stats(user):

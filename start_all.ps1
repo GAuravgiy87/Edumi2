@@ -108,14 +108,34 @@ foreach ($p in $pids) {
     }
 }
 Start-Sleep -Seconds 1
-
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Share this URL with students:"            -ForegroundColor White
 Write-Host "  $ngrokUrl"                                -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Press Ctrl+C to stop."
+Write-Host "Press Ctrl+C to stop all services."
 Write-Host ""
 
-python manage.py runserver 0.0.0.0:8000
+try {
+    # Start Django with Daphne (better for WebSockets)
+    daphne -b 0.0.0.0 -p 8000 school_project.asgi:application
+}
+finally {
+    Write-Host ""
+    Write-Host "=== Stopping all services ===" -ForegroundColor Red
+    
+    # 1. Kill Camera Service
+    Get-Process | Where-Object { $_.CommandLine -like "*camera_service*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    # 2. Kill Celery
+    Get-Process | Where-Object { $_.Name -eq "celery" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    # 3. Kill ngrok
+    Get-Process | Where-Object { $_.Name -like "*ngrok*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    # 4. Kill LiveKit
+    Get-Process | Where-Object { $_.Name -like "*livekit*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    Write-Host "Cleanup complete." -ForegroundColor Gray
+}

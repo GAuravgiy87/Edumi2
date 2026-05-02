@@ -264,6 +264,11 @@
                     <img id="previewImg" class="upload-preview" alt="Preview">
                 </div>
 
+                <!-- Hidden profile fields -->
+                <input type="hidden" name="roll_number" value="{{ u_profile.roll_number|default:'' }}">
+                <input type="hidden" name="branch" value="{{ u_profile.branch|default:'' }}">
+                <input type="hidden" name="contact_number" value="{{ u_profile.contact_number|default:'' }}">
+
                 <div class="btn-group">
                     <button type="submit" class="btn-primary" id="uploadBtn" disabled>Register Face</button>
                     <button type="button" class="btn-secondary" onclick="document.getElementById('photoInput').click()">
@@ -365,6 +370,11 @@ async function saveProfileInfo() {
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
             body: JSON.stringify({ roll_number: roll, branch: branch, contact_number: contact })
         });
+        
+        if (resp.status === 404) {
+             throw new Error("Profile update endpoint not found.");
+        }
+        
         const data = await resp.json();
         
         if (data.status === 'success') {
@@ -546,8 +556,10 @@ async function capturePhoto() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
             body: JSON.stringify({ 
-                frame_b64: frameB64
-                // Student info is now pulled from profile on server side
+                frame_b64: frameB64,
+                roll_number: document.getElementById('modal_roll')?.value || "{{ u_profile.roll_number|default:'' }}",
+                branch: document.getElementById('modal_branch')?.value || "{{ u_profile.branch|default:'' }}",
+                contact_number: document.getElementById('modal_contact')?.value || "{{ u_profile.contact_number|default:'' }}"
             }),
             signal: controller.signal
         });

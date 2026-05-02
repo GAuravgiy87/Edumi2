@@ -153,10 +153,16 @@
             <h1>Professor {{ user.last_name|default:user.username }}</h1>
             <p>Welcome to your academic command center. You have {{ scheduled_meetings }} active sessions today.</p>
         </div>
-        <a href="{% url 'create_classroom' %}" class="btn-action-primary">
-            <i data-lucide="plus-circle"></i>
-            <span>Create New Room</span>
-        </a>
+        <div style="display: flex; gap: 1rem;">
+            <a href="{% url 'create_meeting' %}" class="btn-action-primary" style="background: #10b981; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);">
+                <i data-lucide="calendar"></i>
+                <span>Schedule Meeting</span>
+            </a>
+            <a href="{% url 'create_classroom' %}" class="btn-action-primary">
+                <i data-lucide="plus-circle"></i>
+                <span>Create New Room</span>
+            </a>
+        </div>
     </div>
 
     <div class="stats-grid">
@@ -233,29 +239,42 @@
                 <h2 class="card-title"><i data-lucide="calendar"></i> Today's Schedule</h2>
             </div>
             <div class="timeline">
-                <div class="timeline-item">
-                    <span class="time-stamp">09:00 AM - 10:30 AM</span>
-                    <div class="timeline-content">
-                        <h4 class="class-title">Quantum Mechanics II</h4>
-                        <div class="class-meta"><i data-lucide="map-pin" style="width:14px;"></i> Hall 4A • 52 Students</div>
+                {% if live_meetings_list %}
+                    {% for meeting in live_meetings_list %}
+                    <div class="timeline-item">
+                        <span class="time-stamp">{{ meeting.scheduled_time|date:"h:i A" }} - NOW <span class="live-badge"><i data-lucide="circle" style="width:8px;fill:currentColor;"></i> LIVE</span></span>
+                        <a href="{% url 'join_meeting' meeting.meeting_code %}" style="text-decoration: none;">
+                            <div class="timeline-content" style="border-color: #ef4444; background: #fffbff;">
+                                <h4 class="class-title">{{ meeting.title }}</h4>
+                                <div class="class-meta"><i data-lucide="map-pin" style="width:14px;"></i> {{ meeting.meeting_code }} • {{ meeting.participants.count }} Students</div>
+                            </div>
+                        </a>
                     </div>
-                </div>
-                <div class="timeline-item">
-                    <span class="time-stamp">11:00 AM - 12:30 PM <span class="live-badge"><i data-lucide="circle" style="width:8px;fill:currentColor;"></i> LIVE</span></span>
-                    <div class="timeline-content" style="border-color: #ef4444; background: #fffbff;">
-                        <h4 class="class-title">Computational Logic</h4>
-                        <div class="class-meta"><i data-lucide="map-pin" style="width:14px;"></i> Lab 102 • 38 Students</div>
+                    {% endfor %}
+                {% endif %}
+
+                {% if upcoming_meetings %}
+                    {% for meeting in upcoming_meetings %}
+                    <div class="timeline-item">
+                        <span class="time-stamp">{{ meeting.scheduled_time|date:"h:i A" }} - {{ meeting.scheduled_time|date:"M d" }}</span>
+                        <a href="{% url 'join_meeting' meeting.meeting_code %}" style="text-decoration: none;">
+                            <div class="timeline-content">
+                                <h4 class="class-title">{{ meeting.title }}</h4>
+                                <div class="class-meta"><i data-lucide="clock" style="width:14px;"></i> {{ meeting.duration_minutes }} mins • {{ meeting.meeting_code }}</div>
+                            </div>
+                        </a>
                     </div>
-                </div>
-                <div class="timeline-item">
-                    <span class="time-stamp">02:00 PM - 03:30 PM</span>
-                    <div class="timeline-content">
-                        <h4 class="class-title">Seminar: AI Ethics</h4>
-                        <div class="class-meta"><i data-lucide="map-pin" style="width:14px;"></i> Room 205 • 12 Grad Students</div>
+                    {% endfor %}
+                {% endif %}
+
+                {% if not live_meetings_list and not upcoming_meetings %}
+                    <div style="text-align: center; padding: 2rem; color: #64748b;">
+                        <i data-lucide="calendar-off" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>No meetings scheduled for today.</p>
                     </div>
-                </div>
+                {% endif %}
             </div>
-            <button style="width:100%; padding:1rem; margin-top:1rem; border-radius:1rem; border:1px dashed #cbd5e1; background:none; color:#64748b; font-weight:700; cursor:pointer; transition:all 0.2s;">View Full Academic Calendar</button>
+            <a href="{% url 'teacher_meetings' %}" style="width:100%; display:block; text-align:center; padding:1rem; margin-top:1rem; border-radius:1rem; border:1px dashed #cbd5e1; background:none; color:#64748b; font-weight:700; cursor:pointer; transition:all 0.2s; text-decoration: none;">View All Academic Sessions</a>
         </div>
     </div>
 </div>

@@ -466,27 +466,28 @@
 }
 
 .meet-sidebar {
-    position: fixed;
-    right: 0;
-    top: clamp(56px, 8vh, 72px);
-    bottom: 0;
-    width: clamp(300px, 30vw, 380px);
-    background: var(--bg-card);
-    border-left: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    z-index: 50;
-    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
-    transition: transform 0.3s ease;
+    position: fixed !important;
+    right: 0 !important;
+    top: clamp(56px, 8vh, 72px) !important;
+    bottom: 0 !important;
+    width: clamp(300px, 30vw, 380px) !important;
+    background: #1a1a1a !important;
+    backdrop-filter: blur(16px) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 50 !important;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4) !important;
+    transition: transform 0.3s ease !important;
 }
 
 .sidebar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: clamp(12px, 2vh, 20px);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    background: #fafafa;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: clamp(12px, 2vh, 20px) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: #1a1a1a !important;
 }
 
 .sidebar-tabs {
@@ -495,14 +496,14 @@
 }
 
 .sidebar-tab {
-    padding: clamp(6px, 1vh, 10px) clamp(12px, 2vw, 18px);
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: #666;
-    font-weight: 600;
-    font-size: clamp(12px, 1.6vw, 14px);
-    cursor: pointer;
+    padding: clamp(6px, 1vh, 10px) clamp(12px, 2vw, 18px) !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 8px !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    font-weight: 600 !important;
+    font-size: clamp(12px, 1.6vw, 14px) !important;
+    cursor: pointer !important;
     transition: all 0.2s;
     display: flex;
     align-items: center;
@@ -516,13 +517,13 @@
 }
 
 .sidebar-tab:hover {
-    background: rgba(99, 102, 241, 0.08);
-    color: #6366f1;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
 }
 
 .sidebar-tab.active {
-    background: rgba(99, 102, 241, 0.12);
-    color: #6366f1;
+    background: rgba(99, 102, 241, 0.2) !important;
+    color: #818cf8 !important;
 }
 
 .close-sidebar {
@@ -531,7 +532,7 @@
     border-radius: 50%;
     border: none;
     background: transparent;
-    color: #666;
+    color: #aaa;
     font-size: clamp(18px, 2.5vw, 22px);
     cursor: pointer;
     display: flex;
@@ -541,8 +542,9 @@
 }
 
 .close-sidebar:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    transform: rotate(90deg);
 }
 
 .sidebar-content {
@@ -561,12 +563,12 @@
 }
 
 .participants-count {
-    padding: clamp(12px, 2vh, 18px);
-    color: #666;
-    font-size: clamp(12px, 1.6vw, 14px);
-    font-weight: 600;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-    background: #fafafa;
+    padding: clamp(12px, 2vh, 18px) !important;
+    color: #ffffff !important;
+    font-size: clamp(12px, 1.6vw, 14px) !important;
+    font-weight: 600 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: #1a1a1a !important;
 }
 
 .participants-list {
@@ -586,7 +588,7 @@
 }
 
 .participant-item:hover {
-    background: rgba(99, 102, 241, 0.05);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .participant-avatar {
@@ -609,22 +611,22 @@
 }
 
 .participant-name {
-    color: var(--text-main);
-    font-size: clamp(13px, 1.8vw, 15px);
-    font-weight: 600;
+    color: #ffffff !important;
+    font-size: clamp(13px, 1.8vw, 15px) !important;
+    font-weight: 600 !important;
 }
 
 .host-label {
     display: inline-block;
-    background: rgba(99, 102, 241, 0.12);
-    color: #6366f1;
+    background: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
     padding: 2px 8px;
     border-radius: 4px;
-    font-size: clamp(10px, 1.4vw, 11px);
+    font-size: clamp(9px, 1.3vw, 10px);
     font-weight: 700;
-    margin-left: 6px;
+    margin-left: 8px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
 }
 
 .participant-status {
@@ -665,54 +667,60 @@
 }
 
 .chat-msg-header strong {
-    color: var(--text-main);
-    font-weight: 600;
+    color: #ffffff !important;
+    font-weight: 600 !important;
 }
 
 .chat-msg-time {
-    color: #999;
-    font-size: clamp(10px, 1.4vw, 11px);
+    color: #666;
+    font-size: clamp(9px, 1.3vw, 10px);
 }
 
 .chat-msg-text {
-    background: #f5f5f5;
-    padding: clamp(8px, 1.5vh, 12px) clamp(10px, 2vw, 16px);
-    border-radius: 12px;
+    background: #2d2d2d !important;
+    padding: clamp(8px, 1.5vh, 12px) clamp(10px, 2vw, 16px) !important;
+    border-radius: 12px !important;
     display: inline-block;
     max-width: 80%;
     text-align: left;
-    color: var(--text-main);
+    color: #fff;
     word-wrap: break-word;
     font-size: clamp(13px, 1.8vw, 14px);
     line-height: 1.5;
 }
 
 .chat-msg.own .chat-msg-text {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: #ffffff;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+    color: #ffffff !important;
 }
 
 .chat-input-box {
     display: flex;
     gap: clamp(6px, 1vw, 10px);
     padding: clamp(12px, 2vh, 18px);
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
-    background: #fafafa;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: transparent;
 }
 
 .chat-input-box input {
-    flex: 1;
-    padding: clamp(8px, 1.5vh, 12px) clamp(12px, 2vw, 18px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 24px;
-    font-size: clamp(13px, 1.8vw, 14px);
-    outline: none;
-    transition: all 0.2s;
+    flex: 1 !important;
+    padding: clamp(8px, 1.5vh, 12px) clamp(12px, 2vw, 18px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 24px !important;
+    font-size: clamp(13px, 1.8vw, 14px) !important;
+    outline: none !important;
+    transition: all 0.2s !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #ffffff !important;
+}
+
+.chat-input-box input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .chat-input-box input:focus {
     border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .send-btn {
@@ -1047,14 +1055,20 @@
     }
     
     .meet-controls {
-        bottom: 8px;
-        padding: 6px 10px;
-        gap: 4px;
+        bottom: 12px;
+        padding: 8px 12px;
+        gap: 6px;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        width: max-content;
+        max-width: 95vw;
+        overflow-x: visible;
     }
     
     .control-button {
         width: 40px;
         height: 40px;
+        flex-shrink: 0;
     }
     
     .control-button svg {
@@ -1171,23 +1185,24 @@
 
 .more-options-menu {
     position: absolute;
-    bottom: calc(100% + 20px);
+    bottom: calc(100% + 15px);
     left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: rgba(26, 26, 26, 0.95);
-    backdrop-filter: blur(12px);
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 200px;
+    border-radius: 14px;
+    padding: 6px;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px;
+    min-width: 180px;
+    width: max-content;
     opacity: 0;
     pointer-events: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    z-index: 101;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    z-index: 1000;
 }
 
 .more-options-menu.show {
@@ -1205,24 +1220,25 @@
     transform: translateX(-50%);
     border-width: 8px 8px 0;
     border-style: solid;
-    border-color: rgba(26, 26, 26, 0.95) transparent transparent transparent;
+    border-color: rgba(30, 30, 30, 0.95) transparent transparent transparent;
 }
 
 .menu-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    padding: 12px 14px;
-    background: transparent;
-    border: none;
-    border-radius: 10px;
-    color: #fff;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
-    text-align: left;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    padding: 10px 14px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: #ffffff !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    text-align: left !important;
+    white-space: nowrap !important;
 }
 
 .menu-item:hover {
@@ -1230,11 +1246,12 @@
 }
 
 .menu-item svg {
-    width: 18px;
-    height: 18px;
-    stroke: #fff;
-    fill: none;
-    opacity: 0.8;
+    width: 16px !important;
+    height: 16px !important;
+    stroke: #ffffff !important;
+    fill: none !important;
+    flex-shrink: 0 !important;
+    opacity: 0.9;
 }
 
 .menu-divider {
@@ -1258,4 +1275,21 @@
     .meet-main.sidebar-open {
         padding-right: 0 !important; /* Don't squash video area on mobile */
     }
+}
+/* Custom scrollbar for sidebar */
+.meet-sidebar ::-webkit-scrollbar {
+    width: 5px;
+}
+
+.meet-sidebar ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.meet-sidebar ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.meet-sidebar ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
 }

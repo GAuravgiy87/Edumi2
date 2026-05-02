@@ -48,7 +48,7 @@ def create_classroom(request):
         # Validate class code uniqueness
         if Classroom.objects.filter(class_code=class_code).exists():
             messages.error(request, 'Class code already exists. Please choose a different one.')
-            return render(request, 'meetings/create_classroom.html')
+            return render(request, 'meetings/create_classroom.html', status=422)
         
         # Create classroom with hashed password
         classroom = Classroom.objects.create(
@@ -349,12 +349,12 @@ def create_meeting(request):
 
         if not title:
             messages.error(request, 'Meeting title cannot be empty.')
-            return render(request, 'meetings/create_meeting.html')
+            return render(request, 'meetings/create_meeting.html', status=422)
 
         # Prevent duplicate title for the same teacher (across non-ended standalone meetings)
         if Meeting.objects.filter(teacher=request.user, title__iexact=title, classroom__isnull=True).exclude(status__in=['ended', 'cancelled']).exists():
             messages.error(request, f'You already have a meeting named "{title}". Please use a different title.')
-            return render(request, 'meetings/create_meeting.html')
+            return render(request, 'meetings/create_meeting.html', status=422)
 
         meeting_code = generate_meeting_code()
         
@@ -462,12 +462,6 @@ def join_meeting(request, meeting_code):
         participant.joined_at = join_time
         participant.is_active = True
         participant.save(update_fields=['joined_at', 'is_active'])
-
-    # --- Log every JOIN event for detailed attendance tracking ---
-    MeetingAttendanceLog.objects.create(
-        participant=participant,
-        event_type='join'
-    )
 
     # Update meeting status to live if teacher joins
     if meeting.teacher == request.user and meeting.status == 'scheduled':

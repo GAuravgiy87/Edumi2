@@ -64,10 +64,13 @@ class MeetingConsumer(AsyncWebsocketConsumer):
         participant.is_active = True
         participant.save()
         
-        MeetingAttendanceLog.objects.create(
-            participant=participant,
-            event_type='join'
-        )
+        # Prevent log spam on reloads: only log join if last event was 'leave' or first time
+        last_log = MeetingAttendanceLog.objects.filter(participant=participant).order_by('-timestamp').first()
+        if not last_log or last_log.event_type == 'leave':
+            MeetingAttendanceLog.objects.create(
+                participant=participant,
+                event_type='join'
+            )
         
         return {
             'id': self.user.id,
@@ -321,6 +324,15 @@ class MeetingConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_meeting(self):
         return Meeting.objects.get(meeting_code=self.meeting_code)
+
+    @database_sync_to_async
+    def get_last_log(self, participant):
+        last = MeetingAttendanceLog.objects.filter(participant=participant).order_by('-timestamp').first()
+        return last.event_type if last else None
+
+    @database_sync_to_async
+    def create_join_log(self, participant):
+        MeetingAttendanceLog.objects.create(participant=participant, event_type='join')
 
     @database_sync_to_async
     def record_join(self):
