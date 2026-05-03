@@ -12,6 +12,15 @@ class Camera(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # Health Monitoring
+    status = models.CharField(max_length=20, default='unknown', choices=[
+        ('online', 'Online'),
+        ('offline', 'Offline'),
+        ('unknown', 'Unknown')
+    ])
+    last_seen = models.DateTimeField(null=True, blank=True)
+    uptime_percentage = models.FloatField(default=0.0)
+    
     def __str__(self):
         return self.name
     
@@ -146,3 +155,86 @@ class HeadCountSession(models.Model):
     
     def __str__(self):
         return f"Session for {self.camera_name} ({self.status})"
+
+class LiveClass(models.Model):
+    """Tracks active RTMP/HLS live classes started by teachers"""
+    STATUS_CHOICES = (
+        ('active', 'Active'),
+        ('ended', 'Ended'),
+    )
+    
+    title = models.CharField(max_length=200)
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='live_classes')
+    stream_key = models.CharField(max_length=50, unique=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    
+    viewer_count = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return f"{self.title} - {self.teacher.username} ({self.status})"
+
+class LiveClassRecording(models.Model):
+    """Tracks chunked recordings of live classes"""
+    live_class = models.ForeignKey(LiveClass, on_delete=models.CASCADE, related_name='recordings')
+    file_path = models.CharField(max_length=500)
+    chunk_index = models.IntegerField()
+    duration_seconds = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Metadata
+    file_size_bytes = models.BigIntegerField(default=0)
+    
+    class Meta:
+        ordering = ['chunk_index']
+        unique_together = ('live_class', 'chunk_index')
+
+class ProcessedVideo(models.Model):
+    """Stores the final processed multi-bitrate HLS recording"""
+    live_class = models.OneToOneField(LiveClass, on_delete=models.CASCADE, related_name='processed_video')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    # Paths
+    hls_manifest_path = models.CharField(max_length=500)  # Path to master.m3u8
+    thumbnail = models.ImageField(upload_to='thumbnails/', blank=True, null=True)
+    
+    # Metadata
+    duration_seconds = models.FloatField(default=0.0)
+    total_size_bytes = models.BigIntegerField(default=0)
+    processing_status = models.CharField(
+        max_length=20, 
+        choices=[('pending', 'Pending'), ('processing', 'Processing'), ('completed', 'Completed'), ('failed', 'Failed')],
+        default='pending'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Processed: {self.title} ({self.processing_status})"
+
+class StreamToken(models.Model):
+    """Temporary token for securing HLS streams"""
+    token = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    camera_id = models.CharField(max_length=100) # Can be RTSP or Live Class key
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        from django.utils import timezone
+        return self.expires_at > timezone.now()
+
+class CameraLog(models.Model):
+    """Stores error logs and connectivity events for cameras"""
+    camera = models.ForeignKey(Camera, on_delete=models.CASCADE, null=True, blank=True)
+    event_type = models.CharField(max_length=50) # 'error', 'connectivity', 'performance'
+    message = models.TextField()
+    level = models.CharField(max_length=20, default='error') # 'info', 'warning', 'error'
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"[{self.timestamp}] {self.event_type}: {self.message[:50]}"

@@ -1,0 +1,526 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Teacher Camera Dashboard{% endblock %}
+
+{% block content %}
+<div class="teacher-container">
+    <!-- Header Section -->
+    <div class="dashboard-header">
+        <div class="header-left">
+            <h1>👨‍🏫 Teacher Console</h1>
+            <p class="subtitle">Manage your assigned cameras and broadcast live classes.</p>
+        </div>
+        <div class="header-right">
+            {% if active_class %}
+            <div class="live-status-pill pulse">
+                <span class="live-dot"></span> LIVE NOW: {{ active_class.title }}
+            </div>
+            {% else %}
+            <button class="btn-primary" onclick="showStartClassModal()">
+                <i data-lucide="video"></i> Start Live Class
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Main Content Area -->
+        <div class="main-column">
+            <!-- Assigned Cameras Section -->
+            <section class="assigned-cameras card">
+                <div class="section-header">
+                    <h2><i data-lucide="camera"></i> Assigned RTSP Cameras</h2>
+                    <span class="count-badge">{{ cameras|length }} active</span>
+                </div>
+                
+                <div class="cameras-grid">
+                    {% for camera in cameras %}
+                    <div class="camera-preview-card">
+                        <div class="preview-header">
+                            <h3>{{ camera.name }}</h3>
+                            <span class="status-indicator online">Online</span>
+                        </div>
+                        <div class="preview-body">
+                            <div class="video-container">
+                                <video id="video-{{ camera.id }}" class="hls-player" data-camera-id="{{ camera.id }}" data-token="{{ camera.temp_token }}" autoplay muted playsinline></video>
+                                <div class="video-overlay" id="overlay-{{ camera.id }}">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="preview-footer">
+                            <span class="camera-ip"><i data-lucide="map-pin"></i> {{ camera.ip_address }}</span>
+                            <a href="{% url 'view_camera' camera.id %}" class="btn-icon" title="Full Screen">
+                                <i data-lucide="maximize"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <i data-lucide="camera-off"></i>
+                        <p>No RTSP cameras assigned to you yet.</p>
+                        <small>Contact administrator to request access.</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Mobile Cameras Section -->
+            <section class="mobile-cameras card mt-4">
+                <div class="section-header">
+                    <h2><i data-lucide="smartphone"></i> Assigned Mobile Cameras</h2>
+                    <span class="count-badge">{{ mobile_cameras|length }} active</span>
+                </div>
+                
+                <div class="cameras-grid">
+                    {% for camera in mobile_cameras %}
+                    <div class="camera-preview-card mobile">
+                        <div class="preview-header">
+                            <h3>{{ camera.name }}</h3>
+                            <span class="status-indicator online">Online</span>
+                        </div>
+                        <div class="preview-body">
+                            <div class="video-container">
+                                <video id="video-m-{{ camera.id }}" class="hls-player mobile" data-camera-id="m_{{ camera.id }}" data-token="{{ camera.temp_token }}" autoplay muted playsinline></video>
+                                <div class="video-overlay" id="overlay-m-{{ camera.id }}">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <p>No mobile cameras assigned.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <!-- Sidebar Area -->
+        <div class="sidebar-column">
+            <!-- Live Class Control Center -->
+            <section class="live-class-control card">
+                <div class="section-header">
+                    <h2><i data-lucide="radio"></i> Live Control</h2>
+                </div>
+                
+                {% if active_class %}
+                <div class="active-class-info">
+                    <div class="stat-group">
+                        <div class="stat-item">
+                            <span class="label">Status</span>
+                            <span class="value live">BROADCASTING</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Viewers</span>
+                            <span class="value" id="viewer-count">{{ active_class.viewer_count }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="rtmp-info">
+                        <label>Ingest Server</label>
+                        <div class="copy-input">
+                            <input type="text" value="rtmp://{{ request.get_host|slice:":-5" }}:1935/live" readonly>
+                            <button onclick="copyToClipboard(this)">Copy</button>
+                        </div>
+                        
+                        <label>Stream Key</label>
+                        <div class="copy-input">
+                            <input type="password" value="{{ active_class.stream_key }}" readonly>
+                            <button onclick="toggleVisibility(this)">Show</button>
+                            <button onclick="copyToClipboard(this)">Copy</button>
+                        </div>
+                    </div>
+                    
+                    <div class="stream-preview mt-4">
+                        <label>Monitor Feed</label>
+                        <div class="video-container monitor">
+                            <video id="video-live" class="hls-player live" data-stream-key="{{ active_class.stream_key }}" data-token="{{ active_class.temp_token }}" autoplay muted playsinline></video>
+                        </div>
+                    </div>
+                    
+                    <form action="{% url 'stop_live_class' active_class.id %}" method="POST" class="mt-4">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-danger btn-block">Stop Broadcast</button>
+                    </form>
+                </div>
+                {% else %}
+                <div class="inactive-class">
+                    <p>No active broadcast.</p>
+                    <button class="btn-primary mt-2" onclick="showStartClassModal()">Go Live</button>
+                </div>
+                {% endif %}
+            </section>
+
+            <!-- Recent Recordings -->
+            <section class="recordings card mt-4">
+                <div class="section-header">
+                    <h2><i data-lucide="film"></i> Recent Recordings</h2>
+                </div>
+                <div class="recordings-list">
+                    {% for rec in recent_recordings %}
+                    <div class="recording-item">
+                        <div class="rec-info">
+                            <span class="rec-title">{{ rec.live_class.title }}</span>
+                            <span class="rec-date">{{ rec.created_at|date:"M d, H:i" }}</span>
+                        </div>
+                        <span class="rec-duration">{{ rec.duration_seconds|floatformat:0 }}s</span>
+                    </div>
+                    {% empty %}
+                    <p class="empty-text">No recordings yet.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<!-- Start Class Modal -->
+<div id="startClassModal" class="modal">
+    <div class="modal-content card">
+        <h2>Start New Live Class</h2>
+        <form action="{% url 'start_live_class' %}" method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Class Title</label>
+                <input type="text" name="title" placeholder="e.g. Advanced Mathematics Section B" required>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="hideStartClassModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Start Listener</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+:root {
+    --bg-dark: #0f172a;
+    --card-bg: rgba(30, 41, 59, 0.7);
+    --accent-primary: #6366f1;
+    --accent-success: #10b981;
+    --accent-danger: #ef4444;
+    --text-main: #f8fafc;
+    --text-dim: #94a3b8;
+}
+
+.teacher-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+    color: var(--text-main);
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.dashboard-header h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to right, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle { color: var(--text-dim); }
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 2rem;
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1.5rem;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.count-badge {
+    background: rgba(99, 102, 241, 0.2);
+    color: var(--accent-primary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.cameras-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.camera-preview-card {
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+.camera-preview-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent-primary);
+}
+
+.preview-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.preview-header h3 { font-size: 1rem; font-weight: 600; }
+
+.status-indicator {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-indicator.online { color: var(--accent-success); }
+
+.video-container {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: #000;
+}
+
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.preview-footer {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+/* Sidebar Styles */
+.stat-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-item {
+    background: rgba(15, 23, 42, 0.5);
+    padding: 1rem;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.stat-item .label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 0.25rem;
+}
+
+.stat-item .value {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.stat-item .value.live { color: var(--accent-danger); }
+
+.rtmp-info label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin: 1rem 0 0.5rem;
+}
+
+.copy-input {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.copy-input input {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.5rem;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+
+.copy-input button {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.btn-primary { background: var(--accent-primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+.btn-danger { background: var(--accent-danger); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; cursor: pointer; }
+.btn-secondary { background: rgba(255,255,255,0.1); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; cursor: pointer; }
+.btn-block { width: 100%; }
+
+/* Modal Styles */
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000; }
+.modal.active { display: flex; }
+.modal-content { max-width: 500px; width: 90%; }
+.form-group { margin-bottom: 1.5rem; }
+.form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-dim); }
+.form-group input { width: 100%; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.75rem; color: var(--text-main); }
+.modal-actions { display: flex; gap: 1rem; justify-content: flex-end; }
+
+@media (max-width: 1100px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    const hlsPlayers = {};
+
+    function initHLS(video, url, statusBadgeId, overlayId) {
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                lowLatencyMode: true,
+                backBufferLength: 0
+            });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play();
+                if (overlayId) document.getElementById(overlayId).style.display = 'none';
+            });
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    console.warn("HLS Error", data);
+                    setTimeout(() => hls.loadSource(url), 3000);
+                }
+            });
+            return hls;
+        }
+    }
+
+    document.querySelectorAll('.hls-player').forEach(video => {
+        const cameraId = video.dataset.cameraId;
+        const streamKey = video.dataset.streamKey;
+        const token = video.dataset.token;
+        let url;
+        
+        if (streamKey) {
+            url = `/cameras/live-class/feed/${streamKey}/?file=stream.m3u8&token=${token}`;
+        } else {
+            const isMobile = video.classList.contains('mobile');
+            url = `/cameras/camera-feed/${cameraId}/?file=stream.m3u8&token=${token}${isMobile ? '&mobile=true' : ''}`;
+        }
+        
+        const overlayId = video.id.replace('video-', 'overlay-');
+        hlsPlayers[video.id] = initHLS(video, url, null, overlayId);
+    });
+
+    function showStartClassModal() {
+        document.getElementById('startClassModal').classList.add('active');
+    }
+
+    function hideStartClassModal() {
+        document.getElementById('startClassModal').classList.remove('active');
+    }
+
+    function copyToClipboard(btn) {
+        const input = btn.previousElementSibling;
+        input.select();
+        document.execCommand('copy');
+        const originalText = btn.innerText;
+        btn.innerText = 'Copied!';
+        setTimeout(() => btn.innerText = originalText, 2000);
+    }
+
+    function toggleVisibility(btn) {
+        const input = btn.previousElementSibling;
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerText = 'Hide';
+        } else {
+            input.type = 'password';
+            btn.innerText = 'Show';
+        }
+    }
+
+    // WebSocket logic for Live Class
+    {% if active_class %}
+    const streamKey = "{{ active_class.stream_key }}";
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(
+        wsScheme + '://' + window.location.host + '/ws/live-class/' + streamKey + '/'
+    );
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'viewer_count') {
+            document.getElementById('viewer-count').innerText = data.count;
+        } else if (data.type === 'chat') {
+            // Handle chat messages if UI exists
+            console.log('Chat message:', data.username + ': ' + data.message);
+        }
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+    {% endif %}
+</script>
+{% endblock %}

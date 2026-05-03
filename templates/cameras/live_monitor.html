@@ -22,8 +22,8 @@
             </div>
             <div class="card-body">
                 <div class="feed-container">
-                    <img src="{% url 'camera_feed' camera.id %}" alt="{{ camera.name }}" class="live-feed"
-                        data-camera-id="{{ camera.id }}" style="display: block !important; z-index: 100 !important;">
+                    <video id="video-{{ camera.id }}" class="live-feed" data-camera-id="{{ camera.id }}" data-token="{{ camera.temp_token }}"
+                        style="width: 100%; height: 100%; object-fit: contain; display: block !important; z-index: 100 !important;" autoplay muted playsinline></video>
                     <div class="overlay" id="overlay-{{ camera.id }}" style="z-index: 50;">
                         <div class="spinner"></div>
                     </div>
@@ -201,8 +201,10 @@
     }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
     let serverOnline = true;
+    const hlsPlayers = {};
     
     function checkServerStatus() {
         // Try to fetch from any camera to check if server is online
@@ -224,6 +226,7 @@
     function showServerOfflineMessage() {
         document.querySelectorAll('.overlay').forEach(overlay => {
             overlay.innerHTML = '<div style="text-align:center; color: #ff7675;"><strong>⚠ Server Offline</strong><br><small>Please start Django server</small></div>';
+            overlay.style.display = 'flex';
         });
         
         document.querySelectorAll('.badge').forEach(badge => {
@@ -258,19 +261,55 @@
         }
     }
 
-    // Attach event listeners to all live feeds
-    document.querySelectorAll('.live-feed').forEach(img => {
-        const id = img.getAttribute('data-camera-id');
+    // Attach event listeners and load HLS for all live feeds
+    document.querySelectorAll('.live-feed').forEach(video => {
+        const id = video.getAttribute('data-camera-id');
+        const token = video.getAttribute('data-token');
+        const feedUrl = `/cameras/camera-feed/${id}/?file=stream.m3u8&token=${token}`;
         
-        // For MJPEG streams, hide overlay after short delay since onload doesn't fire
-        setTimeout(() => {
-            updateStatus(id, 'online');
-        }, 2000);
-        
-        img.onerror = function () {
-            checkServerStatus();
-            updateStatus(id, 'offline');
-        };
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                lowLatencyMode: true,
+                liveDurationInfinity: true,
+                manifestLoadingTimeOut: 10000,
+                manifestLoadingMaxRetry: 5,
+            });
+            hlsPlayers[id] = hls;
+            hls.loadSource(feedUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play().then(() => {
+                    updateStatus(id, 'online');
+                }).catch(e => {
+                    console.error('Auto-play prevented', e);
+                });
+            });
+            hls.on(Hls.Events.ERROR, function(event, data) {
+                if (data.fatal) {
+                    updateStatus(id, 'offline');
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            setTimeout(() => hls.startLoad(), 3000);
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            hls.destroy();
+                            break;
+                    }
+                }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = feedUrl;
+            video.addEventListener('loadedmetadata', function() {
+                video.play();
+                updateStatus(id, 'online');
+            });
+            video.addEventListener('error', function() {
+                updateStatus(id, 'offline');
+            });
+        }
     });
 
     // Initial count

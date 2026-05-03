@@ -17,7 +17,7 @@
     </div>
     
     <div class="camera-feed-wrapper">
-        <img id="cameraFeed" src="{% url 'mobile_cameras:feed' mobile_camera.id %}" alt="{{ mobile_camera.name }}" class="camera-feed">
+        <video id="cameraFeed" class="camera-feed" autoplay muted playsinline controls></video>
         <div class="headcount-badge" id="headcountBadge" style="display: none;">
             <span class="badge-icon">👥</span>
             <span class="badge-text">Head Count: <span id="headCountValue">0</span></span>
@@ -261,65 +261,85 @@
 }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
 let headcountEnabled = false;
-let headcountInterval = null;
+let hls;
+
+function startStream(isHeadcount = false) {
+    const video = document.getElementById('cameraFeed');
+    let feedUrl = "{% url 'mobile_cameras:feed' mobile_camera.id %}?file=stream.m3u8";
+    if (isHeadcount) {
+        // Headcount not supported on HLS yet, fallback to normal stream
+        feedUrl = "{% url 'mobile_cameras:feed' mobile_camera.id %}?file=stream.m3u8";
+    }
+    
+    if (Hls.isSupported()) {
+        if (hls) {
+            hls.destroy();
+        }
+        hls = new Hls({
+            lowLatencyMode: true,
+            liveDurationInfinity: true,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 10,
+        });
+        hls.loadSource(feedUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play().catch(e => console.log('Auto-play prevented', e));
+        });
+        hls.on(Hls.Events.ERROR, function(event, data) {
+            if (data.fatal) {
+                switch (data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        setTimeout(() => hls.startLoad(), 3000);
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        hls.recoverMediaError();
+                        break;
+                    default:
+                        hls.destroy();
+                        setTimeout(() => startStream(isHeadcount), 3000);
+                        break;
+                }
+            }
+        });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = feedUrl;
+        video.addEventListener('loadedmetadata', function() {
+            video.play();
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    startStream(false);
+});
 
 function toggleHeadcount() {
-    const feed = document.getElementById('cameraFeed');
     const toggle = document.getElementById('headcountToggle');
     const badge = document.getElementById('headcountBadge');
     
     headcountEnabled = !headcountEnabled;
     
     if (headcountEnabled) {
-        // Switch to headcount feed
-        feed.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
         toggle.classList.add('active');
-        toggle.querySelector('.toggle-text').textContent = 'Disable Detection';
+        toggle.querySelector('.toggle-text').textContent = 'Detection Unvailable (HLS mode)';
         toggle.querySelector('.toggle-icon').textContent = '👁️‍🗨️';
-        badge.style.display = 'flex';
-        
-        // Note: Count is displayed on the video feed itself by the server
-    } else {
-        // Switch back to normal feed
-        feed.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
-        toggle.classList.remove('active');
-        toggle.querySelector('.toggle-text').textContent = 'Enable Detection';
-        toggle.querySelector('.toggle-icon').textContent = '👁️';
-        badge.style.display = 'none';
+        setTimeout(() => {
+            toggle.classList.remove('active');
+            toggle.querySelector('.toggle-text').textContent = 'Enable Detection';
+            toggle.querySelector('.toggle-icon').textContent = '👁️';
+            headcountEnabled = false;
+        }, 3000);
     }
 }
 
-function simulateHeadCount() {
-    // DISABLED - Using actual detection from server
-    // This function is kept for compatibility but does nothing
-    return;
-}
-
-// Handle image load errors
-const cameraFeed = document.getElementById('cameraFeed');
-if (cameraFeed) {
-    cameraFeed.onerror = function() {
-        console.error('Camera feed error');
-        // Retry after 2 seconds
-        setTimeout(() => {
-            if (headcountEnabled) {
-                this.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
-            } else {
-                this.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
-            }
-        }, 2000);
-    };
-}
-</script>
-
-<script>
 function changeQuality() {
-    const quality = document.getElementById('quality-picker').value;
-    const img = document.querySelector('.camera-feed');
-    const baseUrl = 'http://localhost:8001/api/mobile-cameras/{{ mobile_camera.id }}/feed/';
-    img.src = `${baseUrl}?q=${quality}&t=${new Date().getTime()}`;
+    const picker = document.getElementById('quality-picker');
+    picker.disabled = true;
+    console.log('Quality switching not available for HLS streams yet');
 }
 </script>
 {% endblock %}

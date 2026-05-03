@@ -1,0 +1,317 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Live: {{ live_class.title }}{% endblock %}
+
+{% block content %}
+<div class="live-stream-container">
+    <div class="main-content">
+        <div class="video-section glass-card">
+            <div class="video-wrapper">
+                <video id="live-video" autoplay muted playsinline crossorigin="anonymous"></video>
+                <div class="video-overlay" id="video-loading">
+                    <div class="spinner"></div>
+                    <span>Connecting to Live Feed...</span>
+                </div>
+                <div class="live-badge-overlay">
+                    <span class="live-dot"></span> LIVE
+                </div>
+            </div>
+            
+            <div class="stream-info">
+                <div class="info-left">
+                    <h1>{{ live_class.title }}</h1>
+                    <div class="teacher-info">
+                        <img src="https://ui-avatars.com/api/?name={{ live_class.teacher.username }}&background=6366f1&color=fff" alt="Teacher">
+                        <div>
+                            <span class="teacher-name">{{ live_class.teacher.get_full_name|default:live_class.teacher.username }}</span>
+                            <span class="viewers"><i data-lucide="users"></i> <span id="viewer-count">{{ live_class.viewer_count }}</span> watching</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-right">
+                    <button class="btn-share" onclick="copyStreamLink()"><i data-lucide="share-2"></i> Share</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-sidebar glass-card">
+        <div class="chat-header">
+            <h2>Live Chat</h2>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <!-- Messages will appear here -->
+            <div class="chat-system">Welcome to the live session! Please be respectful.</div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Type a message...">
+            <button id="chat-send"><i data-lucide="send"></i></button>
+        </div>
+    </div>
+</div>
+
+<style>
+.live-stream-container {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 1.5rem;
+    height: calc(100vh - 120px);
+    padding: 1.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.glass-card {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.video-wrapper {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: #000;
+}
+
+#live-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.video-overlay {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: #fff;
+    z-index: 10;
+}
+
+.live-badge-overlay {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(239, 68, 68, 0.9);
+    color: #fff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 5;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.stream-info {
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.stream-info h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 1rem;
+}
+
+.teacher-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.teacher-info img {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+}
+
+.teacher-name {
+    display: block;
+    color: #fff;
+    font-weight: 600;
+}
+
+.viewers {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Chat Styles */
+.chat-header {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.chat-message {
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.chat-user {
+    font-weight: 700;
+    color: #6366f1;
+    margin-right: 0.5rem;
+}
+
+.chat-text {
+    color: #cbd5e1;
+}
+
+.chat-system {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-align: center;
+    font-style: italic;
+    margin: 0.5rem 0;
+}
+
+.chat-input-area {
+    padding: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chat-input-area input {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.6rem;
+    color: #fff;
+}
+
+.chat-input-area button {
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    width: 40px;
+    cursor: pointer;
+}
+
+@media (max-width: 1000px) {
+    .live-stream-container { grid-template-columns: 1fr; height: auto; }
+    .chat-sidebar { height: 500px; }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    const streamKey = "{{ live_class.stream_key }}";
+    const token = "{{ token }}";
+    const hlsUrl = `/cameras/live-class/feed/${streamKey}/?file=stream.m3u8&token=${token}`;
+    const video = document.getElementById('live-video');
+    const loadingOverlay = document.getElementById('video-loading');
+
+    function initPlayer() {
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                backBufferLength: 30,
+                maxBufferLength: 60
+            });
+            hls.loadSource(hlsUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play().catch(e => console.warn("Autoplay blocked", e));
+                loadingOverlay.style.display = 'none';
+            });
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    console.warn("HLS Fatal Error, retrying...", data);
+                    setTimeout(() => hls.loadSource(hlsUrl), 3000);
+                }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = hlsUrl;
+            video.addEventListener('loadedmetadata', () => {
+                video.play();
+                loadingOverlay.style.display = 'none';
+            });
+        }
+    }
+
+    initPlayer();
+
+    // WebSocket for Chat and Viewer Count
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(
+        wsScheme + '://' + window.location.host + '/ws/live-class/' + streamKey + '/'
+    );
+
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send');
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'chat') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'chat-message';
+            msgDiv.innerHTML = `<span class="chat-user">${data.username}</span><span class="chat-text">${data.message}</span>`;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        } else if (data.type === 'viewer_count') {
+            document.getElementById('viewer-count').innerText = data.count;
+        }
+    };
+
+    function sendMessage() {
+        const message = chatInput.value.trim();
+        if (message) {
+            chatSocket.send(JSON.stringify({ 'message': message }));
+            chatInput.value = '';
+        }
+    }
+
+    chatSend.onclick = sendMessage;
+    chatInput.onkeyup = (e) => { if (e.key === 'Enter') sendMessage(); };
+
+    function copyStreamLink() {
+        navigator.clipboard.writeText(window.location.href);
+        alert("Link copied to clipboard!");
+    }
+</script>
+{% endblock %}

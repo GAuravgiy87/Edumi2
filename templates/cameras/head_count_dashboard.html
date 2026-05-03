@@ -67,7 +67,7 @@
                 </div>
                 <div class="camera-body">
                     <div class="camera-preview">
-                        <img src="{% url 'camera_feed' camera.id %}" alt="{{ camera.name }}" class="preview-feed">
+                        <video id="video-rtsp-{{ camera.id }}" class="preview-feed hls-player" data-url="{% url 'camera_feed' camera.id %}?file=stream.m3u8&token={{ camera.temp_token }}" autoplay muted playsinline></video>
                     </div>
                 </div>
                 <div class="camera-footer">
@@ -112,7 +112,7 @@
                 </div>
                 <div class="camera-body">
                     <div class="camera-preview">
-                        <img src="{% url 'mobile_cameras:feed' camera.id %}" alt="{{ camera.name }}" class="preview-feed">
+                        <video id="video-mobile-{{ camera.id }}" class="preview-feed hls-player" data-url="{% url 'mobile_cameras:feed' camera.id %}?file=stream.m3u8&token={{ camera.temp_token }}" autoplay muted playsinline></video>
                     </div>
                 </div>
                 <div class="camera-footer">
@@ -413,7 +413,39 @@
     }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const hlsPlayers = [];
+        
+        function initHlsPlayers() {
+            document.querySelectorAll('.hls-player').forEach(video => {
+                const url = video.dataset.url;
+                if (!url) return;
+                
+                if (Hls.isSupported()) {
+                    const hls = new Hls({
+                        lowLatencyMode: true,
+                        manifestLoadingTimeOut: 10000,
+                    });
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                        video.play();
+                    });
+                    hlsPlayers.push(hls);
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = url;
+                    video.addEventListener('loadedmetadata', function() {
+                        video.play();
+                    });
+                }
+            });
+        }
+        
+        initHlsPlayers();
+    });
+
     let currentCameraType = null;
     let currentCameraId = null;
 

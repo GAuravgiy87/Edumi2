@@ -22,8 +22,8 @@
                 <p>Connecting to camera...</p>
                 <p style="font-size: 0.8rem; color: #aaa; margin-top: 10px;">Attempting TCP/UDP connection...</p>
             </div>
-            <img id="camera-stream" src="" alt="{{ camera.name }} feed" class="camera-stream" style="width: 100%; height: auto; display: block;">
-            <div id="stream-status" style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 10;">Connecting...</div>
+            <video id="camera-stream" class="camera-stream" autoplay muted playsinline controls style="width: 100%; height: auto; display: block;"></video>
+            <div id="stream-status" style="position: absolute; bottom: 40px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 10;">Connecting...</div>
         </div>
         
         <div class="camera-details">
@@ -75,49 +75,68 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-let imageLoaded = false;
-let loadAttempts = 0;
-const maxAttempts = 3;
-let serverCheckInterval;
-let frameCount = 0;
-let lastFrameTime = 0;
+let hls;
 
-// Start loading the stream
 function startStream() {
-    const img = document.getElementById('camera-stream');
+    const video = document.getElementById('camera-stream');
     const streamStatus = document.getElementById('stream-status');
-    const feedUrl = '{% url "camera_feed" camera.id %}';
+    const feedUrl = '{% url "camera_feed" camera.id %}?file=stream.m3u8&token={{ camera.temp_token }}';
     
-    console.log('Starting stream from:', feedUrl);
-    streamStatus.textContent = 'Connecting to camera...';
+    streamStatus.textContent = 'Connecting to HLS stream...';
     
-    // Add timestamp to prevent caching
-    img.src = feedUrl + '?t=' + Date.now();
-    
-    // Track if we're receiving frames
-    frameCount = 0;
-    lastFrameTime = Date.now();
-    
-    // For MJPEG, the onload event fires continuously
-    img.onload = function() {
-        frameCount++;
-        lastFrameTime = Date.now();
-        
-        if (frameCount === 1) {
-            console.log('First frame received!');
-            hideOverlay();
-            streamStatus.textContent = 'Live - ' + frameCount + ' frames';
-        } else if (frameCount % 30 === 0) {
-            streamStatus.textContent = 'Live - ' + frameCount + ' frames';
+    if (Hls.isSupported()) {
+        if (hls) {
+            hls.destroy();
         }
-    };
-    
-    img.onerror = function() {
-        console.error('Stream error');
-        streamStatus.textContent = 'Error - retrying...';
-        handleImageError();
-    };
+        hls = new Hls({
+            lowLatencyMode: true,
+            liveDurationInfinity: true,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 10,
+            levelLoadingTimeOut: 10000,
+            levelLoadingMaxRetry: 10,
+        });
+        hls.loadSource(feedUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play().then(() => {
+                hideOverlay();
+                streamStatus.textContent = 'Live';
+            }).catch(e => {
+                streamStatus.textContent = 'Click to play';
+            });
+        });
+        hls.on(Hls.Events.ERROR, function (event, data) {
+            if (data.fatal) {
+                switch (data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        streamStatus.textContent = 'Network error... retrying';
+                        hls.startLoad();
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        streamStatus.textContent = 'Media error... recovering';
+                        hls.recoverMediaError();
+                        break;
+                    default:
+                        streamStatus.textContent = 'Stream error';
+                        hls.destroy();
+                        setTimeout(startStream, 3000);
+                        break;
+                }
+            }
+        });
+    }
+    // For Safari
+    else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = feedUrl;
+        video.addEventListener('loadedmetadata', function() {
+            video.play();
+            hideOverlay();
+            streamStatus.textContent = 'Live';
+        });
+    }
 }
 
 function hideOverlay() {
@@ -132,21 +151,8 @@ function hideOverlay() {
     status.className = 'value status-active';
 }
 
-// Start stream when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page loaded, starting stream...');
     startStream();
-    
-    // Check if frames are still coming (every 5 seconds)
-    setInterval(function() {
-        const now = Date.now();
-        if (now - lastFrameTime > 10000 && frameCount > 0) {
-            console.log('No frames for 10 seconds, reconnecting...');
-            const streamStatus = document.getElementById('stream-status');
-            streamStatus.textContent = 'Reconnecting...';
-            startStream();
-        }
-    }, 5000);
 });
 
 function testCamera() {
@@ -218,34 +224,20 @@ function handleServerOffline() {
 function handleImageError() {
     const overlay = document.getElementById('loading-overlay');
     const status = document.getElementById('camera-status');
-    const img = document.getElementById('camera-stream');
     const streamStatus = document.getElementById('stream-status');
     
-    loadAttempts++;
-    console.log('Image load error, attempt:', loadAttempts);
+    streamStatus.textContent = 'Stream failed';
     
-    if (loadAttempts < maxAttempts) {
-        streamStatus.textContent = 'Retrying (' + loadAttempts + '/' + maxAttempts + ')...';
-        // Retry loading
-        setTimeout(() => {
-            startStream();
-        }, 2000);
-    } else {
-        // Check if server is offline
-        fetch('{% url "test_camera" camera.id %}')
-            .then(response => response.json())
-            .then(data => {
-                // Server is online, show camera issue
-                overlay.innerHTML = '<p style="color: #d63031;">⚠ Camera Test Passed but Stream Failed<br><small>RTSP URL may be incorrect or camera not streaming</small></p>';
-                status.innerHTML = '● Stream Error';
-                status.className = 'value status-inactive';
-                streamStatus.textContent = 'Stream failed';
-            })
-            .catch(error => {
-                // Server is offline
-                handleServerOffline();
-            });
-    }
+    fetch('{% url "test_camera" camera.id %}')
+        .then(response => response.json())
+        .then(data => {
+            overlay.innerHTML = '<p style="color: #d63031;">⚠ Camera Test Passed but Stream Failed<br><small>RTSP URL may be incorrect or camera not streaming</small></p>';
+            status.innerHTML = '● Stream Error';
+            status.className = 'value status-inactive';
+        })
+        .catch(error => {
+            handleServerOffline();
+        });
 }
 
 // Hide loading overlay when stream starts (for MJPEG streams)
@@ -291,20 +283,12 @@ setTimeout(() => {
 }, 10000);
 // Quality Control
 function changeQuality() {
+    // Quality control disabled for HLS stream
     const picker = document.getElementById('quality-picker');
-    const quality = picker.value;
-    const img = document.getElementById('camera-stream');
-    const baseUrl = '{% url "camera_feed" camera.id %}';
-    const timestamp = new Date().getTime();
-    
-    // Update image source with quality param and cache buster
-    img.src = `${baseUrl}?q=${quality}&t=${timestamp}`;
-    
-    const statusMsg = document.getElementById('status-message');
-    statusMsg.textContent = `Quality changed to ${quality.toUpperCase()}`;
-    statusMsg.className = 'status-message info';
-    statusMsg.style.display = 'block';
-    setTimeout(() => statusMsg.style.display = 'none', 3000);
+    picker.disabled = true;
+    const streamStatus = document.getElementById('stream-status');
+    streamStatus.textContent = 'Quality switching not available for HLS streams yet';
+    setTimeout(() => streamStatus.textContent = 'Live', 3000);
 }
 </script>
 

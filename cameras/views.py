@@ -10,18 +10,12 @@ from django.contrib.auth.models import User
 from django.db.models import Avg, Max, Min, Count
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession
+from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession, LiveClass, LiveClassRecording
 from mobile_cameras.models import MobileCamera, MobileCameraPermission
 from .head_count_service import head_count_manager
+from .utils import verify_stream_token, generate_stream_token, is_admin, auto_detect_stream_path, parse_stream_url, validate_rtsp_url
 
 logger = logging.getLogger('cameras')
-
-def is_admin(user):
-    """Check if user is admin"""
-    if user.is_authenticated:
-        if user.is_superuser:
-            return True
-    return False
 
 
 def can_manage_camera(user, camera):
@@ -42,119 +36,28 @@ def can_view_camera(user, camera):
     return False
 
 
-def test_rtsp_paths(ip, port, username, password):
-    """Test common RTSP paths to find the working one"""
-    import cv2
-    common_paths = [
-        '/live',
-        '/stream',
-        '/h264',
-        '/video',
-        '/cam/realmonitor',
-        '/Streaming/Channels/101',
-        '/1',
-        '/11',
-        '/av0_0',
-        '/mpeg4',
-        '/media/video1',
-        '/onvif1',
-        '/ch0',
-        '/ch01.264',
-        '/',
-    ]
-    
-    from urllib.parse import quote
-    for path in common_paths:
-        if username and password:
-            safe_user = quote(username)
-            safe_pass = quote(password)
-            rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip}:{port}{path}"
-        else:
-            rtsp_url = f"rtsp://{ip}:{port}{path}"
-        
-        try:
-            cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
-            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
-            
-            if cap.isOpened():
-                ret, frame = cap.read()
-                cap.release()
-                
-                if ret and frame is not None:
-                    return path, rtsp_url
-            else:
-                cap.release()
-        except Exception as e:
-            continue
-    
-    return None, None
-
-
-def parse_rtsp_url(url):
-    """
-    Robustly parse an RTSP URL to extract components.
-    Handles complex passwords with multiple '@' symbols.
-    """
-    if not url.startswith('rtsp://'):
-        raise ValueError("URL must start with rtsp://")
-    
-    # Remove prefix
-    temp = url[7:]
-    
-    # Standard format: [user[:pass]@]host[:port][/path]
-    # Split at the LAST '@' to separate userinfo from host/path
-    if '@' in temp:
-        userinfo, rest = temp.rsplit('@', 1)
-        # Split userinfo at the FIRST ':' to handle '@' in password
-        if ':' in userinfo:
-            username, password = userinfo.split(':', 1)
-        else:
-            username = userinfo
-            password = ''
-    else:
-        username = ''
-        password = ''
-        rest = temp
-    
-    # Now 'rest' is host[:port][/path]
-    if '/' in rest:
-        hostport, stream_path = rest.split('/', 1)
-        stream_path = '/' + stream_path
-    else:
-        hostport = rest
-        stream_path = '/'
-    
-    if ':' in hostport:
-        ip_address, port = hostport.split(':', 1)
-        try:
-            port = int(port)
-        except ValueError:
-            port = 554
-    else:
-        ip_address = hostport
-        port = 554
-    
-    return {
-        'ip_address': ip_address,
-        'port': port,
-        'username': username,
-        'password': password,
-        'stream_path': stream_path
-    }
+# Removed redundant test_rtsp_paths and parse_rtsp_url (now in utils.py)
 
 @login_required
 def admin_dashboard(request):
     if not is_admin(request.user):
         return redirect('login')
     
-    cameras = Camera.objects.all()
+    from django.core.paginator import Paginator
+    
+    camera_list = Camera.objects.all().order_by('-id')
+    paginator = Paginator(camera_list, 10) # 10 cameras per page
+    page_number = request.GET.get('page')
+    cameras = paginator.get_page(page_number)
+    
     teachers = User.objects.filter(userprofile__user_type='teacher')
     
-    # Get permissions for each camera
+    # Get permissions for each camera on this page
     camera_permissions = {}
+    from .utils import generate_stream_token
     for camera in cameras:
         camera_permissions[camera.id] = camera.get_authorized_teachers()
+        camera.temp_token = generate_stream_token(request.user, camera.id)
     
     context = {
         'cameras': cameras,
@@ -175,7 +78,7 @@ def add_camera(request):
         if rtsp_url_input:
             # Parse RTSP URL to extract components (ignore the path, we'll auto-detect)
             try:
-                parsed = parse_rtsp_url(rtsp_url_input)
+                parsed = parse_stream_url(rtsp_url_input)
                 name = request.POST.get('name') or f"Camera {parsed['ip_address']}"
                 ip_address = parsed['ip_address']
                 port = parsed['port']
@@ -193,9 +96,9 @@ def add_camera(request):
             username = request.POST.get('username', '')
             password = request.POST.get('password', '')
         
-        # ALWAYS auto-detect the correct RTSP path
+        # ALWAYS auto-detect the correct RTSP path using the unified utility
         logger.info(f"Auto-detecting RTSP path for {ip_address}:{port}")
-        detected_path, rtsp_url = test_rtsp_paths(ip_address, port, username, password)
+        detected_path, rtsp_url = auto_detect_stream_path(ip_address, port, username, password, protocol='rtsp')
         
         if detected_path:
             logger.info(f"Successfully detected path: {detected_path}")
@@ -236,6 +139,77 @@ def add_camera(request):
             })
     
     return render(request, 'cameras/add_camera.html')
+    
+@login_required
+def edit_camera(request, camera_id):
+    if not is_admin(request.user):
+        return redirect('login')
+        
+    camera = get_object_or_404(Camera, id=camera_id)
+    
+    if request.method == 'POST':
+        rtsp_url_input = request.POST.get('rtsp_url', '').strip()
+        name = request.POST.get('name') or camera.name
+        
+        if rtsp_url_input:
+            try:
+                parsed = parse_stream_url(rtsp_url_input)
+                ip_address = parsed['ip_address']
+                port = parsed['port']
+                username = parsed['username']
+                password = parsed['password']
+            except Exception as e:
+                return render(request, 'cameras/edit_camera.html', {
+                    'camera': camera,
+                    'error': f'Invalid RTSP URL format: {str(e)}'
+                })
+        else:
+            ip_address = request.POST.get('ip_address') or camera.ip_address
+            port = int(request.POST.get('port') or camera.port)
+            username = request.POST.get('username') or camera.username
+            password = request.POST.get('password') or camera.password
+            
+        logger.info(f"Auto-detecting RTSP path for {ip_address}:{port}")
+        detected_path, rtsp_url = auto_detect_stream_path(ip_address, port, username, password, protocol='rtsp')
+        
+        if detected_path:
+            logger.info(f"Successfully detected path: {detected_path}")
+            camera.name = name
+            camera.rtsp_url = rtsp_url
+            camera.ip_address = ip_address
+            camera.port = port
+            camera.username = username
+            camera.password = password
+            camera.stream_path = detected_path
+            camera.is_active = True
+            camera.save()
+            return redirect('admin_dashboard')
+        else:
+            logger.warning(f"Could not auto-detect path for {ip_address}:{port}")
+            if username and password:
+                from urllib.parse import quote
+                safe_user = quote(username)
+                safe_pass = quote(password)
+                rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip_address}:{port}/stream"
+            else:
+                rtsp_url = f"rtsp://{ip_address}:{port}/stream"
+                
+            camera.name = name
+            camera.rtsp_url = rtsp_url
+            camera.ip_address = ip_address
+            camera.port = port
+            camera.username = username
+            camera.password = password
+            camera.stream_path = '/stream'
+            camera.is_active = False
+            camera.save()
+            
+            return render(request, 'cameras/edit_camera.html', {
+                'camera': camera,
+                'error': 'Could not auto-detect camera path. Camera updated but marked as inactive. Please verify camera is online and accessible.'
+            })
+            
+    return render(request, 'cameras/edit_camera.html', {'camera': camera})
 
 @login_required
 def delete_camera(request, camera_id):
@@ -248,218 +222,62 @@ def delete_camera(request, camera_id):
     return redirect('admin_dashboard')
 
 
-class CameraStreamer:
-    """Non-blocking camera streamer with automatic reconnection"""
-    
-    def __init__(self, camera_id, rtsp_url):
-        self.camera_id = camera_id
-        self.rtsp_url = rtsp_url
-        self.cap: Optional[cv2.VideoCapture] = None
-        self.frame: Optional[bytes] = None
-        self.running: bool = False
-        self.thread: Optional[threading.Thread] = None
-        self.lock = threading.Lock()
-        self.last_access = time.time()
-        self.connection_attempts = 0
-        self.max_reconnect_attempts = 5
-        self.reconnect_delay = 2
-
-    def start(self):
-        """Start the background streaming thread"""
-        if not self.running:
-            self.running = True
-            self.thread = threading.Thread(target=self._update, daemon=True)
-            self.thread.start()
-            logger.info(f"Started streamer for camera {self.camera_id}")
-
-    def stop(self):
-        """Stop the streaming thread"""
-        self.running = False
-        if self.thread is not None:
-            self.thread.join(timeout=2.0)
-        if self.cap is not None:
-            self.cap.release()
-            self.cap = None
-        logger.info(f"Stopped streamer for camera {self.camera_id}")
-
-    def _connect_camera(self):
-        """Attempt to connect to the camera"""
-        import cv2
-        try:
-            import os
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
-            cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
-            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            
-            if cap.isOpened():
-                ret, frame = cap.read()
-                if ret and frame is not None:
-                    self.connection_attempts = 0
-                    logger.info(f"Connected to camera {self.camera_id}")
-                    return cap
-                cap.release()
-            return None
-        except Exception as e:
-            logger.error(f"Error connecting camera {self.camera_id}: {e}")
-            return None
-
-    def _update(self):
-        """Background thread to continuously read frames"""
-        try:
-            while self.running:
-                # Stop if inactive for too long
-                if time.time() - self.last_access > 90:
-                    logger.info(f"Stopping camera {self.camera_id} due to inactivity")
-                    break
-
-                # Try to connect if not connected
-                if self.cap is None:
-                    if self.connection_attempts >= self.max_reconnect_attempts:
-                        logger.warning(f"Camera {self.camera_id} is OFFLINE. Stopping live streamer.")
-                        break
-                    
-                    self.connection_attempts += 1
-                    logger.info(f"Connecting to camera {self.camera_id} (attempt {self.connection_attempts})")
-                    self.cap = self._connect_camera()
-                    
-                    if self.cap is None:
-                        time.sleep(self.reconnect_delay)
-                        continue
-
-                # Read frame from camera
-                try:
-                    import cv2
-                    ret, frame = self.cap.read()
-                    
-                    if ret and frame is not None:
-                        # PROCESS TRACKING on the live feed
-                        try:
-                            # Use the already imported head_count_manager from line 15
-                            head_count, detections, annotated, avg_conf, tracked_persons = \
-                                head_count_manager.detector.detect_heads(frame)
-                            frame = annotated
-                        except Exception as e:
-                            logger.error(f"Tracking error in streamer: {e}")
-                        
-                        # Encode to JPEG
-                        ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        
-                        if ret:
-                            with self.lock:
-                                self.frame = jpeg.tobytes()
-                        
-                        # No fixed delay here - it helps drain the camera buffer faster
-                        
-                    else:
-                        # Frame read failed - reconnect
-                        logger.warning(f"Failed to read frame from camera {self.camera_id}, reconnecting...")
-                        if self.cap is not None:
-                            self.cap.release()
-                        self.cap = None
-                        time.sleep(self.reconnect_delay)
-                        
-                except Exception as e:
-                    logger.error(f"Error reading from camera {self.camera_id}: {e}")
-                    if self.cap is not None:
-                        self.cap.release()
-                    self.cap = None
-                    time.sleep(self.reconnect_delay)
-        finally:
-            self.running = False
-            if self.cap is not None:
-                self.cap.release()
-                self.cap = None
-            logger.info(f"Background thread stopped for camera {self.camera_id}")
-
-    def get_frame(self):
-        """Get the latest frame (thread-safe)"""
-        self.last_access = time.time()
-        with self.lock:
-            return self.frame
-
-class CameraManager:
-    """Global manager for camera streamers - prevents duplicate connections"""
-    
-    _lock = threading.Lock()
-    _streamers = {}
-
-    @classmethod
-    def get_streamer(cls, camera_id, rtsp_url):
-        """Get or create a streamer for the given camera"""
-        with cls._lock:
-            try:
-                camera = Camera.objects.get(id=camera_id)
-                full_url = camera.get_full_rtsp_url()
-                if camera_id not in cls._streamers or not cls._streamers[camera_id].running:
-                    logger.info(f"Creating new streamer for camera {camera_id}")
-                    streamer = CameraStreamer(camera_id, full_url)
-                    streamer.start()
-                    cls._streamers[camera_id] = streamer
-                return cls._streamers[camera_id]
-            except Camera.DoesNotExist:
-                logger.warning(f"Camera {camera_id} not found, cannot create streamer.")
-                return None
-    
-    @classmethod
-    def stop_streamer(cls, camera_id):
-        """Stop a specific camera streamer"""
-        with cls._lock:
-            if camera_id in cls._streamers:
-                cls._streamers[camera_id].stop()
-                del cls._streamers[camera_id]
-    
-    @classmethod
-    def stop_all(cls):
-        """Stop all camera streamers"""
-        with cls._lock:
-            for streamer in cls._streamers.values():
-                streamer.stop()
-            cls._streamers.clear()
 
 @login_required
 def camera_feed(request, camera_id):
     """
-    Directly serve the camera feed with real-time tracking annotations.
-    Uses the internal CameraManager and Streamer for high performance.
+    Proxy the HLS camera feed from the camera proxy service.
     """
-    camera = get_object_or_404(Camera, id=camera_id)
+    """Proxy the camera HLS feed with token validation"""
+    token = request.GET.get('token')
+    if not verify_stream_token(token, camera_id):
+        return HttpResponse("Unauthorized: Invalid or expired token", status=403)
+        
+    import requests
+    from django.http import HttpResponse, StreamingHttpResponse
     
-    # Check permission
-    if not can_view_camera(request.user, camera):
-        return JsonResponse({'error': 'Permission denied'}, status=403)
+    # Rate limiting (Simple implementation)
+    from django.core.cache import cache
+    rate_key = f"rate_limit_{request.user.id}"
+    requests_count = cache.get(rate_key, 0)
+    if requests_count > 100: # 100 fragments per minute
+        return HttpResponse("Rate limit exceeded", status=429)
+    cache.set(rate_key, requests_count + 1, 60)
+
+    filename = request.GET.get('file', 'stream.m3u8')
+    is_mobile = request.GET.get('mobile', 'false') == 'true'
     
-    rtsp_url = camera.get_full_rtsp_url()
-    streamer = CameraManager.get_streamer(camera.id, rtsp_url)
-    
-    def generate():
-        last_frame = None
-        while True:
-            try:
-                frame = streamer.get_frame()
-                if frame and frame != last_frame:
-                    yield (b'--frame\r\n'
-                           b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-                    last_frame = frame
-                else:
-                    time.sleep(0.01)
-            except GeneratorExit:
-                logger.info(f"Client disconnected from camera feed {camera_id}")
-                break
-            except Exception as e:
-                logger.error(f"Error in camera feed {camera_id}: {e}")
-                time.sleep(0.1)
-                
-    response = StreamingHttpResponse(
-        generate(),
-        content_type='multipart/x-mixed-replace; boundary=frame'
-    )
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    response['X-Accel-Buffering'] = 'no'
-    return response
+    # Get the camera object to get the RTSP URL if needed
+    if is_mobile:
+        camera = get_object_or_404(MobileCamera, id=camera_id)
+        # Verify permission
+        if not is_admin(request.user) and not MobileCameraPermission.objects.filter(mobile_camera=camera, teacher=request.user).exists():
+            return HttpResponse("Forbidden", status=403)
+        feed_url = f'http://localhost:8001/api/mobile-cameras/{camera_id}/feed/?file={filename}'
+    else:
+        camera = get_object_or_404(Camera, id=camera_id)
+        if not camera.has_permission(request.user):
+            return HttpResponse("Forbidden", status=403)
+        feed_url = f'http://localhost:8001/api/cameras/{camera_id}/feed/?file={filename}'
+
+    try:
+        response = requests.get(feed_url, stream=True, timeout=10)
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            django_response = StreamingHttpResponse(
+                response.iter_content(chunk_size=8192),
+                content_type=content_type
+            )
+            # Copy important headers
+            if 'Cache-Control' in response.headers:
+                django_response['Cache-Control'] = response.headers['Cache-Control']
+            django_response['Access-Control-Allow-Origin'] = '*'
+            return django_response
+        else:
+            return HttpResponse(status=response.status_code)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error proxying HLS feed for camera {camera_id}: {e}")
+        return JsonResponse({'error': 'Proxy server unavailable'}, status=503)
 
 @login_required
 def live_monitor(request):
@@ -490,6 +308,13 @@ def live_monitor(request):
         cameras = Camera.objects.none()
         mobile_cameras = MobileCamera.objects.none()
     
+    # Add tokens for each camera
+    from .utils import generate_stream_token
+    for camera in cameras:
+        camera.temp_token = generate_stream_token(request.user, camera.id)
+    for camera in mobile_cameras:
+        camera.temp_token = generate_stream_token(request.user, camera.id)
+    
     # Check if camera service is running
     import requests
     camera_service_running = False
@@ -514,10 +339,12 @@ def view_camera(request, camera_id):
     if not can_view_camera(request.user, camera):
         return redirect('login')
     
+    from .utils import generate_stream_token
+    camera.temp_token = generate_stream_token(request.user, camera.id)
     return render(request, 'cameras/view_camera.html', {'camera': camera})
 
 @login_required
-def test_camera(request, camera_id):
+def test_camera_connection(request, camera_id):
     """Test camera connection - uses camera service for diagnostics"""
     import requests
     camera = get_object_or_404(Camera, id=camera_id)
@@ -554,6 +381,236 @@ def test_feed_page(request):
     return render(request, 'test_feed.html')
 
 @login_required
+def teacher_camera_dashboard(request):
+    """Dashboard for teachers to manage their cameras and live classes"""
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.user_type != 'teacher':
+        if not is_admin(request.user):
+            return redirect('login')
+    
+    # 1. Show only assigned cameras (RTSP)
+    camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
+    assigned_cameras = Camera.objects.filter(id__in=camera_ids, is_active=True)
+    
+    # 2. Show only assigned mobile cameras
+    mobile_camera_ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
+    assigned_mobile_cameras = MobileCamera.objects.filter(id__in=mobile_camera_ids, is_active=True)
+    
+    # 3. Get active live class (if any)
+    active_class = LiveClass.objects.filter(teacher=request.user, status='active').first()
+    
+    from .utils import generate_stream_token
+    # Generate tokens for all cameras
+    for cam in assigned_cameras:
+        cam.temp_token = generate_stream_token(request.user, cam.id)
+    for mcam in assigned_mobile_cameras:
+        mcam.temp_token = generate_stream_token(request.user, mcam.id)
+    if active_class:
+        active_class.temp_token = generate_stream_token(request.user, active_class.stream_key)
+    
+    # 4. Recent recordings
+    recent_recordings = LiveClassRecording.objects.filter(live_class__teacher=request.user).order_by('-created_at')[:5]
+    
+    context = {
+        'cameras': assigned_cameras,
+        'mobile_cameras': assigned_mobile_cameras,
+        'active_class': active_class,
+        'recent_recordings': recent_recordings,
+    }
+    return render(request, 'cameras/teacher_dashboard.html', context)
+
+@login_required
+def start_live_class(request):
+    """Initialize a live class and start RTMP listener"""
+    if request.method == 'POST':
+        title = request.POST.get('title', 'Untitled Live Class')
+        import uuid
+        stream_key = str(uuid.uuid4())[:8]
+        
+        # Create LiveClass record
+        live_class = LiveClass.objects.create(
+            title=title,
+            teacher=request.user,
+            stream_key=stream_key,
+            status='active'
+        )
+        
+        # Notify camera service to start listening
+        import requests
+        try:
+            requests.get(f'http://localhost:8001/api/live-class/start/{stream_key}/', timeout=5)
+        except:
+            logger.error("Failed to connect to camera service for live class start")
+            
+        return redirect('teacher_camera_dashboard')
+    
+    return redirect('teacher_camera_dashboard')
+
+@login_required
+def stop_live_class(request, class_id):
+    """End a live class and save recording metadata"""
+    live_class = get_object_or_404(LiveClass, id=class_id, teacher=request.user)
+    live_class.status = 'ended'
+    live_class.ended_at = timezone.now()
+    live_class.save()
+    
+    # Notify camera service to stop listening
+    import requests
+    try:
+        requests.get(f'http://localhost:8001/api/live-class/stop/{live_class.stream_key}/', timeout=5)
+        
+        # Scan for recording chunks
+        # In a real setup, we'd wait a few seconds for FFmpeg to flush
+        time.sleep(2)
+        import os, tempfile
+        rec_dir = os.path.join(tempfile.gettempdir(), 'edumi_recordings', f"live_{live_class.stream_key}")
+        
+        if os.path.exists(rec_dir):
+            chunks = [f for f in os.listdir(rec_dir) if f.endswith('.mp4')]
+            for i, chunk_file in enumerate(sorted(chunks)):
+                file_path = os.path.join(rec_dir, chunk_file)
+                file_size = os.path.getsize(file_path)
+                LiveClassRecording.objects.get_or_create(
+                    live_class=live_class,
+                    chunk_index=i,
+                    defaults={
+                        'file_path': file_path,
+                        'file_size_bytes': file_size,
+                        'duration_seconds': 60.0 # Assumed based on segment_time
+                    }
+                )
+    except Exception as e:
+        logger.error(f"Error finishing live class: {e}")
+        
+    # Trigger background processing
+    from .tasks import process_live_class_recording
+    process_live_class_recording.delay(live_class.id)
+        
+    return redirect('teacher_camera_dashboard')
+
+@login_required
+def list_recordings(request):
+    """View to list all processed camera recordings with caching and optimization"""
+    from django.core.cache import cache
+    
+    query = request.GET.get('q', '')
+    page_number = request.GET.get('page', 1)
+    
+    # Try to get from cache if no query
+    cache_key = f'recordings_list_{request.user.id}_{page_number}'
+    if not query:
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return cached_data
+            
+    if hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher':
+        base_recordings = ProcessedVideo.objects.filter(teacher=request.user)
+    elif is_admin(request.user):
+        base_recordings = ProcessedVideo.objects.all()
+    else:
+        base_recordings = ProcessedVideo.objects.filter(processing_status='completed')
+        
+    if query:
+        from django.db.models import Q
+        base_recordings = base_recordings.filter(
+            Q(title__icontains=query) | Q(teacher__username__icontains=query)
+        )
+        
+    recordings_list = base_recordings.order_by('-created_at')
+    
+    from django.core.paginator import Paginator
+    paginator = Paginator(recordings_list, 12)
+    recordings = paginator.get_page(page_number)
+    
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        response = render(request, 'cameras/partials/recording_grid.html', {'recordings': recordings})
+    else:
+        response = render(request, 'cameras/list_recordings.html', {
+            'recordings': recordings,
+            'query': query
+        })
+        
+    # Cache the result for 5 minutes if no search query
+    if not query:
+        cache.set(cache_key, response, 300)
+        
+    return response
+
+@login_required
+def view_recording(request, recording_id):
+    """Player view for a processed recording with related suggestions"""
+    recording = get_object_or_404(ProcessedVideo, id=recording_id)
+    
+    # Simple recommendation: same teacher or recent
+    related = ProcessedVideo.objects.filter(
+        processing_status='completed'
+    ).exclude(id=recording_id).filter(
+        Q(teacher=recording.teacher) | Q(title__icontains=recording.title[:5])
+    ).order_by('-created_at')[:6]
+    
+    return render(request, 'cameras/view_recording.html', {
+        'recording': recording,
+        'related': related
+    })
+
+@login_required
+def student_live_class(request, stream_key):
+    """Student view for an active live class with token"""
+    live_class = get_object_or_404(LiveClass, stream_key=stream_key, status='active')
+    
+    from .utils import generate_stream_token
+    token = generate_stream_token(request.user, stream_key)
+    
+    return render(request, 'cameras/student_live_class.html', {
+        'live_class': live_class,
+        'token': token
+    })
+
+@login_required
+def active_live_classes(request):
+    """List all currently active live classes for students to join"""
+    live_classes = LiveClass.objects.filter(status='active').order_by('-started_at')
+    return render(request, 'cameras/active_live_classes.html', {'live_classes': live_classes})
+
+@login_required
+def live_class_feed(request, stream_key):
+    """Proxy the live class HLS feed from the camera service with token validation"""
+    token = request.GET.get('token')
+    if not verify_stream_token(token, stream_key):
+        return HttpResponse("Unauthorized: Invalid or expired token", status=403)
+        
+    import requests
+    from django.http import HttpResponse, StreamingHttpResponse
+    
+    # Rate limiting
+    from django.core.cache import cache
+    rate_key = f"rate_limit_live_{request.user.id}"
+    requests_count = cache.get(rate_key, 0)
+    if requests_count > 100:
+        return HttpResponse("Rate limit exceeded", status=429)
+    cache.set(rate_key, requests_count + 1, 60)
+
+    filename = request.GET.get('file', 'stream.m3u8')
+    camera_service_url = f'http://localhost:8001/api/live/feed/{stream_key}/?file={filename}'
+    
+    try:
+        response = requests.get(camera_service_url, stream=True, timeout=10)
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            django_response = StreamingHttpResponse(
+                response.iter_content(chunk_size=8192),
+                content_type=content_type
+            )
+            django_response['Access-Control-Allow-Origin'] = '*'
+            if 'Cache-Control' in response.headers:
+                django_response['Cache-Control'] = response.headers['Cache-Control']
+            return django_response
+        else:
+            return HttpResponse(status=response.status_code)
+    except Exception as e:
+        logger.error(f"Error proxying live class feed: {e}")
+        return JsonResponse({'error': 'Proxy server unavailable'}, status=503)
+
+@login_required
 def grant_permission(request, camera_id):
     """Grant a teacher permission to view a camera"""
     if not is_admin(request.user):
@@ -578,14 +635,17 @@ def grant_permission(request, camera_id):
 def revoke_permission(request, camera_id, teacher_id):
     """Revoke a teacher's permission to view a camera"""
     if not is_admin(request.user):
-        return redirect('login')
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
     
-    camera = get_object_or_404(Camera, id=camera_id)
-    teacher = get_object_or_404(User, id=teacher_id)
-    
-    CameraPermission.objects.filter(camera=camera, teacher=teacher).delete()
-    
-    return redirect('manage_permissions', camera_id=camera_id)
+    if request.method == 'POST':
+        camera = get_object_or_404(Camera, id=camera_id)
+        teacher = get_object_or_404(User, id=teacher_id)
+        
+        CameraPermission.objects.filter(camera=camera, teacher=teacher).delete()
+        
+        return JsonResponse({'success': True, 'message': 'Permission revoked successfully'})
+        
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 @login_required
 def manage_permissions(request, camera_id):
@@ -630,14 +690,17 @@ def head_count_dashboard(request):
     # Check active sessions
     active_sessions = head_count_manager.get_active_sessions()
     
-    # Add session status to cameras
+    # Add session status and security tokens to cameras
+    from .utils import generate_stream_token
     for camera in rtsp_cameras:
         camera.has_active_session = head_count_manager.is_session_active('rtsp', camera.id)
         camera.camera_type = 'rtsp'
+        camera.temp_token = generate_stream_token(request.user, camera.id)
     
     for camera in mobile_cameras:
         camera.has_active_session = head_count_manager.is_session_active('mobile', camera.id)
         camera.camera_type = 'mobile'
+        camera.temp_token = generate_stream_token(request.user, camera.id)
     
     # Get recent head count logs
     recent_logs = HeadCountLog.objects.all()[:10]
@@ -949,3 +1012,70 @@ def export_head_count_csv(request):
         ])
     
     return response
+
+@login_required
+def test_camera_connection(request, camera_id):
+    """AJAX view to test camera connection and update status"""
+    if not is_admin(request.user):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+        
+    camera = get_object_or_404(Camera, id=camera_id)
+    from .utils import validate_rtsp_url
+    from .models import CameraLog
+    
+    is_valid, message = validate_rtsp_url(camera.get_full_rtsp_url())
+    
+    # Update camera status
+    camera.status = 'online' if is_valid else 'offline'
+    camera.last_seen = timezone.now() if is_valid else camera.last_seen
+    camera.save()
+    
+    # Log the event
+    CameraLog.objects.create(
+        camera=camera,
+        event_type='connectivity_test',
+        message=f"Test result: {message}",
+        level='info' if is_valid else 'error'
+    )
+    
+    return JsonResponse({
+        'status': camera.status,
+        'message': message,
+        'last_seen': camera.last_seen.strftime("%Y-%m-%d %H:%M") if camera.last_seen else "Never"
+    })
+
+@login_required
+def view_camera_logs(request, camera_id):
+    """View to see diagnostic logs for a specific camera"""
+    if not is_admin(request.user):
+        return redirect('teacher_camera_dashboard')
+        
+    camera = get_object_or_404(Camera, id=camera_id)
+    logs = CameraLog.objects.filter(camera=camera).order_by('-timestamp')[:100]
+    return render(request, 'cameras/diagnostics.html', {'camera': camera, 'logs': logs})
+
+@login_required
+def simulate_load(request):
+    """Admin tool to simulate multiple streams for load testing"""
+    if not is_admin(request.user):
+        return redirect('teacher_camera_dashboard')
+        
+    if request.method == 'POST':
+        count = int(request.POST.get('count', 5))
+        test_url = "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4"
+        
+        import requests
+        results = []
+        for i in range(count):
+            try:
+                resp = requests.post('http://localhost:8001/api/cameras/start/', json={
+                    'camera_id': f'load_test_{i}',
+                    'url': test_url
+                })
+                results.append(f"Stream {i}: {resp.status_code}")
+            except Exception as e:
+                results.append(f"Stream {i}: Failed - {str(e)}")
+                
+        return render(request, 'cameras/load_test_results.html', {'results': results})
+        
+    return render(request, 'cameras/simulate_load.html')

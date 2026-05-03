@@ -1,0 +1,43 @@
+{% for recording in recordings %}
+<div class="recording-card glass-card">
+    <div class="thumbnail-wrapper">
+        {% if recording.thumbnail %}
+        <img src="{{ recording.thumbnail.url }}" alt="{{ recording.title }}" loading="lazy">
+        {% else %}
+        <div class="no-thumb"><i data-lucide="image"></i></div>
+        {% endif %}
+        <span class="duration-badge">{{ recording.duration_seconds|floatformat:0 }}s</span>
+        {% if recording.processing_status == 'processing' %}
+        <div class="processing-overlay">
+            <div class="spinner"></div>
+            <span>Processing...</span>
+        </div>
+        {% endif %}
+    </div>
+    <div class="card-content">
+        <div class="meta-row">
+            <span class="teacher-tag"><i data-lucide="user"></i> {{ recording.teacher.username }}</span>
+            <span class="date-tag">{{ recording.created_at|date:"M d, Y" }}</span>
+        </div>
+        <h3>{{ recording.title }}</h3>
+        <p class="description">{{ recording.description|default:"No description provided." }}</p>
+        
+        <div class="card-actions">
+            {% if recording.processing_status == 'completed' %}
+            <a href="{% url 'view_recording' recording.id %}" class="btn-primary">
+                <i data-lucide="play"></i> Watch Now
+            </a>
+            {% elif recording.processing_status == 'failed' %}
+            <span class="status-failed"><i data-lucide="alert-circle"></i> Failed</span>
+            {% else %}
+            <span class="status-pending"><i data-lucide="clock"></i> Processing</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="empty-state glass-card">
+    <i data-lucide="video-off"></i>
+    <p>No recordings found.</p>
+</div>
+{% endfor %}

@@ -14,6 +14,7 @@ from django.urls import re_path
 from meetings.routing import websocket_urlpatterns as meeting_ws
 from attendance.routing import websocket_urlpatterns as attendance_ws
 from accounts.routing import websocket_urlpatterns as account_ws
+from cameras.routing import websocket_urlpatterns as camera_ws
 from meetings.livekit_proxy import LiveKitProxyConsumer
 
 livekit_patterns = [
@@ -26,7 +27,7 @@ application = ProtocolTypeRouter({
     "websocket": URLRouter(
         livekit_patterns + [
             re_path(r'', AuthMiddlewareStack(
-                URLRouter(meeting_ws + attendance_ws + account_ws)
+                URLRouter(meeting_ws + attendance_ws + account_ws + camera_ws)
             )),
         ]
     ),

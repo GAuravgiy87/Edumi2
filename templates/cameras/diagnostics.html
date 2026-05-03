@@ -1,0 +1,106 @@
+{% extends 'base_sidebar.html' %}
+{% block page_title %}Diagnostics: {{ camera.name }}{% endblock %}
+
+{% block content %}
+<div class="diagnostics-container">
+    <div class="header">
+        <h1>🔍 Diagnostics: {{ camera.name }}</h1>
+        <div class="actions">
+            <button id="test-btn" class="btn-test"><i data-lucide="refresh-cw"></i> Run Connection Test</button>
+            <a href="{% url 'admin_dashboard' %}" class="btn-back">Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="status-summary glass-card">
+        <div class="status-item">
+            <label>Current Status</label>
+            <span id="status-badge" class="status-badge {{ camera.status }}">{{ camera.status|title }}</span>
+        </div>
+        <div class="status-item">
+            <label>Last Seen</label>
+            <span id="last-seen">{{ camera.last_seen|date:"Y-m-d H:i"|default:"Never" }}</span>
+        </div>
+        <div class="status-item">
+            <label>Uptime</label>
+            <span>{{ camera.uptime_percentage }}%</span>
+        </div>
+    </div>
+
+    <div class="log-section glass-card">
+        <h3>Diagnostic Event Logs</h3>
+        <div class="log-table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Event</th>
+                        <th>Level</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody id="log-body">
+                    {% for log in logs %}
+                    <tr class="log-row {{ log.level }}">
+                        <td>{{ log.timestamp|date:"H:i:s M d" }}</td>
+                        <td>{{ log.event_type }}</td>
+                        <td><span class="level-tag">{{ log.level|upper }}</span></td>
+                        <td>{{ log.message }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="empty-msg">No diagnostic logs found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.diagnostics-container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.actions { display: flex; gap: 1rem; }
+.glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 2rem; margin-bottom: 2rem; }
+
+.status-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
+.status-item label { display: block; color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem; }
+.status-item span { font-size: 1.25rem; font-weight: 700; color: #fff; }
+
+.status-badge.online { color: #10b981; }
+.status-badge.offline { color: #ef4444; }
+.status-badge.unknown { color: #94a3b8; }
+
+.log-section h3 { margin-bottom: 1.5rem; color: #fff; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 1rem; color: #94a3b8; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+td { padding: 1rem; color: #cbd5e1; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+.log-row.error .level-tag { background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+.log-row.info .level-tag { background: rgba(99, 102, 241, 0.2); color: #6366f1; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+
+.btn-test { background: #6366f1; color: #fff; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+.btn-test.loading { opacity: 0.5; pointer-events: none; }
+</style>
+
+<script>
+document.getElementById('test-btn').onclick = function() {
+    const btn = this;
+    btn.classList.add('loading');
+    btn.innerHTML = '<i class="spinner"></i> Testing...';
+    
+    fetch("{% url 'test_camera_connection' camera.id %}")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('status-badge').className = `status-badge ${data.status}`;
+            document.getElementById('status-badge').innerText = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+            document.getElementById('last-seen').innerText = data.last_seen;
+            alert(data.message);
+            location.reload(); // Quick way to see new log
+        })
+        .finally(() => {
+            btn.classList.remove('loading');
+            btn.innerHTML = '<i data-lucide="refresh-cw"></i> Run Connection Test';
+            if (window.lucide) lucide.createIcons();
+        });
+};
+</script>
+{% endblock %}

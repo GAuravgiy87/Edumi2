@@ -1,12 +1,12 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}Add Camera{% endblock %}
+{% block page_title %}Edit Camera{% endblock %}
 
 {% block content %}
 <div class="add-camera-container">
     <div class="form-card-large">
-        <h2>Add New Camera</h2>
+        <h2>Edit Camera</h2>
         <p class="subtitle">Enter camera details - Stream path will be auto-detected</p>
         
         {% if error %}
@@ -20,12 +20,12 @@
             
             <div class="form-group">
                 <label>Camera Name</label>
-                <input type="text" name="name" required placeholder="e.g., Front Door Camera">
+                <input type="text" name="name" value="{{ camera.name }}" required placeholder="e.g., Front Door Camera">
             </div>
             
             <div class="form-group">
                 <label>RTSP URL</label>
-                <input type="text" name="rtsp_url" id="rtspUrl" required placeholder="rtsp://username:password@ip_address:port/stream" oninput="validateUrl()">
+                <input type="text" name="rtsp_url" id="rtspUrl" value="{{ camera.rtsp_url }}" required placeholder="rtsp://username:password@ip_address:port/stream" oninput="validateUrl()">
                 <small id="urlError" style="color: #dc3545; display: none;">Invalid RTSP URL format. Must start with rtsp://</small>
             </div>
             
@@ -47,7 +47,7 @@
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    Add Camera & Auto-Detect Path
+                    Save Changes & Re-Detect Path
                 </button>
                 <a href="{% url 'admin_dashboard' %}" class="btn-cancel">Cancel</a>
             </div>

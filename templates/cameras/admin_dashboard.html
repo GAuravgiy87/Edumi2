@@ -22,24 +22,30 @@
         {% for camera in cameras %}
         <div class="camera-card">
             <div class="camera-info">
-                <h3>{{ camera.name }}</h3>
-                <p class="camera-url">{{ camera.rtsp_url }}</p>
-                <p class="camera-status">
+                <h3><span class="camera-id">#{{ camera.id }}</span> {{ camera.name }}</h3>
+                <p class="camera-url" title="URL">🔗 {{ camera.rtsp_url }}</p>
+                <p class="camera-path" title="Detected Path">📂 Path: {{ camera.stream_path }}</p>
+                <p class="camera-status" id="status-{{ camera.id }}">
                     {% if camera.is_active %}
-                        <span class="status-active">● Active</span>
+                        <span class="status-active">● Online</span>
                     {% else %}
-                        <span class="status-inactive">● Inactive</span>
+                        <span class="status-inactive">● Offline</span>
                     {% endif %}
                 </p>
             </div>
+            
+            <div class="camera-preview" id="preview-container-{{ camera.id }}">
+                <button class="btn-play-preview" onclick="loadPreview({{ camera.id }}, '{{ camera.temp_token }}')">▶ Play Preview</button>
+                <video id="video-{{ camera.id }}" class="camera-video-preview" style="display:none;" muted playsinline controls></video>
+            </div>
+
             <div class="camera-actions">
-                <button class="btn-test" onclick="testCamera({{ camera.id }})">🧪 Test</button>
-                <a href="{% url 'view_camera' camera.id %}" class="btn-view">View Feed</a>
+                <a href="{% url 'edit_camera' camera.id %}" class="btn-edit">✏️ Edit</a>
+                <a href="{% url 'view_camera' camera.id %}" class="btn-view">📺 View</a>
                 <a href="{% url 'manage_permissions' camera.id %}" class="btn-permissions">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    Permissions
                 </a>
-                <a href="{% url 'delete_camera' camera.id %}" class="btn-delete" onclick="return confirm('Are you sure?')">Delete</a>
+                <a href="{% url 'delete_camera' camera.id %}" class="btn-delete" onclick="return confirm('Are you sure?')">🗑️</a>
             </div>
             {% if camera_permissions %}
             <div class="camera-permissions-info">
@@ -57,40 +63,70 @@
         </div>
         {% endfor %}
     </div>
+
+    <!-- Pagination -->
+    {% if cameras.has_other_pages %}
+    <div class="pagination">
+        {% if cameras.has_previous %}
+            <a href="?page={{ cameras.previous_page_number }}">&laquo; Previous</a>
+        {% endif %}
+        
+        <span class="current-page">Page {{ cameras.number }} of {{ cameras.paginator.num_pages }}</span>
+        
+        {% if cameras.has_next %}
+            <a href="?page={{ cameras.next_page_number }}">Next &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-function testCamera(cameraId) {
-    const resultDiv = document.getElementById('test-result-' + cameraId);
-    resultDiv.style.display = 'block';
-    resultDiv.innerHTML = '<span style="color: #6c757d;">Testing connection...</span>';
+const hlsPlayers = {};
+
+function loadPreview(cameraId, token) {
+    const container = document.getElementById('preview-container-' + cameraId);
+    const video = document.getElementById('video-' + cameraId);
+    const btn = container.querySelector('.btn-play-preview');
     
-    fetch('/cameras/test-camera/' + cameraId + '/')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Test result:', data);
-            
-            if (data.overall_status === 'success') {
-                let msg = '✓ Working via ' + data.working_methods.join(', ');
-                if (data.results) {
-                    const successResult = data.results.find(r => r.status === 'success');
-                    if (successResult && successResult.frame_size) {
-                        msg += ' (' + successResult.frame_size + ')';
-                    }
-                }
-                resultDiv.innerHTML = '<span style="color: #28a745; font-weight: 600;">' + msg + '</span>';
-            } else if (data.status === 'success') {
-                resultDiv.innerHTML = '<span style="color: #28a745; font-weight: 600;">✓ ' + (data.message || 'Connected') + '</span>';
-            } else {
-                let msg = '✗ ' + (data.message || 'Failed');
-                if (data.hint) msg += ' <br><small style="color:#856404;">💡 ' + data.hint + '</small>';
-                resultDiv.innerHTML = '<span style="color: #dc3545;">' + msg + '</span>';
+    btn.style.display = 'none';
+    video.style.display = 'block';
+    
+    const feedUrl = `/cameras/camera-feed/${cameraId}/?file=stream.m3u8&token=${token}`;
+    
+    if (Hls.isSupported()) {
+        const hls = new Hls({
+            lowLatencyMode: true,
+            manifestLoadingTimeOut: 10000,
+        });
+        hlsPlayers[cameraId] = hls;
+        hls.loadSource(feedUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play().catch(e => console.log('Autoplay prevented', e));
+        });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = feedUrl;
+        video.addEventListener('loadedmetadata', function() {
+            video.play();
+        });
+    }
+}
+
+// Status Polling
+function pollStatus() {
+    fetch('/cameras/test-feed/') // Lightweight endpoint to verify proxy connection
+        .then(response => {
+            if(response.ok) {
+                // If proxy is ok, we don't necessarily know individual camera status 
+                // without hitting the DB. For a lightweight check, we just know the backend proxy is up.
+                // Ideally, a specific endpoint returning all statuses should be used.
             }
-        })
-        .catch(error => {
-            resultDiv.innerHTML = '<span style="color: #dc3545;">✗ Camera service not running on port 8001</span>';
         });
 }
+
+// Check every 30s
+setInterval(pollStatus, 30000);
 </script>
 
 <style>

@@ -1,0 +1,81 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Active Live Classes{% endblock %}
+
+{% block content %}
+<div class="active-classes-container">
+    <div class="header">
+        <h1>🎥 Live Broadcasts</h1>
+        <p class="subtitle">Join active sessions and interact with your teachers in real-time.</p>
+    </div>
+
+    <div class="live-grid">
+        {% for live_class in live_classes %}
+        <div class="live-card glass-card">
+            <div class="live-preview">
+                <div class="live-badge"><span class="live-dot"></span> LIVE</div>
+                <div class="viewer-tag"><i data-lucide="users"></i> {{ live_class.viewer_count }}</div>
+                <div class="overlay-play">
+                    <a href="{% url 'student_live_class' live_class.stream_key %}" class="play-btn">
+                        <i data-lucide="play"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="live-info">
+                <div class="teacher-meta">
+                    <img src="https://ui-avatars.com/api/?name={{ live_class.teacher.username }}&background=6366f1&color=fff" alt="">
+                    <span>{{ live_class.teacher.username }}</span>
+                </div>
+                <h3>{{ live_class.title }}</h3>
+                <p class="time">Started {{ live_class.started_at|timesince }} ago</p>
+                <a href="{% url 'student_live_class' live_class.stream_key %}" class="btn-join">Join Session</a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="no-live glass-card">
+            <i data-lucide="video-off"></i>
+            <h3>No Active Broadcasts</h3>
+            <p>Check back later for scheduled live classes.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.active-classes-container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.header { margin-bottom: 2rem; }
+.header h1 { font-size: 2.5rem; font-weight: 800; color: #fff; }
+.subtitle { color: #94a3b8; }
+
+.live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 2rem; }
+.live-card { background: rgba(30, 41, 59, 0.7); border-radius: 20px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease; }
+.live-card:hover { transform: translateY(-5px); border-color: #6366f1; }
+
+.live-preview { position: relative; aspect-ratio: 16/9; background: #0f172a; }
+.live-badge { position: absolute; top: 1rem; left: 1rem; background: #ef4444; color: #fff; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; font-weight: 800; display: flex; align-items: center; gap: 0.4rem; }
+.live-dot { width: 6px; height: 6px; background: #fff; border-radius: 50%; animation: pulse 1s infinite; }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+.viewer-tag { position: absolute; top: 1rem; right: 1rem; background: rgba(0,0,0,0.6); color: #fff; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; display: flex; align-items: center; gap: 0.4rem; }
+
+.overlay-play { position: absolute; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+.live-card:hover .overlay-play { opacity: 1; }
+.play-btn { width: 60px; height: 60px; background: #6366f1; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
+
+.live-info { padding: 1.5rem; }
+.teacher-meta { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+.teacher-meta img { width: 32px; height: 32px; border-radius: 8px; }
+.teacher-meta span { color: #94a3b8; font-size: 0.85rem; }
+.live-info h3 { color: #fff; font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+.live-info .time { color: #64748b; font-size: 0.8rem; margin-bottom: 1.5rem; }
+
+.btn-join { display: block; width: 100%; text-align: center; background: rgba(99, 102, 241, 0.1); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.3); padding: 0.75rem; border-radius: 12px; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+.live-card:hover .btn-join { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+.no-live { grid-column: 1 / -1; padding: 5rem; text-align: center; }
+.no-live i { width: 64px; height: 64px; color: #475569; margin-bottom: 1.5rem; }
+.no-live h3 { color: #fff; font-size: 1.5rem; margin-bottom: 0.5rem; }
+.no-live p { color: #94a3b8; }
+</style>
+{% endblock %}

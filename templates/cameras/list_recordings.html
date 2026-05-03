@@ -1,0 +1,139 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Camera Recordings{% endblock %}
+
+{% block content %}
+<div class="recordings-container">
+    <div class="header">
+        <div class="header-main">
+            <h1>🎥 Class Recordings</h1>
+            <p class="subtitle">Access your past live classes with adaptive HLS playback.</p>
+        </div>
+        
+        <form action="." method="GET" class="search-form">
+            <div class="search-input-group">
+                <i data-lucide="search"></i>
+                <input type="text" name="q" placeholder="Search by title or teacher..." value="{{ query }}">
+                {% if query %}
+                <a href="?" class="clear-search"><i data-lucide="x"></i></a>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn-search">Search</button>
+        </form>
+    </div>
+
+    <div class="recordings-grid" id="recordings-grid">
+        {% include 'cameras/partials/recording_grid.html' %}
+    </div>
+    
+    <div id="loading-sentinel" class="loading-sentinel" style="display: none;">
+        <div class="spinner"></div>
+        <span>Loading more recordings...</span>
+    </div>
+</div>
+
+<style>
+.header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem; gap: 2rem; }
+.search-form { display: flex; gap: 1rem; flex: 1; max-width: 500px; }
+.search-input-group { position: relative; flex: 1; }
+.search-input-group i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; width: 18px; }
+.search-input-group input { width: 100%; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.75rem 1rem 0.75rem 3rem; color: #fff; }
+.clear-search { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+.btn-search { background: #6366f1; color: #fff; border: none; border-radius: 12px; padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; }
+
+.loading-sentinel { grid-column: 1 / -1; padding: 2rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; color: #94a3b8; }
+
+@media (max-width: 800px) {
+    .header { flex-direction: column; align-items: stretch; }
+    .search-form { max-width: none; }
+}
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let page = 1;
+        let hasNext = {% if recordings.has_next %}true{% else %}false{% endif %};
+        let loading = false;
+        const grid = document.getElementById('recordings-grid');
+        const sentinel = document.getElementById('loading-sentinel');
+        
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && hasNext && !loading) {
+                loadMore();
+            }
+        }, { threshold: 0.1 });
+        
+        if (hasNext) {
+            sentinel.style.display = 'flex';
+            observer.observe(sentinel);
+        }
+        
+        function loadMore() {
+            loading = true;
+            page++;
+            const url = new URL(window.location.href);
+            url.searchParams.set('page', page);
+            
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(res => res.text())
+                .then(html => {
+                    if (html.trim() === '') {
+                        hasNext = false;
+                        sentinel.style.display = 'none';
+                    } else {
+                        const temp = document.createElement('div');
+                        temp.innerHTML = html;
+                        while (temp.firstChild) {
+                            grid.appendChild(temp.firstChild);
+                        }
+                        // Check if more pages exist from server (simplified)
+                        if (temp.childElementCount < 12) hasNext = false;
+                    }
+                    loading = false;
+                    if (!hasNext) {
+                        sentinel.style.display = 'none';
+                        observer.disconnect();
+                    }
+                    // Re-init Lucide icons if any
+                    if (window.lucide) lucide.createIcons();
+                });
+        }
+    });
+</script>
+
+<style>
+.recordings-container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.header { margin-bottom: 2rem; }
+.header h1 { font-size: 2.5rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+.subtitle { color: #94a3b8; }
+
+.recordings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 2rem; }
+.glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; overflow: hidden; transition: transform 0.3s ease; }
+.glass-card:hover { transform: translateY(-5px); border-color: #6366f1; }
+
+.thumbnail-wrapper { position: relative; aspect-ratio: 16/9; background: #000; overflow: hidden; }
+.thumbnail-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+.no-thumb { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #475569; }
+.duration-badge { position: absolute; bottom: 0.75rem; right: 0.75rem; background: rgba(0,0,0,0.8); color: #fff; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+
+.processing-overlay { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; color: #fff; font-size: 0.85rem; }
+.spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.card-content { padding: 1.5rem; }
+.meta-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.75rem; }
+.teacher-tag, .date-tag { display: flex; align-items: center; gap: 0.4rem; }
+.card-content h3 { font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+.description { font-size: 0.875rem; color: #94a3b8; margin-bottom: 1.5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.btn-primary { background: #6366f1; color: white; padding: 0.6rem 1.2rem; border-radius: 10px; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; transition: background 0.2s; }
+.btn-primary:hover { background: #4f46e5; }
+
+.status-failed { color: #ef4444; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+.status-pending { color: #eab308; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+
+.empty-state { grid-column: 1 / -1; padding: 4rem; text-align: center; color: #64748b; }
+.empty-state i { width: 64px; height: 64px; margin-bottom: 1rem; opacity: 0.5; }
+</style>
+{% endblock %}

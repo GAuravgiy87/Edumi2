@@ -1,0 +1,163 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}{{ recording.title }}{% endblock %}
+
+{% block content %}
+<div class="player-container">
+    <div class="player-header">
+        <a href="{% url 'list_recordings' %}" class="btn-back"><i data-lucide="arrow-left"></i> Back to Recordings</a>
+        <h1>{{ recording.title }}</h1>
+        <div class="meta">
+            <span><i data-lucide="user"></i> {{ recording.teacher.username }}</span>
+            <span><i data-lucide="calendar"></i> {{ recording.created_at|date:"M d, Y" }}</span>
+            <span><i data-lucide="clock"></i> {{ recording.duration_seconds|floatformat:0 }}s</span>
+        </div>
+    </div>
+
+    <div class="video-grid">
+        <div class="main-player">
+            <div class="video-section glass-card">
+                <div class="video-wrapper">
+                    <video id="video-player" controls crossorigin="anonymous"></video>
+                    <div class="quality-selector" id="quality-selector-container" style="display: none;">
+                        <button class="quality-btn" id="quality-trigger">1080p</button>
+                        <ul class="quality-menu" id="quality-menu">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-section glass-card mt-4">
+                <h2>About this Session</h2>
+                <p>{{ recording.description|default:"No additional description for this session." }}</p>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="glass-card related-videos">
+                <h3>Up Next</h3>
+                <div class="related-list">
+                    {% for item in related %}
+                    <a href="{% url 'view_recording' item.id %}" class="related-item">
+                        <div class="rel-thumb">
+                            {% if item.thumbnail %}
+                            <img src="{{ item.thumbnail.url }}" alt="">
+                            {% endif %}
+                            <span class="rel-duration">{{ item.duration_seconds|floatformat:0 }}s</span>
+                        </div>
+                        <div class="rel-info">
+                            <h4>{{ item.title }}</h4>
+                            <span>{{ item.teacher.username }}</span>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <p class="empty-text">No suggestions available.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.player-container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; }
+.video-grid { display: grid; grid-template-columns: 1fr 350px; gap: 2rem; }
+
+.video-wrapper { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; }
+#video-player { width: 100%; height: 100%; }
+
+/* Quality Selector */
+.quality-selector { position: absolute; top: 1rem; right: 1rem; z-index: 10; }
+.quality-btn { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; }
+.quality-menu { position: absolute; top: 110%; right: 0; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; list-style: none; padding: 0.5rem; display: none; min-width: 100px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); }
+.quality-menu.active { display: block; }
+.quality-menu li { padding: 0.5rem; color: #94a3b8; cursor: pointer; border-radius: 4px; font-size: 0.8rem; }
+.quality-menu li:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.quality-menu li.active { color: #6366f1; font-weight: 700; }
+
+/* Sidebar Related */
+.related-videos h3 { color: #fff; font-size: 1.1rem; margin-bottom: 1.25rem; }
+.related-list { display: flex; flex-direction: column; gap: 1rem; }
+.related-item { display: flex; gap: 0.75rem; text-decoration: none; transition: opacity 0.2s; }
+.related-item:hover { opacity: 0.8; }
+.rel-thumb { position: relative; width: 120px; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+.rel-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.rel-duration { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.8); font-size: 0.6rem; color: #fff; padding: 1px 3px; border-radius: 2px; }
+.rel-info h4 { font-size: 0.9rem; color: #fff; margin: 0 0 0.25rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rel-info span { font-size: 0.75rem; color: #94a3b8; }
+
+@media (max-width: 1100px) {
+    .video-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const video = document.getElementById('video-player');
+        const manifestUrl = '{{ recording.hls_manifest_path }}';
+        const absoluteUrl = window.location.origin + '/media/' + manifestUrl;
+        const qualityMenu = document.getElementById('quality-menu');
+        const qualityTrigger = document.getElementById('quality-trigger');
+        const qualityContainer = document.getElementById('quality-selector-container');
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                capLevelToPlayerSize: true,
+                autoStartLoad: true,
+                startLevel: -1 // auto
+            });
+            hls.loadSource(absoluteUrl);
+            hls.attachMedia(video);
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                qualityContainer.style.display = 'block';
+                const levels = hls.levels;
+                
+                // Add Auto option
+                const autoLi = document.createElement('li');
+                autoLi.innerText = 'Auto';
+                autoLi.dataset.level = -1;
+                autoLi.onclick = () => { hls.currentLevel = -1; updateQualityUI(-1); };
+                qualityMenu.appendChild(autoLi);
+
+                levels.forEach((level, index) => {
+                    const li = document.createElement('li');
+                    li.innerText = level.height + 'p';
+                    li.dataset.level = index;
+                    li.onclick = () => { hls.currentLevel = index; updateQualityUI(index); };
+                    qualityMenu.appendChild(li);
+                });
+            });
+
+            hls.on(Hls.Events.LEVEL_SWITCHED, function(event, data) {
+                updateQualityUI(hls.currentLevel, data.level);
+            });
+
+            function updateQualityUI(currentLevel) {
+                const lis = qualityMenu.querySelectorAll('li');
+                lis.forEach(li => li.classList.remove('active'));
+                
+                const activeLi = Array.from(lis).find(li => li.dataset.level == currentLevel);
+                if (activeLi) {
+                    activeLi.classList.add('active');
+                    qualityTrigger.innerText = activeLi.innerText;
+                }
+                qualityMenu.classList.remove('active');
+            }
+
+            qualityTrigger.onclick = (e) => {
+                e.stopPropagation();
+                qualityMenu.classList.toggle('active');
+            };
+
+            document.onclick = () => qualityMenu.classList.remove('active');
+
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = absoluteUrl;
+        }
+    });
+</script>
+{% endblock %}

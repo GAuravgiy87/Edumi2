@@ -15,8 +15,33 @@
     </div>
     
     <div class="camera-feed-wrapper">
-        <img src="{% url 'mobile_cameras:feed' mobile_camera.id %}" alt="{{ mobile_camera.name }}" class="camera-feed">
+        <video id="hls-video" class="camera-feed" autoplay muted playsinline controls></video>
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('hls-video');
+            const hlsUrl = "{% url 'mobile_cameras:feed' mobile_camera.id %}?file=stream.m3u8";
+            
+            if (Hls.isSupported()) {
+                const hls = new Hls({
+                    lowLatencyMode: true,
+                    manifestLoadingTimeOut: 10000,
+                });
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    video.play();
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = hlsUrl;
+                video.addEventListener('loadedmetadata', function() {
+                    video.play();
+                });
+            }
+        });
+    </script>
     
     <div class="camera-info-card">
         <h3>Camera Information</h3>

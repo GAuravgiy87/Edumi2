@@ -5,20 +5,39 @@ urlpatterns = [
     # RTSP Camera URLs
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('add-camera/', views.add_camera, name='add_camera'),
+    path('edit-camera/<int:camera_id>/', views.edit_camera, name='edit_camera'),
     path('delete-camera/<int:camera_id>/', views.delete_camera, name='delete_camera'),
     path('camera-feed/<int:camera_id>/', views.camera_feed, name='camera_feed'),
     path('view-camera/<int:camera_id>/', views.view_camera, name='view_camera'),
-    path('test-camera/<int:camera_id>/', views.test_camera, name='test_camera'),
-    path('test-feed/', views.test_feed_page, name='test_feed_page'),
     path('live-monitor/', views.live_monitor, name='live_monitor'),
     path('grant-permission/<int:camera_id>/', views.grant_permission, name='grant_permission'),
     path('revoke-permission/<int:camera_id>/<int:teacher_id>/', views.revoke_permission, name='revoke_permission'),
     path('manage-permissions/<int:camera_id>/', views.manage_permissions, name='manage_permissions'),
     
+    # Teacher Dashboard & Live Classes
+    path('dashboard/', views.teacher_camera_dashboard, name='teacher_camera_dashboard'),
+    path('live-class/start/', views.start_live_class, name='start_live_class'),
+    path('live-class/stop/<int:class_id>/', views.stop_live_class, name='stop_live_class'),
+    path('live-class/feed/<str:stream_key>/', views.live_class_feed, name='live_class_feed'),
+    
+    # Processed Recordings
+    path('recordings/', views.list_recordings, name='list_recordings'),
+    path('recordings/view/<int:recording_id>/', views.view_recording, name='view_recording'),
+    
+    # Student Live Views
+    path('live-classes/', views.active_live_classes, name='active_live_classes'),
+    path('join-live/<str:stream_key>/', views.student_live_class, name='student_live_class'),
+    
     # Head Counting URLs
     path('head-count/', views.head_count_dashboard, name='head_count_dashboard'),
     path('head-count/start/<str:camera_type>/<int:camera_id>/', views.start_head_count, name='start_head_count'),
     path('head-count/stop/<str:camera_type>/<int:camera_id>/', views.stop_head_count, name='stop_head_count'),
+    
+    # Debugging & Diagnostics
+    path('test-connection/<int:camera_id>/', views.test_camera_connection, name='test_camera_connection'),
+    path('diagnostics/<int:camera_id>/', views.view_camera_logs, name='view_camera_logs'),
+    path('simulate-load/', views.simulate_load, name='simulate_load'),
+    
     path('head-count/logs/', views.head_count_logs, name='head_count_logs'),
     path('head-count/logs/<int:log_id>/', views.head_count_log_detail, name='head_count_log_detail'),
     path('head-count/sessions/', views.head_count_session_history, name='head_count_session_history'),
