@@ -1,559 +1,482 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}View Camera{% endblock %}
+{% block page_title %}{{ camera.name }}{% endblock %}
 
 {% block content %}
-<div class="view-camera-container">
-    <div class="camera-header">
-        <h2>{{ camera.name }}</h2>
+<div class="vc-page">
+
+  <!-- ── Header ── -->
+  <div class="vc-header">
+    <div class="vc-header-left">
+      <a href="{% url 'admin_dashboard' %}" class="vc-back">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Cameras
+      </a>
+      <div>
+        <h1 class="vc-title">{{ camera.name }}</h1>
+        <div class="vc-meta">
+          <span class="vc-meta-item">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            {{ camera.ip_address }}:{{ camera.port }}
+          </span>
+          <span class="vc-meta-dot">·</span>
+          <span class="vc-meta-item" id="svc-badge">
+            <span class="dot dot-checking"></span>
+            <span id="svc-label">Checking…</span>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="vc-header-actions">
+      <button class="vc-btn vc-btn-ghost" onclick="testConnection()" id="test-btn">
+        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Test Connection
+      </button>
+      {% if request.user.is_superuser %}
+      <a href="{% url 'manage_permissions' camera.id %}" class="vc-btn vc-btn-ghost">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Permissions
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Test result banner ── -->
+  <div id="test-banner" class="vc-banner" style="display:none"></div>
+
+  <!-- ── Main grid ── -->
+  <div class="vc-grid">
+
+    <!-- Feed panel -->
+    <div class="vc-feed-panel">
+
+      <!-- Service offline notice -->
+      <div id="svc-offline-notice" class="vc-notice vc-notice-warn" style="display:none">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <div>
-            <button onclick="testCamera()" class="btn-test">Test Connection</button>
-            <a href="{% url 'admin_dashboard' %}" class="btn-back">← Back to Dashboard</a>
+          <strong>Camera service is not running.</strong>
+          The stream requires the camera service on port 8001.
+          Start it with: <code>cd camera_service &amp;&amp; python manage.py runserver 8001</code>
+          <br><span style="font-size:.8rem;opacity:.8">Checking again every 10 s…</span>
         </div>
+      </div>
+
+      <!-- Video wrapper -->
+      <div class="vc-video-wrap" id="video-wrap">
+        <video id="cam-video" autoplay muted playsinline controls></video>
+
+        <!-- Overlay shown while connecting / on error -->
+        <div class="vc-overlay" id="overlay">
+          <div class="vc-spinner" id="overlay-spinner"></div>
+          <p class="vc-overlay-title" id="overlay-title">Starting stream…</p>
+          <p class="vc-overlay-sub"  id="overlay-sub">Connecting to camera service</p>
+        </div>
+
+        <!-- Live pill -->
+        <div class="vc-live-pill" id="live-pill" style="display:none">
+          <span class="dot dot-live"></span> LIVE
+        </div>
+      </div>
+
+      <!-- Stream status bar -->
+      <div class="vc-stream-bar">
+        <span id="stream-state-text">Initialising…</span>
+        <span id="stream-quality-text" style="opacity:.6"></span>
+      </div>
     </div>
-    
-    <div id="status-message" class="status-message"></div>
-    
-    <div class="camera-feed-container">
-        <div class="feed-wrapper">
-            <div id="loading-overlay" class="loading-overlay">
-                <div class="spinner"></div>
-                <p>Connecting to camera...</p>
-                <p style="font-size: 0.8rem; color: #aaa; margin-top: 10px;">Attempting TCP/UDP connection...</p>
-            </div>
-            <video id="camera-stream" class="camera-stream" autoplay muted playsinline controls style="width: 100%; height: auto; display: block;"></video>
-            <div id="stream-status" style="position: absolute; bottom: 40px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 10;">Connecting...</div>
+
+    <!-- Info panel -->
+    <div class="vc-info-panel">
+
+      <!-- Connection card -->
+      <div class="vc-card">
+        <div class="vc-card-head">Connection</div>
+        <div class="vc-info-row">
+          <span class="vc-info-label">IP Address</span>
+          <span class="vc-info-val mono">{{ camera.ip_address }}</span>
         </div>
-        
-        <div class="camera-details">
-            <h3>Camera Details</h3>
-            <div class="detail-item">
-                <span class="label">RTSP URL:</span>
-                <span class="value">{{ camera.rtsp_url }}</span>
-            </div>
-            <div class="detail-item">
-                <span class="label">IP Address:</span>
-                <span class="value">{{ camera.ip_address }}</span>
-            </div>
-            <div class="detail-item">
-                <span class="label">Port:</span>
-                <span class="value">{{ camera.port }}</span>
-            </div>
-            <div class="detail-item">
-                <span class="label">Status:</span>
-                <span class="value status-active" id="camera-status">● Connecting...</span>
-            </div>
-            
-            <div class="detail-item">
-                <span class="label">Stream Quality:</span>
-                <div class="quality-selector">
-                    <select id="quality-picker" onchange="changeQuality()">
-                        <option value="low">Low (360p - Saving Data)</option>
-                        <option value="med" selected>Medium (480p - Balanced)</option>
-                        <option value="high">High (720p - HD Video)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="troubleshooting">
-                <h4>Troubleshooting RTSP Cameras</h4>
-                <ul>
-                    <li><strong>Check RTSP URL format:</strong> rtsp://username:password@ip:port/path</li>
-                    <li><strong>Common paths:</strong> /stream, /live, /h264, /cam/realmonitor</li>
-                    <li><strong>Test in VLC:</strong> Open Network Stream → paste RTSP URL</li>
-                    <li><strong>Check camera is on same network</strong> and powered on</li>
-                    <li><strong>Verify credentials:</strong> Username/password are correct</li>
-                    <li><strong>Try different port:</strong> Default is 554, some cameras use 5544</li>
-                    <li><strong>Mobile cameras work?</strong> Then camera service is running fine</li>
-                </ul>
-                <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 0.85rem;">
-                    <strong>Tip:</strong> Click "Test Connection" to see detailed diagnostics including which transport protocol works.
-                </div>
-            </div>
+        <div class="vc-info-row">
+          <span class="vc-info-label">Port</span>
+          <span class="vc-info-val mono">{{ camera.port }}</span>
         </div>
-    </div>
+        <div class="vc-info-row">
+          <span class="vc-info-label">Protocol</span>
+          <span class="vc-info-val mono">RTSP / TCP</span>
+        </div>
+        <div class="vc-info-row">
+          <span class="vc-info-label">Stream Path</span>
+          <span class="vc-info-val mono">{{ camera.stream_path }}</span>
+        </div>
+        <div class="vc-info-row">
+          <span class="vc-info-label">Camera Status</span>
+          <span class="vc-info-val" id="cam-status-val">
+            {% if camera.is_active %}
+              <span class="dot dot-on"></span> Online
+            {% else %}
+              <span class="dot dot-off"></span> Offline
+            {% endif %}
+          </span>
+        </div>
+        <div class="vc-info-row" style="border:none">
+          <span class="vc-info-label">Stream Status</span>
+          <span class="vc-info-val" id="stream-status-val">
+            <span class="dot dot-checking"></span> Connecting…
+          </span>
+        </div>
+      </div>
+
+      <!-- Stream settings card -->
+      <div class="vc-card">
+        <div class="vc-card-head">Stream Settings</div>
+        <div class="vc-info-row" style="border:none;flex-direction:column;gap:.5rem">
+          <span class="vc-info-label">Playback Quality</span>
+          <select id="quality-picker" class="vc-select" onchange="changeQuality()">
+            <option value="auto" selected>Auto (recommended)</option>
+            <option value="high">High (720p)</option>
+            <option value="med">Medium (480p)</option>
+            <option value="low">Low (360p)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Added info card -->
+      <div class="vc-card">
+        <div class="vc-card-head">Camera Info</div>
+        <div class="vc-info-row">
+          <span class="vc-info-label">Name</span>
+          <span class="vc-info-val">{{ camera.name }}</span>
+        </div>
+        <div class="vc-info-row">
+          <span class="vc-info-label">Added</span>
+          <span class="vc-info-val">{{ camera.created_at|date:"d M Y" }}</span>
+        </div>
+        <div class="vc-info-row" style="border:none">
+          <span class="vc-info-label">Assigned Teachers</span>
+          <span class="vc-info-val">{{ camera.teacher_count|default:"0" }}</span>
+        </div>
+      </div>
+
+    </div><!-- /info panel -->
+  </div><!-- /grid -->
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script>
-let hls;
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest" data-turbo-eval="false"></script>
+<script data-turbo-eval="false">
+(function () {
+  /* ── URLs ─────────────────────────────────────────────────────────────── */
+  const FEED_URL = '{% url "camera_feed" camera.id %}?file=stream.m3u8&token={{ camera.temp_token }}';
+  const TEST_URL = '{% url "test_camera_connection" camera.id %}';
 
-function startStream() {
-    const video = document.getElementById('camera-stream');
-    const streamStatus = document.getElementById('stream-status');
-    const feedUrl = '{% url "camera_feed" camera.id %}?file=stream.m3u8&token={{ camera.temp_token }}';
-    
-    streamStatus.textContent = 'Connecting to HLS stream...';
-    
+  /* ── State ────────────────────────────────────────────────────────────── */
+  let hls            = null;
+  let streamLive     = false;
+  let svcOnline      = null;   // null=unknown, true/false
+  let retryTimer     = null;
+  let svcCheckTimer  = null;
+
+  /* ── DOM ──────────────────────────────────────────────────────────────── */
+  const video       = document.getElementById('cam-video');
+  const overlay     = document.getElementById('overlay');
+  const oSpinner    = document.getElementById('overlay-spinner');
+  const oTitle      = document.getElementById('overlay-title');
+  const oSub        = document.getElementById('overlay-sub');
+  const livePill    = document.getElementById('live-pill');
+  const streamTxt   = document.getElementById('stream-state-text');
+  const qualityTxt  = document.getElementById('stream-quality-text');
+  const statusVal   = document.getElementById('stream-status-val');
+  const svcBadge    = document.getElementById('svc-badge');
+  const svcLabel    = document.getElementById('svc-label');
+  const svcNotice   = document.getElementById('svc-offline-notice');
+
+  /* ── Helpers ──────────────────────────────────────────────────────────── */
+  function setOverlay(title, sub, showSpinner) {
+    overlay.style.display = 'flex';
+    oTitle.textContent    = title;
+    oSub.textContent      = sub || '';
+    oSpinner.style.display = showSpinner !== false ? 'block' : 'none';
+  }
+
+  function hideOverlay() {
+    overlay.style.display = 'none';
+    livePill.style.display = 'flex';
+  }
+
+  function setStreamStatus(html, cls) {
+    statusVal.innerHTML = html;
+    streamTxt.textContent = cls === 'live' ? '● Live' : cls === 'error' ? '✗ Error' : '◌ Connecting…';
+  }
+
+  function setSvcOnline(online) {
+    if (svcOnline === online) return;
+    svcOnline = online;
+    if (online) {
+      svcBadge.className = 'vc-meta-item svc-on';
+      svcLabel.textContent = 'Service online';
+      svcNotice.style.display = 'none';
+    } else {
+      svcBadge.className = 'vc-meta-item svc-off';
+      svcLabel.textContent = 'Service offline';
+      svcNotice.style.display = 'flex';
+      setOverlay('Camera service not running', 'Start it: cd camera_service && python manage.py runserver 8001', false);
+      setStreamStatus('<span class="dot dot-off"></span> Service offline', 'error');
+    }
+  }
+
+  /* ── HLS stream ───────────────────────────────────────────────────────── */
+  function startStream() {
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    if (hls)        { hls.destroy(); hls = null; }
+    streamLive = false;
+    livePill.style.display = 'none';
+    setOverlay('Starting stream…', 'Connecting to camera service', true);
+    setStreamStatus('<span class="dot dot-checking"></span> Connecting…', 'connecting');
+
+    if (typeof Hls === 'undefined') {
+      setOverlay('HLS.js failed to load', 'Check your internet connection', false);
+      return;
+    }
+
     if (Hls.isSupported()) {
-        if (hls) {
-            hls.destroy();
+      hls = new Hls({
+        lowLatencyMode: true,
+        liveDurationInfinity: true,
+        manifestLoadingTimeOut: 12000,
+        manifestLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 3000,
+        levelLoadingTimeOut: 12000,
+        levelLoadingMaxRetry: 2,
+      });
+
+      hls.loadSource(FEED_URL);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, function (e, data) {
+        streamLive = true;
+        setSvcOnline(true);
+        video.play().catch(() => {});
+        hideOverlay();
+        setStreamStatus('<span class="dot dot-live"></span> Live', 'live');
+        streamTxt.textContent = '● Live';
+        const lvl = hls.levels[hls.currentLevel];
+        if (lvl) qualityTxt.textContent = lvl.height ? lvl.height + 'p' : '';
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, function (e, data) {
+        const lvl = hls.levels[data.level];
+        if (lvl && lvl.height) qualityTxt.textContent = lvl.height + 'p';
+      });
+
+      hls.on(Hls.Events.ERROR, function (event, data) {
+        if (!data.fatal) return;
+        const code = data.response && data.response.code;
+
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          if (code === 503) {
+            // FFmpeg still connecting to RTSP camera — retry
+            setSvcOnline(true);
+            setOverlay('Camera stream starting…', 'FFmpeg is connecting to the RTSP camera — retrying in 5 s', true);
+            setStreamStatus('<span class="dot dot-checking"></span> Starting…', 'connecting');
+            hls.destroy(); hls = null;
+            retryTimer = setTimeout(startStream, 5000);
+            return;
+          }
+          if (code === 403) {
+            setOverlay('Access denied', 'You do not have permission to view this camera', false);
+            setStreamStatus('<span class="dot dot-off"></span> Forbidden', 'error');
+            hls.destroy(); hls = null;
+            return;
+          }
+          // Generic network error — could be service down
+          setSvcOnline(false);
+          hls.destroy(); hls = null;
+          retryTimer = setTimeout(startStream, 8000);
+          return;
         }
-        hls = new Hls({
-            lowLatencyMode: true,
-            liveDurationInfinity: true,
-            manifestLoadingTimeOut: 10000,
-            manifestLoadingMaxRetry: 10,
-            levelLoadingTimeOut: 10000,
-            levelLoadingMaxRetry: 10,
-        });
-        hls.loadSource(feedUrl);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            video.play().then(() => {
-                hideOverlay();
-                streamStatus.textContent = 'Live';
-            }).catch(e => {
-                streamStatus.textContent = 'Click to play';
-            });
-        });
-        hls.on(Hls.Events.ERROR, function (event, data) {
-            if (data.fatal) {
-                switch (data.type) {
-                    case Hls.ErrorTypes.NETWORK_ERROR:
-                        streamStatus.textContent = 'Network error... retrying';
-                        hls.startLoad();
-                        break;
-                    case Hls.ErrorTypes.MEDIA_ERROR:
-                        streamStatus.textContent = 'Media error... recovering';
-                        hls.recoverMediaError();
-                        break;
-                    default:
-                        streamStatus.textContent = 'Stream error';
-                        hls.destroy();
-                        setTimeout(startStream, 3000);
-                        break;
-                }
-            }
-        });
-    }
-    // For Safari
-    else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = feedUrl;
-        video.addEventListener('loadedmetadata', function() {
-            video.play();
-            hideOverlay();
-            streamStatus.textContent = 'Live';
-        });
-    }
-}
 
-function hideOverlay() {
-    const overlay = document.getElementById('loading-overlay');
-    const status = document.getElementById('camera-status');
-    
-    overlay.style.opacity = '0';
-    setTimeout(() => {
-        overlay.style.display = 'none';
-    }, 300);
-    status.innerHTML = '● Active';
-    status.className = 'value status-active';
-}
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          hls.recoverMediaError();
+          return;
+        }
 
-document.addEventListener('DOMContentLoaded', function() {
+        // Fatal unknown
+        setOverlay('Stream error', 'Retrying in 10 s…', true);
+        hls.destroy(); hls = null;
+        retryTimer = setTimeout(startStream, 10000);
+      });
+
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari native HLS
+      video.src = FEED_URL;
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch(() => {});
+        hideOverlay();
+        streamLive = true;
+        setSvcOnline(true);
+        setStreamStatus('<span class="dot dot-live"></span> Live', 'live');
+      });
+      video.addEventListener('error', () => setSvcOnline(false));
+    } else {
+      setOverlay('Browser not supported', 'HLS playback requires a modern browser', false);
+    }
+  }
+
+  /* ── Service health check ─────────────────────────────────────────────── */
+  function checkService() {
+    fetch(TEST_URL, { signal: AbortSignal.timeout(6000) })
+      .then(r => r.json())
+      .then(data => {
+        const ok = data.status === 'success' || data.overall_status === 'success';
+        setSvcOnline(true);   // service responded = it's running
+        if (!streamLive && !retryTimer) startStream();
+      })
+      .catch(() => {
+        // If stream is already live, don't flip to offline on a single timeout
+        if (!streamLive) setSvcOnline(false);
+      });
+  }
+
+  /* ── Test Connection button ───────────────────────────────────────────── */
+  window.testConnection = function () {
+    const btn    = document.getElementById('test-btn');
+    const banner = document.getElementById('test-banner');
+    btn.disabled = true;
+    btn.textContent = 'Testing…';
+    banner.style.display = 'none';
+
+    fetch(TEST_URL)
+      .then(r => r.json())
+      .then(data => {
+        const ok  = data.status === 'success' || data.overall_status === 'success';
+        const msg = ok
+          ? '✓ Camera reachable — ' + (data.working_methods ? data.working_methods.join(', ') : (data.message || 'OK'))
+          : '✗ ' + (data.message || 'Connection failed') + (data.hint ? ' · ' + data.hint : '');
+        banner.textContent  = msg;
+        banner.className    = 'vc-banner ' + (ok ? 'vc-banner-ok' : 'vc-banner-err');
+        banner.style.display = 'block';
+        setSvcOnline(true);
+        if (ok && !streamLive) startStream();
+        setTimeout(() => { banner.style.display = 'none'; }, 10000);
+      })
+      .catch(() => {
+        banner.textContent  = '✗ Camera service not running on port 8001 — cd camera_service && python manage.py runserver 8001';
+        banner.className    = 'vc-banner vc-banner-err';
+        banner.style.display = 'block';
+        setSvcOnline(false);
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Test Connection';
+      });
+  };
+
+  /* ── Quality picker ───────────────────────────────────────────────────── */
+  window.changeQuality = function () {
+    if (!hls || !hls.levels || hls.levels.length === 0) return;
+    const v   = document.getElementById('quality-picker').value;
+    const len = hls.levels.length;
+    hls.currentLevel = v === 'auto' ? -1
+                     : v === 'high' ? 0
+                     : v === 'med'  ? Math.floor(len / 2)
+                     : len - 1;
+  };
+
+  /* ── Boot ─────────────────────────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', function () {
     startStream();
-});
+    // Periodic service check every 10 s
+    svcCheckTimer = setInterval(checkService, 10000);
+  });
 
-function testCamera() {
-    const statusMsg = document.getElementById('status-message');
-    statusMsg.textContent = 'Testing camera connection...';
-    statusMsg.className = 'status-message info';
-    statusMsg.style.display = 'block';
-    
-    fetch('{% url "test_camera" camera.id %}')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Test result:', data);
-            
-            if (data.overall_status === 'success') {
-                let msg = `✓ Camera working via: ${data.working_methods.join(', ')}`;
-                if (data.results) {
-                    const successResult = data.results.find(r => r.status === 'success');
-                    if (successResult && successResult.frame_size) {
-                        msg += ` (${successResult.frame_size})`;
-                    }
-                }
-                statusMsg.textContent = msg;
-                statusMsg.className = 'status-message success';
-            } else if (data.status === 'success') {
-                statusMsg.textContent = '✓ ' + (data.message || 'Camera accessible');
-                statusMsg.className = 'status-message success';
-            } else {
-                let msg = '✗ ' + (data.message || 'Connection failed');
-                if (data.hint) {
-                    msg += '\n💡 ' + data.hint;
-                }
-                if (data.results) {
-                    const failedMethods = data.results.filter(r => r.status !== 'success').map(r => 
-                        `${r.method}: ${r.status}`
-                    ).join(', ');
-                    if (failedMethods) {
-                        msg += `\nAttempted: ${failedMethods}`;
-                    }
-                }
-                statusMsg.innerHTML = msg.replace(/\n/g, '<br>');
-                statusMsg.className = 'status-message error';
-            }
-            statusMsg.style.display = 'block';
-            setTimeout(() => {
-                statusMsg.style.display = 'none';
-            }, 8000);
-        })
-        .catch(error => {
-            statusMsg.textContent = '✗ Camera service not running. Start: cd camera_service && python manage.py runserver 8001';
-            statusMsg.className = 'status-message error';
-            handleServerOffline();
-        });
-}
-
-function handleServerOffline() {
-    const overlay = document.getElementById('loading-overlay');
-    const status = document.getElementById('camera-status');
-    
-    overlay.innerHTML = '<p style="color: #d63031; font-size: 1.2rem;">⚠ Server is Offline<br><small style="font-size: 0.9rem;">Please start the Django server</small></p>';
-    status.innerHTML = '● Server Offline';
-    status.className = 'value status-inactive';
-    
-    // Stop checking
-    if (serverCheckInterval) {
-        clearInterval(serverCheckInterval);
-    }
-}
-
-function handleImageError() {
-    const overlay = document.getElementById('loading-overlay');
-    const status = document.getElementById('camera-status');
-    const streamStatus = document.getElementById('stream-status');
-    
-    streamStatus.textContent = 'Stream failed';
-    
-    fetch('{% url "test_camera" camera.id %}')
-        .then(response => response.json())
-        .then(data => {
-            overlay.innerHTML = '<p style="color: #d63031;">⚠ Camera Test Passed but Stream Failed<br><small>RTSP URL may be incorrect or camera not streaming</small></p>';
-            status.innerHTML = '● Stream Error';
-            status.className = 'value status-inactive';
-        })
-        .catch(error => {
-            handleServerOffline();
-        });
-}
-
-// Hide loading overlay when stream starts (for MJPEG streams)
-const cameraStream = document.getElementById('camera-stream');
-const overlay = document.getElementById('loading-overlay');
-const status = document.getElementById('camera-status');
-
-// Fallback: hide overlay after 10 seconds if still showing
-setTimeout(() => {
-    if (overlay.style.display !== 'none') {
-        console.log('Fallback: hiding overlay after timeout');
-        overlay.innerHTML = '<p style="color: #f39c12;">Stream taking longer than expected...<br><small>Check camera service logs</small></p>';
-    }
-}, 10000);
-
-// Check server status periodically
-function checkServerStatus() {
-    fetch('{% url "test_camera" camera.id %}')
-        .then(response => {
-            console.log('Server is online');
-        })
-        .catch(error => {
-            console.log('Server is offline');
-            handleServerOffline();
-        });
-}
-
-// Initial server check
-setTimeout(() => {
-    checkServerStatus();
-}, 1000);
-
-// Check every 5 seconds
-serverCheckInterval = setInterval(checkServerStatus, 5000);
-
-// Force hide loading overlay after 10 seconds if image is loading
-setTimeout(() => {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay.style.display !== 'none' && !imageLoaded) {
-        console.log('Force hiding overlay after timeout');
-        handleImageError();
-    }
-}, 10000);
-// Quality Control
-function changeQuality() {
-    // Quality control disabled for HLS stream
-    const picker = document.getElementById('quality-picker');
-    picker.disabled = true;
-    const streamStatus = document.getElementById('stream-status');
-    streamStatus.textContent = 'Quality switching not available for HLS streams yet';
-    setTimeout(() => streamStatus.textContent = 'Live', 3000);
-}
+})();
 </script>
 
 <style>
-.view-camera-container {
-    max-width: 1400px;
-    margin: 2rem auto;
-    padding: 2rem;
-}
+/* ── Page ── */
+.vc-page { max-width:1400px; margin:2rem auto; padding:0 1.5rem 3rem; }
 
-.camera-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    background: #ffffff;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 1px solid #e9ecef;
-}
+/* ── Header ── */
+.vc-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
+.vc-header-left { display:flex; align-items:flex-start; gap:1rem; }
+.vc-back { display:inline-flex; align-items:center; gap:.3rem; color:#6b7280; font-size:.85rem; text-decoration:none; padding:.4rem .6rem; border-radius:6px; transition:background .15s; margin-top:.15rem; white-space:nowrap; }
+.vc-back:hover { background:#f3f4f6; color:#111827; }
+.vc-back svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2.5; }
+.vc-title { font-size:1.5rem; font-weight:700; color:#111827; margin:0 0 .35rem; }
+.vc-meta { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.vc-meta-item { display:inline-flex; align-items:center; gap:.35rem; font-size:.82rem; color:#6b7280; }
+.vc-meta-item svg { width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2; }
+.vc-meta-dot { color:#d1d5db; }
+.vc-header-actions { display:flex; gap:.75rem; flex-wrap:wrap; }
 
-.camera-header h2 {
-    color: #212529;
-    font-size: 1.8rem;
-    font-weight: 600;
-}
+/* ── Buttons ── */
+.vc-btn { display:inline-flex; align-items:center; gap:.45rem; padding:.6rem 1.1rem; border-radius:8px; font-size:.875rem; font-weight:600; border:none; cursor:pointer; text-decoration:none; transition:all .15s; }
+.vc-btn svg { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:2; flex-shrink:0; }
+.vc-btn-ghost { background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; }
+.vc-btn-ghost:hover { background:#e5e7eb; }
+.vc-btn:disabled { opacity:.6; cursor:not-allowed; }
 
-.camera-header > div {
-    display: flex;
-    gap: 1rem;
-}
+/* ── Banner ── */
+.vc-banner { padding:.85rem 1.1rem; border-radius:8px; font-size:.875rem; font-weight:500; margin-bottom:1rem; }
+.vc-banner-ok  { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; }
+.vc-banner-err { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; }
 
-.btn-test {
-    background: #28a745;
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
+/* ── Notice ── */
+.vc-notice { display:flex; align-items:flex-start; gap:.75rem; padding:1rem 1.1rem; border-radius:10px; font-size:.85rem; margin-bottom:1rem; }
+.vc-notice svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; flex-shrink:0; margin-top:.1rem; }
+.vc-notice code { background:rgba(0,0,0,.08); padding:.15rem .4rem; border-radius:4px; font-size:.82rem; }
+.vc-notice-warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
 
-.btn-test:hover {
-    background: #218838;
-    transform: translateY(-1px);
-}
+/* ── Grid ── */
+.vc-grid { display:grid; grid-template-columns:1fr 340px; gap:1.5rem; align-items:start; }
+@media (max-width:1100px) { .vc-grid { grid-template-columns:1fr; } }
 
-.btn-back {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-}
+/* ── Feed panel ── */
+.vc-feed-panel { display:flex; flex-direction:column; gap:.75rem; }
 
-.btn-back:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-}
+/* ── Video wrap ── */
+.vc-video-wrap { position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:16/9; border:1px solid #1f2937; }
+.vc-video-wrap video { width:100%; height:100%; display:block; object-fit:contain; }
 
-.status-message {
-    display: none;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 6px;
-    text-align: center;
-    font-weight: 600;
-}
+/* ── Overlay ── */
+.vc-overlay { position:absolute; inset:0; background:rgba(0,0,0,.88); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.6rem; padding:2rem; z-index:10; }
+.vc-overlay-title { color:#f9fafb; font-size:1rem; font-weight:600; text-align:center; margin:0; }
+.vc-overlay-sub   { color:#9ca3af; font-size:.82rem; text-align:center; margin:0; max-width:320px; line-height:1.5; }
+.vc-spinner { width:40px; height:40px; border:3px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
 
-.status-message.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
+/* ── Live pill ── */
+.vc-live-pill { position:absolute; top:12px; left:12px; display:flex; align-items:center; gap:.4rem; background:rgba(0,0,0,.65); color:#fff; font-size:.75rem; font-weight:700; padding:.3rem .65rem; border-radius:20px; letter-spacing:.04em; z-index:5; }
 
-.status-message.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
+/* ── Stream bar ── */
+.vc-stream-bar { display:flex; justify-content:space-between; align-items:center; padding:.5rem .75rem; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; font-size:.8rem; color:#6b7280; }
 
-.status-message.info {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
-}
+/* ── Info panel ── */
+.vc-info-panel { display:flex; flex-direction:column; gap:1rem; }
 
-.camera-feed-container {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 2rem;
-}
+/* ── Card ── */
+.vc-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; }
+.vc-card-head { padding:.75rem 1.1rem; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; background:#f9fafb; border-bottom:1px solid #e5e7eb; }
+.vc-info-row { display:flex; justify-content:space-between; align-items:center; padding:.7rem 1.1rem; border-bottom:1px solid #f3f4f6; gap:.5rem; }
+.vc-info-label { font-size:.8rem; color:#9ca3af; white-space:nowrap; }
+.vc-info-val { font-size:.85rem; font-weight:600; color:#111827; text-align:right; word-break:break-all; }
+.vc-info-val.mono { font-family:monospace; font-size:.82rem; }
 
-@media (max-width: 1200px) {
-    .camera-feed-container {
-        grid-template-columns: 1fr;
-    }
-}
+/* ── Select ── */
+.vc-select { width:100%; padding:.6rem .8rem; border:1.5px solid #e5e7eb; border-radius:8px; font-size:.875rem; color:#374151; background:#fafafa; cursor:pointer; }
+.vc-select:focus { outline:none; border-color:#6366f1; }
 
-.feed-wrapper {
-    background: #000;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    min-height: 300px;
-    max-height: 540px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    border: 1px solid #343a40;
-    aspect-ratio: 16/9;
-}
+/* ── Dots ── */
+.dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.dot-live     { background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.25); animation:pulse 2s infinite; }
+.dot-on       { background:#22c55e; }
+.dot-off      { background:#ef4444; }
+.dot-checking { background:#f59e0b; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 3px rgba(34,197,94,.25)} 50%{box-shadow:0 0 0 6px rgba(34,197,94,.1)} }
 
-.camera-stream {
-    width: 100%;
-    height: auto;
-    display: block;
-    position: relative;
-    z-index: 1;
-}
-
-.loading-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.9);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    transition: opacity 0.3s ease;
-    z-index: 5;
-}
-
-.spinner {
-    border: 4px solid rgba(255,255,255,0.3);
-    border-top: 4px solid white;
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-    margin-bottom: 1rem;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.camera-details {
-    background: #ffffff;
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 1px solid #e9ecef;
-    height: fit-content;
-}
-
-.camera-details h3 {
-    color: #212529;
-    margin-bottom: 1.5rem;
-    font-size: 1.3rem;
-    font-weight: 600;
-}
-
-.detail-item {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 1.2rem;
-    padding-bottom: 1.2rem;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.detail-item:last-child {
-    border-bottom: none;
-}
-
-.detail-item .label {
-    color: #6c757d;
-    font-size: 0.85rem;
-    margin-bottom: 0.3rem;
-}
-
-.detail-item .value {
-    color: #212529;
-    font-weight: 600;
-    word-break: break-all;
-}
-
-.status-active {
-    color: #28a745 !important;
-}
-
-.status-inactive {
-    color: #dc3545 !important;
-}
-
-.quality-selector {
-    margin-top: 0.5rem;
-}
-
-.quality-selector select {
-    width: 100%;
-    padding: 0.75rem;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    background: #f8f9fa;
-    font-weight: 600;
-    color: #495057;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.quality-selector select:focus {
-    outline: none;
-    border-color: #764ba2;
-    box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
-}
-
-.troubleshooting {
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    border-top: 2px solid #e9ecef;
-}
-
-.troubleshooting h4 {
-    color: #212529;
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-.troubleshooting ul {
-    list-style: none;
-    padding: 0;
-}
-
-.troubleshooting li {
-    color: #6c757d;
-    font-size: 0.85rem;
-    padding: 0.5rem 0;
-    padding-left: 1.5rem;
-    position: relative;
-}
-
-.troubleshooting li:before {
-    content: "→";
-    position: absolute;
-    left: 0;
-    color: #495057;
-}
-
-@media (max-width: 968px) {
-    .camera-feed-container {
-        grid-template-columns: 1fr;
-    }
-}
+/* ── Service badge states ── */
+.svc-on  .dot { background:#22c55e; }
+.svc-off .dot { background:#ef4444; }
+.svc-on  #svc-label { color:#15803d; }
+.svc-off #svc-label { color:#dc2626; }
 </style>
 {% endblock %}

@@ -26,24 +26,8 @@ def can_view_mobile_camera(user, mobile_camera):
 
 @login_required
 def mobile_camera_dashboard(request):
-    """Dashboard for managing mobile cameras"""
-    if not is_admin(request.user):
-        return redirect('login')
-    
-    mobile_cameras = MobileCamera.objects.all()
-    teachers = User.objects.filter(userprofile__user_type='teacher')
-    
-    # Get permissions for each mobile camera
-    mobile_camera_permissions = {}
-    for mobile_camera in mobile_cameras:
-        mobile_camera_permissions[mobile_camera.id] = mobile_camera.get_authorized_teachers()
-    
-    context = {
-        'mobile_cameras': mobile_cameras,
-        'teachers': teachers,
-        'mobile_camera_permissions': mobile_camera_permissions,
-    }
-    return render(request, 'mobile_cameras/dashboard.html', context)
+    """Redirect to main camera dashboard — mobile cameras are now managed there."""
+    return redirect('admin_dashboard')
 
 
 # Removed redundant test_mobile_camera_paths and parse_camera_url (now in utils.py)

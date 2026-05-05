@@ -173,7 +173,7 @@ a.btn-view:hover {
                     Frozen
                 </button>
                 {% else %}
-                <a href="{% url 'join_meeting' meeting.meeting_code %}" class="btn-view">
+                <a href="{% url 'join_meeting' meeting.meeting_code %}" class="btn-view" data-turbo="false">
                     {% if meeting.status == 'live' %}Join Now{% else %}View Details{% endif %}
                 </a>
                 {% endif %}

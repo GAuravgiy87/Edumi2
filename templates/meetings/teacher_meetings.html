@@ -323,7 +323,7 @@ button.btn-freeze:hover {
             
             <div class="meeting-actions">
                 {% if meeting.status == 'scheduled' or meeting.status == 'live' %}
-                <a href="{% url 'join_meeting' meeting.meeting_code %}" class="btn-view">
+                <a href="{% url 'join_meeting' meeting.meeting_code %}" class="btn-view" data-turbo="false">
                     {% if meeting.status == 'scheduled' %}Start Meeting{% else %}Join Meeting{% endif %}
                 </a>
                 {% endif %}

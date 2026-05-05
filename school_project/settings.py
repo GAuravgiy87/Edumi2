@@ -30,7 +30,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-@j!l-9t=qs!b&lkynb=zq
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,10.17.2.47,*').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split(',')
 
 # Disable SSL redirect for development (enable in production)
 SECURE_SSL_REDIRECT = False
@@ -81,11 +81,11 @@ INSTALLED_APPS = [
     'attendance',  # Face Recognition Attendance System
     'django_browser_reload',
     'django_extensions',  # For HTTPS development server
-    'compressor',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'school_project.middleware.RemoveUnsupportedSecurityHeadersMiddleware',  # Strip COOP/COEP on HTTP
     'school_project.middleware.DatabaseErrorMiddleware',  # Handle database locked errors
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -140,16 +140,34 @@ else:
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            'timeout': 30,  # Wait up to 30 seconds for database lock
-            'check_same_thread': False,  # Allow multi-threaded access
-        },
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+if DATABASE_URL:
+    # PostgreSQL (used in Docker / production)
+    import urllib.parse as _up
+    _u = _up.urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE':   'django.db.backends.postgresql',
+            'NAME':     _u.path.lstrip('/'),
+            'USER':     _u.username,
+            'PASSWORD': _u.password,
+            'HOST':     _u.hostname,
+            'PORT':     str(_u.port or 5432),
+        }
     }
-}
+else:
+    # SQLite (local dev — no extra setup needed)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                'timeout': 30,
+                'check_same_thread': False,
+            },
+        }
+    }
 
 
 # Password validation
@@ -186,14 +204,13 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-    'compressor.finders.CompressorFinder',
 ]
 
 COMPRESS_ENABLED = False
@@ -219,28 +236,98 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+        'clean': {
+            'format': '[{levelname}] {asctime} {module}: {message}',
             'style': '{',
+            'datefmt': '%H:%M:%S',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
         },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+            'formatter': 'clean',
+        },
+        'null': {
+            'class': 'logging.NullHandler',
         },
     },
     'loggers': {
+        # ── App loggers (keep these) ──────────────────────────────────────
         'cameras': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'WARNING',
             'propagate': False,
         },
+        'attendance': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'meetings': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'accounts': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+
+        # ── Django internals — only errors ────────────────────────────────
         'django': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'ERROR',
             'propagate': False,
         },
+        # Silence 404 warnings completely (they flood the terminal)
+        'django.request': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
+        # Silence routine DB queries
+        'django.db.backends': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
+
+        # ── Daphne / ASGI — silence per-request access lines ─────────────
+        'daphne.access': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
+        'daphne': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
+
+        # ── Channels ─────────────────────────────────────────────────────
+        'channels': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
+
+        # ── Third-party noise ─────────────────────────────────────────────
+        'asyncio': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
+    },
+    # Root logger: only show WARNING+ from anything not listed above
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
     },
 }
 

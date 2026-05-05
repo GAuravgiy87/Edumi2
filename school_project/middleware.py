@@ -50,3 +50,21 @@ class DatabaseErrorMiddleware:
                     )
         
         return None  # Let other middleware handle other exceptions
+
+
+class RemoveUnsupportedSecurityHeadersMiddleware:
+    """
+    Remove security headers that browsers reject on non-HTTPS (HTTP) origins.
+    Cross-Origin-Opener-Policy is only meaningful over HTTPS; sending it over
+    plain HTTP causes a browser console warning and is silently ignored anyway.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        # Only strip on plain HTTP — keep headers intact when served over HTTPS
+        if not request.is_secure():
+            response.headers.pop('Cross-Origin-Opener-Policy', None)
+            response.headers.pop('Cross-Origin-Embedder-Policy', None)
+        return response

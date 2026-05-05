@@ -8,14 +8,16 @@
     <meta http-equiv="Expires" content="0">
     <title>{% block title %}EduMi - Educational Management System{% endblock %}</title>
     {% load static %}
-    {% load compress %}
     
-    {% compress css %}
-    <link rel="stylesheet" href="{% static 'css/modern-design.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
-    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{% static 'css/modern-design.css' %}?v={{ timestamp }}">
+    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}?v={{ timestamp }}">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}?v={{ timestamp }}">
+    <link rel="stylesheet" href="{% static 'css/buttons.css' %}?v={{ timestamp }}">
     {% block extra_css %}{% endblock %}
-    {% endcompress %}
 
     <!-- Hotwired Turbo for seamless navigation (no full page reloads) -->
     <!-- Lucide Icons -->
@@ -127,9 +129,8 @@
         </main>
     </div>
 
-    {% compress js %}
     <script>
-        // Mobile Sidebar
+        // ── Mobile Sidebar ────────────────────────────────────────────────────────────
         function openMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -150,33 +151,23 @@
             }
         }
 
-        // Close mobile sidebar on window resize
         window.addEventListener('resize', function() {
-            if (window.innerWidth > 768) {
-                closeMobileSidebar();
-            }
+            if (window.innerWidth > 768) closeMobileSidebar();
         });
 
-        // Search functionality
+        // ── Search ────────────────────────────────────────────────────────────────────
         function handleSearch(event) {
             if (event.key === 'Enter') {
                 const query = event.target.value.trim();
-                if (query) {
-                    window.location.href = `/search/?q=${encodeURIComponent(query)}`;
-                }
+                if (query) window.location.href = `/search/?q=${encodeURIComponent(query)}`;
             }
         }
 
-        // Notification Dropdown Toggle
+        // ── Notification Dropdown ─────────────────────────────────────────────────────
         function toggleNotifications(event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
+            if (event) { event.preventDefault(); event.stopPropagation(); }
             const dropdown = document.getElementById('notificationDropdown');
-            const isShowing = dropdown.classList.contains('show');
-            
-            if (!isShowing) {
+            if (!dropdown.classList.contains('show')) {
                 dropdown.classList.add('show');
                 loadRecentNotifications();
             } else {
@@ -184,60 +175,46 @@
             }
         }
 
-        // Load recent notifications via AJAX
         function loadRecentNotifications() {
             const list = document.getElementById('notificationList');
             list.innerHTML = '<div class="notification-loading">Loading...</div>';
-            
             fetch('/notifications/recent/')
-                .then(response => response.json())
+                .then(r => { if (!r.ok) throw new Error(); return r.json(); })
                 .then(data => {
                     const badge = document.getElementById('notificationBadge');
-                    // Update count while we're at it
-                    if (data.unread_count > 0) {
-                        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
-                        badge.style.display = 'flex';
-                    } else {
-                        badge.style.display = 'none';
+                    if (badge) {
+                        if (data.unread_count > 0) {
+                            badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                            badge.style.display = 'flex';
+                        } else {
+                            badge.style.display = 'none';
+                        }
                     }
-
                     if (data.notifications && data.notifications.length > 0) {
                         list.innerHTML = data.notifications.map(n => `
-                            <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="handleNotificationClick(event, '${n.link || '#'}', ${n.id})">
+                            <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="handleNotificationClick(event,'${n.link||'#'}',${n.id})">
                                 <div class="notification-item-content">
                                     <h4 class="notification-item-title">${n.title}</h4>
                                     <p class="notification-item-message">${n.message}</p>
                                     <span class="notification-item-time">${n.created_at}</span>
                                 </div>
                                 ${n.is_read ? '' : '<span class="unread-dot"></span>'}
-                            </div>
-                        `).join('');
+                            </div>`).join('');
                     } else {
                         list.innerHTML = '<div class="notification-empty">No new notifications</div>';
                     }
                 })
-                .catch(error => {
-                    console.error('Error loading notifications:', error);
-                    list.innerHTML = '<div class="notification-error">Failed to load notifications</div>';
-                });
+                .catch(() => { list.innerHTML = '<div class="notification-error">Failed to load</div>'; });
         }
 
         function handleNotificationClick(event, link, id) {
             if (event) event.stopPropagation();
-            
-            // Mark as read then navigate
             fetch(`/notifications/mark-read/${id}/`, {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                }
+                headers: { 'X-CSRFToken': getCookie('csrftoken') }
             }).finally(() => {
-                if (link && link !== '#') {
-                    window.location.href = link;
-                } else {
-                    loadRecentNotifications();
-                    updateNotificationCount();
-                }
+                if (link && link !== '#') window.location.href = link;
+                else { loadRecentNotifications(); updateNotificationCount(); }
             });
         }
 
@@ -245,165 +222,153 @@
             if (event) event.stopPropagation();
             fetch('/notifications/mark-all-read/', {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                }
+                headers: { 'X-CSRFToken': getCookie('csrftoken') }
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    loadRecentNotifications();
-                    updateNotificationCount();
-                }
-            })
-            .catch(error => console.error('Error marking all as read:', error));
+            .then(r => r.json())
+            .then(data => { if (data.status === 'success') { loadRecentNotifications(); updateNotificationCount(); } })
+            .catch(() => {});
         }
 
-        // Helper to get CSRF token
         function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
+            let v = null;
+            if (document.cookie) {
+                document.cookie.split(';').forEach(c => {
+                    c = c.trim();
+                    if (c.startsWith(name + '=')) v = decodeURIComponent(c.slice(name.length + 1));
+                });
             }
-            return cookieValue;
+            return v;
         }
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
             const dropdown = document.getElementById('notificationDropdown');
             const btn = document.getElementById('notificationBtn');
-            if (dropdown && !dropdown.contains(event.target) && !btn.contains(event.target)) {
+            if (dropdown && btn && !dropdown.contains(event.target) && !btn.contains(event.target)) {
                 dropdown.classList.remove('show');
             }
         });
 
-        // Notification count update
-        function updateNotificationCount(count = null) {
-            if (count !== null) {
-                const badge = document.getElementById('notificationBadge');
-                if (count > 0) {
-                    badge.textContent = count > 99 ? '99+' : count;
-                    badge.style.display = 'flex';
-                } else {
-                    badge.style.display = 'none';
-                }
+        // ── Notification count ────────────────────────────────────────────────────────
+        function updateNotificationCount(count) {
+            const badge = document.getElementById('notificationBadge');
+            if (!badge) return;
+            if (count != null) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.style.display = count > 0 ? 'flex' : 'none';
                 return;
             }
             fetch('/notifications/unread-count/')
-                .then(response => response.json())
-                .then(data => {
-                    const badge = document.getElementById('notificationBadge');
-                    if (data.count > 0) {
-                        badge.textContent = data.count > 99 ? '99+' : data.count;
-                        badge.style.display = 'flex';
-                    } else {
-                        badge.style.display = 'none';
-                    }
+                .then(r => {
+                    if (!r.ok) return null;
+                    if (!(r.headers.get('content-type') || '').includes('application/json')) return null;
+                    return r.json();
                 })
-                .catch(error => console.error('Error fetching notification count:', error));
+                .then(data => {
+                    if (!data) return;
+                    badge.textContent = data.count > 99 ? '99+' : data.count;
+                    badge.style.display = data.count > 0 ? 'flex' : 'none';
+                })
+                .catch(() => {});
         }
 
-        // Real-time WebSocket connection
+        // ── Notification WebSocket ────────────────────────────────────────────────────
+        // State lives on window so Turbo re-execution never causes redeclaration errors
         function connectNotificationWS() {
+            if (window._notifSocket &&
+                (window._notifSocket.readyState === WebSocket.OPEN ||
+                 window._notifSocket.readyState === WebSocket.CONNECTING)) return;
+
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
-            const socket = new WebSocket(wsUrl);
+            try {
+                window._notifSocket = new WebSocket(`${protocol}//${window.location.host}/ws/notifications/`);
+            } catch (e) { _scheduleNotifReconnect(); return; }
 
-            socket.onmessage = function(e) {
-                const data = JSON.parse(e.data);
-                console.log('Notification received:', data);
+            window._notifSocket.onopen = function() { window._notifReconnectDelay = 3000; };
 
+            window._notifSocket.onmessage = function(e) {
+                var data; try { data = JSON.parse(e.data); } catch(_) { return; }
                 if (data.type === 'new_message') {
-                    // Show a toast
-                    showToast(`Message from ${data.data.sender}`, data.data.message, 'info');
+                    showToast('Message from ' + data.data.sender, data.data.message, 'info');
                     updateNotificationCount();
-                    
-                    // Dispatch event for specialized pages (like Chat)
                     window.dispatchEvent(new CustomEvent('new_message', { detail: data.data }));
                 } else if (data.type === 'meeting_started') {
-                    showToast(`Class Started!`, `${data.data.title} is now LIVE.`, 'success');
+                    showToast('Class Started!', data.data.title + ' is now LIVE.', 'success');
                     updateNotificationCount();
-                    // Update dashboards if needed
                     window.dispatchEvent(new CustomEvent('meeting_state_change', { detail: data.data }));
+                } else if (data.type === 'send_notification') {
+                    updateNotificationCount();
                 }
             };
 
-            socket.onclose = function(e) {
-                console.log('Notification socket closed. Reconnecting in 3 seconds...');
-                setTimeout(connectNotificationWS, 3000);
+            window._notifSocket.onclose = function() {
+                window._notifSocket = null;
+                _scheduleNotifReconnect();
             };
 
-            socket.onerror = function(err) {
-                console.error('Notification socket error:', err);
-                socket.close();
-            };
+            window._notifSocket.onerror = function() { window._notifSocket = null; };
         }
 
-        // Toast System
-        function showToast(title, message, type = 'info') {
-            const container = document.getElementById('toastContainer') || createToastContainer();
-            const toast = document.createElement('div');
-            toast.className = `custom-toast ${type}`;
-            toast.innerHTML = `
-                <div class="toast-content">
-                    <strong>${title}</strong>
-                    <p>${message}</p>
-                </div>
-                <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
-            `;
+        function _scheduleNotifReconnect() {
+            clearTimeout(window._notifReconnectTimer);
+            if (!window._notifReconnectDelay) window._notifReconnectDelay = 3000;
+            window._notifReconnectTimer = setTimeout(function() {
+                connectNotificationWS();
+                window._notifReconnectDelay = Math.min(window._notifReconnectDelay * 1.5, 30000);
+            }, window._notifReconnectDelay);
+        }
+
+        // ── Toast ─────────────────────────────────────────────────────────────────────
+        function showToast(title, message, type) {
+            type = type || 'info';
+            var container = document.getElementById('toastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastContainer';
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+            var toast = document.createElement('div');
+            toast.className = 'custom-toast ' + type;
+            toast.innerHTML = '<div class="toast-content"><strong>' + title + '</strong><p>' + message + '</p></div>' +
+                              '<button class="toast-close" onclick="this.parentElement.remove()">&times;</button>';
             container.appendChild(toast);
-            setTimeout(() => {
+            setTimeout(function() {
                 toast.classList.add('fade-out');
-                setTimeout(() => toast.remove(), 500);
+                setTimeout(function() { toast.remove(); }, 500);
             }, 5000);
         }
 
-        function createToastContainer() {
-            const container = document.createElement('div');
-            container.id = 'toastContainer';
-            container.className = 'toast-container';
-            document.body.appendChild(container);
-            return container;
-        }
-
-        // Update notification count on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            // Apply saved theme
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark') {
-                document.body.classList.add('dark-mode');
-                updateThemeIcons(true);
-            }
-
-            updateNotificationCount();
-            connectNotificationWS();
-        });
-
-        // Theme Toggle Logic
+        // ── Theme ─────────────────────────────────────────────────────────────────────
         function toggleTheme() {
-            const isDark = document.body.classList.toggle('dark-mode');
+            var isDark = document.body.classList.toggle('dark-mode');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             updateThemeIcons(isDark);
         }
 
         function updateThemeIcons(isDark) {
-            const sunIcon = document.getElementById('sunIcon');
-            const moonIcon = document.getElementById('moonIcon');
-            if (isDark) {
-                sunIcon.style.display = 'block';
-                moonIcon.style.display = 'none';
-            } else {
-                sunIcon.style.display = 'none';
-                moonIcon.style.display = 'block';
-            }
+            var sun  = document.getElementById('sunIcon');
+            var moon = document.getElementById('moonIcon');
+            if (sun)  sun.style.display  = isDark ? 'block' : 'none';
+            if (moon) moon.style.display = isDark ? 'none'  : 'block';
         }
+
+        // ── Init ─────────────────────────────────────────────────────────────────────
+        // turbo:load fires on every navigation (including the first page load).
+        // Guard against double-call on initial load by tracking whether we already ran.
+        function _initSidebar() {
+            var savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                updateThemeIcons(true);
+            }
+            updateNotificationCount();
+            connectNotificationWS();
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // turbo:load alone covers both initial load and navigations.
+        // Do NOT also listen to DOMContentLoaded — that causes double-calls.
+        document.addEventListener('turbo:load', _initSidebar);
     </script>
     <style>
         .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
@@ -415,16 +380,9 @@
         .toast-content p { font-size: 0.8rem; color: #64748b; margin: 0; }
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
-    {% endcompress %}
     {% else %}
     <!-- Not authenticated - redirect to login -->
     <script>window.location.href = "{% url 'login' %}";</script>
     {% endif %}
-    <script>
-        lucide.createIcons();
-        document.addEventListener('turbo:load', () => {
-            lucide.createIcons();
-        });
-    </script>
 </body>
 </html>

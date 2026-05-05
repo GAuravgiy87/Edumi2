@@ -40,39 +40,39 @@ except ImportError:
     from hls_proxy import HLSProxyManager
 
 def serve_hls_file(camera_id, filename, is_mobile=False):
-    """Helper to serve HLS chunks and playlist"""
+    """Helper to serve HLS chunks and playlist, resetting the idle timer."""
     import mimetypes
     from django.http import FileResponse, Http404
-    
-    # Get the file path from the proxy manager
-    # We use a prefix 'm_' for mobile cameras, 'l_' for live classes
-    if is_mobile:
-        cid = f"m_{camera_id}"
-    elif filename.startswith('l_'):
-        cid = str(camera_id) # live class ids are already prefixed if needed, but here we just use the camera_id string
-    else:
-        cid = str(camera_id)
-    
+
+    cid = f"m_{camera_id}" if is_mobile else str(camera_id)
+
+    # Reset idle timer so FFmpeg doesn't shut down while someone is watching
+    HLSProxyManager.touch_streamer(cid)
+
     filepath = HLSProxyManager.get_file_path(cid, filename)
-    
+
     if not os.path.exists(filepath):
-        # If it's a playlist request, maybe the stream is starting up
         if filename.endswith('.m3u8'):
-            time.sleep(2)
+            # Give FFmpeg up to 8 s to produce the first playlist
+            for _ in range(4):
+                time.sleep(2)
+                if os.path.exists(filepath):
+                    break
             if not os.path.exists(filepath):
-                return JsonResponse({'error': 'Stream not ready yet, wait a moment'}, status=404)
+                return JsonResponse(
+                    {'error': 'Stream not ready — FFmpeg may still be connecting. '
+                              'Check the camera is reachable and the RTSP URL is correct.'},
+                    status=503,
+                )
         else:
             raise Http404("Segment not found")
-            
+
     content_type, _ = mimetypes.guess_type(filepath)
     if not content_type:
         content_type = 'application/octet-stream'
-        
+
     response = FileResponse(open(filepath, 'rb'), content_type=content_type)
-    # Enable CORS for frontend players
     response['Access-Control-Allow-Origin'] = '*'
-    
-    # Do not cache m3u8 playlists
     if filename.endswith('.m3u8'):
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
@@ -159,3 +159,28 @@ def live_stream_feed(request, stream_key):
     filename = request.GET.get('file', 'stream.m3u8')
     stream_id = f"live_{stream_key}"
     return serve_hls_file(stream_id, filename)
+
+def list_cameras(request):
+    """List all available cameras for the proxy service"""
+    cameras = Camera.objects.all()
+    return JsonResponse({
+        'cameras': [
+            {'id': c.id, 'name': c.name, 'is_active': c.is_active} 
+            for c in cameras
+        ]
+    })
+
+def test_camera(request, camera_id):
+    """Test camera connectivity from this service"""
+    try:
+        camera = Camera.objects.get(id=camera_id)
+        from cameras.utils import validate_rtsp_url
+        full_url = camera.get_full_rtsp_url()
+        is_valid, message = validate_rtsp_url(full_url)
+        return JsonResponse({
+            'status': 'success' if is_valid else 'error',
+            'message': message,
+            'url': full_url
+        })
+    except Camera.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Camera not found'}, status=404)

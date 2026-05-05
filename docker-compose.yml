@@ -1,48 +1,122 @@
 version: '3.8'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Edumi — Production-ready docker-compose
+# Services: postgres, redis, livekit, camera_service, web (Django), nginx
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-edumi}
+      POSTGRES_USER:     ${POSTGRES_USER:-edumi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edumi_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-edumi}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    restart: unless-stopped
     expose:
       - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
+  # ── LiveKit SFU ─────────────────────────────────────────────────────────────
   livekit:
     image: livekit/livekit-server:latest
+    restart: unless-stopped
     command: --config /etc/livekit/config.yaml
     ports:
-      - "7880:7880"   # HTTP/WS API
-      - "7881:7881"   # RTC TCP
-      - "50000-50200:50000-50200/udp"  # RTC UDP range
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50200:50000-50200/udp"
     volumes:
       - ./livekit.yaml:/etc/livekit/config.yaml
-    restart: unless-stopped
 
-  web:
+  # ── Camera Service (port 8001, internal only) ────────────────────────────────
+  camera_service:
     build: .
-    command: daphne -b 0.0.0.0 -p 8000 school_project.asgi:application
+    restart: unless-stopped
+    command: python camera_service/manage.py runserver 0.0.0.0:8001 --noreload
     volumes:
       - .:/app
+      - hls_tmp:/tmp/edumi_hls
+      - rec_tmp:/tmp/edumi_recordings
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-edumi}:${POSTGRES_PASSWORD:-edumi_secret}@postgres:5432/${POSTGRES_DB:-edumi}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8001"
+
+  # ── Django main app ──────────────────────────────────────────────────────────
+  web:
+    build: .
+    restart: unless-stopped
+    command: daphne -b 0.0.0.0 -p 8000 -v 0 school_project.asgi:application
+    volumes:
+      - .:/app
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
+      - hls_tmp:/tmp/edumi_hls
+      - rec_tmp:/tmp/edumi_recordings
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
       - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-edumi}:${POSTGRES_PASSWORD:-edumi_secret}@postgres:5432/${POSTGRES_DB:-edumi}
       - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit:7880}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-devsecret}
+      # Tell the main app where the camera service is
+      - CAMERA_SERVICE_URL=http://camera_service:8001
     depends_on:
-      - redis
-      - livekit
-    ports:
-      - "8000:8000"
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      camera_service:
+        condition: service_started
+    expose:
+      - "8000"
 
+  # ── Nginx reverse proxy ──────────────────────────────────────────────────────
   nginx:
-    image: nginx:latest
+    image: nginx:1.25-alpine
+    restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-      - ./staticfiles:/app/static
-      - ./media:/app/media
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./staticfiles:/app/static:ro
+      - ./media:/app/media:ro
+      - ./ssl/cert.pem:/etc/nginx/ssl/cert.pem:ro
+      - ./ssl/key.pem:/etc/nginx/ssl/key.pem:ro
     depends_on:
       - web
+
+volumes:
+  postgres_data:
+  hls_tmp:
+  rec_tmp:

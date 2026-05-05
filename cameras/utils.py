@@ -37,35 +37,71 @@ def validate_rtsp_url(url, timeout=5):
 
 def auto_detect_stream_path(ip, port, username, password, protocol='rtsp'):
     """
-    Unified path detection for both RTSP and HTTP (mobile) cameras using ffprobe.
+    Unified path detection for both RTSP and HTTP cameras using ffprobe.
+    For RTSP cameras, also tries HTTP paths since many IP cameras serve
+    video over HTTP (MJPEG/H264) even when they also support RTSP.
     """
     if protocol == 'rtsp':
-        common_paths = [
+        # Try RTSP paths first
+        rtsp_paths = [
             '/stream', '/live', '/h264', '/video', '/cam/realmonitor',
-            '/Streaming/Channels/101', '/1', '/11', '/av0_0', '/mpeg4',
-            '/media/video1', '/onvif1', '/ch0', '/ch01.264', '/',
+            '/Streaming/Channels/101', '/Streaming/Channels/1',
+            '/1', '/11', '/av0_0', '/mpeg4',
+            '/media/video1', '/onvif1', '/ch0', '/ch01.264',
+            '/videoMain', '/video1', '/live/ch00_0',
+            '/live/main', '/live/sub', '/live0', '/live1',
+            '/',
         ]
-        prefix = 'rtsp://'
-    else: # http/mobile
+        # Also try HTTP paths — many IP cameras (Hikvision, Dahua, generic)
+        # serve MJPEG or H264 over HTTP even when RTSP is also available
+        http_paths = [
+            '/video', '/mjpeg', '/mjpegfeed', '/videostream.cgi',
+            '/video.mjpg', '/video.cgi', '/cgi-bin/video.cgi',
+            '/cgi-bin/mjpeg', '/snap.jpg', '/image.jpg',
+            '/cgi-bin/viewer/video.jpg', '/GetData.cgi',
+            '/videoMain', '/video1.mjpeg',
+        ]
+
+        # Try RTSP first
+        for path in rtsp_paths:
+            url = _build_url('rtsp://', ip, port, username, password, path)
+            is_valid, _ = validate_rtsp_url(url, timeout=3)
+            if is_valid:
+                return path, url
+
+        # Fall back to HTTP on port 80 (or the given port if it's not 554)
+        http_port = 80 if port == 554 else port
+        for path in http_paths:
+            url = _build_url('http://', ip, http_port, username, password, path)
+            is_valid, _ = validate_rtsp_url(url, timeout=3)
+            if is_valid:
+                return path, url
+
+        return None, None
+
+    else:  # http/mobile
         common_paths = [
-            '/video', '/mjpegfeed', '/videofeed', '/cam_1.mjpg', 
+            '/video', '/mjpegfeed', '/videofeed', '/cam_1.mjpg',
             '/stream', '/video.mjpg', '/video.cgi', '/',
         ]
-        prefix = 'http://'
-    
-    for path in common_paths:
-        if username and password:
-            safe_user = quote(username)
-            safe_pass = quote(password)
-            url = f"{prefix}{safe_user}:{safe_pass}@{ip}:{port}{path}"
-        else:
-            url = f"{prefix}{ip}:{port}{path}"
-        
-        is_valid, _ = validate_rtsp_url(url, timeout=3)
-        if is_valid:
-            return path, url
-            
-    return None, None
+        for path in common_paths:
+            url = _build_url('http://', ip, port, username, password, path)
+            is_valid, _ = validate_rtsp_url(url, timeout=3)
+            if is_valid:
+                return path, url
+
+        return None, None
+
+
+def _build_url(prefix, ip, port, username, password, path):
+    # Omit default ports so the URL is clean and standard
+    default_port = 554 if prefix == 'rtsp://' else 80
+    host = f"{ip}:{port}" if port != default_port else ip
+    if username and password:
+        safe_user = quote(username)
+        safe_pass = quote(password)
+        return f"{prefix}{safe_user}:{safe_pass}@{host}{path}"
+    return f"{prefix}{host}{path}"
 
 def parse_stream_url(url):
     """
@@ -115,10 +151,10 @@ def parse_stream_url(url):
         try:
             port = int(port)
         except ValueError:
-            port = 554 if scheme == 'rtsp' else 8080
+            port = 554 if scheme == 'rtsp' else 80
     else:
         ip_address = hostport
-        port = 554 if scheme == 'rtsp' else 8080
+        port = 554 if scheme == 'rtsp' else 80
     
     return {
         'ip_address': ip_address,

@@ -203,6 +203,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
+(function() {
     let serverOnline = true;
     const hlsPlayers = {};
     
@@ -320,5 +321,6 @@
     
     // Initial check after 2 seconds
     setTimeout(checkServerStatus, 2000);
+})();
 </script>
 {% endblock %}

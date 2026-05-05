@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
     <!-- LiveKit JS SDK (browser bundle) -->
-    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+    <script src="https://unpkg.com/livekit-client@2.0.4/dist/livekit-client.umd.js" data-turbo-track="reload"></script>
 
     <style>
         /* AI Monitoring Styles */
@@ -133,25 +133,26 @@
             overflow: hidden;
         }
 
-        /* More Options Menu Fixes */
+        /* More Options Menu */
         .more-options-menu {
             position: absolute !important;
             bottom: calc(100% + 15px) !important;
             left: 50% !important;
             transform: translateX(-50%) translateY(10px) !important;
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 4px !important;
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 10px !important;
             background: rgba(20, 20, 20, 0.98) !important;
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
-            padding: 8px !important;
-            min-width: 200px !important;
-            width: max-content !important;
-            border-radius: 12px !important;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8) !important;
+            padding: 14px !important;
+            min-width: min(300px, 90vw) !important;
+            max-width: 90vw !important;
+            width: auto !important;
+            border-radius: 20px !important;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8) !important;
             opacity: 0 !important;
             pointer-events: none !important;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
             z-index: 1000 !important;
         }
 
@@ -163,40 +164,88 @@
 
         .menu-item {
             display: flex !important;
-            flex-direction: row !important;
+            flex-direction: column !important;
             align-items: center !important;
-            gap: 12px !important;
-            width: 100% !important;
-            background: transparent !important;
+            justify-content: center !important;
+            gap: 8px !important;
+            aspect-ratio: 1 / 1 !important;
+            width: auto !important;
+            background: rgba(255, 255, 255, 0.06) !important;
             border: none !important;
+            border-radius: 14px !important;
             color: #ffffff !important;
-            padding: 10px 14px !important;
-            border-radius: 8px !important;
+            padding: 10px 6px !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
             cursor: pointer !important;
-            text-align: left !important;
-            transition: background 0.2s !important;
+            text-align: center !important;
+            white-space: normal !important;
+            transition: background 0.2s, transform 0.2s !important;
         }
 
         .menu-item:hover {
-            background: rgba(255, 255, 255, 0.1) !important;
+            background: rgba(99, 102, 241, 0.25) !important;
+            transform: translateY(-2px) !important;
         }
 
         .menu-item svg {
-            width: 18px !important;
-            height: 18px !important;
+            width: 22px !important;
+            height: 22px !important;
             stroke: #ffffff !important;
             fill: none !important;
             flex-shrink: 0 !important;
         }
 
         .menu-divider {
+            grid-column: span 3 !important;
             height: 1px !important;
             background: rgba(255, 255, 255, 0.1) !important;
-            margin: 4px 8px !important;
+            margin: 2px 0 !important;
+        }
+
+        .menu-close-btn {
+            grid-column: span 3 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: none !important;
+            border-radius: 10px !important;
+            color: #fff !important;
+            padding: 9px !important;
+            font-size: 12px !important;
+            cursor: pointer !important;
+            transition: background 0.2s !important;
+        }
+
+        .menu-close-btn:hover {
+            background: rgba(239, 68, 68, 0.25) !important;
         }
 
         .more-options-container {
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Match exact button size so it doesn't stretch the toolbar */
+            width: clamp(44px, 7vw, 56px);
+            height: clamp(44px, 7vw, 56px);
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 768px) {
+            .more-options-container {
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .more-options-container {
+                width: 36px;
+                height: 36px;
+            }
         }
     </style>
 </head>
@@ -353,28 +402,10 @@
                         </svg>
                         <span>Face Tracking</span>
                     </button>
-                    <div class="menu-divider"></div>
-                    <button class="menu-item" id="muteAllBtn"
-                        onclick="toggleGlobalControl('mute_all'); toggleMoreOptions();">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M11 5L6 9H2v6h4l5 4V5z" />
-                            <line x1="23" y1="9" x2="17" y2="15" />
-                            <line x1="17" y1="9" x2="23" y2="15" />
-                        </svg>
-                        <span>Mute All</span>
-                    </button>
-                    <button class="menu-item" id="camOffAllBtn"
-                        onclick="toggleGlobalControl('camera_off_all'); toggleMoreOptions();">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
-                            <path d="M7 2l10 10L7 22" />
-                            <path d="M23 7l-7 5 7 5V7z" />
-                        </svg>
-                        <span>Stop All Cams</span>
-                    </button>
                     {% endif %}
+                    <button class="menu-close-btn" onclick="toggleMoreOptions()">
+                        ✕ Close Menu
+                    </button>
                 </div>
             </div>
 
@@ -404,19 +435,19 @@
         data-permission-url="{% url 'update_participant_permission' meeting.id 0 %}"
         data-global-control-url="{% url 'toggle_global_control' meeting.id %}"
         data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
-        data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}">
+        data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}"
+        data-is-superuser="{{ user.is_superuser|yesno:'true,false' }}">
         </script>
 
-    <script>
+    <script id="meeting-script-v2">
+        console.log("=== Edumi Meeting Room Script v2.1 Loading ===");
         // ── Config ────────────────────────────────────────────────────────────────────
         const _d = document.getElementById('meeting-data').dataset;
         const meetingCode = _d.meetingCode;
         const currentUserId = _d.userId;
         const currentUsername = _d.username;
         const isHost = _d.isHost === 'true';
-        const initialCanSpeak = _d.canSpeak === 'true';
-        const initialCanVideo = _d.canVideo === 'true';
-        const initialCanShare = _d.canShare === 'true';
+        const isSuperUser = _d.isSuperUser === 'true';
         const TOKEN_URL = _d.tokenUrl;
         const LEAVE_URL = _d.leaveUrl;
         const SLEEP_URL = _d.sleepUrl;
@@ -424,9 +455,13 @@
         const AFTER_LEAVE = _d.afterLeaveUrl;
         const CSRF = _d.csrf;
 
-        // LiveKit SDK globals (from UMD bundle)
+        // LiveKit SDK globals (fallback for various UMD names in v1/v2)
+        const LK = window.LiveKitClient || window.LivekitClient || window.LiveKit;
+        if (!LK) {
+            console.error('LiveKit SDK missing. Check CDN script or network.');
+        }
         const { Room, RoomEvent, Track, TrackEvent, LocalTrack,
-            createLocalScreenTracks, VideoPresets, ConnectionState } = LivekitClient;
+            createLocalScreenTracks, VideoPresets, ConnectionState } = LK || {};
 
         // ── State ─────────────────────────────────────────────────────────────────────
         let room = null;
@@ -440,10 +475,7 @@
         let timerSeconds = 0;
         let signalingWs = null;
 
-        // Permission State (Enforced locally for students)
-        let canSpeak = initialCanSpeak;
-        let canVideo = initialCanVideo;
-        let canShare = initialCanShare;
+        // Permissions gating removed
 
         // ── Init ──────────────────────────────────────────────────────────────────────
         async function init() {
@@ -476,8 +508,8 @@
                 publishDefaults: {
                     simulcast: true,
                     videoCodec: 'h264',
-                    videoEncoding: { maxBitrate: 3000000, maxFramerate: 30 }, // Full HD Camera
-                    screenShareEncoding: { maxBitrate: 5000000, maxFramerate: 30 }, // High Quality Screen
+                    videoEncoding: { maxBitrate: 5000000, maxFramerate: 30 }, // 5 Mbps for crisp 1080p Camera
+                    screenShareEncoding: { maxBitrate: 8000000, maxFramerate: 30 }, // 8 Mbps for ultra-clear Screen
                 },
             });
 
@@ -497,22 +529,45 @@
             await room.connect(url, token);
             console.log('Connected to LiveKit room:', room.name);
 
-            // Initial state based on permissions
-            isMicOn = isHost ? true : canSpeak;
-            isCameraOn = isHost ? true : canVideo;
+            // ── AudioContext (Chrome autoplay policy) ─────────────────────────────────
+            // LiveKit manages its own AudioContext. Call room.startAudio() on the first
+            // user gesture so remote audio plays without the browser blocking it.
+            const resumeAudio = async () => {
+                try { await room.startAudio(); } catch (_) {}
+                document.removeEventListener('click',   resumeAudio);
+                document.removeEventListener('keydown', resumeAudio);
+                document.removeEventListener('touchend', resumeAudio);
+            };
+            document.addEventListener('click',    resumeAudio, { once: true });
+            document.addEventListener('keydown',  resumeAudio, { once: true });
+            document.addEventListener('touchend', resumeAudio, { once: true });
 
-            // Publish local camera + mic if permitted
+            // Initial state
+            isMicOn    = true;
+            isCameraOn = true;
+
+            // ── Publish mic ───────────────────────────────────────────────────────────
             try {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    showNotification('Camera/Mic blocked! Please use HTTPS or localhost.', 'error');
-                    console.warn('mediaDevices API is missing. Usually happens on non-HTTPS connections.');
+                await room.localParticipant.setMicrophoneEnabled(true);
+            } catch (micErr) {
+                isMicOn = false;
+                if (micErr.name === 'NotFoundError' || micErr.name === 'DevicesNotFoundError') {
+                    console.warn('No microphone found — joining without mic.');
                 } else {
-                    if (isMicOn) await room.localParticipant.setMicrophoneEnabled(true);
-                    if (isCameraOn) await room.localParticipant.setCameraEnabled(true);
+                    console.warn('Mic error:', micErr.message);
                 }
-            } catch (e) {
-                console.error('Camera/Mic error:', e);
-                showNotification('Could not start camera/mic: ' + e.message, 'warning');
+            }
+
+            // ── Publish camera ────────────────────────────────────────────────────────
+            try {
+                await room.localParticipant.setCameraEnabled(true);
+            } catch (camErr) {
+                isCameraOn = false;
+                if (camErr.name === 'NotFoundError' || camErr.name === 'DevicesNotFoundError') {
+                    console.warn('Camera not available:', camErr.message);
+                } else {
+                    console.warn('Camera error:', camErr.message);
+                }
             }
 
             // Update UI buttons to reflect actual initial state
@@ -605,7 +660,9 @@
             const el = track.attach();
             el.dataset.kind = track.kind;
             if (track.kind === Track.Kind.Video) {
-                el.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+                // Screen shares MUST use 'contain' so text isn't cropped. Camera uses 'cover' for full fill.
+                const fit = (track.source === Track.Source.ScreenShare) ? 'contain' : 'cover';
+                el.style.cssText = `width:100%;height:100%;object-fit:${fit};display:block;`;
                 if (isLocal) el.style.transform = 'scaleX(-1)';
                 el.muted = true;
                 el.autoplay = true;
@@ -671,7 +728,10 @@
                 camBox.classList.remove('main-presents');
                 document.getElementById('sidebarVideoArea').appendChild(camBox);
                 const v = camBox.querySelector('video');
-                if (v) { v.style.objectFit = 'cover'; v.style.transform = 'scaleX(-1)'; }
+                if (v) { 
+                    v.style.objectFit = 'cover'; 
+                    v.style.transform = 'scaleX(-1)'; 
+                }
             }
             updateLayout();
         }
@@ -815,30 +875,11 @@
         }
 
         async function handleLocalPermissionUpdate(type, allowed, message) {
-            showNotification(message, allowed ? 'success' : 'warning');
-            if (type === 'audio') {
-                canSpeak = allowed;
-                if (!allowed && isMicOn) toggleMic();
-            } else if (type === 'video') {
-                canVideo = allowed;
-                if (!allowed && isCameraOn) toggleCamera();
-            } else if (type === 'screenshare') {
-                canShare = allowed;
-                if (!allowed && isScreenSharing) stopScreenShare();
-            }
+            // Permissions gating removed
         }
 
         async function handleGlobalControlUpdate(type, value, message) {
-            if (isHost) return; // Host isn't affected by global student controls
-
-            showNotification(message, value ? 'warning' : 'info');
-            if (type === 'mute_all' && value) {
-                if (isMicOn) toggleMic();
-            } else if (type === 'camera_off_all' && value) {
-                if (isCameraOn) toggleCamera();
-            } else if (type === 'screenshare_off_all' && value) {
-                if (isScreenSharing) stopScreenShare();
-            }
+            // Global controls removed
         }
 
         // ── Layout ────────────────────────────────────────────────────────────────────
@@ -891,33 +932,49 @@
 
         // ── Controls ──────────────────────────────────────────────────────────────────
         async function toggleMic() {
-            if (!canSpeak && !isHost) {
-                showNotification('Teacher has blocked your microphone', 'error');
-                return;
-            }
-            isMicOn = !isMicOn;
-            await room.localParticipant.setMicrophoneEnabled(isMicOn);
             const btn = document.getElementById('micBtn');
-            btn.classList.toggle('off', !isMicOn);
-            const micOnIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+            const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
             const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+
+            const desired = !isMicOn;
+            try {
+                await room.localParticipant.setMicrophoneEnabled(desired);
+                isMicOn = desired;
+            } catch (e) {
+                if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+                    showNotification('No microphone found on this device.', 'warning');
+                } else {
+                    showNotification('Mic error: ' + e.message, 'warning');
+                }
+                isMicOn = false;
+            }
+
+            btn.classList.toggle('off', !isMicOn);
             btn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
         }
 
         async function toggleCamera() {
-            if (!canVideo && !isHost) {
-                showNotification('Teacher has blocked your camera', 'error');
-                return;
-            }
-            isCameraOn = !isCameraOn;
-            await room.localParticipant.setCameraEnabled(isCameraOn);
             const btn = document.getElementById('camBtn');
-            btn.classList.toggle('off', !isCameraOn);
-            const camOnIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+            const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
             const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
+
+            const desired = !isCameraOn;
+            try {
+                await room.localParticipant.setCameraEnabled(desired);
+                isCameraOn = desired;
+            } catch (e) {
+                if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+                    showNotification('No camera found on this device.', 'warning');
+                } else {
+                    showNotification('Camera error: ' + e.message, 'warning');
+                }
+                isCameraOn = false;   // stay off
+            }
+
+            btn.classList.toggle('off', !isCameraOn);
             btn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
 
-            // Force stop track to turn off physical camera light
+            // Stop physical camera light when turning off
             if (!isCameraOn) {
                 room.localParticipant.videoTrackPublications.forEach(pub => {
                     if (pub.source === Track.Source.Camera && pub.track && pub.track.mediaStreamTrack) {
@@ -927,16 +984,11 @@
                 });
             }
 
-            // Update UI
             const localBox = document.getElementById(`video-box-${room.localParticipant.identity}`);
             if (localBox) localBox.classList.toggle('cam-off', !isCameraOn);
         }
 
         async function toggleScreenShare() {
-            if (!canShare && !isHost) {
-                showNotification('Teacher has blocked screen sharing', 'error');
-                return;
-            }
             if (!isScreenSharing) {
                 try {
                     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
@@ -946,10 +998,13 @@
                         audio: false,
                         resolution: VideoPresets.h1080.resolution
                     });
+                    if (screenTrack.mediaStreamTrack) {
+                        screenTrack.mediaStreamTrack.contentHint = 'text';
+                    }
                     screenTrackPub = await room.localParticipant.publishTrack(screenTrack, {
                         name: "screen",
                         simulcast: false, // Force single high-quality stream for crisp text
-                        videoEncoding: { maxBitrate: 5_000_000, maxFramerate: 30 },
+                        videoEncoding: { maxBitrate: 8_000_000, maxFramerate: 30 },
                     });
                     isScreenSharing = true;
                     document.getElementById('screenBtn').classList.add('active');
@@ -1116,17 +1171,26 @@
         }
 
         // ── Sidebar helpers ───────────────────────────────────────────────────────────
-        function openSidebar(tab) {
-            document.getElementById('meetSidebar').style.display = 'flex';
-            document.getElementById('meetMain').classList.add('sidebar-open');
-            switchSidebarTab(tab);
+        function toggleSidebar() {
+            const sidebar = document.getElementById('meetSidebar');
+            const main = document.getElementById('meetMain');
+            
+            const isHidden = window.getComputedStyle(sidebar).display === 'none';
+            
+            if (isHidden) {
+                sidebar.setAttribute('style', 'display: flex !important');
+                main.classList.add('sidebar-open');
+            } else {
+                sidebar.setAttribute('style', 'display: none !important');
+                main.classList.remove('sidebar-open');
+            }
         }
 
-        function toggleSidebar() {
-            const s = document.getElementById('meetSidebar');
-            const isOpen = s.style.display !== 'none';
-            s.style.display = isOpen ? 'none' : 'flex';
-            document.getElementById('meetMain').classList.toggle('sidebar-open', !isOpen);
+        function openSidebar(tab) {
+            const sidebar = document.getElementById('meetSidebar');
+            sidebar.setAttribute('style', 'display: flex !important');
+            document.getElementById('meetMain').classList.add('sidebar-open');
+            switchSidebarTab(tab);
         }
 
         // ── More Options ──────────────────────────────────────────────────────────────
@@ -1148,8 +1212,12 @@
         function switchSidebarTab(tab) {
             document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.sidebar-panel').forEach(p => p.style.display = 'none');
-            document.querySelector(`.sidebar-tab[onclick*="${tab}"]`).classList.add('active');
-            document.getElementById(tab + 'Panel').style.display = 'flex';
+            
+            const activeTabBtn = document.querySelector(`.sidebar-tab[onclick*="${tab}"]`);
+            if (activeTabBtn) activeTabBtn.classList.add('active');
+            
+            const activePanel = document.getElementById(tab + 'Panel');
+            if (activePanel) activePanel.style.display = 'flex';
 
             if (tab === 'chat') {
                 unreadMessages = 0;
@@ -1181,8 +1249,6 @@
                 </div>
                 ${isHost ? `
                 <div class="participant-actions">
-                    <button class="action-btn" onclick="updatePermission('${p.identity}', 'audio', true)" title="Allow Mic">🎤</button>
-                    <button class="action-btn" onclick="updatePermission('${p.identity}', 'video', true)" title="Allow Cam">📷</button>
                     <button class="action-btn danger" onclick="kickUser('${p.identity}')" title="Kick Out">🚫</button>
                 </div>
                 ` : ''}`;
@@ -1226,8 +1292,8 @@
         init().catch(e => { console.error('Init error:', e); showNotification('Failed to connect: ' + e.message, 'error'); });
 
         // ── Face Attendance Module (Students Only) ───────────────────────────────────
-        {% if not is_host and not user.is_superuser %}
-        (function () {
+        if (!isHost && !isSuperUser) {
+            (function () {
             let attWs = null;
             let captureTimer = null;
             let marked = false;
@@ -1310,11 +1376,11 @@
 
             window.addEventListener('load', () => setTimeout(connect, 3000));
         })();
-        {% endif %}
+        }
 
         // ── Face Tracking Module (Host Only) ─────────────────────────────────────────
-        {% if is_host %}
-        (function () {
+        if (isHost) {
+            (function () {
             let ftWs = null;
             let ftEnabled = false;
             let ftTimer = null;
@@ -1403,7 +1469,7 @@
                 eb.textContent = label;
             }
         })();
-        {% endif %}
+        }
     </script>
 </body>
 

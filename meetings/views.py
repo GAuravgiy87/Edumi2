@@ -453,7 +453,13 @@ def join_meeting(request, meeting_code):
     participant, created = MeetingParticipant.objects.get_or_create(
         meeting=meeting,
         user=request.user,
-        defaults={'joined_at': timezone.now(), 'is_active': True}
+        defaults={
+            'joined_at': timezone.now(),
+            'is_active': True,
+            'audio_permitted': True,
+            'video_permitted': True,
+            'screenshare_permitted': True
+        }
     )
 
     join_time = timezone.now()
@@ -461,7 +467,14 @@ def join_meeting(request, meeting_code):
         # Re-joining: update join timestamp and mark active again
         participant.joined_at = join_time
         participant.is_active = True
-        participant.save(update_fields=['joined_at', 'is_active'])
+        
+        # FIX: Ensure existing participants also get permissions enabled if they were blocked
+        if not is_host:
+            participant.audio_permitted = True
+            participant.video_permitted = True
+            participant.screenshare_permitted = True
+            
+        participant.save(update_fields=['joined_at', 'is_active', 'audio_permitted', 'video_permitted', 'screenshare_permitted'])
 
     # Update meeting status to live if teacher joins
     if meeting.teacher == request.user and meeting.status == 'scheduled':

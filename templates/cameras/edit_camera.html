@@ -15,8 +15,7 @@
         </div>
         {% endif %}
         
-        <form method="post">
-            {% csrf_token %}
+        <form method="post" data-turbo="false">            {% csrf_token %}
             
             <div class="form-group">
                 <label>Camera Name</label>

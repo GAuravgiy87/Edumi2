@@ -26,12 +26,16 @@ class Camera(models.Model):
     
     def get_full_rtsp_url(self):
         from urllib.parse import quote
+        # Omit default ports (554 for RTSP, 80 for HTTP)
+        scheme = 'http' if self.rtsp_url.startswith('http://') else 'rtsp'
+        default_port = 80 if scheme == 'http' else 554
+        host = f"{self.ip_address}:{self.port}" if self.port != default_port else self.ip_address
+        prefix = 'http://' if scheme == 'http' else 'rtsp://'
         if self.username and self.password:
-            # Quote username and password to handle special chars like '@'
             safe_user = quote(self.username)
             safe_pass = quote(self.password)
-            return f"rtsp://{safe_user}:{safe_pass}@{self.ip_address}:{self.port}{self.stream_path}"
-        return f"rtsp://{self.ip_address}:{self.port}{self.stream_path}"
+            return f"{prefix}{safe_user}:{safe_pass}@{host}{self.stream_path}"
+        return f"{prefix}{host}{self.stream_path}"
     
     def has_permission(self, user):
         """Check if user has permission to access this camera"""

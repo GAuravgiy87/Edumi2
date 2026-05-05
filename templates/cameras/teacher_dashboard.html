@@ -1,526 +1,868 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}Teacher Camera Dashboard{% endblock %}
+{% block page_title %}Camera Dashboard{% endblock %}
 
 {% block content %}
-<div class="teacher-container">
-    <!-- Header Section -->
-    <div class="dashboard-header">
-        <div class="header-left">
-            <h1>👨‍🏫 Teacher Console</h1>
-            <p class="subtitle">Manage your assigned cameras and broadcast live classes.</p>
-        </div>
-        <div class="header-right">
-            {% if active_class %}
-            <div class="live-status-pill pulse">
-                <span class="live-dot"></span> LIVE NOW: {{ active_class.title }}
-            </div>
-            {% else %}
-            <button class="btn-primary" onclick="showStartClassModal()">
-                <i data-lucide="video"></i> Start Live Class
-            </button>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="dashboard-grid">
-        <!-- Main Content Area -->
-        <div class="main-column">
-            <!-- Assigned Cameras Section -->
-            <section class="assigned-cameras card">
-                <div class="section-header">
-                    <h2><i data-lucide="camera"></i> Assigned RTSP Cameras</h2>
-                    <span class="count-badge">{{ cameras|length }} active</span>
-                </div>
-                
-                <div class="cameras-grid">
-                    {% for camera in cameras %}
-                    <div class="camera-preview-card">
-                        <div class="preview-header">
-                            <h3>{{ camera.name }}</h3>
-                            <span class="status-indicator online">Online</span>
-                        </div>
-                        <div class="preview-body">
-                            <div class="video-container">
-                                <video id="video-{{ camera.id }}" class="hls-player" data-camera-id="{{ camera.id }}" data-token="{{ camera.temp_token }}" autoplay muted playsinline></video>
-                                <div class="video-overlay" id="overlay-{{ camera.id }}">
-                                    <div class="spinner"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="preview-footer">
-                            <span class="camera-ip"><i data-lucide="map-pin"></i> {{ camera.ip_address }}</span>
-                            <a href="{% url 'view_camera' camera.id %}" class="btn-icon" title="Full Screen">
-                                <i data-lucide="maximize"></i>
-                            </a>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="empty-state">
-                        <i data-lucide="camera-off"></i>
-                        <p>No RTSP cameras assigned to you yet.</p>
-                        <small>Contact administrator to request access.</small>
-                    </div>
-                    {% endfor %}
-                </div>
-            </section>
-
-            <!-- Mobile Cameras Section -->
-            <section class="mobile-cameras card mt-4">
-                <div class="section-header">
-                    <h2><i data-lucide="smartphone"></i> Assigned Mobile Cameras</h2>
-                    <span class="count-badge">{{ mobile_cameras|length }} active</span>
-                </div>
-                
-                <div class="cameras-grid">
-                    {% for camera in mobile_cameras %}
-                    <div class="camera-preview-card mobile">
-                        <div class="preview-header">
-                            <h3>{{ camera.name }}</h3>
-                            <span class="status-indicator online">Online</span>
-                        </div>
-                        <div class="preview-body">
-                            <div class="video-container">
-                                <video id="video-m-{{ camera.id }}" class="hls-player mobile" data-camera-id="m_{{ camera.id }}" data-token="{{ camera.temp_token }}" autoplay muted playsinline></video>
-                                <div class="video-overlay" id="overlay-m-{{ camera.id }}">
-                                    <div class="spinner"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="empty-state">
-                        <p>No mobile cameras assigned.</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </section>
-        </div>
-
-        <!-- Sidebar Area -->
-        <div class="sidebar-column">
-            <!-- Live Class Control Center -->
-            <section class="live-class-control card">
-                <div class="section-header">
-                    <h2><i data-lucide="radio"></i> Live Control</h2>
-                </div>
-                
-                {% if active_class %}
-                <div class="active-class-info">
-                    <div class="stat-group">
-                        <div class="stat-item">
-                            <span class="label">Status</span>
-                            <span class="value live">BROADCASTING</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="label">Viewers</span>
-                            <span class="value" id="viewer-count">{{ active_class.viewer_count }}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="rtmp-info">
-                        <label>Ingest Server</label>
-                        <div class="copy-input">
-                            <input type="text" value="rtmp://{{ request.get_host|slice:":-5" }}:1935/live" readonly>
-                            <button onclick="copyToClipboard(this)">Copy</button>
-                        </div>
-                        
-                        <label>Stream Key</label>
-                        <div class="copy-input">
-                            <input type="password" value="{{ active_class.stream_key }}" readonly>
-                            <button onclick="toggleVisibility(this)">Show</button>
-                            <button onclick="copyToClipboard(this)">Copy</button>
-                        </div>
-                    </div>
-                    
-                    <div class="stream-preview mt-4">
-                        <label>Monitor Feed</label>
-                        <div class="video-container monitor">
-                            <video id="video-live" class="hls-player live" data-stream-key="{{ active_class.stream_key }}" data-token="{{ active_class.temp_token }}" autoplay muted playsinline></video>
-                        </div>
-                    </div>
-                    
-                    <form action="{% url 'stop_live_class' active_class.id %}" method="POST" class="mt-4">
-                        {% csrf_token %}
-                        <button type="submit" class="btn-danger btn-block">Stop Broadcast</button>
-                    </form>
-                </div>
-                {% else %}
-                <div class="inactive-class">
-                    <p>No active broadcast.</p>
-                    <button class="btn-primary mt-2" onclick="showStartClassModal()">Go Live</button>
-                </div>
-                {% endif %}
-            </section>
-
-            <!-- Recent Recordings -->
-            <section class="recordings card mt-4">
-                <div class="section-header">
-                    <h2><i data-lucide="film"></i> Recent Recordings</h2>
-                </div>
-                <div class="recordings-list">
-                    {% for rec in recent_recordings %}
-                    <div class="recording-item">
-                        <div class="rec-info">
-                            <span class="rec-title">{{ rec.live_class.title }}</span>
-                            <span class="rec-date">{{ rec.created_at|date:"M d, H:i" }}</span>
-                        </div>
-                        <span class="rec-duration">{{ rec.duration_seconds|floatformat:0 }}s</span>
-                    </div>
-                    {% empty %}
-                    <p class="empty-text">No recordings yet.</p>
-                    {% endfor %}
-                </div>
-            </section>
-        </div>
-    </div>
-</div>
-
-<!-- Start Class Modal -->
-<div id="startClassModal" class="modal">
-    <div class="modal-content card">
-        <h2>Start New Live Class</h2>
-        <form action="{% url 'start_live_class' %}" method="POST">
-            {% csrf_token %}
-            <div class="form-group">
-                <label>Class Title</label>
-                <input type="text" name="title" placeholder="e.g. Advanced Mathematics Section B" required>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn-secondary" onclick="hideStartClassModal()">Cancel</button>
-                <button type="submit" class="btn-primary">Start Listener</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <style>
-:root {
-    --bg-dark: #0f172a;
-    --card-bg: rgba(30, 41, 59, 0.7);
-    --accent-primary: #6366f1;
-    --accent-success: #10b981;
-    --accent-danger: #ef4444;
-    --text-main: #f8fafc;
-    --text-dim: #94a3b8;
+/* ── Page shell ── */
+.td-page {
+  max-width: 1400px;
+  margin: 2rem auto;
+  padding: 0 2rem 3rem;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  color: #111827;
 }
 
-.teacher-container {
-    max-width: 1400px;
-    margin: 2rem auto;
-    padding: 0 2rem;
-    color: var(--text-main);
+/* ── Header ── */
+.td-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.td-header-left h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 .2rem;
+}
+.td-header-left p {
+  color: #6b7280;
+  font-size: .9rem;
+  margin: 0;
 }
 
-.dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
+/* ── Header buttons ── */
+.td-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .65rem 1.25rem;
+  border-radius: 8px;
+  font-size: .875rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all .18s;
+  text-decoration: none;
 }
-
-.dashboard-header h1 {
-    font-size: 2.25rem;
-    font-weight: 800;
-    margin-bottom: 0.5rem;
-    background: linear-gradient(to right, #818cf8, #c084fc);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+.td-btn-green {
+  background: #059669;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(5,150,105,.3);
 }
-
-.subtitle { color: var(--text-dim); }
-
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 2rem;
+.td-btn-green:hover { background: #047857; transform: translateY(-1px); }
+.td-btn-red {
+  background: #dc2626;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(220,38,38,.3);
 }
-
-.card {
-    background: var(--card-bg);
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 1.5rem;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+.td-btn-red:hover { background: #b91c1c; transform: translateY(-1px); }
+.td-btn-ghost {
+  background: #f3f4f6;
+  color: #374151;
 }
-
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
+.td-btn-ghost:hover { background: #e5e7eb; }
+.td-btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
 }
+.td-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,.35); }
 
-.section-header h2 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+/* ── Two-column layout ── */
+.td-grid {
+  display: grid;
+  grid-template-columns: 2fr 340px;
+  gap: 1.5rem;
+  align-items: start;
 }
-
-.count-badge {
-    background: rgba(99, 102, 241, 0.2);
-    color: var(--accent-primary);
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-.cameras-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
-}
-
-.camera-preview-card {
-    background: rgba(15, 23, 42, 0.5);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    overflow: hidden;
-    transition: transform 0.3s ease;
-}
-
-.camera-preview-card:hover {
-    transform: translateY(-5px);
-    border-color: var(--accent-primary);
-}
-
-.preview-header {
-    padding: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.preview-header h3 { font-size: 1rem; font-weight: 600; }
-
-.status-indicator {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.status-indicator.online { color: var(--accent-success); }
-
-.video-container {
-    position: relative;
-    aspect-ratio: 16/9;
-    background: #000;
-}
-
-.video-container video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.video-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(255,255,255,0.1);
-    border-top-color: var(--accent-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.preview-footer {
-    padding: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-}
-
-/* Sidebar Styles */
-.stat-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.stat-item {
-    background: rgba(15, 23, 42, 0.5);
-    padding: 1rem;
-    border-radius: 12px;
-    text-align: center;
-}
-
-.stat-item .label {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    margin-bottom: 0.25rem;
-}
-
-.stat-item .value {
-    font-size: 1.1rem;
-    font-weight: 700;
-}
-
-.stat-item .value.live { color: var(--accent-danger); }
-
-.rtmp-info label {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin: 1rem 0 0.5rem;
-}
-
-.copy-input {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.copy-input input {
-    flex: 1;
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 0.5rem;
-    color: var(--text-main);
-    font-size: 0.85rem;
-    font-family: monospace;
-}
-
-.copy-input button {
-    background: var(--accent-primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 0 0.75rem;
-    font-size: 0.8rem;
-    cursor: pointer;
-}
-
-.btn-primary { background: var(--accent-primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
-.btn-danger { background: var(--accent-danger); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; cursor: pointer; }
-.btn-secondary { background: rgba(255,255,255,0.1); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; cursor: pointer; }
-.btn-block { width: 100%; }
-
-/* Modal Styles */
-.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000; }
-.modal.active { display: flex; }
-.modal-content { max-width: 500px; width: 90%; }
-.form-group { margin-bottom: 1.5rem; }
-.form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-dim); }
-.form-group input { width: 100%; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.75rem; color: var(--text-main); }
-.modal-actions { display: flex; gap: 1rem; justify-content: flex-end; }
-
 @media (max-width: 1100px) {
-    .dashboard-grid { grid-template-columns: 1fr; }
+  .td-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Cards ── */
+.td-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  overflow: hidden;
+}
+.td-card-body { padding: 1.5rem; }
+
+/* ── Section heading ── */
+.td-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+.td-section-head h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+.td-badge {
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: .75rem;
+  font-weight: 700;
+  padding: .2rem .65rem;
+  border-radius: 20px;
+}
+
+/* ── Camera grid ── */
+.td-cameras-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+/* ── Camera card ── */
+.td-cam-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fafafa;
+  transition: box-shadow .18s, border-color .18s;
+}
+.td-cam-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  border-color: #6366f1;
+}
+.td-cam-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .75rem 1rem;
+}
+.td-cam-top h3 {
+  font-size: .9rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 65%;
+}
+.td-online-badge {
+  font-size: .72rem;
+  font-weight: 700;
+  color: #059669;
+  white-space: nowrap;
+}
+
+/* ── Video area ── */
+.td-video-wrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.td-video-wrap video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.td-video-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  transition: opacity .3s;
+}
+.td-video-overlay.hidden { opacity: 0; pointer-events: none; }
+.td-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255,255,255,.15);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: td-spin .8s linear infinite;
+}
+@keyframes td-spin { to { transform: rotate(360deg); } }
+.td-overlay-msg {
+  font-size: .75rem;
+  color: rgba(255,255,255,.6);
+}
+.td-stream-status {
+  font-size: .72rem;
+  font-weight: 600;
+  color: #059669;
+  display: none;
+}
+
+/* ── Camera footer ── */
+.td-cam-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .6rem 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+.td-cam-ip {
+  font-size: .78rem;
+  color: #6b7280;
+  font-family: monospace;
+}
+.td-cam-link {
+  font-size: .78rem;
+  font-weight: 600;
+  color: #6366f1;
+  text-decoration: none;
+}
+.td-cam-link:hover { text-decoration: underline; }
+
+/* ── Empty state ── */
+.td-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: #9ca3af;
+  font-size: .9rem;
+}
+.td-empty-icon {
+  font-size: 2rem;
+  margin-bottom: .5rem;
+}
+
+/* ── Right column ── */
+.td-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Live control card ── */
+.td-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: .8rem;
+  font-weight: 700;
+  padding: .35rem .75rem;
+  border-radius: 20px;
+  margin-bottom: .75rem;
+}
+.td-live-dot {
+  width: 8px;
+  height: 8px;
+  background: #dc2626;
+  border-radius: 50%;
+  animation: td-pulse 1.4s ease-in-out infinite;
+}
+@keyframes td-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(.8); }
+}
+.td-live-title {
+  font-size: .95rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 .5rem;
+}
+.td-viewer-count {
+  font-size: .82rem;
+  color: #6b7280;
+  margin: 0 0 1.25rem;
+}
+
+/* ── RTMP inputs ── */
+.td-field-label {
+  display: block;
+  font-size: .8rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 1rem 0 .35rem;
+}
+.td-field-label:first-of-type { margin-top: 0; }
+.td-copy-row {
+  display: flex;
+  gap: .4rem;
+}
+.td-copy-row input {
+  flex: 1;
+  min-width: 0;
+  padding: .55rem .75rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 7px;
+  font-size: .8rem;
+  font-family: monospace;
+  color: #111827;
+  background: #f9fafb;
+}
+.td-copy-row input:focus { outline: none; border-color: #6366f1; }
+.td-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: .5rem .65rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 7px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: .75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+}
+.td-icon-btn:hover { background: #e5e7eb; border-color: #d1d5db; }
+
+/* ── No broadcast state ── */
+.td-no-broadcast {
+  text-align: center;
+  padding: 1rem 0 .5rem;
+}
+.td-no-broadcast p {
+  color: #6b7280;
+  font-size: .9rem;
+  margin: 0 0 1rem;
+}
+.td-go-live-btn {
+  width: 100%;
+  padding: .75rem;
+  background: #059669;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: .95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s;
+}
+.td-go-live-btn:hover { background: #047857; }
+
+/* ── Stop broadcast button ── */
+.td-stop-btn {
+  width: 100%;
+  padding: .7rem;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: .875rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 1.25rem;
+  transition: background .18s;
+}
+.td-stop-btn:hover { background: #b91c1c; }
+
+/* ── Recordings list ── */
+.td-rec-list { display: flex; flex-direction: column; gap: .75rem; }
+.td-rec-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: .5rem;
+  padding: .75rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+}
+.td-rec-title {
+  font-size: .85rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 .2rem;
+}
+.td-rec-date {
+  font-size: .75rem;
+  color: #9ca3af;
+}
+.td-rec-dur {
+  font-size: .78rem;
+  font-weight: 600;
+  color: #6366f1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.td-empty-sm {
+  color: #9ca3af;
+  font-size: .875rem;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* ── Modal ── */
+.td-modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.td-modal-backdrop.open { display: flex; }
+.td-modal-box {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  overflow: hidden;
+}
+.td-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.td-modal-head h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+.td-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: .25rem;
+  border-radius: 6px;
+  line-height: 1;
+}
+.td-modal-close:hover { background: #f3f4f6; color: #374151; }
+.td-modal-body { padding: 1.5rem; }
+.td-form-group { margin-bottom: 1.25rem; }
+.td-form-group label {
+  display: block;
+  font-size: .85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: .4rem;
+}
+.td-form-group input[type="text"] {
+  width: 100%;
+  padding: .7rem .9rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: .9rem;
+  color: #111827;
+  background: #fafafa;
+  box-sizing: border-box;
+  transition: border .15s;
+}
+.td-form-group input[type="text"]:focus {
+  outline: none;
+  border-color: #6366f1;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.1);
+}
+.td-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: .75rem;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* ── Divider between camera sections ── */
+.td-section-gap { margin-top: 1.5rem; }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script>
-    const hlsPlayers = {};
+<div class="td-page">
 
-    function initHLS(video, url, statusBadgeId, overlayId) {
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                lowLatencyMode: true,
-                backBufferLength: 0
-            });
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play();
-                if (overlayId) document.getElementById(overlayId).style.display = 'none';
-            });
-            hls.on(Hls.Events.ERROR, (event, data) => {
-                if (data.fatal) {
-                    console.warn("HLS Error", data);
-                    setTimeout(() => hls.loadSource(url), 3000);
-                }
-            });
-            return hls;
-        }
+  <!-- ══ Header ══════════════════════════════════════════════════════════ -->
+  <div class="td-header">
+    <div class="td-header-left">
+      <h1>Camera Dashboard</h1>
+      <p>Manage your assigned cameras and broadcast live classes.</p>
+    </div>
+    <div>
+      {% if active_class %}
+        <form action="{% url 'stop_live_class' active_class.id %}" method="POST" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="td-btn td-btn-red">
+            &#9632; Stop Broadcast
+          </button>
+        </form>
+      {% else %}
+        <button class="td-btn td-btn-green" onclick="showStartClassModal()">
+          &#9654; Start Live Class
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ══ Two-column grid ═════════════════════════════════════════════════ -->
+  <div class="td-grid">
+
+    <!-- ── Left column: cameras ──────────────────────────────────────── -->
+    <div class="td-left-col">
+
+      <!-- RTSP Cameras -->
+      <div class="td-card">
+        <div class="td-card-body">
+          <div class="td-section-head">
+            <h2>Assigned Cameras</h2>
+            <span class="td-badge">{{ cameras|length }}{% if mobile_cameras %} + {{ mobile_cameras|length }} mobile{% endif %}</span>
+          </div>
+
+          <div class="td-cameras-grid">
+            {% for camera in cameras %}
+            <div class="td-cam-card">
+              <div class="td-cam-top">
+                <h3>{{ camera.name }}</h3>
+                <span class="td-online-badge">&#9679; Online</span>
+              </div>
+              <div class="td-video-wrap">
+                <video
+                  id="video-{{ camera.id }}"
+                  class="hls-player"
+                  data-camera-id="{{ camera.id }}"
+                  data-token="{{ camera.temp_token }}"
+                  autoplay
+                  muted
+                  playsinline
+                ></video>
+                <div class="td-video-overlay" id="overlay-{{ camera.id }}">
+                  <div class="td-spinner"></div>
+                  <span class="td-overlay-msg" id="msg-{{ camera.id }}">Connecting&hellip;</span>
+                </div>
+                <span class="td-stream-status" id="status-{{ camera.id }}">&#9679; Live</span>
+              </div>
+              <div class="td-cam-foot">
+                <span class="td-cam-ip">{{ camera.ip_address }}</span>
+                <a href="{% url 'view_camera' camera.id %}" class="td-cam-link">Full View &rarr;</a>
+              </div>
+            </div>
+            {% empty %}
+            <div class="td-empty" style="grid-column:1/-1">
+              <div class="td-empty-icon">&#128247;</div>
+              <p>No cameras assigned. Contact admin.</p>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Mobile cameras (same section, below) -->
+          {% if mobile_cameras %}
+          <div class="td-section-gap">
+            <div class="td-section-head">
+              <h2>Mobile Cameras</h2>
+              <span class="td-badge">{{ mobile_cameras|length }}</span>
+            </div>
+            <div class="td-cameras-grid">
+              {% for camera in mobile_cameras %}
+              <div class="td-cam-card">
+                <div class="td-cam-top">
+                  <h3>{{ camera.name }}</h3>
+                  <span class="td-online-badge">&#9679; Online</span>
+                </div>
+                <div class="td-video-wrap">
+                  <video
+                    id="video-m-{{ camera.id }}"
+                    class="hls-player"
+                    data-camera-id="m_{{ camera.id }}"
+                    data-token="{{ camera.temp_token }}"
+                    autoplay
+                    muted
+                    playsinline
+                  ></video>
+                  <div class="td-video-overlay" id="overlay-m-{{ camera.id }}">
+                    <div class="td-spinner"></div>
+                    <span class="td-overlay-msg" id="msg-m-{{ camera.id }}">Connecting&hellip;</span>
+                  </div>
+                  <span class="td-stream-status" id="status-m-{{ camera.id }}">&#9679; Live</span>
+                </div>
+                <div class="td-cam-foot">
+                  <span class="td-cam-ip">{{ camera.ip_address }}</span>
+                  <a href="{% url 'view_camera' camera.id %}" class="td-cam-link">Full View &rarr;</a>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div><!-- /left col -->
+
+    <!-- ── Right column ───────────────────────────────────────────────── -->
+    <div class="td-right-col">
+
+      <!-- Live Control card -->
+      <div class="td-card">
+        <div class="td-card-body">
+          <div class="td-section-head">
+            <h2>Live Control</h2>
+          </div>
+
+          {% if active_class %}
+          <!-- Active broadcast -->
+          <div class="td-live-badge">
+            <span class="td-live-dot"></span> LIVE
+          </div>
+          <p class="td-live-title">{{ active_class.title }}</p>
+          <p class="td-viewer-count" id="viewer-count">
+            &#128065; {{ active_class.viewer_count }} viewer{{ active_class.viewer_count|pluralize }}
+          </p>
+
+          <span class="td-field-label">RTMP Server</span>
+          <div class="td-copy-row">
+            <input type="text" value="rtmp://{{ request.get_host }}:1935/live" readonly>
+            <button class="td-icon-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+
+          <span class="td-field-label">Stream Key</span>
+          <div class="td-copy-row">
+            <input type="password" value="{{ active_class.stream_key }}" readonly>
+            <button class="td-icon-btn" onclick="toggleVisibility(this)">Show</button>
+            <button class="td-icon-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+
+          <form action="{% url 'stop_live_class' active_class.id %}" method="POST">
+            {% csrf_token %}
+            <button type="submit" class="td-stop-btn">&#9632; Stop Broadcast</button>
+          </form>
+
+          {% else %}
+          <!-- No active broadcast -->
+          <div class="td-no-broadcast">
+            <p>No active broadcast.</p>
+            <button class="td-go-live-btn" onclick="showStartClassModal()">&#9654; Go Live</button>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      <!-- Recent Recordings card -->
+      <div class="td-card">
+        <div class="td-card-body">
+          <div class="td-section-head">
+            <h2>Recent Recordings</h2>
+          </div>
+
+          <div class="td-rec-list">
+            {% for rec in recent_recordings %}
+            <div class="td-rec-item">
+              <div>
+                <p class="td-rec-title">{{ rec.live_class.title }}</p>
+                <span class="td-rec-date">{{ rec.created_at|date:"M d, H:i" }}</span>
+              </div>
+              <span class="td-rec-dur">
+                {% if rec.duration_seconds %}
+                  {% widthratio rec.duration_seconds 60 1 %}m
+                {% else %}
+                  &mdash;
+                {% endif %}
+              </span>
+            </div>
+            {% empty %}
+            <p class="td-empty-sm">No recordings yet.</p>
+            {% endfor %}
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /right col -->
+  </div><!-- /grid -->
+</div><!-- /page -->
+
+<!-- ══ Start Live Class Modal ══════════════════════════════════════════════ -->
+<div class="td-modal-backdrop" id="startClassModal">
+  <div class="td-modal-box">
+    <div class="td-modal-head">
+      <h2>Start Live Class</h2>
+      <button class="td-modal-close" onclick="hideStartClassModal()">&#10005;</button>
+    </div>
+    <div class="td-modal-body">
+      <form action="{% url 'start_live_class' %}" method="POST">
+        {% csrf_token %}
+        <div class="td-form-group">
+          <label for="classTitle">Class Title</label>
+          <input type="text" id="classTitle" name="title" placeholder="e.g. Advanced Mathematics &mdash; Section B" required>
+        </div>
+        <div class="td-modal-foot" style="padding:0; border:none; margin-top:0;">
+          <button type="button" class="td-btn td-btn-ghost" onclick="hideStartClassModal()">Cancel</button>
+          <button type="submit" class="td-btn td-btn-green">&#9654; Go Live</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HLS.js — data-turbo-eval="false" prevents Turbo from re-running ══ -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js" data-turbo-eval="false"></script>
+
+<script data-turbo-eval="false">
+(function () {
+  'use strict';
+
+  // ── Modal helpers ─────────────────────────────────────────────────────
+  window.showStartClassModal = function () {
+    document.getElementById('startClassModal').classList.add('open');
+  };
+
+  window.hideStartClassModal = function () {
+    document.getElementById('startClassModal').classList.remove('open');
+  };
+
+  // Close modal when clicking the backdrop
+  document.getElementById('startClassModal').addEventListener('click', function (e) {
+    if (e.target === this) window.hideStartClassModal();
+  });
+
+  // ── Clipboard helper ──────────────────────────────────────────────────
+  // btn is the Copy button; its previous sibling is the input
+  window.copyToClipboard = function (btn) {
+    var input = btn.previousElementSibling;
+    // Temporarily reveal password inputs so execCommand can copy
+    var wasPassword = input.type === 'password';
+    if (wasPassword) input.type = 'text';
+    input.select();
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value);
+      } else {
+        document.execCommand('copy');
+      }
+    } catch (_) {}
+    if (wasPassword) input.type = 'password';
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function () { btn.textContent = orig; }, 2000);
+  };
+
+  // ── Show/hide password helper ─────────────────────────────────────────
+  // btn is the Show/Hide button; its previous sibling is the input
+  window.toggleVisibility = function (btn) {
+    var input = btn.previousElementSibling;
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = 'Hide';
+    } else {
+      input.type = 'password';
+      btn.textContent = 'Show';
+    }
+  };
+
+  // ── HLS player initialisation ─────────────────────────────────────────
+  function initHLSPlayer(video) {
+    var cameraId = video.dataset.cameraId;
+    var token    = video.dataset.token;
+    var videoId  = video.id;
+
+    // Derive overlay / message / status element IDs from the video ID
+    // video id is either "video-{id}" or "video-m-{id}"
+    var suffix   = videoId.replace(/^video-/, '');          // e.g. "42" or "m-7"
+    var overlayEl = document.getElementById('overlay-' + suffix);
+    var msgEl     = document.getElementById('msg-'     + suffix);
+    var statusEl  = document.getElementById('status-'  + suffix);
+
+    var url = '/cameras/camera-feed/' + cameraId + '/?file=stream.m3u8&token=' + token;
+
+    if (!Hls.isSupported()) {
+      // Safari native HLS
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        video.addEventListener('loadedmetadata', function () {
+          video.play();
+          if (overlayEl) overlayEl.classList.add('hidden');
+          if (statusEl)  statusEl.style.display = 'inline';
+        });
+      }
+      return;
     }
 
-    document.querySelectorAll('.hls-player').forEach(video => {
-        const cameraId = video.dataset.cameraId;
-        const streamKey = video.dataset.streamKey;
-        const token = video.dataset.token;
-        let url;
-        
-        if (streamKey) {
-            url = `/cameras/live-class/feed/${streamKey}/?file=stream.m3u8&token=${token}`;
-        } else {
-            const isMobile = video.classList.contains('mobile');
-            url = `/cameras/camera-feed/${cameraId}/?file=stream.m3u8&token=${token}${isMobile ? '&mobile=true' : ''}`;
-        }
-        
-        const overlayId = video.id.replace('video-', 'overlay-');
-        hlsPlayers[video.id] = initHLS(video, url, null, overlayId);
+    var hls = new Hls({
+      lowLatencyMode: true,
+      liveDurationInfinity: true
     });
 
-    function showStartClassModal() {
-        document.getElementById('startClassModal').classList.add('active');
-    }
+    hls.loadSource(url);
+    hls.attachMedia(video);
 
-    function hideStartClassModal() {
-        document.getElementById('startClassModal').classList.remove('active');
-    }
+    hls.on(Hls.Events.MANIFEST_PARSED, function () {
+      video.play().catch(function () {});
+      if (overlayEl) overlayEl.classList.add('hidden');
+      if (statusEl)  statusEl.style.display = 'inline';
+    });
 
-    function copyToClipboard(btn) {
-        const input = btn.previousElementSibling;
-        input.select();
-        document.execCommand('copy');
-        const originalText = btn.innerText;
-        btn.innerText = 'Copied!';
-        setTimeout(() => btn.innerText = originalText, 2000);
-    }
+    hls.on(Hls.Events.ERROR, function (event, data) {
+      if (!data.fatal) return;
 
-    function toggleVisibility(btn) {
-        const input = btn.previousElementSibling;
-        if (input.type === 'password') {
-            input.type = 'text';
-            btn.innerText = 'Hide';
-        } else {
-            input.type = 'password';
-            btn.innerText = 'Show';
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        var delay = 8000;
+        var message = 'Retrying\u2026';
+        if (data.response && data.response.code === 503) {
+          delay = 5000;
+          message = 'Stream starting\u2026';
         }
+        if (msgEl) msgEl.textContent = message;
+        if (overlayEl) overlayEl.classList.remove('hidden');
+        if (statusEl)  statusEl.style.display = 'none';
+        setTimeout(function () {
+          hls.loadSource(url);
+          hls.startLoad();
+        }, delay);
+
+      } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        hls.recoverMediaError();
+      }
+    });
+  }
+
+  // Initialise all HLS players on the page
+  document.querySelectorAll('.hls-player').forEach(function (video) {
+    initHLSPlayer(video);
+  });
+
+  // ── WebSocket: live viewer count ──────────────────────────────────────
+  {% if active_class %}
+  (function () {
+    var streamKey = '{{ active_class.stream_key|escapejs }}';
+    var protocol  = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var ws;
+
+    function connect() {
+      try {
+        ws = new WebSocket(protocol + '//' + window.location.host + '/ws/live-class/' + streamKey + '/');
+      } catch (e) { return; }
+
+      ws.onmessage = function (e) {
+        try {
+          var data = JSON.parse(e.data);
+          if (data.type === 'viewer_count') {
+            var el = document.getElementById('viewer-count');
+            if (el) {
+              var n = data.count;
+              el.textContent = '\uD83D\uDC41 ' + n + ' viewer' + (n === 1 ? '' : 's');
+            }
+          }
+        } catch (_) {}
+      };
+
+      ws.onclose = function () {
+        setTimeout(connect, 5000);
+      };
     }
 
-    // WebSocket logic for Live Class
-    {% if active_class %}
-    const streamKey = "{{ active_class.stream_key }}";
-    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const chatSocket = new WebSocket(
-        wsScheme + '://' + window.location.host + '/ws/live-class/' + streamKey + '/'
-    );
+    connect();
+  })();
+  {% endif %}
 
-    chatSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        if (data.type === 'viewer_count') {
-            document.getElementById('viewer-count').innerText = data.count;
-        } else if (data.type === 'chat') {
-            // Handle chat messages if UI exists
-            console.log('Chat message:', data.username + ': ' + data.message);
-        }
-    };
-
-    chatSocket.onclose = function(e) {
-        console.error('Chat socket closed unexpectedly');
-    };
-    {% endif %}
+})();
 </script>
 {% endblock %}

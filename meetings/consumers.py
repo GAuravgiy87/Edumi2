@@ -210,6 +210,15 @@ class MeetingConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"Receive error: {e}")
     
+    async def chat_message(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'chat',
+            'message': event['message'],
+            'username': event['username'],
+            'user_id': event['user_id'],
+            'timestamp': event['timestamp']
+        }))
+
     async def user_joined(self, event):
         await self.send(text_data=json.dumps({
             'type': 'user_joined',

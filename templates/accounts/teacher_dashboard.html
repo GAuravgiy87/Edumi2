@@ -243,7 +243,7 @@
                     {% for meeting in live_meetings_list %}
                     <div class="timeline-item">
                         <span class="time-stamp">{{ meeting.scheduled_time|date:"h:i A" }} - NOW <span class="live-badge"><i data-lucide="circle" style="width:8px;fill:currentColor;"></i> LIVE</span></span>
-                        <a href="{% url 'join_meeting' meeting.meeting_code %}" style="text-decoration: none;">
+                        <a href="{% url 'join_meeting' meeting.meeting_code %}" style="text-decoration: none;" data-turbo="false">
                             <div class="timeline-content" style="border-color: #ef4444; background: #fffbff;">
                                 <h4 class="class-title">{{ meeting.title }}</h4>
                                 <div class="class-meta"><i data-lucide="map-pin" style="width:14px;"></i> {{ meeting.meeting_code }} • {{ meeting.participants.count }} Students</div>
@@ -257,7 +257,7 @@
                     {% for meeting in upcoming_meetings %}
                     <div class="timeline-item">
                         <span class="time-stamp">{{ meeting.scheduled_time|date:"h:i A" }} - {{ meeting.scheduled_time|date:"M d" }}</span>
-                        <a href="{% url 'join_meeting' meeting.meeting_code %}" style="text-decoration: none;">
+                        <a href="{% url 'join_meeting' meeting.meeting_code %}" style="text-decoration: none;" data-turbo="false">
                             <div class="timeline-content">
                                 <h4 class="class-title">{{ meeting.title }}</h4>
                                 <div class="class-meta"><i data-lucide="clock" style="width:14px;"></i> {{ meeting.duration_minutes }} mins • {{ meeting.meeting_code }}</div>

@@ -1,6 +1,7 @@
 import threading
 import time
 import logging
+import os
 from typing import Optional
 from urllib.parse import urlparse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -16,6 +17,9 @@ from .head_count_service import head_count_manager
 from .utils import verify_stream_token, generate_stream_token, is_admin, auto_detect_stream_path, parse_stream_url, validate_rtsp_url
 
 logger = logging.getLogger('cameras')
+
+# Camera service base URL — configurable via env so docker-compose can override
+CAMERA_SVC = os.environ.get('CAMERA_SERVICE_URL', '{CAMERA_SVC}')
 
 
 def can_manage_camera(user, camera):
@@ -42,181 +46,200 @@ def can_view_camera(user, camera):
 def admin_dashboard(request):
     if not is_admin(request.user):
         return redirect('login')
-    
+
     from django.core.paginator import Paginator
-    
+
     camera_list = Camera.objects.all().order_by('-id')
-    paginator = Paginator(camera_list, 10) # 10 cameras per page
+    paginator = Paginator(camera_list, 20)
     page_number = request.GET.get('page')
     cameras = paginator.get_page(page_number)
-    
-    teachers = User.objects.filter(userprofile__user_type='teacher')
-    
-    # Get permissions for each camera on this page
-    camera_permissions = {}
+
+    # Annotate each camera with teacher count and token
     from .utils import generate_stream_token
     for camera in cameras:
-        camera_permissions[camera.id] = camera.get_authorized_teachers()
+        camera.teacher_count = CameraPermission.objects.filter(camera=camera).count()
         camera.temp_token = generate_stream_token(request.user, camera.id)
-    
+
     context = {
         'cameras': cameras,
-        'teachers': teachers,
-        'camera_permissions': camera_permissions,
+        'csrf_token': request.META.get('CSRF_COOKIE', ''),
     }
     return render(request, 'cameras/admin_dashboard.html', context)
 
 @login_required
 def add_camera(request):
     if not is_admin(request.user):
-        return redirect('login')
-    
-    if request.method == 'POST':
-        # Check if RTSP URL is provided
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    if request.method != 'POST':
+        return redirect('admin_dashboard')
+
+    camera_type = request.POST.get('camera_type', 'rtsp')
+    name = request.POST.get('name', '').strip()
+
+    if not name:
+        return JsonResponse({'error': 'Camera name is required.'}, status=400)
+
+    # Duplicate name check
+    if Camera.objects.filter(name__iexact=name).exists():
+        return JsonResponse({'error': f'A camera named "{name}" already exists.'}, status=400)
+
+    if camera_type == 'rtsp':
         rtsp_url_input = request.POST.get('rtsp_url', '').strip()
-        
-        if rtsp_url_input:
-            # Parse RTSP URL to extract components (ignore the path, we'll auto-detect)
-            try:
-                parsed = parse_stream_url(rtsp_url_input)
-                name = request.POST.get('name') or f"Camera {parsed['ip_address']}"
-                ip_address = parsed['ip_address']
-                port = parsed['port']
-                username = parsed['username']
-                password = parsed['password']
-            except Exception as e:
-                return render(request, 'cameras/add_camera.html', {
-                    'error': f'Invalid RTSP URL format: {str(e)}'
-                })
-        else:
-            # Use manual input
-            name = request.POST.get('name')
-            ip_address = request.POST.get('ip_address')
-            port = int(request.POST.get('port', 554))
-            username = request.POST.get('username', '')
-            password = request.POST.get('password', '')
-        
-        # ALWAYS auto-detect the correct RTSP path using the unified utility
-        logger.info(f"Auto-detecting RTSP path for {ip_address}:{port}")
-        detected_path, rtsp_url = auto_detect_stream_path(ip_address, port, username, password, protocol='rtsp')
-        
-        if detected_path:
-            logger.info(f"Successfully detected path: {detected_path}")
-            Camera.objects.create(
-                name=name,
-                rtsp_url=rtsp_url,
-                ip_address=ip_address,
-                port=port,
-                username=username,
-                password=password,
-                stream_path=detected_path,
-                is_active=True
-            )
-            return redirect('admin_dashboard')
-        else:
-            # If auto-detection fails, save with default path but mark as inactive
-            logger.warning(f"Could not auto-detect path for {ip_address}:{port}")
-            if username and password:
-                from urllib.parse import quote
-                safe_user = quote(username)
-                safe_pass = quote(password)
-                rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip_address}:{port}/stream"
-            else:
-                rtsp_url = f"rtsp://{ip_address}:{port}/stream"
-            
-            Camera.objects.create(
-                name=name,
-                rtsp_url=rtsp_url,
-                ip_address=ip_address,
-                port=port,
-                username=username,
-                password=password,
-                stream_path='/stream',
-                is_active=False  # Mark as inactive if path not detected
-            )
-            return render(request, 'cameras/add_camera.html', {
-                'error': 'Could not auto-detect camera path. Camera saved but marked as inactive. Please verify camera is online and accessible.'
-            })
-    
-    return render(request, 'cameras/add_camera.html')
+        if not rtsp_url_input:
+            return JsonResponse({'error': 'RTSP URL is required.'}, status=400)
+        if Camera.objects.filter(rtsp_url=rtsp_url_input).exists():
+            return JsonResponse({'error': 'A camera with this RTSP URL already exists.'}, status=400)
+        try:
+            parsed = parse_stream_url(rtsp_url_input)
+            ip_address = parsed['ip_address']
+            port = parsed['port']
+            username = parsed['username']
+            password = parsed['password']
+        except Exception as e:
+            return JsonResponse({'error': f'Invalid RTSP URL: {str(e)}'}, status=400)
+        protocol = 'rtsp'
+
+    elif camera_type == 'rtsp_ip':
+        # RTSP camera added by IP + port + credentials (no URL needed)
+        ip_address = request.POST.get('ip_address', '').strip()
+        if not ip_address:
+            return JsonResponse({'error': 'IP address is required.'}, status=400)
+        try:
+            port = int(request.POST.get('port', '554').strip() or '554')
+        except ValueError:
+            return JsonResponse({'error': 'Port must be a number.'}, status=400)
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        protocol = 'rtsp'
+        # Duplicate IP+port check
+        if Camera.objects.filter(ip_address=ip_address, port=port).exists():
+            return JsonResponse({'error': f'A camera at {ip_address}:{port} already exists.'}, status=400)
+
+    elif camera_type in ('droidcam', 'ipwebcam'):
+        ip_address = request.POST.get('ip_address', '').strip()
+        if not ip_address:
+            return JsonResponse({'error': 'IP address is required.'}, status=400)
+        port = 4747 if camera_type == 'droidcam' else 8080
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        protocol = 'http'
+        # Duplicate IP+port check
+        if Camera.objects.filter(ip_address=ip_address, port=port).exists():
+            return JsonResponse({'error': f'A camera at {ip_address}:{port} already exists.'}, status=400)
+    else:
+        return JsonResponse({'error': 'Unknown camera type.'}, status=400)
+
+    logger.info(f"Auto-detecting path for {ip_address}:{port} ({camera_type})")
+    detected_path, stream_url = auto_detect_stream_path(ip_address, port, username, password, protocol=protocol)
+
+    if detected_path:
+        Camera.objects.create(
+            name=name,
+            rtsp_url=stream_url,
+            ip_address=ip_address,
+            port=port,
+            username=username,
+            password=password,
+            stream_path=detected_path,
+            is_active=True
+        )
+        return JsonResponse({'success': True})
+    else:
+        return JsonResponse({
+            'error': f'Could not connect to camera at {ip_address}:{port}. '
+                     'Check the device is powered on, reachable on the network, and credentials are correct.'
+        }, status=400)
     
 @login_required
 def edit_camera(request, camera_id):
     if not is_admin(request.user):
-        return redirect('login')
-        
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
     camera = get_object_or_404(Camera, id=camera_id)
-    
-    if request.method == 'POST':
-        rtsp_url_input = request.POST.get('rtsp_url', '').strip()
-        name = request.POST.get('name') or camera.name
-        
-        if rtsp_url_input:
-            try:
-                parsed = parse_stream_url(rtsp_url_input)
-                ip_address = parsed['ip_address']
-                port = parsed['port']
-                username = parsed['username']
-                password = parsed['password']
-            except Exception as e:
-                return render(request, 'cameras/edit_camera.html', {
-                    'camera': camera,
-                    'error': f'Invalid RTSP URL format: {str(e)}'
-                })
-        else:
-            ip_address = request.POST.get('ip_address') or camera.ip_address
-            port = int(request.POST.get('port') or camera.port)
-            username = request.POST.get('username') or camera.username
-            password = request.POST.get('password') or camera.password
-            
-        logger.info(f"Auto-detecting RTSP path for {ip_address}:{port}")
-        detected_path, rtsp_url = auto_detect_stream_path(ip_address, port, username, password, protocol='rtsp')
-        
-        if detected_path:
-            logger.info(f"Successfully detected path: {detected_path}")
+
+    if request.method != 'POST':
+        return redirect('admin_dashboard')
+
+    name = request.POST.get('name', '').strip() or camera.name
+    rtsp_url_input = request.POST.get('rtsp_url', '').strip()
+    force_url = request.POST.get('force_url', '').strip()  # direct override, skip auto-detect
+
+    # Duplicate name check (exclude self)
+    if Camera.objects.filter(name__iexact=name).exclude(id=camera_id).exists():
+        return JsonResponse({'error': f'A camera named "{name}" already exists.'}, status=400)
+
+    # ── Force URL mode: user provides exact working URL, skip auto-detection ──
+    if force_url:
+        if Camera.objects.filter(rtsp_url=force_url).exclude(id=camera_id).exists():
+            return JsonResponse({'error': 'A camera with this URL already exists.'}, status=400)
+        # Validate it actually works
+        is_valid, err = validate_rtsp_url(force_url, timeout=5)
+        if not is_valid:
+            return JsonResponse({
+                'error': f'URL does not appear to serve a video stream: {err}. '
+                         'If you are sure it works, the camera service may need to be running.'
+            }, status=400)
+        try:
+            parsed = parse_stream_url(force_url)
             camera.name = name
-            camera.rtsp_url = rtsp_url
-            camera.ip_address = ip_address
-            camera.port = port
-            camera.username = username
-            camera.password = password
-            camera.stream_path = detected_path
+            camera.rtsp_url = force_url
+            camera.ip_address = parsed['ip_address']
+            camera.port = parsed['port']
+            camera.username = parsed['username']
+            camera.password = parsed['password']
+            camera.stream_path = parsed['stream_path']
             camera.is_active = True
             camera.save()
-            return redirect('admin_dashboard')
-        else:
-            logger.warning(f"Could not auto-detect path for {ip_address}:{port}")
-            if username and password:
-                from urllib.parse import quote
-                safe_user = quote(username)
-                safe_pass = quote(password)
-                rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip_address}:{port}/stream"
-            else:
-                rtsp_url = f"rtsp://{ip_address}:{port}/stream"
-                
-            camera.name = name
-            camera.rtsp_url = rtsp_url
-            camera.ip_address = ip_address
-            camera.port = port
-            camera.username = username
-            camera.password = password
-            camera.stream_path = '/stream'
-            camera.is_active = False
-            camera.save()
-            
-            return render(request, 'cameras/edit_camera.html', {
-                'camera': camera,
-                'error': 'Could not auto-detect camera path. Camera updated but marked as inactive. Please verify camera is online and accessible.'
-            })
-            
-    return render(request, 'cameras/edit_camera.html', {'camera': camera})
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'error': f'Could not parse URL: {str(e)}'}, status=400)
+
+    # ── Auto-detect mode ──────────────────────────────────────────────────────
+    if rtsp_url_input:
+        if Camera.objects.filter(rtsp_url=rtsp_url_input).exclude(id=camera_id).exists():
+            return JsonResponse({'error': 'A camera with this RTSP URL already exists.'}, status=400)
+        try:
+            parsed = parse_stream_url(rtsp_url_input)
+            ip_address = parsed['ip_address']
+            port = parsed['port']
+            username = parsed['username']
+            password = parsed['password']
+        except Exception as e:
+            return JsonResponse({'error': f'Invalid URL: {str(e)}'}, status=400)
+    else:
+        ip_address = request.POST.get('ip_address') or camera.ip_address
+        port = int(request.POST.get('port') or camera.port)
+        username = request.POST.get('username', camera.username)
+        password = request.POST.get('password', camera.password)
+
+    logger.info(f"Auto-detecting path for {ip_address}:{port}")
+    detected_path, stream_url = auto_detect_stream_path(ip_address, port, username, password, protocol='rtsp')
+
+    if detected_path:
+        camera.name = name
+        camera.rtsp_url = stream_url
+        camera.ip_address = ip_address
+        camera.port = port
+        camera.username = username
+        camera.password = password
+        camera.stream_path = detected_path
+        camera.is_active = True
+        camera.save()
+        return JsonResponse({'success': True})
+    else:
+        return JsonResponse({
+            'error': f'Auto-detection failed for {ip_address}:{port}. '
+                     'If you know the exact stream URL, use the "Direct URL" field below to set it manually.'
+        }, status=400)
 
 @login_required
 def delete_camera(request, camera_id):
-    """Delete a camera and stop its streamer"""
+    """Delete a camera"""
     if not is_admin(request.user):
         return redirect('login')
-    
+    if request.method != 'POST':
+        return redirect('admin_dashboard')
     camera = get_object_or_404(Camera, id=camera_id)
     camera.delete()
     return redirect('admin_dashboard')
@@ -225,59 +248,82 @@ def delete_camera(request, camera_id):
 
 @login_required
 def camera_feed(request, camera_id):
-    """
-    Proxy the HLS camera feed from the camera proxy service.
-    """
-    """Proxy the camera HLS feed with token validation"""
+    """Proxy the HLS camera feed from the camera service, rewriting segment URLs."""
+    import requests as req_lib
+    from django.http import HttpResponse, StreamingHttpResponse
+
     token = request.GET.get('token')
     if not verify_stream_token(token, camera_id):
         return HttpResponse("Unauthorized: Invalid or expired token", status=403)
-        
-    import requests
-    from django.http import HttpResponse, StreamingHttpResponse
-    
-    # Rate limiting (Simple implementation)
-    from django.core.cache import cache
-    rate_key = f"rate_limit_{request.user.id}"
-    requests_count = cache.get(rate_key, 0)
-    if requests_count > 100: # 100 fragments per minute
-        return HttpResponse("Rate limit exceeded", status=429)
-    cache.set(rate_key, requests_count + 1, 60)
 
     filename = request.GET.get('file', 'stream.m3u8')
     is_mobile = request.GET.get('mobile', 'false') == 'true'
-    
-    # Get the camera object to get the RTSP URL if needed
+
+    # Permission check
     if is_mobile:
         camera = get_object_or_404(MobileCamera, id=camera_id)
-        # Verify permission
-        if not is_admin(request.user) and not MobileCameraPermission.objects.filter(mobile_camera=camera, teacher=request.user).exists():
+        if not is_admin(request.user) and not MobileCameraPermission.objects.filter(
+                mobile_camera=camera, teacher=request.user).exists():
             return HttpResponse("Forbidden", status=403)
-        feed_url = f'http://localhost:8001/api/mobile-cameras/{camera_id}/feed/?file={filename}'
+        svc_feed_url = f'{CAMERA_SVC}/api/mobile-cameras/{camera_id}/feed/?file={filename}'
     else:
         camera = get_object_or_404(Camera, id=camera_id)
-        if not camera.has_permission(request.user):
+        if not can_view_camera(request.user, camera):
             return HttpResponse("Forbidden", status=403)
-        feed_url = f'http://localhost:8001/api/cameras/{camera_id}/feed/?file={filename}'
+        svc_feed_url = f'{CAMERA_SVC}/api/cameras/{camera_id}/feed/?file={filename}'
 
     try:
-        response = requests.get(feed_url, stream=True, timeout=10)
-        if response.status_code == 200:
-            content_type = response.headers.get('Content-Type', 'application/octet-stream')
-            django_response = StreamingHttpResponse(
-                response.iter_content(chunk_size=8192),
-                content_type=content_type
-            )
-            # Copy important headers
-            if 'Cache-Control' in response.headers:
-                django_response['Cache-Control'] = response.headers['Cache-Control']
-            django_response['Access-Control-Allow-Origin'] = '*'
-            return django_response
-        else:
-            return HttpResponse(status=response.status_code)
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error proxying HLS feed for camera {camera_id}: {e}")
+        svc_resp = req_lib.get(svc_feed_url, stream=True, timeout=15)
+    except req_lib.exceptions.ConnectionError:
+        logger.error(f"Camera service not running on :8001 for camera {camera_id}")
+        return JsonResponse({'error': 'Camera service not running on port 8001'}, status=503)
+    except req_lib.exceptions.RequestException as e:
+        logger.error(f"Error proxying feed for camera {camera_id}: {e}")
         return JsonResponse({'error': 'Proxy server unavailable'}, status=503)
+
+    if svc_resp.status_code == 503:
+        return JsonResponse({'error': 'Stream not ready yet. FFmpeg is connecting to the camera.'}, status=503)
+
+    if svc_resp.status_code != 200:
+        return HttpResponse(status=svc_resp.status_code)
+
+    content_type = svc_resp.headers.get('Content-Type', 'application/octet-stream')
+
+    # ── Rewrite .m3u8 manifest so segment URLs route back through this proxy ──
+    # The camera service returns relative segment names (e.g. "segment_042.ts").
+    # HLS.js resolves them against the manifest URL, which would produce wrong
+    # paths. We rewrite each segment line to an absolute proxy URL with the
+    # token so the browser fetches segments through this view.
+    if filename.endswith('.m3u8'):
+        manifest = svc_resp.content.decode('utf-8', errors='replace')
+        proxy_base = request.build_absolute_uri(
+            f'/cameras/camera-feed/{camera_id}/'
+        )
+        mobile_param = '&mobile=true' if is_mobile else ''
+        rewritten_lines = []
+        for line in manifest.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                # It's a segment filename — rewrite to absolute proxy URL
+                seg_url = f'{proxy_base}?file={stripped}&token={token}{mobile_param}'
+                rewritten_lines.append(seg_url)
+            else:
+                rewritten_lines.append(line)
+        rewritten = '\n'.join(rewritten_lines) + '\n'
+        response = HttpResponse(rewritten, content_type='application/vnd.apple.mpegurl')
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    # ── Stream .ts segments straight through ──────────────────────────────────
+    django_response = StreamingHttpResponse(
+        svc_resp.iter_content(chunk_size=8192),
+        content_type=content_type,
+    )
+    django_response['Access-Control-Allow-Origin'] = '*'
+    if 'Cache-Control' in svc_resp.headers:
+        django_response['Cache-Control'] = svc_resp.headers['Cache-Control']
+    return django_response
 
 @login_required
 def live_monitor(request):
@@ -319,7 +365,7 @@ def live_monitor(request):
     import requests
     camera_service_running = False
     try:
-        response = requests.get('http://localhost:8001/api/cameras/', timeout=2)
+        response = requests.get('{CAMERA_SVC}/api/cameras/', timeout=2)
         camera_service_running = response.status_code == 200
     except:
         pass
@@ -341,6 +387,7 @@ def view_camera(request, camera_id):
     
     from .utils import generate_stream_token
     camera.temp_token = generate_stream_token(request.user, camera.id)
+    camera.teacher_count = CameraPermission.objects.filter(camera=camera).count()
     return render(request, 'cameras/view_camera.html', {'camera': camera})
 
 @login_required
@@ -351,7 +398,7 @@ def test_camera_connection(request, camera_id):
     
     try:
         # Use camera service for testing (it has better RTSP handling)
-        camera_service_url = f'http://localhost:8001/api/cameras/{camera_id}/test/'
+        camera_service_url = f'{CAMERA_SVC}/api/cameras/{camera_id}/test/'
         response = requests.get(camera_service_url, timeout=30)
         
         if response.status_code == 200:
@@ -437,7 +484,7 @@ def start_live_class(request):
         # Notify camera service to start listening
         import requests
         try:
-            requests.get(f'http://localhost:8001/api/live-class/start/{stream_key}/', timeout=5)
+            requests.get(f'{CAMERA_SVC}/api/live-class/start/{stream_key}/', timeout=5)
         except:
             logger.error("Failed to connect to camera service for live class start")
             
@@ -456,7 +503,7 @@ def stop_live_class(request, class_id):
     # Notify camera service to stop listening
     import requests
     try:
-        requests.get(f'http://localhost:8001/api/live-class/stop/{live_class.stream_key}/', timeout=5)
+        requests.get(f'{CAMERA_SVC}/api/live-class/stop/{live_class.stream_key}/', timeout=5)
         
         # Scan for recording chunks
         # In a real setup, we'd wait a few seconds for FFmpeg to flush
@@ -574,41 +621,51 @@ def active_live_classes(request):
 @login_required
 def live_class_feed(request, stream_key):
     """Proxy the live class HLS feed from the camera service with token validation"""
+    import requests as req_lib
+    from django.http import HttpResponse, StreamingHttpResponse
+
     token = request.GET.get('token')
     if not verify_stream_token(token, stream_key):
         return HttpResponse("Unauthorized: Invalid or expired token", status=403)
-        
-    import requests
-    from django.http import HttpResponse, StreamingHttpResponse
-    
-    # Rate limiting
-    from django.core.cache import cache
-    rate_key = f"rate_limit_live_{request.user.id}"
-    requests_count = cache.get(rate_key, 0)
-    if requests_count > 100:
-        return HttpResponse("Rate limit exceeded", status=429)
-    cache.set(rate_key, requests_count + 1, 60)
 
     filename = request.GET.get('file', 'stream.m3u8')
-    camera_service_url = f'http://localhost:8001/api/live/feed/{stream_key}/?file={filename}'
-    
+    svc_url = f'{CAMERA_SVC}/api/live/feed/{stream_key}/?file={filename}'
+
     try:
-        response = requests.get(camera_service_url, stream=True, timeout=10)
-        if response.status_code == 200:
-            content_type = response.headers.get('Content-Type', 'application/octet-stream')
-            django_response = StreamingHttpResponse(
-                response.iter_content(chunk_size=8192),
-                content_type=content_type
-            )
-            django_response['Access-Control-Allow-Origin'] = '*'
-            if 'Cache-Control' in response.headers:
-                django_response['Cache-Control'] = response.headers['Cache-Control']
-            return django_response
-        else:
-            return HttpResponse(status=response.status_code)
+        svc_resp = req_lib.get(svc_url, stream=True, timeout=10)
     except Exception as e:
         logger.error(f"Error proxying live class feed: {e}")
         return JsonResponse({'error': 'Proxy server unavailable'}, status=503)
+
+    if svc_resp.status_code != 200:
+        return HttpResponse(status=svc_resp.status_code)
+
+    content_type = svc_resp.headers.get('Content-Type', 'application/octet-stream')
+
+    if filename.endswith('.m3u8'):
+        manifest = svc_resp.content.decode('utf-8', errors='replace')
+        proxy_base = request.build_absolute_uri(f'/cameras/live-class/feed/{stream_key}/')
+        rewritten_lines = []
+        for line in manifest.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                rewritten_lines.append(f'{proxy_base}?file={stripped}&token={token}')
+            else:
+                rewritten_lines.append(line)
+        rewritten = '\n'.join(rewritten_lines) + '\n'
+        response = HttpResponse(rewritten, content_type='application/vnd.apple.mpegurl')
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    django_response = StreamingHttpResponse(
+        svc_resp.iter_content(chunk_size=8192),
+        content_type=content_type,
+    )
+    django_response['Access-Control-Allow-Origin'] = '*'
+    if 'Cache-Control' in svc_resp.headers:
+        django_response['Cache-Control'] = svc_resp.headers['Cache-Control']
+    return django_response
 
 @login_required
 def grant_permission(request, camera_id):
@@ -652,15 +709,17 @@ def manage_permissions(request, camera_id):
     """Manage camera permissions"""
     if not is_admin(request.user):
         return redirect('login')
-    
+
     camera = get_object_or_404(Camera, id=camera_id)
-    teachers = User.objects.filter(userprofile__user_type='teacher')
     authorized_teachers = camera.get_authorized_teachers()
-    
+    authorized_ids = set(authorized_teachers.values_list('id', flat=True))
+    all_teachers = User.objects.filter(userprofile__user_type='teacher').order_by('first_name', 'username')
+    unauthorized_teachers = all_teachers.exclude(id__in=authorized_ids)
+
     context = {
         'camera': camera,
-        'teachers': teachers,
         'authorized_teachers': authorized_teachers,
+        'unauthorized_teachers': unauthorized_teachers,
     }
     return render(request, 'cameras/manage_permissions.html', context)
 
@@ -1068,7 +1127,7 @@ def simulate_load(request):
         results = []
         for i in range(count):
             try:
-                resp = requests.post('http://localhost:8001/api/cameras/start/', json={
+                resp = requests.post('{CAMERA_SVC}/api/cameras/start/', json={
                     'camera_id': f'load_test_{i}',
                     'url': test_url
                 })
@@ -1079,3 +1138,5 @@ def simulate_load(request):
         return render(request, 'cameras/load_test_results.html', {'results': results})
         
     return render(request, 'cameras/simulate_load.html')
+
+

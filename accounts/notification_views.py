@@ -39,17 +39,18 @@ def mark_all_notifications_read(request):
     return JsonResponse({'status': 'success'})
 
 
-@login_required
 def get_unread_count(request):
     """Get unread notification count (for AJAX polling)"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'count': 0})
     count = Notification.get_unread_count(request.user)
-    
     return JsonResponse({'count': count})
 
 
-@login_required
 def get_recent_notifications(request):
     """Get recent notifications (for dropdown)"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'notifications': [], 'unread_count': 0})
     notifications = Notification.objects.filter(recipient=request.user)[:10]
     
     data = [{

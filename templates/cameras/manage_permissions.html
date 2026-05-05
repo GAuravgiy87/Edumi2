@@ -1,350 +1,200 @@
-{% extends 'base_sidebar.html' %}
+﻿{% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}Manage Permissions{% endblock %}
+{% block page_title %}Assign Teachers — {{ camera.name }}{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="page-header">
-        <h1>Manage Camera Permissions</h1>
-        <p class="subtitle">{{ camera.name }}</p>
+<div class="perm-page">
+
+  <!-- Header -->
+  <div class="perm-header">
+    <div>
+      <a href="{% url 'admin_dashboard' %}" class="back-link">
+        <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Camera Management
+      </a>
+      <h1 class="perm-title">Assign Teachers</h1>
+      <p class="perm-sub">Camera: <strong>{{ camera.name }}</strong> &nbsp;·&nbsp; {{ camera.ip_address }}:{{ camera.port }}</p>
     </div>
-    
-    <div class="permissions-grid">
-        <!-- Authorized Teachers -->
-        <div class="permission-card">
-            <div class="card-header">
-                <h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    Authorized Teachers
-                </h2>
-                <span class="badge">{{ authorized_teachers.count }}</span>
-            </div>
-            
-            <div class="teacher-list">
-                {% if authorized_teachers %}
-                    {% for teacher in authorized_teachers %}
-                    <div class="teacher-item authorized">
-                        <div class="teacher-info">
-                            <img src="{{ teacher.userprofile.get_profile_picture_url }}" alt="{{ teacher.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ teacher.get_full_name|default:teacher.username|urlencode }}&background=10b981&color=fff&size=40'">
-                            <div>
-                                <p class="teacher-name">{{ teacher.get_full_name|default:teacher.username }}</p>
-                                <p class="teacher-username">@{{ teacher.username }}</p>
-                            </div>
-                        </div>
-                        <button class="btn-revoke" onclick="revokePermission({{ camera.id }}, {{ teacher.id }}, '{{ teacher.username }}')">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            Revoke
-                        </button>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-state">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        <p>No teachers have access yet</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        
-        <!-- Unauthorized Teachers -->
-        <div class="permission-card">
-            <div class="card-header">
-                <h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                    Available Teachers
-                </h2>
-                <span class="badge">{{ unauthorized_teachers.count }}</span>
-            </div>
-            
-            <div class="teacher-list">
-                {% if unauthorized_teachers %}
-                    {% for teacher in unauthorized_teachers %}
-                    <div class="teacher-item">
-                        <div class="teacher-info">
-                            <img src="{{ teacher.userprofile.get_profile_picture_url }}" alt="{{ teacher.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ teacher.get_full_name|default:teacher.username|urlencode }}&background=6366f1&color=fff&size=40'">
-                            <div>
-                                <p class="teacher-name">{{ teacher.get_full_name|default:teacher.username }}</p>
-                                <p class="teacher-username">@{{ teacher.username }}</p>
-                            </div>
-                        </div>
-                        <button class="btn-grant" onclick="grantPermission({{ camera.id }}, {{ teacher.id }}, '{{ teacher.username }}')">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            Grant Access
-                        </button>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-state">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        <p>All teachers have access</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
+    <div class="perm-stats">
+      <div class="stat-pill stat-green">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        {{ authorized_teachers.count }} Assigned
+      </div>
+      <div class="stat-pill stat-gray">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        {{ unauthorized_teachers.count }} Available
+      </div>
     </div>
-    
-    <div class="actions">
-        <a href="{% url 'admin_dashboard' %}" class="btn-secondary">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-            Back to Dashboard
-        </a>
+  </div>
+
+  <div class="perm-grid">
+
+    <!-- ── Assigned Teachers ─────────────────────────────────────────── -->
+    <div class="perm-card">
+      <div class="pcard-head">
+        <h2>
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          Assigned Teachers
+        </h2>
+        <span class="count-badge count-green">{{ authorized_teachers.count }}</span>
+      </div>
+      <div class="teacher-list" id="assignedList">
+        {% if authorized_teachers %}
+          {% for t in authorized_teachers %}
+          <div class="teacher-row" data-name="{{ t.get_full_name|lower }} {{ t.username|lower }}" data-id="{{ t.id }}">
+            <img src="{{ t.userprofile.get_profile_picture_url }}" alt="{{ t.username }}"
+                 onerror="this.src='https://ui-avatars.com/api/?name={{ t.get_full_name|default:t.username|urlencode }}&background=10b981&color=fff&size=40'">
+            <div class="teacher-meta">
+              <p class="t-name">{{ t.get_full_name|default:t.username }}</p>
+              <p class="t-sub">@{{ t.username }}{% if t.userprofile.employee_id %} · ID {{ t.userprofile.employee_id }}{% endif %}</p>
+            </div>
+            <button class="taction-btn taction-revoke"
+                    onclick="revokePermission({{ camera.id }}, {{ t.id }}, '{{ t.username|escapejs }}')">
+              <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Revoke
+            </button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p>No teachers assigned yet</p>
+          </div>
+        {% endif %}
+      </div>
     </div>
+
+    <!-- ── Available Teachers ────────────────────────────────────────── -->
+    <div class="perm-card">
+      <div class="pcard-head">
+        <h2>
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Available Teachers
+        </h2>
+        <span class="count-badge count-gray">{{ unauthorized_teachers.count }}</span>
+      </div>
+
+      <!-- Search -->
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="teacherSearch" placeholder="Search by name or ID…" oninput="filterTeachers(this.value)">
+      </div>
+
+      <div class="teacher-list" id="availableList">
+        {% if unauthorized_teachers %}
+          {% for t in unauthorized_teachers %}
+          <div class="teacher-row" data-name="{{ t.get_full_name|lower }} {{ t.username|lower }}" data-id="{{ t.id }}">
+            <img src="{{ t.userprofile.get_profile_picture_url }}" alt="{{ t.username }}"
+                 onerror="this.src='https://ui-avatars.com/api/?name={{ t.get_full_name|default:t.username|urlencode }}&background=6366f1&color=fff&size=40'">
+            <div class="teacher-meta">
+              <p class="t-name">{{ t.get_full_name|default:t.username }}</p>
+              <p class="t-sub">@{{ t.username }}{% if t.userprofile.employee_id %} · ID {{ t.userprofile.employee_id }}{% endif %}</p>
+            </div>
+            <button class="taction-btn taction-assign"
+                    onclick="grantPermission({{ camera.id }}, {{ t.id }}, '{{ t.username|escapejs }}')">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Assign
+            </button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            <p>All teachers are assigned</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <style>
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
-}
+.perm-page  { max-width:1200px; margin:2rem auto; padding:0 1.5rem 3rem; }
 
-.page-header {
-    margin-bottom: 2rem;
-}
+.perm-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.75rem; }
+.back-link   { display:inline-flex; align-items:center; gap:.4rem; color:#6b7280; font-size:.85rem; text-decoration:none; margin-bottom:.5rem; }
+.back-link svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2; }
+.back-link:hover { color:#111827; }
+.perm-title  { font-size:1.5rem; font-weight:700; color:#111827; margin:0 0 .25rem; }
+.perm-sub    { color:#6b7280; font-size:.9rem; margin:0; }
+.perm-stats  { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
+.stat-pill   { display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .9rem; border-radius:20px; font-size:.82rem; font-weight:600; }
+.stat-pill svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2.5; }
+.stat-green  { background:#d1fae5; color:#065f46; }
+.stat-gray   { background:#f3f4f6; color:#374151; }
 
-.page-header h1 {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin-bottom: 0.5rem;
-}
+.perm-grid   { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+@media(max-width:900px){ .perm-grid { grid-template-columns:1fr; } }
 
-.subtitle {
-    color: var(--gray-600);
-    font-size: 1.1rem;
-}
+.perm-card   { background:#fff; border-radius:12px; border:1px solid #e5e7eb; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.pcard-head  { display:flex; justify-content:space-between; align-items:center; padding:1.1rem 1.25rem; background:#f9fafb; border-bottom:1px solid #e5e7eb; }
+.pcard-head h2 { display:flex; align-items:center; gap:.6rem; font-size:1rem; font-weight:700; color:#111827; margin:0; }
+.pcard-head h2 svg { width:18px; height:18px; stroke:#6366f1; fill:none; stroke-width:2; }
+.count-badge { padding:.2rem .65rem; border-radius:12px; font-size:.8rem; font-weight:700; }
+.count-green { background:#d1fae5; color:#065f46; }
+.count-gray  { background:#f3f4f6; color:#374151; }
 
-.permissions-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 2rem;
-    margin-bottom: 2rem;
-}
+.search-wrap { display:flex; align-items:center; gap:.6rem; padding:.75rem 1.25rem; border-bottom:1px solid #f3f4f6; }
+.search-wrap svg { width:16px; height:16px; stroke:#9ca3af; fill:none; stroke-width:2; flex-shrink:0; }
+.search-wrap input { flex:1; border:none; outline:none; font-size:.875rem; color:#111827; background:transparent; }
+.search-wrap input::placeholder { color:#9ca3af; }
 
-.permission-card {
-    background: var(--white);
-    border-radius: 12px;
-    border: 1px solid var(--gray-200);
-    overflow: hidden;
-}
+.teacher-list { max-height:420px; overflow-y:auto; padding:.5rem; }
+.teacher-row  { display:flex; align-items:center; gap:.85rem; padding:.75rem .85rem; border-radius:8px; transition:background .12s; }
+.teacher-row:hover { background:#f9fafb; }
+.teacher-row img { width:38px; height:38px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.teacher-meta { flex:1; min-width:0; }
+.t-name { font-weight:600; color:#111827; font-size:.875rem; margin:0 0 .15rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.t-sub  { color:#9ca3af; font-size:.78rem; margin:0; }
 
-.card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.5rem;
-    background: var(--gray-50);
-    border-bottom: 1px solid var(--gray-200);
-}
+.taction-btn { display:inline-flex; align-items:center; gap:.35rem; padding:.4rem .85rem; border:none; border-radius:7px; font-size:.8rem; font-weight:600; cursor:pointer; transition:all .15s; flex-shrink:0; }
+.taction-btn svg { width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2.5; }
+.taction-assign { background:#ede9fe; color:#6d28d9; }
+.taction-assign:hover { background:#6366f1; color:#fff; transform:translateY(-1px); }
+.taction-revoke { background:#fee2e2; color:#dc2626; }
+.taction-revoke:hover { background:#dc2626; color:#fff; transform:translateY(-1px); }
 
-.card-header h2 {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--gray-900);
-}
-
-.card-header h2 svg {
-    width: 24px;
-    height: 24px;
-    stroke: var(--primary);
-}
-
-.badge {
-    background: var(--primary);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-.teacher-list {
-    padding: 1rem;
-    max-height: 500px;
-    overflow-y: auto;
-}
-
-.teacher-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 0.75rem;
-    background: var(--gray-50);
-    transition: all 0.2s;
-}
-
-.teacher-item:hover {
-    background: var(--white);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.teacher-item.authorized {
-    border-left: 3px solid var(--success);
-}
-
-.teacher-info {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.teacher-info img {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-}
-
-.teacher-name {
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: 0.25rem;
-}
-
-.teacher-username {
-    color: var(--gray-500);
-    font-size: 0.875rem;
-}
-
-.btn-grant, .btn-revoke {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-grant {
-    background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-    color: white;
-}
-
-.btn-grant:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
-.btn-revoke {
-    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-    color: white;
-}
-
-.btn-revoke:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.btn-grant svg, .btn-revoke svg {
-    width: 16px;
-    height: 16px;
-}
-
-.empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: var(--gray-500);
-}
-
-.empty-state svg {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 1rem;
-    stroke: var(--gray-400);
-}
-
-.actions {
-    display: flex;
-    justify-content: center;
-}
-
-.btn-secondary {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    background: var(--gray-100);
-    color: var(--gray-700);
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-    background: var(--gray-200);
-}
-
-.btn-secondary svg {
-    width: 20px;
-    height: 20px;
-}
-
-@media (max-width: 1024px) {
-    .permissions-grid {
-        grid-template-columns: 1fr;
-    }
-}
+.empty-state { text-align:center; padding:2.5rem 1rem; color:#9ca3af; }
+.empty-state svg { width:40px; height:40px; stroke:#d1d5db; fill:none; stroke-width:1.5; margin-bottom:.75rem; display:block; margin-left:auto; margin-right:auto; }
+.empty-state p { margin:0; font-size:.875rem; }
 </style>
 
 <script>
+function filterTeachers(q) {
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('#availableList .teacher-row').forEach(row => {
+    const match = row.dataset.name.includes(q) || row.dataset.id.includes(q);
+    row.style.display = match ? '' : 'none';
+  });
+}
+
 function grantPermission(cameraId, teacherId, teacherName) {
-    if (!confirm(`Grant camera access to ${teacherName}?`)) return;
-    
-    fetch(`/cameras/grant-permission/${cameraId}/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: `teacher_id=${teacherId}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            location.reload();
-        } else {
-            alert(data.message || 'Failed to grant permission');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred');
-    });
+  if (!confirm('Assign camera access to ' + teacherName + '?')) return;
+  fetch('/cameras/grant-permission/' + cameraId + '/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+    body: 'teacher_id=' + teacherId
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) location.reload();
+    else alert(data.message || 'Failed to assign');
+  });
 }
 
 function revokePermission(cameraId, teacherId, teacherName) {
-    if (!confirm(`Revoke camera access from ${teacherName}?`)) return;
-    
-    fetch(`/cameras/revoke-permission/${cameraId}/${teacherId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            location.reload();
-        } else {
-            alert(data.message || 'Failed to revoke permission');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred');
-    });
+  if (!confirm('Revoke access from ' + teacherName + '?')) return;
+  fetch('/cameras/revoke-permission/' + cameraId + '/' + teacherId + '/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) location.reload();
+    else alert(data.message || 'Failed to revoke');
+  });
 }
 </script>
 {% endblock %}
