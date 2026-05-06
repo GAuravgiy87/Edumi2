@@ -1,7 +1,12 @@
 port: 7880
+bind_addresses:
+  - ""          # bind on all interfaces so LAN clients can reach it
+
 rtc:
   tcp_port: 7881
   udp_port: 7882
+  # Allow WebRTC from any IP on the LAN
+  use_external_ip: false
 
 keys:
   devkey: devsecret_must_be_32_characters_long_1234

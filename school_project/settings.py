@@ -47,6 +47,10 @@ CSRF_TRUSTED_ORIGINS = [
     'https://10.7.32.175:8443',
     'https://10.17.2.47',
     'https://10.17.2.47:8443',
+    # Current server IP from env (set by start_all.ps1)
+    *([f'https://{os.environ.get("SERVER_IP")}',
+       f'https://{os.environ.get("SERVER_IP")}:8443']
+      if os.environ.get('SERVER_IP') else []),
     'https://*.ngrok.io',
     'https://*.ngrok-free.app',
     'https://*.ngrok-free.dev',

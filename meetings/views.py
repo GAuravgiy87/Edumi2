@@ -562,6 +562,31 @@ def verify_face_prejoin(request):
     else:
         return JsonResponse({'success': False, 'message': result['message']})
 
+def _get_livekit_url_for_browser(request):
+    """
+    Return the LiveKit WebSocket URL the browser should connect to.
+
+    When accessed via ngrok: settings.LIVEKIT_URL is the direct LiveKit ngrok tunnel
+    When accessed via LAN:   use wss://same-host/livekit-proxy (proxy through Django)
+    """
+    configured = settings.LIVEKIT_URL  # set by start_all.ps1
+
+    # If configured URL is a direct LiveKit URL (not our proxy), use it as-is
+    # This is the case when start_all.ps1 set up a direct LiveKit ngrok tunnel
+    if configured and '/livekit-proxy' not in configured:
+        return configured
+
+    # Fall back: route through our Django proxy using same host as browser
+    is_secure = (
+        request.is_secure() or
+        request.META.get('HTTP_X_FORWARDED_PROTO') == 'https' or
+        request.META.get('SERVER_PORT') in ('443', '8443')
+    )
+    ws_scheme = 'wss' if is_secure else 'ws'
+    host = request.get_host()
+    return f'{ws_scheme}://{host}/livekit-proxy'
+
+
 @login_required
 def livekit_token(request, meeting_code):
     """Generate a LiveKit access token for the requesting user."""
@@ -595,7 +620,7 @@ def livekit_token(request, meeting_code):
         .to_jwt()
     )
 
-    return JsonResponse({'token': token, 'url': settings.LIVEKIT_URL})
+    return JsonResponse({'token': token, 'url': _get_livekit_url_for_browser(request)})
 
 @login_required
 def meeting_attendance(request, meeting_code):

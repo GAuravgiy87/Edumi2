@@ -498,6 +498,8 @@
             if (data.error) { showNotification('Access denied: ' + data.error, 'error'); return; }
 
             const { token, url } = data;
+            console.log('LiveKit URL from server:', url);
+            console.log('Page origin:', window.location.origin);
 
             room = new Room({
                 adaptiveStream: true,          // auto-adjust quality per subscriber bandwidth
@@ -525,6 +527,19 @@
                 .on(RoomEvent.DataReceived, onDataReceived)
                 .on(RoomEvent.Disconnected, onDisconnected)
                 .on(RoomEvent.ConnectionStateChanged, onConnectionStateChanged);
+
+            // ── Pre-flight WebSocket test ─────────────────────────────────────────────
+            // Test the proxy path before handing off to LiveKit SDK
+            console.log('Testing proxy path:', url);
+            try {
+                const proxyHost = new URL(url).host;
+                const testWs = new WebSocket(`${url.startsWith('wss') ? 'wss' : 'ws'}://${proxyHost}/livekit-proxy/rtc?access_token=${token}`);
+                await new Promise((resolve) => {
+                    testWs.onopen  = () => { console.log('Proxy WS: OPEN'); testWs.close(); resolve(); };
+                    testWs.onerror = (e) => { console.warn('Proxy WS test error (non-fatal):', e); resolve(); };
+                    setTimeout(resolve, 3000);
+                });
+            } catch(e) { console.warn('Proxy test skipped:', e); }
 
             await room.connect(url, token);
             console.log('Connected to LiveKit room:', room.name);
@@ -1289,7 +1304,56 @@
 
         // ── Start ─────────────────────────────────────────────────────────────────────
         window.addEventListener('beforeunload', () => { if (room) room.disconnect(); });
-        init().catch(e => { console.error('Init error:', e); showNotification('Failed to connect: ' + e.message, 'error'); });
+        init().catch(e => {
+            console.error('Init error:', e);
+            // Show a clear full-screen error instead of just a toast
+            const isLiveKitError = e.message && (
+                e.message.includes('pc connection') ||
+                e.message.includes('websocket') ||
+                e.message.includes('signal') ||
+                e.message.includes('connect')
+            );
+            if (isLiveKitError) {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position:fixed;inset:0;background:rgba(10,10,20,0.97);
+                    display:flex;flex-direction:column;align-items:center;
+                    justify-content:center;z-index:99999;color:#fff;text-align:center;
+                    padding:2rem;font-family:Inter,sans-serif;
+                `;
+                overlay.innerHTML = `
+                    <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
+                    <h2 style="font-size:1.4rem;font-weight:700;margin:0 0 .75rem;color:#f87171;">
+                        Cannot connect to meeting server
+                    </h2>
+                    <p style="color:#94a3b8;max-width:420px;line-height:1.6;margin:0 0 1.5rem;font-size:.95rem;">
+                        The LiveKit server is not reachable.<br>
+                        Make sure the app was started with <code style="background:#1e293b;padding:2px 6px;border-radius:4px;">start_all.ps1</code>
+                        and ngrok is running.
+                    </p>
+                    <div style="background:#1e293b;border-radius:10px;padding:1rem 1.5rem;margin-bottom:1.5rem;text-align:left;font-size:.85rem;color:#94a3b8;max-width:420px;">
+                        <div style="color:#f8fafc;font-weight:600;margin-bottom:.5rem;">Technical detail:</div>
+                        <code style="color:#f87171;">${e.message}</code>
+                    </div>
+                    <div style="display:flex;gap:1rem;">
+                        <button onclick="location.reload()" style="
+                            background:#6366f1;color:#fff;border:none;padding:.7rem 1.5rem;
+                            border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem;">
+                            Retry
+                        </button>
+                        <a href="javascript:history.back()" style="
+                            background:#1e293b;color:#94a3b8;border:none;padding:.7rem 1.5rem;
+                            border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem;
+                            text-decoration:none;display:inline-flex;align-items:center;">
+                            Go Back
+                        </a>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+            } else {
+                showNotification('Failed to connect: ' + e.message, 'error');
+            }
+        });
 
         // ── Face Attendance Module (Students Only) ───────────────────────────────────
         if (!isHost && !isSuperUser) {
