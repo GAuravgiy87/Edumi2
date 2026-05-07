@@ -3,6 +3,10 @@
 
 {% block page_title %}{{ camera.name }}{% endblock %}
 
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+{% endblock %}
+
 {% block content %}
 <div class="vc-page">
 
@@ -29,7 +33,7 @@
       </div>
     </div>
     <div class="vc-header-actions">
-      <button class="vc-btn vc-btn-ghost" onclick="testConnection()" id="test-btn">
+      <button class="vc-btn vc-btn-ghost" id="test-btn">
         <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         Test Connection
       </button>
@@ -131,7 +135,7 @@
         <div class="vc-card-head">Stream Settings</div>
         <div class="vc-info-row" style="border:none;flex-direction:column;gap:.5rem">
           <span class="vc-info-label">Playback Quality</span>
-          <select id="quality-picker" class="vc-select" onchange="changeQuality()">
+          <select id="quality-picker" class="vc-select">
             <option value="auto" selected>Auto (recommended)</option>
             <option value="high">High (720p)</option>
             <option value="med">Medium (480p)</option>
@@ -161,9 +165,13 @@
   </div><!-- /grid -->
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest" data-turbo-eval="false"></script>
-<script data-turbo-eval="false">
+<script>
 (function () {
+  /* ── Cleanup any previous instance on this page ──────────────────────── */
+  if (window._vcHls)        { window._vcHls.destroy();        window._vcHls = null; }
+  if (window._vcRetry)      { clearTimeout(window._vcRetry);  window._vcRetry = null; }
+  if (window._vcSvcTimer)   { clearInterval(window._vcSvcTimer); window._vcSvcTimer = null; }
+
   /* ── URLs ─────────────────────────────────────────────────────────────── */
   const FEED_URL = '{% url "camera_feed" camera.id %}?file=stream.m3u8&token={{ camera.temp_token }}';
   const TEST_URL = '{% url "test_camera_connection" camera.id %}';
@@ -171,9 +179,17 @@
   /* ── State ────────────────────────────────────────────────────────────── */
   let hls            = null;
   let streamLive     = false;
-  let svcOnline      = null;   // null=unknown, true/false
+  let svcOnline      = null;
   let retryTimer     = null;
   let svcCheckTimer  = null;
+
+  // Keep references on window so the cleanup block above can reach them
+  // on the next Turbo navigation to this page
+  function _saveRefs() {
+    window._vcHls      = hls;
+    window._vcRetry    = retryTimer;
+    window._vcSvcTimer = svcCheckTimer;
+  }
 
   /* ── DOM ──────────────────────────────────────────────────────────────── */
   const video       = document.getElementById('cam-video');
@@ -337,7 +353,7 @@
   }
 
   /* ── Test Connection button ───────────────────────────────────────────── */
-  window.testConnection = function () {
+  function testConnection() {
     const btn    = document.getElementById('test-btn');
     const banner = document.getElementById('test-banner');
     btn.disabled = true;
@@ -371,7 +387,7 @@
   };
 
   /* ── Quality picker ───────────────────────────────────────────────────── */
-  window.changeQuality = function () {
+  function changeQuality() {
     if (!hls || !hls.levels || hls.levels.length === 0) return;
     const v   = document.getElementById('quality-picker').value;
     const len = hls.levels.length;
@@ -382,10 +398,26 @@
   };
 
   /* ── Boot ─────────────────────────────────────────────────────────────── */
-  document.addEventListener('DOMContentLoaded', function () {
+  // Attach listeners and start — runs immediately when Turbo injects the script
+  (function init() {
+    var testBtn = document.getElementById('test-btn');
+    if (testBtn) testBtn.addEventListener('click', testConnection);
+
+    var qualityPicker = document.getElementById('quality-picker');
+    if (qualityPicker) qualityPicker.addEventListener('change', changeQuality);
+
     startStream();
-    // Periodic service check every 10 s
     svcCheckTimer = setInterval(checkService, 10000);
+    _saveRefs();
+  })();
+
+  // Also clean up when Turbo navigates away from this page
+  document.addEventListener('turbo:before-visit', function cleanup() {
+    if (hls)          { hls.destroy(); hls = null; }
+    if (retryTimer)   { clearTimeout(retryTimer); retryTimer = null; }
+    if (svcCheckTimer){ clearInterval(svcCheckTimer); svcCheckTimer = null; }
+    window._vcHls = window._vcRetry = window._vcSvcTimer = null;
+    document.removeEventListener('turbo:before-visit', cleanup);
   });
 
 })();

@@ -58,10 +58,12 @@ def get_student_stats(user):
 
 def get_admin_stats():
     """Get overall platform statistics for the admin panel."""
+    import os
     import requests
+    CAMERA_SVC = os.environ.get('CAMERA_SERVICE_URL', 'http://localhost:8001')
     camera_service_online = False
     try:
-        response = requests.get("http://127.0.0.1:8001/api/cameras/", timeout=1)
+        response = requests.get(f"{CAMERA_SVC}/api/cameras/", timeout=1)
         camera_service_online = (response.status_code == 200)
     except:
         camera_service_online = False

@@ -3,7 +3,9 @@
 
 {% block page_title %}Live: {{ live_class.title }}{% endblock %}
 
-{% block content %}
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+{% endblock %}
 <div class="live-stream-container">
     <div class="main-content">
         <div class="video-section glass-card">
@@ -236,7 +238,6 @@
 }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
     const streamKey = "{{ live_class.stream_key }}";
     const token = "{{ token }}";

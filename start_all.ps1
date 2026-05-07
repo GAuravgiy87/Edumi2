@@ -172,7 +172,7 @@ $envLines = @(
     "DEBUG=True",
     "ALLOWED_HOSTS=*",
     "REDIS_URL=redis://localhost:6379/0",
-    "CAMERA_SERVICE_URL=http://localhost:8001",
+    "CAMERA_SERVICE_URL=http://127.0.0.1:8001",
     "LIVEKIT_URL=$livekitProxyUrl",
     "LIVEKIT_API_KEY=devkey",
     "LIVEKIT_API_SECRET=devsecret_must_be_32_characters_long_1234"
@@ -210,7 +210,7 @@ Kill-Port 8001
 Start-Sleep -Milliseconds 500
 
 Start-Process -FilePath $PYTHON `
-    -ArgumentList "camera_service\manage.py", "runserver", "0.0.0.0:8001", "--noreload" `
+    -ArgumentList "camera_service\manage.py", "runserver", "127.0.0.1:8001", "--noreload" `
     -WindowStyle Hidden
 
 Write-Host "         Waiting for camera service..." -ForegroundColor Gray

@@ -100,36 +100,65 @@ def delete_mobile_camera(request, mobile_camera_id):
 
 
 def mobile_camera_feed(request, mobile_camera_id):
-    """Proxy mobile camera HLS feed from camera service on port 8001"""
-    mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
-    
-    # Check permission
-    if not can_view_mobile_camera(request.user, mobile_camera):
-        return JsonResponse({'error': 'You do not have permission to view this camera'}, status=403)
-    
+    """Proxy mobile camera HLS feed from camera service, rewriting segment URLs."""
+    import os
     import requests
     from django.http import HttpResponse, StreamingHttpResponse
-    
+
+    mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
+
+    if not can_view_mobile_camera(request.user, mobile_camera):
+        return JsonResponse({'error': 'You do not have permission to view this camera'}, status=403)
+
+    CAMERA_SVC = os.environ.get('CAMERA_SERVICE_URL', 'http://localhost:8001')
     filename = request.GET.get('file', 'stream.m3u8')
-    camera_service_url = f'http://localhost:8001/api/mobile-cameras/{mobile_camera_id}/feed/?file={filename}'
-    
+    camera_service_url = f'{CAMERA_SVC}/api/mobile-cameras/{mobile_camera_id}/feed/?file={filename}'
+
     try:
-        response = requests.get(camera_service_url, stream=True, timeout=10)
-        if response.status_code == 200:
-            content_type = response.headers.get('Content-Type', 'application/octet-stream')
-            django_response = StreamingHttpResponse(
-                response.iter_content(chunk_size=8192),
-                content_type=content_type
-            )
-            if 'Cache-Control' in response.headers:
-                django_response['Cache-Control'] = response.headers['Cache-Control']
-            django_response['Access-Control-Allow-Origin'] = '*'
-            return django_response
-        else:
-            return HttpResponse(status=response.status_code)
+        response = requests.get(camera_service_url, stream=True, timeout=15)
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Camera service not running for mobile camera {mobile_camera_id}")
+        return JsonResponse({'error': 'Camera service not running on port 8001'}, status=503)
     except requests.exceptions.RequestException as e:
         logger.error(f"Error proxying HLS feed for mobile camera {mobile_camera_id}: {e}")
         return JsonResponse({'error': 'Proxy server unavailable'}, status=503)
+
+    if response.status_code == 503:
+        return JsonResponse({'error': 'Stream not ready yet. FFmpeg is connecting to the camera.'}, status=503)
+
+    if response.status_code != 200:
+        return HttpResponse(status=response.status_code)
+
+    content_type = response.headers.get('Content-Type', 'application/octet-stream')
+
+    # Rewrite .m3u8 manifest so segment URLs route back through this proxy
+    if filename.endswith('.m3u8'):
+        manifest = response.content.decode('utf-8', errors='replace')
+        proxy_base = request.build_absolute_uri(
+            f'/mobile-cameras/feed/{mobile_camera_id}/'
+        )
+        rewritten_lines = []
+        for line in manifest.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                rewritten_lines.append(f'{proxy_base}?file={stripped}')
+            else:
+                rewritten_lines.append(line)
+        rewritten = '\n'.join(rewritten_lines) + '\n'
+        resp = HttpResponse(rewritten, content_type='application/vnd.apple.mpegurl')
+        resp['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        resp['Access-Control-Allow-Origin'] = '*'
+        return resp
+
+    # Stream .ts segments straight through
+    django_response = StreamingHttpResponse(
+        response.iter_content(chunk_size=8192),
+        content_type=content_type,
+    )
+    django_response['Access-Control-Allow-Origin'] = '*'
+    if 'Cache-Control' in response.headers:
+        django_response['Cache-Control'] = response.headers['Cache-Control']
+    return django_response
 
 
 @login_required

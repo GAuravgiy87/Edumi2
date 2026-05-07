@@ -41,10 +41,11 @@
                 </a>
             </div>
             <div class="camera-feed-wrapper">
-                <img src="http://localhost:8001/api/mobile-cameras/{{ mobile_camera.id }}/feed/" 
-                     alt="{{ mobile_camera.name }}" 
-                     class="camera-feed"
-                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 300%22%3E%3Crect fill=%22%23333%22 width=%22400%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23fff%22 text-anchor=%22middle%22 dy=%22.3em%22 font-family=%22Arial%22 font-size=%2220%22%3ECamera Offline%3C/text%3E%3C/svg%3E'">
+                <video class="camera-feed hls-player"
+                       data-url="{% url 'mobile_cameras:feed' mobile_camera.id %}?file=stream.m3u8"
+                       autoplay muted playsinline
+                       onerror="this.poster='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 300%22%3E%3Crect fill=%22%23333%22 width=%22400%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23fff%22 text-anchor=%22middle%22 dy=%22.3em%22 font-family=%22Arial%22 font-size=%2220%22%3ECamera Offline%3C/text%3E%3C/svg%3E'">
+                </video>
             </div>
             <div class="camera-feed-footer">
                 <span class="camera-ip">{{ mobile_camera.ip_address }}:{{ mobile_camera.port }}</span>
@@ -338,4 +339,22 @@
     }
 }
 </style>
+
+<script>
+(function () {
+    document.querySelectorAll('.hls-player').forEach(function (video) {
+        var url = video.dataset.url;
+        if (!url) return;
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+            var hls = new Hls({ lowLatencyMode: true, manifestLoadingTimeOut: 10000 });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function () { video.play().catch(function(){}); });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = url;
+            video.addEventListener('loadedmetadata', function () { video.play().catch(function(){}); });
+        }
+    });
+})();
+</script>
 {% endblock %}

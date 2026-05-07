@@ -19,7 +19,7 @@ from .utils import verify_stream_token, generate_stream_token, is_admin, auto_de
 logger = logging.getLogger('cameras')
 
 # Camera service base URL — configurable via env so docker-compose can override
-CAMERA_SVC = os.environ.get('CAMERA_SERVICE_URL', '{CAMERA_SVC}')
+CAMERA_SVC = os.environ.get('CAMERA_SERVICE_URL', 'http://localhost:8001')
 
 
 def can_manage_camera(user, camera):
@@ -365,7 +365,7 @@ def live_monitor(request):
     import requests
     camera_service_running = False
     try:
-        response = requests.get('{CAMERA_SVC}/api/cameras/', timeout=2)
+        response = requests.get(f'{CAMERA_SVC}/api/cameras/', timeout=2)
         camera_service_running = response.status_code == 200
     except:
         pass
@@ -1127,7 +1127,7 @@ def simulate_load(request):
         results = []
         for i in range(count):
             try:
-                resp = requests.post('{CAMERA_SVC}/api/cameras/start/', json={
+                resp = requests.post(f'{CAMERA_SVC}/api/cameras/start/', json={
                     'camera_id': f'load_test_{i}',
                     'url': test_url
                 })

@@ -23,6 +23,9 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script type="module" src="https://esm.sh/@hotwired/turbo"></script>
+    <!-- HLS.js — loaded globally so camera pages always have it available,
+         even when Turbo Drive does a partial page swap instead of a full reload -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
 </head>
 <body>
     {% if user.is_authenticated %}

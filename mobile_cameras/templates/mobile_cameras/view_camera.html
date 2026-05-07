@@ -3,7 +3,9 @@
 
 {% block page_title %}View Camera{% endblock %}
 
-{% block content %}
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+{% endblock %}
 <div class="camera-view-container">
     <div class="camera-header">
         <div>
@@ -261,7 +263,6 @@
 }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
 let headcountEnabled = false;
 let hls;

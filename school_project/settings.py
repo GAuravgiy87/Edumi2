@@ -60,6 +60,10 @@ else:
 
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_CONTENT_TYPE_NOSNIFF = True
+# Disable COOP on HTTP — browsers warn when this header is sent over plain HTTP.
+# The RemoveUnsupportedSecurityHeadersMiddleware also strips it, but disabling
+# it here prevents SecurityMiddleware from adding it in the first place.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 
 # Application definition

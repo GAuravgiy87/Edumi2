@@ -3,6 +3,10 @@
 
 {% block page_title %}Head Count Dashboard{% endblock %}
 
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+{% endblock %}
+
 {% block content %}
 <div class="headcount-container">
     <div class="page-header">
@@ -413,9 +417,8 @@
     }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('turbo:load DOMContentLoaded', function() {
         const hlsPlayers = [];
         
         function initHlsPlayers() {

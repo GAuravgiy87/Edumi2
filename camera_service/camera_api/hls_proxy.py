@@ -107,7 +107,7 @@ class HLSStreamer:
         if self.url.startswith('rtsp://'):
             cmd += [
                 '-rtsp_transport', 'tcp',
-                '-stimeout', '5000000',   # 5 s connection timeout (µs)
+                '-timeout', '5000000',    # 5 s connection timeout (µs) — replaces deprecated -stimeout
             ]
 
         cmd += [

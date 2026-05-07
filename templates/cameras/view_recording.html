@@ -3,6 +3,10 @@
 
 {% block page_title %}{{ recording.title }}{% endblock %}
 
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+{% endblock %}
+
 {% block content %}
 <div class="player-container">
     <div class="player-header">
@@ -93,9 +97,8 @@
 }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('turbo:load DOMContentLoaded', function() {
         const video = document.getElementById('video-player');
         const manifestUrl = '{{ recording.hls_manifest_path }}';
         const absoluteUrl = window.location.origin + '/media/' + manifestUrl;

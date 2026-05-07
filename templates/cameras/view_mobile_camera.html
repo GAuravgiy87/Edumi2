@@ -18,9 +18,8 @@
         <video id="hls-video" class="camera-feed" autoplay muted playsinline controls></video>
     </div>
     
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('turbo:load DOMContentLoaded', function() {
             const video = document.getElementById('hls-video');
             const hlsUrl = "{% url 'mobile_cameras:feed' mobile_camera.id %}?file=stream.m3u8";
             

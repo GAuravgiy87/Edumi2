@@ -3,6 +3,10 @@
 
 {% block page_title %}Live Monitor{% endblock %}
 
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+{% endblock %}
+
 {% block content %}
 <div class="monitor-container">
     <div class="monitor-header">
@@ -201,7 +205,6 @@
     }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
 (function() {
     let serverOnline = true;

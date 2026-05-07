@@ -3,7 +3,9 @@
 
 {% block page_title %}Camera Dashboard{% endblock %}
 
-{% block content %}
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+{% endblock %}
 <style>
 /* ── Page shell ── */
 .td-page {
@@ -703,10 +705,9 @@
   </div>
 </div>
 
-<!-- ══ HLS.js — data-turbo-eval="false" prevents Turbo from re-running ══ -->
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js" data-turbo-eval="false"></script>
+<!-- ══ HLS.js is loaded globally in base_sidebar.html ══ -->
 
-<script data-turbo-eval="false">
+<script>
 (function () {
   'use strict';
 
