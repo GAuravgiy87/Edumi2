@@ -99,7 +99,7 @@ if (-not (Test-Path $LIVEKIT)) {
     Write-Fail "livekit-server.exe not found at $LIVEKIT"
     Write-Warn "Video meetings will not work"
 } else {
-    Start-Process -FilePath $LIVEKIT -ArgumentList "--config", "livekit.yaml" -WindowStyle Hidden
+    Start-Process -FilePath $LIVEKIT -ArgumentList "--config", "livekit.yaml", "--bind", "0.0.0.0" -WindowStyle Hidden
     Start-Sleep -Seconds 2
     if (Wait-Port 7880 10) {
         Write-OK "LiveKit running  :7880"
@@ -113,7 +113,7 @@ if (-not (Test-Path $LIVEKIT)) {
 # =============================================================================
 Write-Step 3 8 "ngrok  (public HTTPS tunnel -> :8000)"
 
-# Write ngrok config pointing to Daphne on 8000
+# Write ngrok config — only the HTTP tunnel (free plan supports 1 tunnel)
 $ngrokLines = @(
     'version: "3"',
     'agent:',
@@ -130,6 +130,7 @@ $ngrokLines = @(
 $ngrokLines | Set-Content -Path "ngrok.yml" -Encoding UTF8
 
 $ngrokUrl = ""
+
 if (-not (Test-Path $NGROK)) {
     Write-Fail "ngrok not found at $NGROK"
     $ngrokUrl = "http://$(hostname):8000"
@@ -173,12 +174,11 @@ $envLines = @(
     "ALLOWED_HOSTS=*",
     "REDIS_URL=redis://localhost:6379/0",
     "CAMERA_SERVICE_URL=http://127.0.0.1:8001",
-    "LIVEKIT_URL=$livekitProxyUrl",
     "LIVEKIT_API_KEY=devkey",
     "LIVEKIT_API_SECRET=devsecret_must_be_32_characters_long_1234"
 )
 $envLines | Set-Content -Path ".env" -Encoding UTF8
-Write-OK ".env written  (LiveKit -> $livekitProxyUrl)"
+Write-OK ".env written  (LiveKit URL auto-derived from request - no hardcoding needed)"
 
 # =============================================================================
 #  STEP 5 -- Database migrations + collectstatic

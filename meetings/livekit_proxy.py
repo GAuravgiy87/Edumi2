@@ -1,18 +1,20 @@
 """
 WebSocket proxy: browser <-> Django/ngrok <-> LiveKit (localhost:7880)
 
-Browser connects to:  wss://<ngrok>/livekit-proxy/rtc?access_token=...
+Browser connects to:  wss://<any-host>/livekit-proxy/rtc?access_token=...
 Proxy forwards to:    ws://localhost:7880/rtc?access_token=...
+
+LIVEKIT_INTERNAL_URL env var overrides the target (default: ws://localhost:7880).
 """
 import asyncio
+import os
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 import websockets
-from websockets.http11 import Request
 
 logger = logging.getLogger(__name__)
 
-LIVEKIT_INTERNAL = "ws://localhost:7880"
+LIVEKIT_INTERNAL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://127.0.0.1:7880')
 
 
 class LiveKitProxyConsumer(AsyncWebsocketConsumer):

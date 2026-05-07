@@ -497,19 +497,26 @@
             const data = await res.json();
             if (data.error) { showNotification('Access denied: ' + data.error, 'error'); return; }
 
-            const { token, url } = data;
+            const { token, url, iceServers } = data;
+
+            // Build ICE server config — include TURN relay so the connection works
+            // when the browser can't reach LiveKit's RTC ports directly (e.g. via ngrok).
+            // LiveKit provides TURN credentials via the /rtc/validate endpoint.
+            const rtcConfig = iceServers && iceServers.length > 0
+                ? { iceServers, iceTransportPolicy: 'all' }
+                : { iceTransportPolicy: 'all' };
 
             room = new Room({
-                adaptiveStream: true,          // auto-adjust quality per subscriber bandwidth
-                dynacast: true,                // only encode layers actually needed
+                adaptiveStream: true,
+                dynacast: true,
                 videoCaptureDefaults: {
                     resolution: VideoPresets.h1080.resolution,
                 },
                 publishDefaults: {
                     simulcast: true,
                     videoCodec: 'h264',
-                    videoEncoding: { maxBitrate: 5000000, maxFramerate: 30 }, // 5 Mbps for crisp 1080p Camera
-                    screenShareEncoding: { maxBitrate: 8000000, maxFramerate: 30 }, // 8 Mbps for ultra-clear Screen
+                    videoEncoding: { maxBitrate: 5000000, maxFramerate: 30 },
+                    screenShareEncoding: { maxBitrate: 8000000, maxFramerate: 30 },
                 },
             });
 
@@ -526,7 +533,10 @@
                 .on(RoomEvent.Disconnected, onDisconnected)
                 .on(RoomEvent.ConnectionStateChanged, onConnectionStateChanged);
 
-            await room.connect(url, token);
+            await room.connect(url, token, {
+                autoSubscribe: true,
+                rtcConfig,
+            });
             console.log('Connected to LiveKit room:', room.name);
 
             // ── AudioContext (Chrome autoplay policy) ─────────────────────────────────

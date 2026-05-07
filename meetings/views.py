@@ -564,7 +564,13 @@ def verify_face_prejoin(request):
 
 @login_required
 def livekit_token(request, meeting_code):
-    """Generate a LiveKit access token for the requesting user."""
+    """Generate a LiveKit access token for the requesting user.
+
+    The LiveKit URL returned to the browser is derived from the *current request*
+    so it works on localhost, LAN IP, and ngrok without any configuration change.
+    The browser connects to  wss://<same-host>/livekit-proxy  which Django's ASGI
+    proxy forwards internally to the LiveKit server on port 7880.
+    """
     meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
 
     # Same access check as join_meeting
@@ -595,7 +601,16 @@ def livekit_token(request, meeting_code):
         .to_jwt()
     )
 
-    return JsonResponse({'token': token, 'url': settings.LIVEKIT_URL})
+    # Derive the LiveKit proxy URL from the current request so it works on
+    # localhost, LAN IP, and ngrok without any .env change.
+    # http → ws, https → wss
+    # request.is_secure() respects SECURE_PROXY_SSL_HEADER so it returns True
+    # when behind ngrok/nginx even though Django receives plain HTTP internally.
+    is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
+    scheme = 'wss' if is_secure else 'ws'
+    livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
+
+    return JsonResponse({'token': token, 'url': livekit_url, 'iceServers': []})
 
 @login_required
 def meeting_attendance(request, meeting_code):

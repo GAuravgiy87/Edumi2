@@ -65,6 +65,11 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # it here prevents SecurityMiddleware from adding it in the first place.
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
+# Trust the X-Forwarded-Proto header from reverse proxies (ngrok, nginx, etc.)
+# so request.is_secure() returns True when the browser is on HTTPS even though
+# Django receives plain HTTP internally.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 # Application definition
 
@@ -344,11 +349,16 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
 # ─── LiveKit SFU ────────────────────────────────────────────────────────────
-# LIVEKIT_URL: what the *browser* connects to.
-# When running behind ngrok, set this to your ngrok URL + /livekit-proxy
-# e.g.  wss://xxxx.ngrok-free.app/livekit-proxy
-# The proxy in asgi.py forwards it to ws://localhost:7880 internally.
+# LIVEKIT_URL is no longer sent to the browser — the token endpoint derives
+# the correct ws/wss URL from the incoming request automatically, so it works
+# on localhost, LAN IP, and ngrok without any configuration change.
+# Keep it here only as a fallback for any code that still reads it directly.
 LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:7880')
+
+# LIVEKIT_INTERNAL_URL: where the Django proxy connects to reach LiveKit.
+# Only change this if LiveKit runs on a different host/port.
+LIVEKIT_INTERNAL_URL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://localhost:7880')
+
 LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey')
 LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_characters_long_1234')
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
