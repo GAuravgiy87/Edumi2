@@ -180,7 +180,6 @@ This section provides a theoretical breakdown of the core software components an
 *   **Proactive Idle Shutdown**: The logic that kills unused video streams to prevent the server from running out of RAM/CPU.
 
 ---
----
 
 ## 9. Detailed System Workflows
 
