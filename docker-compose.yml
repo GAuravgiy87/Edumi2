@@ -86,8 +86,9 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql://${POSTGRES_USER:-edumi}:${POSTGRES_PASSWORD:-edumi_secret}@postgres:5432/${POSTGRES_DB:-edumi}
       - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit:7880}
+      - LIVEKIT_INTERNAL_URL=${LIVEKIT_INTERNAL_URL:-ws://livekit:7880}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-devsecret}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-devsecret_must_be_32_characters_long_1234}
       # Tell the main app where the camera service is
       - CAMERA_SERVICE_URL=http://camera_service:8001
     depends_on:

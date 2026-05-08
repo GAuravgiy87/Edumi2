@@ -14,7 +14,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-LIVEKIT_INTERNAL = os.environ.get('LIVEKIT_INTERNAL_URL', 'http://127.0.0.1:7880').replace('ws://', 'http://').replace('wss://', 'https://')
+LIVEKIT_INTERNAL = os.environ.get(
+    'LIVEKIT_INTERNAL_URL',
+    os.environ.get('LIVEKIT_URL', 'ws://127.0.0.1:7880')
+).replace('ws://', 'http://').replace('wss://', 'https://')
 
 
 @csrf_exempt

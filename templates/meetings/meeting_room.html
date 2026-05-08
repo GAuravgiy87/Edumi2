@@ -70,18 +70,9 @@
             background: #ef4444;
         }
 
-        @keyframes fa-pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-
-            50% {
-                opacity: 0.5;
-                transform: scale(1.2);
-            }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         #face-att-progress-bar {
@@ -251,7 +242,51 @@
 </head>
 
 <body class="meeting-body">
-    <div class="meet-container">
+    <!-- Pre-Join Screen -->
+    <div id="preJoinScreen" class="prejoin-container" style="display: flex; min-height: 100vh; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div class="prejoin-card" style="background: white; border-radius: 1.5rem; padding: 3rem; max-width: 500px; width: 100%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+            <div style="margin-bottom: 2rem;">
+                <h1 style="color: #1f2937; font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">{{ meeting.title }}</h1>
+                <p style="color: #6b7280; font-size: 1.1rem;">Meeting Code: <strong>{{ meeting.meeting_code }}</strong></p>
+            </div>
+
+            <div class="device-checks" style="margin-bottom: 2rem;">
+                <div class="status-item" id="cameraStatus" style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; border-radius: 0.75rem; background: #f8fafc; color: #374151;">
+                    <div class="status-icon" style="background: #e5e7eb;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                    </div>
+                    <span>Checking camera...</span>
+                </div>
+
+                <div class="status-item" id="micStatus" style="display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; border-radius: 0.75rem; background: #f8fafc; color: #374151;">
+                    <div class="status-icon" style="background: #e5e7eb;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                    </div>
+                    <span>Checking microphone...</span>
+                </div>
+            </div>
+
+            <button id="joinButton" class="btn-join" onclick="joinMeeting()" disabled style="margin-top: 2rem;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"/>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+                Join Meeting
+            </button>
+
+            <div id="joinError" style="display: none; margin-top: 1rem; padding: 1rem; background: #fef2f2; color: #991b1b; border-radius: 0.5rem; font-size: 0.9rem;"></div>
+        </div>
+    </div>
+
+    <div class="meet-container" id="meetingContainer" style="display: none;">
 
         <!-- Top Bar -->
         <div class="meet-topbar">
@@ -465,8 +500,8 @@
 
         // ── State ─────────────────────────────────────────────────────────────────────
         let room = null;
-        let isMicOn = true;
-        let isCameraOn = true;
+        let isMicOn = false;  // Start as false, enable after join
+        let isCameraOn = false;  // Start as false, enable after join
         let isScreenSharing = false;
         let screenTrackPub = null;
         let isSleeping = false;
@@ -474,11 +509,93 @@
         let timerInterval = null;
         let timerSeconds = 0;
         let signalingWs = null;
+        let connectionState = 'disconnected';  // disconnected, connecting, connected, reconnecting, failed
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 5;
 
         // Permissions gating removed
 
-        // ── Init ──────────────────────────────────────────────────────────────────────
-        async function init() {
+        // ── Device Checking ───────────────────────────────────────────────────────────
+        async function checkDevices() {
+            const cameraStatus = document.getElementById('cameraStatus');
+            const micStatus = document.getElementById('micStatus');
+            const joinButton = document.getElementById('joinButton');
+
+            try {
+                // Check camera
+                const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStatus.className = 'status-item success';
+                cameraStatus.querySelector('span').textContent = 'Camera ready';
+                cameraStatus.querySelector('.status-icon').innerHTML = '✓';
+            } catch (err) {
+                console.warn('Camera check failed:', err);
+                cameraStatus.className = 'status-item error';
+                cameraStatus.querySelector('span').textContent = 'Camera unavailable';
+                cameraStatus.querySelector('.status-icon').innerHTML = '✗';
+            }
+
+            try {
+                // Check microphone
+                const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                micStream.getTracks().forEach(track => track.stop());
+                micStatus.className = 'status-item success';
+                micStatus.querySelector('span').textContent = 'Microphone ready';
+                micStatus.querySelector('.status-icon').innerHTML = '✓';
+            } catch (err) {
+                console.warn('Microphone check failed:', err);
+                micStatus.className = 'status-item error';
+                micStatus.querySelector('span').textContent = 'Microphone unavailable';
+                micStatus.querySelector('.status-icon').innerHTML = '✗';
+            }
+
+            // Enable join button if at least camera is available
+            joinButton.disabled = false;
+            joinButton.textContent = 'Join Meeting';
+        }
+
+        // ── Join Meeting ──────────────────────────────────────────────────────────────
+        async function joinMeeting() {
+            const joinButton = document.getElementById('joinButton');
+            const joinError = document.getElementById('joinError');
+            const preJoinScreen = document.getElementById('preJoinScreen');
+            const meetingContainer = document.getElementById('meetingContainer');
+
+            try {
+                joinButton.disabled = true;
+                joinButton.innerHTML = '<div style="display:flex;gap:0.5rem;align-items:center;"><div class="spinner" style="width:16px;height:16px;border:2px solid #ffffff;border-top:2px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>Joining...</div>';
+                joinError.style.display = 'none';
+
+                connectionState = 'connecting';
+                console.log('[Meeting] Starting connection process...');
+
+                // Initialize the meeting (this was the old init() function)
+                await initializeMeeting();
+
+                // Show meeting interface
+                preJoinScreen.style.display = 'none';
+                meetingContainer.style.display = 'block';
+
+                connectionState = 'connected';
+                console.log('[Meeting] Successfully joined meeting');
+
+            } catch (error) {
+                console.error('[Meeting] Join failed:', error);
+                connectionState = 'failed';
+
+                joinButton.disabled = false;
+                joinButton.textContent = 'Join Meeting';
+
+                joinError.style.display = 'block';
+                joinError.textContent = `Failed to join meeting: ${error.message}`;
+
+                // Show notification
+                showNotification('Failed to join meeting. Please try again.', 'error');
+            }
+        }
+
+        // ── Initialize Meeting (renamed from init) ────────────────────────────────────
+        async function initializeMeeting() {
             // ── Signaling WebSocket ──────────────────────────────────────────────────
             const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${meetingCode}/`);
@@ -488,35 +605,70 @@
                     const data = JSON.parse(e.data);
                     handleSignalingMessage(data);
                 } catch (err) {
-                    console.error('Signaling parse error:', err);
+                    console.error('[Signaling] Parse error:', err);
                 }
             };
 
+            signalingWs.onopen = () => {
+                console.log('[Signaling] Connected to signaling server');
+            };
+
+            signalingWs.onclose = (e) => {
+                console.log(`[Signaling] Disconnected, code: ${e.code}, reason: ${e.reason}`);
+                if (e.code === 1011) {
+                    console.error('[Signaling] Internal server error - check backend logs');
+                    showNotification('Connection error. Please refresh the page.', 'error');
+                } else if (e.code !== 1000) { // 1000 is normal closure
+                    // Attempt to reconnect signaling
+                    setTimeout(() => {
+                        if (!signalingWs || signalingWs.readyState === WebSocket.CLOSED) {
+                            console.log('[Signaling] Attempting to reconnect...');
+                            initializeMeeting();
+                        }
+                    }, 3000);
+                }
+            };
+
+            signalingWs.onerror = (error) => {
+                console.error('[Signaling] WebSocket error:', error);
+            };
+
             // Fetch token from Django
+            console.log('[Meeting] Fetching LiveKit token...');
             const res = await fetch(TOKEN_URL);
+            if (!res.ok) {
+                throw new Error(`Token request failed: ${res.status} ${res.statusText}`);
+            }
+
             const data = await res.json();
-            if (data.error) { showNotification('Access denied: ' + data.error, 'error'); return; }
+            if (data.error) {
+                console.error('[Meeting] Token error:', data.error);
+                throw new Error('Access denied: ' + data.error);
+            }
 
             const { token, url, iceServers } = data;
+            console.log('[Meeting] Token received, LiveKit URL:', url);
+            console.log('[Meeting] ICE servers:', iceServers);
 
-            // Build ICE server config — include TURN relay so the connection works
-            // when the browser can't reach LiveKit's RTC ports directly (e.g. via ngrok).
-            // LiveKit provides TURN credentials via the /rtc/validate endpoint.
-            const rtcConfig = iceServers && iceServers.length > 0
-                ? { iceServers, iceTransportPolicy: 'all' }
-                : { iceTransportPolicy: 'all' };
+            // Use direct ICE with STUN — works on localhost and LAN IP
+            const rtcConfig = {
+                iceServers: iceServers && iceServers.length > 0
+                    ? iceServers
+                    : [{ urls: ['stun:stun.l.google.com:19302'] }],
+                iceTransportPolicy: 'all',
+            };
 
             room = new Room({
                 adaptiveStream: true,
                 dynacast: true,
                 videoCaptureDefaults: {
-                    resolution: VideoPresets.h1080.resolution,
+                    resolution: VideoPresets.h720.resolution,
                 },
                 publishDefaults: {
-                    simulcast: true,
+                    simulcast: false,
                     videoCodec: 'h264',
-                    videoEncoding: { maxBitrate: 5000000, maxFramerate: 30 },
-                    screenShareEncoding: { maxBitrate: 8000000, maxFramerate: 30 },
+                    videoEncoding: { maxBitrate: 2500000, maxFramerate: 30 },
+                    screenShareEncoding: { maxBitrate: 4000000, maxFramerate: 15 },
                 },
             });
 
@@ -539,21 +691,16 @@
             });
             console.log('Connected to LiveKit room:', room.name);
 
-            // ── AudioContext (Chrome autoplay policy) ─────────────────────────────────
-            // LiveKit manages its own AudioContext. Call room.startAudio() on the first
-            // user gesture so remote audio plays without the browser blocking it.
-            const resumeAudio = async () => {
-                try { await room.startAudio(); } catch (_) {}
-                document.removeEventListener('click',   resumeAudio);
-                document.removeEventListener('keydown', resumeAudio);
-                document.removeEventListener('touchend', resumeAudio);
-            };
-            document.addEventListener('click',    resumeAudio, { once: true });
-            document.addEventListener('keydown',  resumeAudio, { once: true });
-            document.addEventListener('touchend', resumeAudio, { once: true });
+            // ── Start Audio (user already clicked join button) ───────────────────────
+            try {
+                await room.startAudio();
+                console.log('[Meeting] Audio context started');
+            } catch (audioErr) {
+                console.warn('[Meeting] Audio context start failed:', audioErr);
+            }
 
-            // Initial state
-            isMicOn    = true;
+            // Initial state - start with devices enabled since user consented by joining
+            isMicOn = true;
             isCameraOn = true;
 
             // ── Publish mic ───────────────────────────────────────────────────────────
@@ -855,11 +1002,46 @@
         }
 
         function onDisconnected() {
+            console.log('[Meeting] Disconnected from LiveKit room');
+            connectionState = 'disconnected';
             showNotification('Disconnected from meeting', 'error');
+
+            // Attempt to reconnect if not manually disconnected
+            if (reconnectAttempts < maxReconnectAttempts) {
+                connectionState = 'reconnecting';
+                reconnectAttempts++;
+                console.log(`[Meeting] Attempting reconnect ${reconnectAttempts}/${maxReconnectAttempts}`);
+
+                setTimeout(() => {
+                    if (connectionState === 'reconnecting') {
+                        initializeMeeting().catch(err => {
+                            console.error('[Meeting] Reconnect failed:', err);
+                            if (reconnectAttempts >= maxReconnectAttempts) {
+                                connectionState = 'failed';
+                                showNotification('Failed to reconnect. Please refresh the page.', 'error');
+                            }
+                        });
+                    }
+                }, 2000 * reconnectAttempts); // Exponential backoff
+            }
         }
 
         function onConnectionStateChanged(state) {
-            console.log('Connection state:', state);
+            console.log('[Meeting] Connection state changed:', state);
+            const stateMessages = {
+                'connecting': 'Connecting to meeting...',
+                'connected': 'Connected to meeting',
+                'reconnecting': 'Reconnecting...',
+                'disconnected': 'Disconnected from meeting'
+            };
+
+            if (stateMessages[state]) {
+                if (state === 'connected') {
+                    showNotification(stateMessages[state], 'success');
+                } else if (state === 'disconnected' || state === 'reconnecting') {
+                    showNotification(stateMessages[state], 'warning');
+                }
+            }
         }
 
         // ── Signaling Handlers ────────────────────────────────────────────────────────
@@ -1299,7 +1481,7 @@
 
         // ── Start ─────────────────────────────────────────────────────────────────────
         window.addEventListener('beforeunload', () => { if (room) room.disconnect(); });
-        init().catch(e => { console.error('Init error:', e); showNotification('Failed to connect: ' + e.message, 'error'); });
+        checkDevices().catch(e => { console.error('Device check error:', e); });
 
         // ── Face Attendance Module (Students Only) ───────────────────────────────────
         if (!isHost && !isSuperUser) {

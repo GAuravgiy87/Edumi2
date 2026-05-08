@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
 
 # Load environment variables from .env file
 load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
@@ -39,6 +41,12 @@ CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = [
+    'http://localhost',
+    'http://localhost:8000',
+    'http://127.0.0.1',
+    'http://127.0.0.1:8000',
+    'http://10.7.32.175:8000',
+    'http://10.17.2.47:8000',
     'https://localhost',
     'https://localhost:8443',
     'https://127.0.0.1',
@@ -47,9 +55,6 @@ CSRF_TRUSTED_ORIGINS = [
     'https://10.7.32.175:8443',
     'https://10.17.2.47',
     'https://10.17.2.47:8443',
-    'https://*.ngrok.io',
-    'https://*.ngrok-free.app',
-    'https://*.ngrok-free.dev',
 ]
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
@@ -65,7 +70,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # it here prevents SecurityMiddleware from adding it in the first place.
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
-# Trust the X-Forwarded-Proto header from reverse proxies (ngrok, nginx, etc.)
+# Trust the X-Forwarded-Proto header from reverse proxies (nginx, etc.)
 # so request.is_secure() returns True when the browser is on HTTPS even though
 # Django receives plain HTTP internally.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -264,6 +269,11 @@ LOGGING = {
         'null': {
             'class': 'logging.NullHandler',
         },
+        'livekit_proxy_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'livekit_proxy.log'),
+            'formatter': 'clean',
+        },
     },
     'loggers': {
         # ── App loggers (keep these) ──────────────────────────────────────
@@ -279,7 +289,12 @@ LOGGING = {
         },
         'meetings': {
             'handlers': ['console'],
-            'level': 'WARNING',
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'meetings.livekit_proxy': {
+            'handlers': ['console', 'livekit_proxy_file'],
+            'level': 'INFO',
             'propagate': False,
         },
         'accounts': {
@@ -351,16 +366,19 @@ CELERY_TIMEZONE = TIME_ZONE
 # ─── LiveKit SFU ────────────────────────────────────────────────────────────
 # LIVEKIT_URL is no longer sent to the browser — the token endpoint derives
 # the correct ws/wss URL from the incoming request automatically, so it works
-# on localhost, LAN IP, and ngrok without any configuration change.
+# on localhost and LAN IP without any configuration change.
 # Keep it here only as a fallback for any code that still reads it directly.
 LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:7880')
 
 # LIVEKIT_INTERNAL_URL: where the Django proxy connects to reach LiveKit.
 # Only change this if LiveKit runs on a different host/port.
-LIVEKIT_INTERNAL_URL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://localhost:7880')
+LIVEKIT_INTERNAL_URL = os.environ.get('LIVEKIT_INTERNAL_URL', os.environ.get('LIVEKIT_URL', 'ws://localhost:7880'))
 
 LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey')
 LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_characters_long_1234')
+LIVEKIT_TURN_URLS = os.environ.get('LIVEKIT_TURN_URLS', '')
+LIVEKIT_TURN_USERNAME = os.environ.get('LIVEKIT_TURN_USERNAME', '')
+LIVEKIT_TURN_PASSWORD = os.environ.get('LIVEKIT_TURN_PASSWORD', '')
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>
 FACE_ENCRYPTION_KEY = os.environ.get('FACE_ENCRYPTION_KEY', '')

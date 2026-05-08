@@ -67,4 +67,12 @@ class RemoveUnsupportedSecurityHeadersMiddleware:
         if not request.is_secure():
             response.headers.pop('Cross-Origin-Opener-Policy', None)
             response.headers.pop('Cross-Origin-Embedder-Policy', None)
+
+        # Allow Chrome's Private Network Access check so WebRTC ICE can reach
+        # private IPs (10.x.x.x) from local/LAN origins.
+        # Without this, Chrome blocks WebRTC connections to the LAN IP.
+        if request.method == 'OPTIONS' and request.headers.get('Access-Control-Request-Private-Network'):
+            response['Access-Control-Allow-Private-Network'] = 'true'
+        response['Access-Control-Allow-Private-Network'] = 'true'
+
         return response

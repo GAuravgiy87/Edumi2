@@ -566,14 +566,11 @@ def verify_face_prejoin(request):
 def livekit_token(request, meeting_code):
     """Generate a LiveKit access token for the requesting user.
 
-    The LiveKit URL returned to the browser is derived from the *current request*
-    so it works on localhost, LAN IP, and ngrok without any configuration change.
-    The browser connects to  wss://<same-host>/livekit-proxy  which Django's ASGI
-    proxy forwards internally to the LiveKit server on port 7880.
+    The LiveKit URL is derived from the request host so it works on
+    localhost and LAN IP without any configuration.
     """
     meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
 
-    # Same access check as join_meeting
     if meeting.classroom:
         is_teacher = meeting.classroom.teacher == request.user
         is_approved = ClassroomMembership.objects.filter(
@@ -601,16 +598,30 @@ def livekit_token(request, meeting_code):
         .to_jwt()
     )
 
-    # Derive the LiveKit proxy URL from the current request so it works on
-    # localhost, LAN IP, and ngrok without any .env change.
-    # http → ws, https → wss
-    # request.is_secure() respects SECURE_PROXY_SSL_HEADER so it returns True
-    # when behind ngrok/nginx even though Django receives plain HTTP internally.
-    is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
-    scheme = 'wss' if is_secure else 'ws'
+    # Use ws:// or wss:// to match the incoming request scheme.
+    # The browser connects to <scheme>://<host>/livekit-proxy which Django
+    # proxies to the internal LiveKit server.
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
+    scheme = 'wss' if request.is_secure() or forwarded_proto == 'https' else 'ws'
     livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
 
-    return JsonResponse({'token': token, 'url': livekit_url, 'iceServers': []})
+    # Standard STUN servers for ICE — no TURN needed on LAN
+    ice_servers = [
+        {'urls': ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']},
+    ]
+
+    if settings.LIVEKIT_TURN_URLS:
+        turn_urls = [u.strip() for u in settings.LIVEKIT_TURN_URLS.split(',') if u.strip()]
+        if turn_urls:
+            turn_server = {'urls': turn_urls}
+            if settings.LIVEKIT_TURN_USERNAME and settings.LIVEKIT_TURN_PASSWORD:
+                turn_server.update({
+                    'username': settings.LIVEKIT_TURN_USERNAME,
+                    'credential': settings.LIVEKIT_TURN_PASSWORD
+                })
+            ice_servers.append(turn_server)
+
+    return JsonResponse({'token': token, 'url': livekit_url, 'iceServers': ice_servers})
 
 @login_required
 def meeting_attendance(request, meeting_code):
