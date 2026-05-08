@@ -547,11 +547,15 @@ def livekit_token(request, meeting_code):
         is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
         scheme = 'wss' if is_secure else 'ws'
         livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
-    # For local testing, we skip STUN to force 'host' candidates.
-    # This prevents the browser from trying to use its public IP (srflx)
-    # which often fails when the server is on the same local machine.
+    # For local/LAN testing, we skip STUN to force 'host' candidates.
+    # Private IP ranges: 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16.x.x
+    is_private = host in ['localhost', '127.0.0.1'] or \
+                 host.startswith('192.168.') or \
+                 host.startswith('10.') or \
+                 (host.startswith('172.') and host.split('.')[1].isdigit() and 16 <= int(host.split('.')[1]) <= 31)
+
     ice_servers = []
-    if host not in ['localhost', '127.0.0.1']:
+    if not is_private:
         ice_servers = [
             {'urls': 'stun:stun.l.google.com:19302'},
             {'urls': 'stun:stun1.l.google.com:19302'}

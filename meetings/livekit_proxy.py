@@ -35,20 +35,23 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
         proxy_logger.info(f"[LiveKitProxy] Connecting to LiveKit: {target} (Protocols: {subprotocols})")
 
         try:
-            self._lk_ws = await websockets.connect(
-                target,
-                subprotocols=subprotocols,
-                ping_interval=20,
-                ping_timeout=20,
-                max_size=10 * 1024 * 1024,
-                open_timeout=10,
-            )
+            # Connect to LiveKit, only passing subprotocols if the browser provided them
+            connect_kwargs = {
+                "ping_interval": 20,
+                "ping_timeout": 20,
+                "max_size": 10 * 1024 * 1024,
+                "open_timeout": 10,
+            }
+            if subprotocols:
+                connect_kwargs["subprotocols"] = subprotocols
+
+            self._lk_ws = await websockets.connect(target, **connect_kwargs)
             
             # Negotiated subprotocol
-            selected_proto = self._lk_ws.subprotocol
-            proxy_logger.info(f"[LiveKitProxy] Connected to LiveKit (Selected Protocol: {selected_proto})")
+            selected_proto = getattr(self._lk_ws, 'subprotocol', None)
+            proxy_logger.info(f"[LiveKitProxy] Connected (Selected Protocol: {selected_proto})")
             
-            # Accept the browser connection with the same subprotocol
+            # Accept the browser connection
             await self.accept(subprotocol=selected_proto)
             
         except Exception as e:

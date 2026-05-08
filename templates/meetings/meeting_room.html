@@ -598,6 +598,14 @@
             createLocalScreenTracks, VideoPresets, ConnectionState } = LK || {};
 
         // ── State ─────────────────────────────────────────────────────────────────────
+        // Security Check: browsers block media on non-secure origins (except localhost)
+        const isSecureContext = window.isSecureContext;
+        const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        
+        if (!isSecureContext && !isLocalhost) {
+            console.error("Insecure Context detected! Camera/Mic will be blocked by the browser.");
+            showNotification("Browser blocks Camera/Mic on LAN IP (http). Use 'localhost' or enable HTTPS.", "error");
+        }
         let room = null;
         let signalingWs = null;
         let signalingRetryCount = 0;
