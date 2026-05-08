@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 #  Edumi -- One-Click Startup Script
 #  Starts: Redis, LiveKit, ngrok, Migrations, Static, Camera Service,
 #          Celery Worker, Daphne ASGI (foreground)
@@ -52,7 +52,7 @@ function Wait-Port($port, $timeoutSec = 20) {
 Clear-Host
 Write-Host ""
 Write-Host "  +==================================================+" -ForegroundColor Cyan
-Write-Host "  |           E D U M I   S T A R T U P            |" -ForegroundColor Cyan
+Write-Host "  |           E D U M I   S T A R T U P               |" -ForegroundColor Cyan
 Write-Host "  +==================================================+" -ForegroundColor Cyan
 Write-Host ""
 
@@ -245,7 +245,7 @@ Write-Host "  |  Public  ->  $ngrokUrl" -ForegroundColor White
 Write-Host "  +------------------------------------------------------------+" -ForegroundColor Green
 Write-Host "  |  Redis      :6379   WebSocket + Celery                     |" -ForegroundColor Gray
 Write-Host "  |  LiveKit    :7880   WebRTC SFU                             |" -ForegroundColor Gray
-Write-Host "  |  Camera svc :8001   RTSP -> HLS                           |" -ForegroundColor Gray
+Write-Host "  |  Camera svc :8001   RTSP -> HLS                            |" -ForegroundColor Gray
 Write-Host "  |  Celery             Background tasks                       |" -ForegroundColor Gray
 Write-Host "  +------------------------------------------------------------+" -ForegroundColor Green
 Write-Host "  |  Press Ctrl+C to stop everything                           |" -ForegroundColor Yellow

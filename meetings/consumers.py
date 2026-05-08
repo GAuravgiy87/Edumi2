@@ -1,9 +1,12 @@
 import json
+import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
 from django.utils import timezone
 from .models import Meeting, MeetingParticipant, MeetingAttendanceLog, MeetingChat
+
+logger = logging.getLogger(__name__)
 
 class MeetingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -12,8 +15,11 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             self.room_group_name = f'meeting_{self.meeting_code}'
             self.user = self.scope['user']
             
+            logger.info(f"[WS] Connect Attempt: User={self.user} Meeting={self.meeting_code}")
+
             if not self.user.is_authenticated:
-                await self.close()
+                logger.warning(f"[WS] Connect Rejected: User not authenticated")
+                await self.close(code=4003) # Unauthorized
                 return
 
             # Join room group
@@ -22,13 +28,23 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
             
-            # Record join and get user meta in one go
-            user_data = await self.get_user_meta()
-            
-            # Get other active participants BEFORE accepting to ensure we have them
+            # Record join and get user meta
+            try:
+                user_data = await self.get_user_meta()
+            except Meeting.DoesNotExist:
+                logger.error(f"[WS] Connect Rejected: Meeting {self.meeting_code} not found")
+                await self.close(code=4004) # Not Found
+                return
+            except Exception as e:
+                logger.error(f"[WS] Metadata Error: {str(e)}")
+                await self.close(code=1011)
+                return
+
+            # Get other active participants
             active_participants = await self.get_active_participants()
             
             await self.accept()
+            logger.info(f"[WS] Connected: User={self.user.username} Room={self.room_group_name}")
 
             # Send current participant list to the joiner
             await self.send(text_data=json.dumps({
@@ -36,7 +52,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 'participants': active_participants
             }))
 
-            # Notify others that user joined
+            # Notify others
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -48,9 +64,11 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 }
             )
         except Exception as e:
-            # Avoid using self.user directly in strings to prevent DB access errors
-            print(f"WS Connect Error: {str(e)}")
-            await self.close()
+            logger.error(f"[WS] Fatal Connect Error: {str(e)}")
+            try:
+                await self.close(code=1011)
+            except:
+                pass
 
     @database_sync_to_async
     def get_user_meta(self):
@@ -102,6 +120,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             return []
     
     async def disconnect(self, close_code):
+        logger.info(f"[WS] Disconnecting: User={self.user.username} Code={close_code}")
         # Notify others that user left
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -210,14 +229,6 @@ class MeetingConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"Receive error: {e}")
     
-    async def chat_message(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'chat',
-            'message': event['message'],
-            'username': event['username'],
-            'user_id': event['user_id'],
-            'timestamp': event['timestamp']
-        }))
 
     async def user_joined(self, event):
         await self.send(text_data=json.dumps({

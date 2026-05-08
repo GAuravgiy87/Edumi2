@@ -247,10 +247,149 @@
                 height: 36px;
             }
         }
+
+        /* Join Overlay Styles */
+        #join-overlay {
+            position: fixed;
+            inset: 0;
+            background: #0a0a0a;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: white;
+            transition: opacity 0.5s ease, visibility 0.5s;
+        }
+
+        #join-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .join-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 32px;
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .join-title {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .join-subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+
+        .btn-join-main {
+            width: 100%;
+            padding: 18px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 18px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-join-main:hover {
+            background: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-join-main:disabled {
+            background: #334155;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+
+        .join-status {
+            margin-top: 24px;
+            font-size: 13px;
+            color: #64748b;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .status-pill.ready { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .status-pill.loading { color: #6366f1; }
+        .status-pill.error { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 
 <body class="meeting-body">
+    <!-- Join Overlay -->
+    <div id="join-overlay">
+        <div class="join-card">
+            <div class="join-title">Edumi Meet</div>
+            <div class="join-subtitle">Ready to join {{ meeting.title }}?</div>
+            
+            <button id="join-btn-main" class="btn-join-main" onclick="handleJoinClick()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                <span id="join-btn-text">Join Meeting</span>
+            </button>
+
+            <div class="join-status">
+                <div id="join-status-text">Your camera and mic will be initialized after joining.</div>
+                <div id="device-notifs"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reconnecting Overlay -->
+    <div id="reconnect-overlay" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(8px); color:white;">
+        <div class="spinner" style="width:40px; height:40px; border-width:4px; margin-bottom:20px;"></div>
+        <div style="font-size:20px; font-weight:700;">Reconnecting...</div>
+        <div style="color:#94a3b8; font-size:14px; margin-top:8px;">Please stay on the page while we restore your connection.</div>
+    </div>
+
     <div class="meet-container">
 
         <!-- Top Bar -->
@@ -439,8 +578,12 @@
         data-is-superuser="{{ user.is_superuser|yesno:'true,false' }}">
         </script>
 
-    <script id="meeting-script-v2">
-        console.log("=== Edumi Meeting Room Script v2.1 Loading ===");
+    <script id="meeting-script-v3">
+        /**
+         * EDUMI MEETING ROOM CORE v3.0
+         * Robust signaling, safe media initialization, and production-grade join flow.
+         */
+        console.log("=== Edumi Meeting Room Script v3.0 Loading ===");
         // ── Config ────────────────────────────────────────────────────────────────────
         const _d = document.getElementById('meeting-data').dataset;
         const meetingCode = _d.meetingCode;
@@ -465,6 +608,10 @@
 
         // ── State ─────────────────────────────────────────────────────────────────────
         let room = null;
+        let signalingWs = null;
+        let signalingRetryCount = 0;
+        const MAX_SIGNALING_RETRIES = 5;
+
         let isMicOn = true;
         let isCameraOn = true;
         let isScreenSharing = false;
@@ -473,56 +620,62 @@
         let unreadMessages = 0;
         let timerInterval = null;
         let timerSeconds = 0;
-        let signalingWs = null;
+        let isJoined = false;
 
         // Permissions gating removed
 
         // ── Init ──────────────────────────────────────────────────────────────────────
+        // ── Entry Point ───────────────────────────────────────────────────────────────
+        async function handleJoinClick() {
+            const btn = document.getElementById('join-btn-main');
+            const btnText = document.getElementById('join-btn-text');
+            const statusText = document.getElementById('join-status-text');
+
+            if (isJoined) return;
+
+            try {
+                btn.disabled = true;
+                btnText.textContent = 'Joining...';
+                statusText.innerHTML = '<div class="spinner"></div> Connecting...';
+
+                await init();
+
+                isJoined = true;
+                document.getElementById('join-overlay').classList.add('hidden');
+            } catch (err) {
+                console.error("Join Error:", err);
+                btn.disabled = false;
+                btnText.textContent = 'Retry Joining';
+                statusText.innerHTML = `<span style="color:#ef4444">Error: ${err.message}</span>`;
+            }
+        }
+
         async function init() {
-            // ── Signaling WebSocket ──────────────────────────────────────────────────
-            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${meetingCode}/`);
-
-            signalingWs.onmessage = (e) => {
-                try {
-                    const data = JSON.parse(e.data);
-                    handleSignalingMessage(data);
-                } catch (err) {
-                    console.error('Signaling parse error:', err);
-                }
-            };
-
-            // Fetch token from Django
-            const res = await fetch(TOKEN_URL);
-            const data = await res.json();
-            if (data.error) { showNotification('Access denied: ' + data.error, 'error'); return; }
-
-            const { token, url, iceServers } = data;
-
-            // Build ICE server config — include TURN relay so the connection works
-            // when the browser can't reach LiveKit's RTC ports directly (e.g. via ngrok).
-            // LiveKit provides TURN credentials via the /rtc/validate endpoint.
-            const rtcConfig = iceServers && iceServers.length > 0
-                ? { iceServers, iceTransportPolicy: 'all' }
-                : { iceTransportPolicy: 'all' };
+            const tokenRes = await fetch(TOKEN_URL);
+            const tokenData = await tokenRes.json();
+            if (tokenData.error) throw new Error(tokenData.error);
+            const { token, url } = tokenData;
 
             room = new Room({
                 adaptiveStream: true,
                 dynacast: true,
-                videoCaptureDefaults: {
-                    resolution: VideoPresets.h1080.resolution,
-                },
-                publishDefaults: {
-                    simulcast: true,
-                    videoCodec: 'h264',
-                    videoEncoding: { maxBitrate: 5000000, maxFramerate: 30 },
-                    screenShareEncoding: { maxBitrate: 8000000, maxFramerate: 30 },
-                },
+                videoCaptureDefaults: { resolution: VideoPresets.h1080.resolution },
+                publishDefaults: { simulcast: true, videoCodec: 'h264' },
             });
 
-            // ── Room events ───────────────────────────────────────────────────────────
-            room
-                .on(RoomEvent.ParticipantConnected, onParticipantConnected)
+            setupRoomEventHandlers(room);
+            await room.connect(url, token);
+            await safeInitMedia();
+            connectSignaling();
+
+            renderLocalParticipant();
+            room.remoteParticipants.forEach(p => onParticipantConnected(p));
+            updateParticipantCount();
+            startTimer();
+        }
+
+        function setupRoomEventHandlers(r) {
+            r.on(RoomEvent.ParticipantConnected, onParticipantConnected)
                 .on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected)
                 .on(RoomEvent.TrackSubscribed, onTrackSubscribed)
                 .on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed)
@@ -532,70 +685,50 @@
                 .on(RoomEvent.DataReceived, onDataReceived)
                 .on(RoomEvent.Disconnected, onDisconnected)
                 .on(RoomEvent.ConnectionStateChanged, onConnectionStateChanged);
+        }
 
-            await room.connect(url, token, {
-                autoSubscribe: true,
-                rtcConfig,
-            });
-            console.log('Connected to LiveKit room:', room.name);
+        async function safeInitMedia() {
+            try {
+                if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+                    throw new Error("Media devices unavailable (check HTTPS/localhost)");
+                }
+                
+                // Resume AudioContext
+                try { await room.startAudio(); } catch (e) { console.warn("Audio start deferred"); }
 
-            // ── AudioContext (Chrome autoplay policy) ─────────────────────────────────
-            // LiveKit manages its own AudioContext. Call room.startAudio() on the first
-            // user gesture so remote audio plays without the browser blocking it.
-            const resumeAudio = async () => {
-                try { await room.startAudio(); } catch (_) {}
-                document.removeEventListener('click',   resumeAudio);
-                document.removeEventListener('keydown', resumeAudio);
-                document.removeEventListener('touchend', resumeAudio);
+                await room.localParticipant.enableCameraAndMicrophone();
+                isMicOn = true; isCameraOn = true;
+            } catch (err) {
+                console.warn("Media Fail:", err);
+                isMicOn = false; isCameraOn = false;
+                showNotification("Joined as listen-only. No camera/mic access.", "warning");
+            }
+            updateControlButtons();
+        }
+
+        function updateControlButtons() {
+            const micBtn = document.getElementById('micBtn');
+            const camBtn = document.getElementById('camBtn');
+            if (!micBtn || !camBtn) return;
+            micBtn.classList.toggle('off', !isMicOn);
+            camBtn.classList.toggle('off', !isCameraOn);
+        }
+
+        function connectSignaling() {
+            if (signalingRetryCount >= MAX_SIGNALING_RETRIES) return;
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${proto}//${window.location.host}/ws/meeting/${meetingCode}/`;
+            signalingWs = new WebSocket(wsUrl);
+            signalingWs.onopen = () => { signalingRetryCount = 0; console.log("Signaling connected"); };
+            signalingWs.onmessage = (e) => {
+                try { handleSignalingMessage(JSON.parse(e.data)); } catch (err) { }
             };
-            document.addEventListener('click',    resumeAudio, { once: true });
-            document.addEventListener('keydown',  resumeAudio, { once: true });
-            document.addEventListener('touchend', resumeAudio, { once: true });
-
-            // Initial state
-            isMicOn    = true;
-            isCameraOn = true;
-
-            // ── Publish mic ───────────────────────────────────────────────────────────
-            try {
-                await room.localParticipant.setMicrophoneEnabled(true);
-            } catch (micErr) {
-                isMicOn = false;
-                if (micErr.name === 'NotFoundError' || micErr.name === 'DevicesNotFoundError') {
-                    console.warn('No microphone found — joining without mic.');
-                } else {
-                    console.warn('Mic error:', micErr.message);
+            signalingWs.onclose = (e) => {
+                if (isJoined && e.code !== 1000) {
+                    signalingRetryCount++;
+                    setTimeout(connectSignaling, Math.min(1000 * Math.pow(2, signalingRetryCount), 30000));
                 }
-            }
-
-            // ── Publish camera ────────────────────────────────────────────────────────
-            try {
-                await room.localParticipant.setCameraEnabled(true);
-            } catch (camErr) {
-                isCameraOn = false;
-                if (camErr.name === 'NotFoundError' || camErr.name === 'DevicesNotFoundError') {
-                    console.warn('Camera not available:', camErr.message);
-                } else {
-                    console.warn('Camera error:', camErr.message);
-                }
-            }
-
-            // Update UI buttons to reflect actual initial state
-            document.getElementById('micBtn').classList.toggle('off', !isMicOn);
-            document.getElementById('camBtn').classList.toggle('off', !isCameraOn);
-            const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-            const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
-            if (!isMicOn) document.getElementById('micBtn').innerHTML = micOffIcon;
-            if (!isCameraOn) document.getElementById('camBtn').innerHTML = camOffIcon;
-
-            // Render local participant
-            renderLocalParticipant();
-
-            // Render any participants already in the room
-            room.remoteParticipants.forEach(p => onParticipantConnected(p));
-
-            updateParticipantCount();
-            startTimer();
+            };
         }
 
         // ── Render helpers ────────────────────────────────────────────────────────────
@@ -1297,9 +1430,10 @@
             setTimeout(() => n.remove(), 3000);
         }
 
-        // ── Start ─────────────────────────────────────────────────────────────────────
+        // ── Window Listeners ──────────────────────────────────────────────────────────
         window.addEventListener('beforeunload', () => { if (room) room.disconnect(); });
-        init().catch(e => { console.error('Init error:', e); showNotification('Failed to connect: ' + e.message, 'error'); });
+
+        // ── Secondary Modules (Attendance & Face Tracking) ────────────────────────────
 
         // ── Face Attendance Module (Students Only) ───────────────────────────────────
         if (!isHost && !isSuperUser) {
@@ -1384,7 +1518,13 @@
 
             function stopCapture() { clearInterval(captureTimer); captureTimer = null; }
 
-            window.addEventListener('load', () => setTimeout(connect, 3000));
+            // Trigger connection after join
+            const waitJoin = setInterval(() => {
+                if (isJoined) {
+                    clearInterval(waitJoin);
+                    connect();
+                }
+            }, 1000);
         })();
         }
 

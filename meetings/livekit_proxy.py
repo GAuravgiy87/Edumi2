@@ -11,11 +11,15 @@ import os
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 import websockets
+from websockets.exceptions import ConnectionClosed
 
 logger = logging.getLogger(__name__)
 
-LIVEKIT_INTERNAL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://127.0.0.1:7880')
+# Use structured logging for production readiness
+logging.basicConfig(level=logging.INFO)
+proxy_logger = logging.getLogger("livekit_proxy")
 
+LIVEKIT_INTERNAL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://127.0.0.1:7880')
 
 class LiveKitProxyConsumer(AsyncWebsocketConsumer):
 
@@ -27,7 +31,7 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
         if qs:
             target += f"?{qs}"
 
-        logger.info(f"LiveKit proxy → {target}")
+        proxy_logger.info(f"[LiveKitProxy] Attempting connection to internal LiveKit: {target}")
 
         try:
             self._lk_ws = await websockets.connect(
@@ -37,22 +41,27 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
                 max_size=10 * 1024 * 1024,
                 open_timeout=10,
             )
+            proxy_logger.info(f"[LiveKitProxy] Successfully connected to LiveKit server")
         except Exception as e:
-            logger.error(f"LiveKit proxy connect failed: {e}")
+            proxy_logger.error(f"[LiveKitProxy] CRITICAL: Failed to connect to {target}. Reason: {str(e)}")
+            # 1011: Internal Error. 
+            # We close with 1011 so the frontend knows it's a server-side configuration issue.
             await self.close(code=1011)
             return
 
         await self.accept()
+        proxy_logger.info(f"[LiveKitProxy] Browser <-> Proxy connection accepted")
         self._lk_task = asyncio.ensure_future(self._lk_to_browser())
 
     async def disconnect(self, code):
+        proxy_logger.info(f"[LiveKitProxy] Disconnecting with code: {code}")
         if hasattr(self, "_lk_task"):
             self._lk_task.cancel()
         if hasattr(self, "_lk_ws"):
             try:
                 await self._lk_ws.close()
-            except Exception:
-                pass
+            except Exception as e:
+                proxy_logger.debug(f"[LiveKitProxy] Error closing LiveKit WS: {e}")
 
     async def receive(self, text_data=None, bytes_data=None):
         """Browser → LiveKit"""
@@ -63,8 +72,11 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
                 await self._lk_ws.send(bytes_data)
             elif text_data is not None:
                 await self._lk_ws.send(text_data)
+        except ConnectionClosed:
+            proxy_logger.warning("[LiveKitProxy] LiveKit connection closed while sending")
+            await self.close()
         except Exception as e:
-            logger.warning(f"Proxy → LiveKit send error: {e}")
+            proxy_logger.error(f"[LiveKitProxy] Browser → LiveKit send error: {str(e)}")
             await self.close()
 
     async def _lk_to_browser(self):
@@ -75,7 +87,10 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
                     await self.send(bytes_data=msg)
                 else:
                     await self.send(text_data=msg)
+        except ConnectionClosed:
+            proxy_logger.info("[LiveKitProxy] LiveKit server closed the connection")
         except Exception as e:
-            logger.warning(f"LiveKit → proxy ended: {e}")
+            proxy_logger.error(f"[LiveKitProxy] LiveKit → Browser stream error: {str(e)}")
         finally:
+            proxy_logger.info("[LiveKitProxy] Closing proxy session")
             await self.close()

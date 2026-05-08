@@ -468,7 +468,7 @@ def join_meeting(request, meeting_code):
         participant.joined_at = join_time
         participant.is_active = True
         
-        # FIX: Ensure existing participants also get permissions enabled if they were blocked
+        # Ensure existing participants also get permissions enabled if they were blocked
         if not is_host:
             participant.audio_permitted = True
             participant.video_permitted = True
@@ -488,13 +488,6 @@ def join_meeting(request, meeting_code):
         participant.video_permitted = True
         participant.screenshare_permitted = True
         participant.save()
-    
-    # Redirect registered students to face-verification pre-join
-    # Skip if: user not registered, user is host, already verified, or explicitly skipped
-    skip_verify = request.GET.get('skip_verify') == '1'
-    if is_student and not is_host and not face_not_registered and not skip_verify:
-        if not request.session.get(f'verified_meeting_{meeting.meeting_code}'):
-            return redirect('pre_join', meeting_code=meeting.meeting_code)
 
     return render(request, 'meetings/meeting_room.html', {
         'meeting': meeting,
@@ -504,63 +497,6 @@ def join_meeting(request, meeting_code):
         'face_not_registered': face_not_registered,
     })
 
-@login_required
-def pre_join(request, meeting_code):
-    meeting = get_object_or_404(Meeting, meeting_code=meeting_code)
-    
-    # If host, skip pre-join
-    if meeting.teacher == request.user or request.user.is_superuser:
-        return redirect('join_meeting', meeting_code=meeting_code)
-    
-    # Check if student has a face profile registered
-    face_registered = StudentFaceProfile.objects.filter(student=request.user).exists()
-    # NOTE: If not registered we still show the page with a 'Skip' option — attendance
-    # was already logged in join_meeting, so they are not blocked.
-
-    profile = getattr(request.user, 'userprofile', None)
-    return render(request, 'meetings/pre_join.html', {
-        'meeting': meeting,
-        'profile': profile,
-        'face_registered': face_registered,
-    })
-
-@login_required
-@require_http_methods(["POST"])
-def verify_face_prejoin(request):
-    import json
-    data = json.loads(request.body)
-    image_data = data.get('image')
-    meeting_code = data.get('meeting_code')
-    
-    if not image_data:
-        return JsonResponse({'success': False, 'message': 'No image provided'})
-
-    # Decode base64 image
-    format, imgstr = image_data.split(';base64,')
-    image_bytes = base64.b64decode(imgstr)
-    
-    # Get stored profile
-    try:
-        profile = StudentFaceProfile.objects.get(student=request.user)
-    except StudentFaceProfile.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'No face profile found'})
-
-    # Use FaceService to compare
-    fs = get_face_service()
-    result = fs.compare_frame_to_stored(
-        frame_bytes=image_bytes,
-        encrypted_embedding=profile.face_embedding_encrypted,
-        threshold=0.55
-    )
-
-    if result['match']:
-        # Mark this specific meeting as verified in the session
-        if meeting_code:
-            request.session[f'verified_meeting_{meeting_code}'] = True
-        
-        return JsonResponse({'success': True})
-    else:
-        return JsonResponse({'success': False, 'message': result['message']})
 
 @login_required
 def livekit_token(request, meeting_code):
