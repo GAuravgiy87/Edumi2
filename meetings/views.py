@@ -547,13 +547,20 @@ def livekit_token(request, meeting_code):
         is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
         scheme = 'wss' if is_secure else 'ws'
         livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
-    return JsonResponse({
-        'token': token, 
-        'url': livekit_url, 
-        'iceServers': [
+    # For local testing, we skip STUN to force 'host' candidates.
+    # This prevents the browser from trying to use its public IP (srflx)
+    # which often fails when the server is on the same local machine.
+    ice_servers = []
+    if host not in ['localhost', '127.0.0.1']:
+        ice_servers = [
             {'urls': 'stun:stun.l.google.com:19302'},
             {'urls': 'stun:stun1.l.google.com:19302'}
         ]
+
+    return JsonResponse({
+        'token': token, 
+        'url': livekit_url, 
+        'iceServers': ice_servers
     })
 
 @login_required
