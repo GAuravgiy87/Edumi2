@@ -537,16 +537,24 @@ def livekit_token(request, meeting_code):
         .to_jwt()
     )
 
-    # Derive the LiveKit proxy URL from the current request so it works on
-    # localhost, LAN IP, and ngrok without any .env change.
-    # http → ws, https → wss
-    # request.is_secure() respects SECURE_PROXY_SSL_HEADER so it returns True
-    # when behind ngrok/nginx even though Django receives plain HTTP internally.
-    is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
-    scheme = 'wss' if is_secure else 'ws'
-    livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
-
-    return JsonResponse({'token': token, 'url': livekit_url, 'iceServers': []})
+    # Derive the LiveKit URL.
+    # For localhost, we can connect directly to bypass the proxy.
+    # For any other host (LAN, ngrok), we use the proxy.
+    host = request.get_host().split(':')[0]
+    if host in ['localhost', '127.0.0.1']:
+        livekit_url = "ws://127.0.0.1:7880"
+    else:
+        is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
+        scheme = 'wss' if is_secure else 'ws'
+        livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
+    return JsonResponse({
+        'token': token, 
+        'url': livekit_url, 
+        'iceServers': [
+            {'urls': 'stun:stun.l.google.com:19302'},
+            {'urls': 'stun:stun1.l.google.com:19302'}
+        ]
+    })
 
 @login_required
 def meeting_attendance(request, meeting_code):

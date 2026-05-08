@@ -365,21 +365,12 @@
 </head>
 
 <body class="meeting-body">
-    <!-- Join Overlay -->
-    <div id="join-overlay">
-        <div class="join-card">
-            <div class="join-title">Edumi Meet</div>
-            <div class="join-subtitle">Ready to join {{ meeting.title }}?</div>
-            
-            <button id="join-btn-main" class="btn-join-main" onclick="handleJoinClick()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                <span id="join-btn-text">Join Meeting</span>
-            </button>
-
-            <div class="join-status">
-                <div id="join-status-text">Your camera and mic will be initialized after joining.</div>
-                <div id="device-notifs"></div>
-            </div>
+    <!-- Direct Join Loading Indicator -->
+    <div id="join-status-overlay" style="position:fixed; inset:0; background:#0f172a; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;">
+        <div class="spinner" style="width:40px; height:40px; border-width:4px; margin-bottom:20px;"></div>
+        <div id="join-status-text" style="font-size:18px; font-weight:600;">Connecting to {{ meeting.title }}...</div>
+        <div id="join-error-area" class="hidden" style="margin-top:20px;">
+            <button onclick="handleJoinClick()" style="background:#6366f1; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600;">Retry Connection</button>
         </div>
     </div>
 
@@ -626,27 +617,28 @@
 
         // ── Init ──────────────────────────────────────────────────────────────────────
         // ── Entry Point ───────────────────────────────────────────────────────────────
-        async function handleJoinClick() {
-            const btn = document.getElementById('join-btn-main');
-            const btnText = document.getElementById('join-btn-text');
-            const statusText = document.getElementById('join-status-text');
+        window.addEventListener('load', () => {
+            setTimeout(handleJoinClick, 100);
+        });
 
+        async function handleJoinClick() {
             if (isJoined) return;
+            const statusText = document.getElementById('join-status-text');
+            const errorArea = document.getElementById('join-error-area');
+            const overlay = document.getElementById('join-status-overlay');
 
             try {
-                btn.disabled = true;
-                btnText.textContent = 'Joining...';
-                statusText.innerHTML = '<div class="spinner"></div> Connecting...';
-
+                if (statusText) statusText.textContent = 'Connecting directly...';
+                if (errorArea) errorArea.classList.add('hidden');
+                
                 await init();
-
+                
                 isJoined = true;
-                document.getElementById('join-overlay').classList.add('hidden');
+                if (overlay) overlay.style.display = 'none';
             } catch (err) {
                 console.error("Join Error:", err);
-                btn.disabled = false;
-                btnText.textContent = 'Retry Joining';
-                statusText.innerHTML = `<span style="color:#ef4444">Error: ${err.message}</span>`;
+                if (statusText) statusText.innerHTML = `<span style="color:#ef4444">Error: ${err.message}</span>`;
+                if (errorArea) errorArea.classList.remove('hidden');
             }
         }
 
@@ -654,19 +646,32 @@
             const tokenRes = await fetch(TOKEN_URL);
             const tokenData = await tokenRes.json();
             if (tokenData.error) throw new Error(tokenData.error);
-            const { token, url } = tokenData;
+            const { token, url, iceServers } = tokenData;
 
             room = new Room({
                 adaptiveStream: true,
                 dynacast: true,
                 videoCaptureDefaults: { resolution: VideoPresets.h1080.resolution },
                 publishDefaults: { simulcast: true, videoCodec: 'h264' },
+                stopLocalTrackOnUnpublish: true,
+                connectTimeout: 20000, // 20 seconds
             });
 
             setupRoomEventHandlers(room);
-            await room.connect(url, token);
-            await safeInitMedia();
+            await room.connect(url, token, {
+                iceServers: iceServers || [],
+                forceTCP: true, // Force TCP for local stability
+            });
+            
+            // Start signaling and then media (non-blocking if possible)
             connectSignaling();
+            
+            try {
+                await safeInitMedia();
+            } catch (mediaErr) {
+                console.warn("Direct media init failed (gesture needed?):", mediaErr);
+                showNotification("Click anywhere to enable Camera/Mic if they didn't start.", "warning");
+            }
 
             renderLocalParticipant();
             room.remoteParticipants.forEach(p => onParticipantConnected(p));

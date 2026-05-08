@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 #  Edumi -- One-Click Startup Script
 #  Starts: Redis, LiveKit, ngrok, Migrations, Static, Camera Service,
 #          Celery Worker, Daphne ASGI (foreground)
@@ -52,7 +52,7 @@ function Wait-Port($port, $timeoutSec = 20) {
 Clear-Host
 Write-Host ""
 Write-Host "  +==================================================+" -ForegroundColor Cyan
-Write-Host "  |           E D U M I   S T A R T U P               |" -ForegroundColor Cyan
+Write-Host "  |           E D U M I   B Y    G A U R A V               |" -ForegroundColor Cyan
 Write-Host "  +==================================================+" -ForegroundColor Cyan
 Write-Host ""
 
@@ -99,7 +99,9 @@ if (-not (Test-Path $LIVEKIT)) {
     Write-Fail "livekit-server.exe not found at $LIVEKIT"
     Write-Warn "Video meetings will not work"
 } else {
-    Start-Process -FilePath $LIVEKIT -ArgumentList "--config", "livekit.yaml", "--bind", "0.0.0.0" -WindowStyle Hidden
+    Start-Process -FilePath $LIVEKIT -ArgumentList "--config", "livekit.yaml", "--bind", "0.0.0.0" `
+        -RedirectStandardOutput "livekit.log" -RedirectStandardError "livekit_err.log" `
+        -WindowStyle Hidden
     Start-Sleep -Seconds 2
     if (Wait-Port 7880 10) {
         Write-OK "LiveKit running  :7880"
@@ -109,59 +111,15 @@ if (-not (Test-Path $LIVEKIT)) {
 }
 
 # =============================================================================
-#  STEP 3 -- ngrok tunnel
+#  STEP 3 -- URL Info
 # =============================================================================
-Write-Step 3 8 "ngrok  (public HTTPS tunnel -> :8000)"
+Write-Step 3 8 "URL Configuration"
 
-# Write ngrok config — only the HTTP tunnel (free plan supports 1 tunnel)
-$ngrokLines = @(
-    'version: "3"',
-    'agent:',
-    '  authtoken: 3Cyj0XsReXGd9C2Nww5Xr03iexV_2CtxYGFbUapetBGZLC2XE',
-    'tunnels:',
-    '  django:',
-    '    proto: http',
-    '    addr: 8000',
-    '    inspect: false',
-    '    request_header:',
-    '      add:',
-    '        - "ngrok-skip-browser-warning: true"'
-)
-$ngrokLines | Set-Content -Path "ngrok.yml" -Encoding UTF8
-
-$ngrokUrl = ""
-
-if (-not (Test-Path $NGROK)) {
-    Write-Fail "ngrok not found at $NGROK"
-    $ngrokUrl = "http://$(hostname):8000"
-    Write-Warn "LAN only: $ngrokUrl"
-} else {
-    Start-Process -FilePath $NGROK -ArgumentList "start", "django", "--config", "ngrok.yml" -WindowStyle Hidden
-    Write-Host "         Waiting for ngrok tunnel..." -ForegroundColor Gray
-
-    for ($i = 0; $i -lt 15; $i++) {
-        Start-Sleep -Seconds 2
-        try {
-            $tunnels = (Invoke-RestMethod $NGROK_API -TimeoutSec 3).tunnels
-            foreach ($t in $tunnels) {
-                if ($t.public_url -like "https://*") {
-                    $ngrokUrl = $t.public_url
-                    break
-                }
-            }
-            if ($ngrokUrl -ne "") { break }
-        } catch {}
-    }
-
-    if ($ngrokUrl -eq "") {
-        Write-Warn "ngrok tunnel not found -- using LAN only"
-        $ngrokUrl = "http://$(hostname):8000"
-    } else {
-        Write-OK "ngrok tunnel: $ngrokUrl"
-    }
-}
-
-$livekitProxyUrl = ($ngrokUrl -replace "^https://", "wss://") + "/livekit-proxy"
+$localUrl = "http://localhost:8000"
+$lanUrl   = "http://$(hostname):8000"
+Write-OK "Local Access: $localUrl"
+Write-OK "LAN Access  : $lanUrl"
+Write-Warn "Note: For remote access, run ngrok manually: ngrok http 8000"
 
 # =============================================================================
 #  STEP 4 -- Write .env
@@ -175,7 +133,7 @@ $envLines = @(
     "REDIS_URL=redis://localhost:6379/0",
     "CAMERA_SERVICE_URL=http://127.0.0.1:8001",
     "LIVEKIT_API_KEY=devkey",
-    "LIVEKIT_API_SECRET=devsecret_must_be_32_characters_long_1234"
+    "LIVEKIT_API_SECRET=devsecret32charsshallbeusedhere1"
 )
 $envLines | Set-Content -Path ".env" -Encoding UTF8
 Write-OK ".env written  (LiveKit URL auto-derived from request - no hardcoding needed)"
@@ -240,8 +198,8 @@ Write-Host ""
 Write-Host "  +============================================================+" -ForegroundColor Green
 Write-Host "  |  Edumi is RUNNING                                          |" -ForegroundColor Green
 Write-Host "  +============================================================+" -ForegroundColor Green
-Write-Host "  |  Local   ->  http://$(hostname):8000" -ForegroundColor White
-Write-Host "  |  Public  ->  $ngrokUrl" -ForegroundColor White
+Write-Host "  |  Local   ->  http://localhost:8000" -ForegroundColor White
+Write-Host "  |  LAN     ->  http://$(hostname):8000" -ForegroundColor White
 Write-Host "  +------------------------------------------------------------+" -ForegroundColor Green
 Write-Host "  |  Redis      :6379   WebSocket + Celery                     |" -ForegroundColor Gray
 Write-Host "  |  LiveKit    :7880   WebRTC SFU                             |" -ForegroundColor Gray
@@ -263,10 +221,6 @@ try {
 
     # Celery
     Get-Process | Where-Object { $_.Name -like "*celery*" } |
-        Stop-Process -Force -ErrorAction SilentlyContinue
-
-    # ngrok
-    Get-Process | Where-Object { $_.Name -like "*ngrok*" } |
         Stop-Process -Force -ErrorAction SilentlyContinue
 
     # LiveKit
