@@ -8,10 +8,10 @@
 # =============================================================================
 
 # -- Paths --------------------------------------------------------------------
-$PYTHON    = "C:\Users\hp123\AppData\Local\Python\pythoncore-3.14-64\python.exe"
-$DAPHNE    = "C:\Users\hp123\AppData\Local\Python\pythoncore-3.14-64\Scripts\daphne.exe"
-$CELERY    = "C:\Users\hp123\AppData\Local\Python\pythoncore-3.14-64\Scripts\celery.exe"
-$NGROK     = "C:\Users\hp123\Downloads\ngrok-v3-stable-windows-amd64\ngrok.exe"
+$PYTHON    = "C:\Users\hsraa\AppData\Local\Programs\Python\Python312\python.exe"
+$DAPHNE    = "C:\Users\hsraa\AppData\Local\Programs\Python\Python312\Scripts\daphne.exe"
+$CELERY    = "C:\Users\hsraa\AppData\Local\Programs\Python\Python312\Scripts\celery.exe"
+$NGROK     = "C:\Users\hsraa\Downloads\ngrok-v3-stable-windows-amd64\ngrok.exe"
 $LIVEKIT   = ".\livekit-bin\livekit-server.exe"
 $NGROK_API = "http://localhost:4040/api/tunnels"
 $PROJECT   = $PSScriptRoot

@@ -374,12 +374,8 @@
         </div>
     </div>
 
-    <!-- Reconnecting Overlay -->
-    <div id="reconnect-overlay" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(8px); color:white;">
-        <div class="spinner" style="width:40px; height:40px; border-width:4px; margin-bottom:20px;"></div>
-        <div style="font-size:20px; font-weight:700;">Reconnecting...</div>
-        <div style="color:#94a3b8; font-size:14px; margin-top:8px;">Please stay on the page while we restore your connection.</div>
-    </div>
+    <!-- Reconnecting Overlay (disabled) -->
+    <div id="reconnect-overlay" style="display:none !important;"></div>
 
     <div class="meet-container">
 
@@ -657,12 +653,31 @@
             const { token, url, iceServers } = tokenData;
 
             room = new Room({
-                adaptiveStream: true,
-                dynacast: true,
-                videoCaptureDefaults: { resolution: VideoPresets.h1080.resolution },
-                publishDefaults: { simulcast: true, videoCodec: 'h264' },
+                adaptiveStream: false,   // disable adaptive downscaling — keep full quality
+                dynacast: false,         // disable dynamic layer dropping
+                videoCaptureDefaults: {
+                    resolution: { width: 1920, height: 1080, frameRate: 60 },
+                },
+                audioCaptureDefaults: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000,
+                    channelCount: 2,
+                },
+                publishDefaults: {
+                    simulcast: false,        // single full-quality stream, no downscaled layers
+                    videoCodec: 'vp9',       // VP9 — better quality/bitrate than H264
+                    videoEncoding: {
+                        maxBitrate: 8_000_000,   // 8 Mbps for 1080p60
+                        maxFramerate: 60,
+                    },
+                    audioPreset: {
+                        maxBitrate: 320_000,     // 320 kbps stereo audio
+                    },
+                },
                 stopLocalTrackOnUnpublish: true,
-                connectTimeout: 20000, // 20 seconds
+                connectTimeout: 20000,
             });
 
             setupRoomEventHandlers(room);
@@ -709,7 +724,21 @@
                 // Resume AudioContext
                 try { await room.startAudio(); } catch (e) { console.warn("Audio start deferred"); }
 
-                await room.localParticipant.enableCameraAndMicrophone();
+                await room.localParticipant.enableCameraAndMicrophone({
+                    video: {
+                        width: { ideal: 1920, min: 1280 },
+                        height: { ideal: 1080, min: 720 },
+                        frameRate: { ideal: 60, min: 30 },
+                        facingMode: 'user',
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 48000,
+                        channelCount: 2,
+                    },
+                });
                 isMicOn = true; isCameraOn = true;
             } catch (err) {
                 console.warn("Media Fail:", err);
@@ -1116,7 +1145,11 @@
 
             const desired = !isCameraOn;
             try {
-                await room.localParticipant.setCameraEnabled(desired);
+                await room.localParticipant.setCameraEnabled(desired, {
+                    width: { ideal: 1920, min: 1280 },
+                    height: { ideal: 1080, min: 720 },
+                    frameRate: { ideal: 60, min: 30 },
+                });
                 isCameraOn = desired;
             } catch (e) {
                 if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
@@ -1151,16 +1184,16 @@
                         throw new Error("Screen sharing is not supported on mobile browsers or you are not using HTTPS.");
                     }
                     const [screenTrack] = await createLocalScreenTracks({
-                        audio: false,
-                        resolution: VideoPresets.h1080.resolution
+                        audio: true,   // capture system audio with screen share
+                        resolution: { width: 3840, height: 2160, frameRate: 60 },
                     });
                     if (screenTrack.mediaStreamTrack) {
-                        screenTrack.mediaStreamTrack.contentHint = 'text';
+                        screenTrack.mediaStreamTrack.contentHint = 'detail';
                     }
                     screenTrackPub = await room.localParticipant.publishTrack(screenTrack, {
                         name: "screen",
-                        simulcast: false, // Force single high-quality stream for crisp text
-                        videoEncoding: { maxBitrate: 8_000_000, maxFramerate: 30 },
+                        simulcast: false,
+                        videoEncoding: { maxBitrate: 20_000_000, maxFramerate: 60 },
                     });
                     isScreenSharing = true;
                     document.getElementById('screenBtn').classList.add('active');
