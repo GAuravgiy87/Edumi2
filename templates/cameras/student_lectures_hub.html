@@ -1,0 +1,288 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Live Classes & Lectures{% endblock %}
+
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+<style>
+.slh-page { max-width:1300px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+
+/* ── Section header ── */
+.slh-section-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; }
+.slh-section-head h2 { font-size:1.2rem; font-weight:800; margin:0; color:var(--text-main,#111); }
+.slh-section-head a  { font-size:.85rem; font-weight:600; color:#6366f1; text-decoration:none; }
+.slh-section-head a:hover { text-decoration:underline; }
+
+.slh-divider { margin:2.5rem 0; border:none; border-top:1px solid var(--border-color,rgba(0,0,0,.08)); }
+
+/* ── Live grid ── */
+.live-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1.25rem; }
+
+.live-card {
+  background:var(--bg-card,#fff);
+  border:1px solid var(--border-color,rgba(0,0,0,.08));
+  border-radius:16px; overflow:hidden;
+  box-shadow:0 2px 10px rgba(0,0,0,.06);
+  transition:transform .2s, box-shadow .2s;
+}
+.live-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.12); border-color:#6366f1; }
+
+.live-thumb {
+  position:relative; aspect-ratio:16/9; background:#0f172a;
+  display:flex; align-items:center; justify-content:center;
+}
+.live-thumb-icon { font-size:2.5rem; opacity:.4; }
+.live-badge-pill {
+  position:absolute; top:.75rem; left:.75rem;
+  background:#ef4444; color:#fff;
+  font-size:.7rem; font-weight:800; padding:.2rem .6rem; border-radius:4px;
+  display:flex; align-items:center; gap:.35rem;
+}
+.live-dot { width:6px; height:6px; background:#fff; border-radius:50%; animation:blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.viewer-pill {
+  position:absolute; top:.75rem; right:.75rem;
+  background:rgba(0,0,0,.6); color:#fff;
+  font-size:.7rem; padding:.2rem .55rem; border-radius:4px;
+}
+
+.live-info { padding:1rem 1.1rem 1.1rem; }
+.live-teacher { display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+.live-teacher img { width:24px; height:24px; border-radius:50%; }
+.live-teacher span { font-size:.8rem; color:var(--text-muted,#6b7280); font-weight:600; }
+.live-title { font-size:.95rem; font-weight:700; color:var(--text-main,#111); margin:0 0 .3rem; }
+.live-time  { font-size:.78rem; color:var(--text-muted,#9ca3af); margin:0 0 .85rem; }
+.btn-join {
+  display:block; text-align:center; padding:.65rem;
+  background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff;
+  border-radius:8px; font-weight:700; font-size:.875rem; text-decoration:none;
+  transition:opacity .2s;
+}
+.btn-join:hover { opacity:.88; }
+
+/* ── Lecture grid ── */
+.lecture-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1.25rem; }
+
+.lecture-card {
+  background:var(--bg-card,#fff);
+  border:1px solid var(--border-color,rgba(0,0,0,.08));
+  border-radius:16px; overflow:hidden;
+  box-shadow:0 2px 10px rgba(0,0,0,.06);
+  transition:transform .2s, box-shadow .2s;
+}
+.lecture-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.12); border-color:#6366f1; }
+
+.lecture-thumb {
+  position:relative; aspect-ratio:16/9; background:#1e293b;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.lecture-thumb img { width:100%; height:100%; object-fit:cover; }
+.lecture-thumb-icon { font-size:2.5rem; opacity:.5; }
+.lecture-duration {
+  position:absolute; bottom:.5rem; right:.5rem;
+  background:rgba(0,0,0,.75); color:#fff;
+  font-size:.72rem; font-weight:700; padding:.15rem .45rem; border-radius:4px;
+}
+.play-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,.3);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity .2s;
+}
+.lecture-card:hover .play-overlay { opacity:1; }
+.play-btn-circle {
+  width:48px; height:48px; background:rgba(255,255,255,.9); border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:1.2rem;
+}
+
+.lecture-info { padding:1rem 1.1rem 1.1rem; }
+.lecture-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:.4rem; }
+.lecture-teacher { font-size:.78rem; color:var(--text-muted,#6b7280); font-weight:600; }
+.lecture-date    { font-size:.75rem; color:var(--text-muted,#9ca3af); }
+.lecture-title { font-size:.95rem; font-weight:700; color:var(--text-main,#111); margin:0 0 .3rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lecture-desc  { font-size:.8rem; color:var(--text-muted,#6b7280); margin:0 0 .85rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.lecture-cls-tag {
+  display:inline-block; padding:.2rem .65rem;
+  background:rgba(99,102,241,.1); color:#6366f1;
+  border-radius:20px; font-size:.72rem; font-weight:600; margin-bottom:.6rem;
+}
+.btn-watch {
+  display:block; text-align:center; padding:.6rem;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff;
+  border-radius:8px; font-weight:700; font-size:.875rem; text-decoration:none;
+  transition:opacity .2s;
+}
+.btn-watch:hover { opacity:.88; }
+
+/* ── Empty state ── */
+.empty-state {
+  text-align:center; padding:3rem 1rem;
+  background:var(--bg-card,#fff);
+  border:1px solid var(--border-color,rgba(0,0,0,.08));
+  border-radius:16px; color:var(--text-muted,#9ca3af);
+}
+.empty-state .ei { font-size:3rem; margin-bottom:.75rem; }
+.empty-state h3 { color:var(--text-main,#374151); margin:0 0 .4rem; }
+.empty-state p  { margin:0; font-size:.9rem; }
+
+/* ── Filter tabs ── */
+.filter-tabs { display:flex; gap:.5rem; margin-bottom:1.25rem; flex-wrap:wrap; }
+.filter-tab {
+  padding:.45rem 1rem; border-radius:20px; font-size:.82rem; font-weight:600;
+  border:1.5px solid var(--border-color,rgba(0,0,0,.1)); cursor:pointer;
+  background:var(--bg-card,#fff); color:var(--text-muted,#6b7280); transition:all .18s;
+}
+.filter-tab.active, .filter-tab:hover { background:#6366f1; color:#fff; border-color:#6366f1; }
+
+/* ── Search ── */
+.search-bar {
+  display:flex; gap:.5rem; margin-bottom:1.5rem; max-width:420px;
+}
+.search-bar input {
+  flex:1; padding:.65rem 1rem; border:1.5px solid var(--border-color,rgba(0,0,0,.1));
+  border-radius:10px; font-size:.875rem; background:var(--bg-card,#fff); color:var(--text-main,#111);
+}
+.search-bar input:focus { outline:none; border-color:#6366f1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="slh-page">
+
+  <!-- ── LIVE CLASSES ── -->
+  <div class="slh-section-head">
+    <h2>🔴 Live Now</h2>
+    {% if live_classes %}<span style="font-size:.85rem;color:#ef4444;font-weight:700;">{{ live_classes|length }} active</span>{% endif %}
+  </div>
+
+  {% if live_classes %}
+  <div class="live-grid">
+    {% for lc in live_classes %}
+    <div class="live-card">
+      <div class="live-thumb">
+        <span class="live-thumb-icon">📡</span>
+        <span class="live-badge-pill"><span class="live-dot"></span> LIVE</span>
+        <span class="viewer-pill">👁 {{ lc.viewer_count }}</span>
+      </div>
+      <div class="live-info">
+        <div class="live-teacher">
+          <img src="https://ui-avatars.com/api/?name={{ lc.teacher.username|urlencode }}&background=6366f1&color=fff&size=48" alt="">
+          <span>{{ lc.teacher.get_full_name|default:lc.teacher.username }}</span>
+        </div>
+        <p class="live-title">{{ lc.title }}</p>
+        <p class="live-time">Started {{ lc.started_at|timesince }} ago</p>
+        <a href="{% url 'student_live_class' lc.stream_key %}" class="btn-join">▶ Join Live</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="ei">📡</div>
+    <h3>No Live Classes Right Now</h3>
+    <p>Check back later — your teachers will broadcast here when they go live.</p>
+  </div>
+  {% endif %}
+
+  <hr class="slh-divider">
+
+  <!-- ── UPLOADED LECTURES ── -->
+  <div class="slh-section-head">
+    <h2>🎬 Recorded Lectures</h2>
+    <span style="font-size:.85rem;color:var(--text-muted,#6b7280);">{{ uploaded_videos|length }} lecture{{ uploaded_videos|length|pluralize }}</span>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Search lectures…" oninput="filterLectures()">
+  </div>
+
+  {% if uploaded_videos %}
+  <div class="lecture-grid" id="lectureGrid">
+    {% for v in uploaded_videos %}
+    <div class="lecture-card" data-title="{{ v.title|lower }}" data-teacher="{{ v.teacher.username|lower }}">
+      <div class="lecture-thumb">
+        {% if v.thumbnail %}
+          <img src="{{ v.thumbnail.url }}" alt="{{ v.title }}">
+        {% else %}
+          <span class="lecture-thumb-icon">🎬</span>
+        {% endif %}
+        {% if v.duration_seconds > 0 %}
+        <span class="lecture-duration">
+          {% widthratio v.duration_seconds 60 1 %}m
+        </span>
+        {% endif %}
+        <div class="play-overlay">
+          <div class="play-btn-circle">▶</div>
+        </div>
+      </div>
+      <div class="lecture-info">
+        <div class="lecture-meta">
+          <span class="lecture-teacher">{{ v.teacher.get_full_name|default:v.teacher.username }}</span>
+          <span class="lecture-date">{{ v.created_at|date:"M d" }}</span>
+        </div>
+        {% if v.classroom %}
+          <span class="lecture-cls-tag">{{ v.classroom.title }}</span>
+        {% endif %}
+        <p class="lecture-title" title="{{ v.title }}">{{ v.title }}</p>
+        {% if v.description %}
+          <p class="lecture-desc">{{ v.description }}</p>
+        {% endif %}
+        <a href="{{ v.video_file.url }}" target="_blank" class="btn-watch">▶ Watch Lecture</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="ei">🎬</div>
+    <h3>No Recorded Lectures Yet</h3>
+    <p>Your teachers haven't uploaded any lectures yet. Check back soon.</p>
+  </div>
+  {% endif %}
+
+  {% if processed_videos %}
+  <hr class="slh-divider">
+  <div class="slh-section-head">
+    <h2>📼 Past Live Recordings</h2>
+  </div>
+  <div class="lecture-grid">
+    {% for pv in processed_videos %}
+    <div class="lecture-card">
+      <div class="lecture-thumb">
+        {% if pv.thumbnail %}
+          <img src="{{ pv.thumbnail.url }}" alt="{{ pv.title }}">
+        {% else %}
+          <span class="lecture-thumb-icon">📼</span>
+        {% endif %}
+        {% if pv.duration_seconds > 0 %}
+        <span class="lecture-duration">{% widthratio pv.duration_seconds 60 1 %}m</span>
+        {% endif %}
+        <div class="play-overlay"><div class="play-btn-circle">▶</div></div>
+      </div>
+      <div class="lecture-info">
+        <div class="lecture-meta">
+          <span class="lecture-teacher">{{ pv.teacher.get_full_name|default:pv.teacher.username }}</span>
+          <span class="lecture-date">{{ pv.created_at|date:"M d" }}</span>
+        </div>
+        <p class="lecture-title" title="{{ pv.title }}">{{ pv.title }}</p>
+        {% if pv.description %}<p class="lecture-desc">{{ pv.description }}</p>{% endif %}
+        <a href="{% url 'view_recording' pv.id %}" class="btn-watch">▶ Watch Recording</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function filterLectures() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('#lectureGrid .lecture-card').forEach(card => {
+    const title   = card.dataset.title   || '';
+    const teacher = card.dataset.teacher || '';
+    card.style.display = (title.includes(q) || teacher.includes(q)) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

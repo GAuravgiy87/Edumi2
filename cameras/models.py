@@ -242,3 +242,36 @@ class CameraLog(models.Model):
 
     def __str__(self):
         return f"[{self.timestamp}] {self.event_type}: {self.message[:50]}"
+
+class UploadedVideo(models.Model):
+    """Directly uploaded lecture recordings by teachers (MP4/WebM)"""
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploaded_videos')
+    classroom = models.ForeignKey(
+        'meetings.Classroom', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='uploaded_videos'
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    video_file = models.FileField(upload_to='uploaded_lectures/')
+    thumbnail = models.ImageField(upload_to='lecture_thumbnails/', blank=True, null=True)
+    duration_seconds = models.FloatField(default=0.0)
+    file_size_bytes = models.BigIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Uploaded Video'
+        verbose_name_plural = 'Uploaded Videos'
+
+    def __str__(self):
+        return f"{self.title} — {self.teacher.username}"
+
+    def get_file_size_display(self):
+        size = self.file_size_bytes
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} TB"

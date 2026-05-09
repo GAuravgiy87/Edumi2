@@ -8,10 +8,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.contrib.auth.models import User
-from django.db.models import Avg, Max, Min, Count
+from django.db.models import Avg, Max, Min, Count, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession, LiveClass, LiveClassRecording
+from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession, LiveClass, LiveClassRecording, ProcessedVideo, UploadedVideo
 from mobile_cameras.models import MobileCamera, MobileCameraPermission
 from .head_count_service import head_count_manager
 from .utils import verify_stream_token, generate_stream_token, is_admin, auto_detect_stream_path, parse_stream_url, validate_rtsp_url
@@ -1140,3 +1140,134 @@ def simulate_load(request):
     return render(request, 'cameras/simulate_load.html')
 
 
+
+
+# ─────────────────────────────────────────────────────────────
+# TEACHER LIVE CLASS HUB
+# ─────────────────────────────────────────────────────────────
+
+@login_required
+def teacher_live_hub(request):
+    """Dedicated teacher page: start live class, upload recordings, manage content."""
+    if not (hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher') and not is_admin(request.user):
+        return redirect('login')
+
+    active_class = LiveClass.objects.filter(teacher=request.user, status='active').first()
+    from meetings.models import Classroom
+    classrooms = Classroom.objects.filter(teacher=request.user, is_active=True)
+    uploaded_videos = UploadedVideo.objects.filter(teacher=request.user).order_by('-created_at')
+    past_live_classes = LiveClass.objects.filter(teacher=request.user, status='ended').order_by('-ended_at')[:10]
+
+    if active_class:
+        active_class.temp_token = generate_stream_token(request.user, active_class.stream_key)
+
+    return render(request, 'cameras/teacher_live_hub.html', {
+        'active_class': active_class,
+        'classrooms': classrooms,
+        'uploaded_videos': uploaded_videos,
+        'past_live_classes': past_live_classes,
+    })
+
+
+@login_required
+def upload_lecture(request):
+    """Teacher uploads a recorded lecture video."""
+    if not (hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher') and not is_admin(request.user):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    if request.method != 'POST':
+        return redirect('teacher_live_hub')
+
+    title = request.POST.get('title', '').strip()
+    description = request.POST.get('description', '').strip()
+    classroom_id = request.POST.get('classroom_id') or None
+    video_file = request.FILES.get('video_file')
+
+    if not title:
+        messages_list = ['Title is required.']
+        return JsonResponse({'error': messages_list[0]}, status=400)
+    if not video_file:
+        return JsonResponse({'error': 'No video file provided.'}, status=400)
+
+    allowed_types = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-msvideo']
+    if hasattr(video_file, 'content_type') and video_file.content_type not in allowed_types:
+        return JsonResponse({'error': 'Only MP4, WebM, MOV, or AVI files are allowed.'}, status=400)
+
+    max_size = 2 * 1024 * 1024 * 1024  # 2 GB
+    if video_file.size > max_size:
+        return JsonResponse({'error': 'File too large (max 2 GB).'}, status=400)
+
+    classroom = None
+    if classroom_id:
+        from meetings.models import Classroom
+        try:
+            classroom = Classroom.objects.get(id=classroom_id, teacher=request.user)
+        except Classroom.DoesNotExist:
+            pass
+
+    uv = UploadedVideo.objects.create(
+        teacher=request.user,
+        classroom=classroom,
+        title=title,
+        description=description,
+        video_file=video_file,
+        file_size_bytes=video_file.size,
+        is_published=True,
+    )
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'id': uv.id, 'title': uv.title})
+    from django.contrib import messages as dj_messages
+    dj_messages.success(request, f'"{title}" uploaded successfully!')
+    return redirect('teacher_live_hub')
+
+
+@login_required
+def delete_uploaded_lecture(request, video_id):
+    """Teacher deletes their uploaded lecture."""
+    video = get_object_or_404(UploadedVideo, id=video_id, teacher=request.user)
+    if request.method == 'POST':
+        video.video_file.delete(save=False)
+        if video.thumbnail:
+            video.thumbnail.delete(save=False)
+        video.delete()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True})
+        from django.contrib import messages as dj_messages
+        dj_messages.success(request, 'Lecture deleted.')
+    return redirect('teacher_live_hub')
+
+
+# ─────────────────────────────────────────────────────────────
+# STUDENT LECTURES HUB
+# ─────────────────────────────────────────────────────────────
+
+@login_required
+def student_lectures_hub(request):
+    """Student page: see live classes + all uploaded/recorded lectures."""
+    from meetings.models import ClassroomMembership
+
+    # Live classes currently active
+    live_classes = LiveClass.objects.filter(status='active').order_by('-started_at')
+
+    # Uploaded lectures — from classrooms the student is enrolled in, plus public ones
+    enrolled_classroom_ids = ClassroomMembership.objects.filter(
+        student=request.user, status='approved'
+    ).values_list('classroom_id', flat=True)
+
+    uploaded_videos = UploadedVideo.objects.filter(
+        is_published=True
+    ).filter(
+        Q(classroom__isnull=True) | Q(classroom_id__in=enrolled_classroom_ids)
+    ).select_related('teacher', 'classroom').order_by('-created_at')
+
+    # Processed (RTMP) recordings that are completed
+    processed_videos = ProcessedVideo.objects.filter(
+        processing_status='completed'
+    ).select_related('teacher').order_by('-created_at')[:20]
+
+    return render(request, 'cameras/student_lectures_hub.html', {
+        'live_classes': live_classes,
+        'uploaded_videos': uploaded_videos,
+        'processed_videos': processed_videos,
+    })

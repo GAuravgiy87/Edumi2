@@ -133,7 +133,8 @@ $envLines = @(
     "REDIS_URL=redis://localhost:6379/0",
     "CAMERA_SERVICE_URL=http://127.0.0.1:8001",
     "LIVEKIT_API_KEY=devkey",
-    "LIVEKIT_API_SECRET=devsecret32charsshallbeusedhere1"
+    "LIVEKIT_API_SECRET=devsecret32charsshallbeusedhere1",
+    "FACE_ENCRYPTION_KEY=E-ztTbHpqOMjPJMPuTd3gYeiILzSoKL31AxeqrXeJg4="
 )
 $envLines | Set-Content -Path ".env" -Encoding UTF8
 Write-OK ".env written  (LiveKit URL auto-derived from request - no hardcoding needed)"
@@ -198,8 +199,8 @@ Write-Host ""
 Write-Host "  +============================================================+" -ForegroundColor Green
 Write-Host "  |  Edumi is RUNNING                                          |" -ForegroundColor Green
 Write-Host "  +============================================================+" -ForegroundColor Green
-Write-Host "  |  Local   ->  http://localhost:8000" -ForegroundColor White
-Write-Host "  |  LAN     ->  http://$(hostname):8000" -ForegroundColor White
+Write-Host "  |  Local   ->  http://localhost:8000                         |" -ForegroundColor White
+Write-Host "  |  LAN     ->  http://$(hostname):8000                       |" -ForegroundColor White
 Write-Host "  +------------------------------------------------------------+" -ForegroundColor Green
 Write-Host "  |  Redis      :6379   WebSocket + Celery                     |" -ForegroundColor Gray
 Write-Host "  |  LiveKit    :7880   WebRTC SFU                             |" -ForegroundColor Gray

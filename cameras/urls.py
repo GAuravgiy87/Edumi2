@@ -16,9 +16,15 @@ urlpatterns = [
     
     # Teacher Dashboard & Live Classes
     path('dashboard/', views.teacher_camera_dashboard, name='teacher_camera_dashboard'),
+    path('live-hub/', views.teacher_live_hub, name='teacher_live_hub'),
     path('live-class/start/', views.start_live_class, name='start_live_class'),
     path('live-class/stop/<int:class_id>/', views.stop_live_class, name='stop_live_class'),
     path('live-class/feed/<str:stream_key>/', views.live_class_feed, name='live_class_feed'),
+    path('lecture/upload/', views.upload_lecture, name='upload_lecture'),
+    path('lecture/delete/<int:video_id>/', views.delete_uploaded_lecture, name='delete_uploaded_lecture'),
+
+    # Student Lectures Hub
+    path('lectures/', views.student_lectures_hub, name='student_lectures_hub'),
     
     # Processed Recordings
     path('recordings/', views.list_recordings, name='list_recordings'),

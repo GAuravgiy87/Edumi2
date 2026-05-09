@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession
+from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession, UploadedVideo
 
 @admin.register(Camera)
 class CameraAdmin(admin.ModelAdmin):
@@ -31,3 +31,10 @@ class HeadCountSessionAdmin(admin.ModelAdmin):
     readonly_fields = ('started_at', 'stopped_at')
     raw_id_fields = ('classroom', 'started_by')
     date_hierarchy = 'started_at'
+
+@admin.register(UploadedVideo)
+class UploadedVideoAdmin(admin.ModelAdmin):
+    list_display = ('title', 'teacher', 'classroom', 'is_published', 'created_at')
+    list_filter = ('is_published', 'created_at', 'classroom')
+    search_fields = ('title', 'teacher__username')
+    raw_id_fields = ('teacher', 'classroom')

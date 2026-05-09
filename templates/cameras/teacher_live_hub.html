@@ -1,0 +1,552 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Live Class Hub{% endblock %}
+
+{% block extra_css %}
+<meta name="turbo-cache-control" content="no-cache">
+<style>
+:root { --accent: #6366f1; --accent2: #8b5cf6; --green: #059669; --red: #dc2626; }
+
+.hub-page { max-width: 1300px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+/* ── Page header ── */
+.hub-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; flex-wrap:wrap; gap:1rem; }
+.hub-header h1 { font-size:1.6rem; font-weight:800; margin:0 0 .2rem; color:var(--text-main,#111); }
+.hub-header p  { margin:0; color:var(--text-muted,#6b7280); font-size:.9rem; }
+
+/* ── Two-column layout ── */
+.hub-grid { display:grid; grid-template-columns:1fr 360px; gap:1.5rem; align-items:start; }
+@media(max-width:1050px){ .hub-grid{ grid-template-columns:1fr; } }
+
+/* ── Cards ── */
+.hub-card {
+  background:var(--bg-card,#fff);
+  border:1px solid var(--border-color,rgba(0,0,0,.08));
+  border-radius:16px;
+  box-shadow:0 2px 12px rgba(0,0,0,.06);
+  overflow:hidden;
+  margin-bottom:1.5rem;
+}
+.hub-card:last-child { margin-bottom:0; }
+.hub-card-head {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:1.1rem 1.4rem;
+  border-bottom:1px solid var(--border-color,rgba(0,0,0,.06));
+}
+.hub-card-head h2 { font-size:1rem; font-weight:700; margin:0; color:var(--text-main,#111); }
+.hub-card-body { padding:1.4rem; }
+
+/* ── Buttons ── */
+.btn { display:inline-flex; align-items:center; gap:.45rem; padding:.65rem 1.2rem; border-radius:10px; font-size:.875rem; font-weight:600; border:none; cursor:pointer; transition:all .18s; text-decoration:none; }
+.btn-green  { background:var(--green); color:#fff; box-shadow:0 4px 12px rgba(5,150,105,.3); }
+.btn-green:hover  { background:#047857; transform:translateY(-1px); }
+.btn-red    { background:var(--red); color:#fff; box-shadow:0 4px 12px rgba(220,38,38,.3); }
+.btn-red:hover    { background:#b91c1c; transform:translateY(-1px); }
+.btn-purple { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+.btn-purple:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(99,102,241,.35); }
+.btn-ghost  { background:var(--hover-bg,#f3f4f6); color:var(--text-main,#374151); }
+.btn-ghost:hover  { background:#e5e7eb; }
+.btn-sm { padding:.45rem .9rem; font-size:.8rem; }
+.btn-danger-sm { background:rgba(220,38,38,.1); color:var(--red); border:1px solid rgba(220,38,38,.2); }
+.btn-danger-sm:hover { background:rgba(220,38,38,.2); }
+.btn-full { width:100%; justify-content:center; }
+
+/* ── Live badge ── */
+.live-pill {
+  display:inline-flex; align-items:center; gap:.4rem;
+  background:rgba(220,38,38,.1); color:var(--red);
+  font-size:.78rem; font-weight:700; padding:.3rem .75rem; border-radius:20px;
+}
+.live-dot { width:8px; height:8px; background:var(--red); border-radius:50%; animation:pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+/* ── RTMP info ── */
+.rtmp-field { margin-bottom:1rem; }
+.rtmp-field label { display:block; font-size:.8rem; font-weight:600; color:var(--text-muted,#6b7280); margin-bottom:.35rem; }
+.rtmp-row { display:flex; gap:.4rem; }
+.rtmp-row input {
+  flex:1; min-width:0; padding:.55rem .75rem;
+  border:1.5px solid var(--border-color,#e5e7eb); border-radius:8px;
+  font-size:.8rem; font-family:monospace; background:var(--hover-bg,#f9fafb);
+  color:var(--text-main,#111);
+}
+.rtmp-row input:focus { outline:none; border-color:var(--accent); }
+.copy-btn {
+  padding:.5rem .75rem; border:1.5px solid var(--border-color,#e5e7eb);
+  border-radius:8px; background:var(--hover-bg,#f9fafb); color:var(--text-main,#374151);
+  font-size:.78rem; font-weight:600; cursor:pointer; white-space:nowrap; transition:all .15s;
+}
+.copy-btn:hover { background:#e5e7eb; }
+
+/* ── Upload form ── */
+.upload-zone {
+  border:2px dashed rgba(99,102,241,.35); border-radius:12px;
+  padding:2rem 1.5rem; text-align:center; cursor:pointer;
+  transition:all .2s; background:rgba(99,102,241,.03); position:relative;
+}
+.upload-zone:hover, .upload-zone.drag-over { border-color:var(--accent); background:rgba(99,102,241,.08); }
+.upload-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.upload-zone-icon { font-size:2.5rem; margin-bottom:.5rem; }
+.upload-zone h3 { margin:0 0 .3rem; font-size:1rem; font-weight:700; color:var(--text-main,#111); }
+.upload-zone p  { margin:0; font-size:.82rem; color:var(--text-muted,#6b7280); }
+.upload-file-name { margin-top:.75rem; font-size:.85rem; font-weight:600; color:var(--accent); display:none; }
+
+.form-group { margin-bottom:1rem; }
+.form-group label { display:block; font-size:.85rem; font-weight:600; color:var(--text-main,#374151); margin-bottom:.35rem; }
+.form-control {
+  width:100%; padding:.65rem .9rem;
+  border:1.5px solid var(--border-color,#e5e7eb); border-radius:8px;
+  font-size:.9rem; color:var(--text-main,#111); background:var(--bg-card,#fff);
+  box-sizing:border-box; transition:border .15s;
+}
+.form-control:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(99,102,241,.1); }
+select.form-control { cursor:pointer; }
+
+/* ── Progress bar ── */
+.upload-progress { display:none; margin-top:1rem; }
+.progress-bar-wrap { height:8px; background:rgba(0,0,0,.08); border-radius:4px; overflow:hidden; margin-bottom:.4rem; }
+.progress-bar-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:4px; transition:width .3s; width:0%; }
+.progress-label { font-size:.8rem; color:var(--text-muted,#6b7280); text-align:center; }
+
+/* ── Video list ── */
+.video-list { display:flex; flex-direction:column; gap:.75rem; }
+.video-item {
+  display:flex; gap:1rem; align-items:flex-start;
+  padding:1rem; border-radius:10px;
+  background:var(--hover-bg,#f9fafb);
+  border:1px solid var(--border-color,rgba(0,0,0,.06));
+  transition:box-shadow .18s;
+}
+.video-item:hover { box-shadow:0 2px 10px rgba(0,0,0,.08); }
+.video-thumb {
+  width:100px; height:60px; border-radius:8px; background:#1e293b;
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  overflow:hidden; font-size:1.5rem;
+}
+.video-thumb video { width:100%; height:100%; object-fit:cover; }
+.video-info { flex:1; min-width:0; }
+.video-title { font-size:.9rem; font-weight:700; color:var(--text-main,#111); margin:0 0 .2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.video-meta  { font-size:.78rem; color:var(--text-muted,#6b7280); margin:0 0 .5rem; }
+.video-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+
+/* ── Past live classes ── */
+.past-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:.75rem 1rem; border-radius:8px;
+  background:var(--hover-bg,#f9fafb);
+  border:1px solid var(--border-color,rgba(0,0,0,.06));
+  margin-bottom:.6rem;
+}
+.past-item:last-child { margin-bottom:0; }
+.past-title { font-size:.88rem; font-weight:600; color:var(--text-main,#111); margin:0 0 .15rem; }
+.past-date  { font-size:.75rem; color:var(--text-muted,#6b7280); }
+
+/* ── Empty state ── */
+.empty-state { text-align:center; padding:2rem 1rem; color:var(--text-muted,#9ca3af); }
+.empty-state .empty-icon { font-size:2.5rem; margin-bottom:.5rem; }
+.empty-state p { margin:0; font-size:.9rem; }
+
+/* ── Toast ── */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;
+  padding:.85rem 1.4rem; border-radius:12px; font-size:.875rem; font-weight:600;
+  box-shadow:0 8px 24px rgba(0,0,0,.2); display:none; align-items:center; gap:.6rem;
+  animation:slideUp .3s ease-out;
+}
+.toast.success { background:#059669; color:#fff; display:flex; }
+.toast.error   { background:#dc2626; color:#fff; display:flex; }
+@keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+/* ── Modal ── */
+.modal-backdrop {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.5); backdrop-filter:blur(4px);
+  z-index:1000; align-items:center; justify-content:center; padding:1rem;
+}
+.modal-backdrop.open { display:flex; }
+.modal-box {
+  background:var(--bg-card,#fff); border-radius:16px;
+  width:100%; max-width:480px;
+  box-shadow:0 20px 60px rgba(0,0,0,.2); overflow:hidden;
+}
+.modal-head {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:1.2rem 1.5rem; border-bottom:1px solid var(--border-color,rgba(0,0,0,.08));
+}
+.modal-head h2 { font-size:1.1rem; font-weight:700; margin:0; color:var(--text-main,#111); }
+.modal-close { background:none; border:none; font-size:1.2rem; color:var(--text-muted,#9ca3af); cursor:pointer; padding:.2rem; border-radius:6px; line-height:1; }
+.modal-close:hover { background:var(--hover-bg,#f3f4f6); }
+.modal-body { padding:1.5rem; }
+.modal-foot { display:flex; justify-content:flex-end; gap:.75rem; padding:1.2rem 1.5rem; border-top:1px solid var(--border-color,rgba(0,0,0,.08)); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hub-page">
+
+  <div class="hub-header">
+    <div>
+      <h1>🎬 Live Class Hub</h1>
+      <p>Start a live broadcast, upload recorded lectures, and manage your content.</p>
+    </div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+      <a href="{% url 'teacher_classrooms' %}" class="btn btn-ghost">← My Classrooms</a>
+      {% if active_class %}
+        <form action="{% url 'stop_live_class' active_class.id %}" method="POST" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-red">⏹ Stop Broadcast</button>
+        </form>
+      {% else %}
+        <button class="btn btn-green" onclick="openModal('startModal')">▶ Go Live</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hub-grid">
+
+    <!-- ── LEFT COLUMN ── -->
+    <div>
+
+      <!-- Live Control -->
+      <div class="hub-card">
+        <div class="hub-card-head">
+          <h2>Live Broadcast</h2>
+          {% if active_class %}<span class="live-pill"><span class="live-dot"></span> LIVE</span>{% endif %}
+        </div>
+        <div class="hub-card-body">
+          {% if active_class %}
+            <p style="font-size:.95rem;font-weight:700;margin:0 0 .3rem;color:var(--text-main,#111);">{{ active_class.title }}</p>
+            <p style="font-size:.82rem;color:var(--text-muted,#6b7280);margin:0 0 1.25rem;" id="viewer-count">
+              👁 {{ active_class.viewer_count }} viewer{{ active_class.viewer_count|pluralize }}
+            </p>
+            <div class="rtmp-field">
+              <label>RTMP Server URL</label>
+              <div class="rtmp-row">
+                <input type="text" value="rtmp://{{ request.get_host }}:1935/live" readonly>
+                <button class="copy-btn" onclick="copyField(this)">Copy</button>
+              </div>
+            </div>
+            <div class="rtmp-field">
+              <label>Stream Key</label>
+              <div class="rtmp-row">
+                <input type="password" id="streamKeyInput" value="{{ active_class.stream_key }}" readonly>
+                <button class="copy-btn" onclick="toggleKey(this)">Show</button>
+                <button class="copy-btn" onclick="copyField(this)">Copy</button>
+              </div>
+            </div>
+            <p style="font-size:.8rem;color:var(--text-muted,#6b7280);margin:.75rem 0 0;line-height:1.5;">
+              Use OBS Studio or any RTMP encoder. Set the server URL and stream key above, then click "Start Streaming" in your encoder.
+            </p>
+          {% else %}
+            <div class="empty-state">
+              <div class="empty-icon">📡</div>
+              <p>No active broadcast. Start a live class to get your RTMP credentials.</p>
+            </div>
+            <button class="btn btn-green btn-full" style="margin-top:1rem;" onclick="openModal('startModal')">▶ Start Live Class</button>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Upload Lecture -->
+      <div class="hub-card">
+        <div class="hub-card-head">
+          <h2>Upload Recorded Lecture</h2>
+        </div>
+        <div class="hub-card-body">
+          <form id="uploadForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="upload-zone" id="uploadZone">
+              <input type="file" id="videoFileInput" name="video_file" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo" onchange="onFileSelected(this)">
+              <div class="upload-zone-icon">🎥</div>
+              <h3>Drop video here or click to browse</h3>
+              <p>MP4, WebM, MOV, AVI · Max 2 GB</p>
+              <div class="upload-file-name" id="uploadFileName"></div>
+            </div>
+
+            <div style="margin-top:1rem;">
+              <div class="form-group">
+                <label>Title *</label>
+                <input type="text" name="title" class="form-control" placeholder="e.g. Chapter 5 — Thermodynamics" required>
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" class="form-control" rows="2" placeholder="Optional description..."></textarea>
+              </div>
+              <div class="form-group">
+                <label>Classroom (optional)</label>
+                <select name="classroom_id" class="form-control">
+                  <option value="">— Public / All Students —</option>
+                  {% for cls in classrooms %}
+                    <option value="{{ cls.id }}">{{ cls.title }} ({{ cls.class_code }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <div class="upload-progress" id="uploadProgress">
+              <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
+              <div class="progress-label" id="progressLabel">Uploading…</div>
+            </div>
+
+            <button type="button" class="btn btn-purple btn-full" style="margin-top:1rem;" onclick="submitUpload()" id="uploadBtn" disabled>
+              ⬆ Upload Lecture
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- ── RIGHT COLUMN ── -->
+    <div>
+
+      <!-- My Uploaded Lectures -->
+      <div class="hub-card">
+        <div class="hub-card-head">
+          <h2>My Uploaded Lectures</h2>
+          <span style="font-size:.8rem;color:var(--text-muted,#6b7280);">{{ uploaded_videos|length }} video{{ uploaded_videos|length|pluralize }}</span>
+        </div>
+        <div class="hub-card-body" style="padding:1rem;">
+          {% if uploaded_videos %}
+          <div class="video-list">
+            {% for v in uploaded_videos %}
+            <div class="video-item" id="vid-{{ v.id }}">
+              <div class="video-thumb">🎬</div>
+              <div class="video-info">
+                <p class="video-title" title="{{ v.title }}">{{ v.title }}</p>
+                <p class="video-meta">
+                  {% if v.classroom %}{{ v.classroom.title }} · {% endif %}
+                  {{ v.get_file_size_display }} · {{ v.created_at|date:"M d, Y" }}
+                </p>
+                <div class="video-actions">
+                  <a href="{{ v.video_file.url }}" target="_blank" class="btn btn-ghost btn-sm">▶ Play</a>
+                  <button class="btn btn-danger-sm btn-sm" onclick="deleteVideo({{ v.id }})">🗑 Delete</button>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">📂</div>
+            <p>No uploaded lectures yet.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Past Live Classes -->
+      <div class="hub-card">
+        <div class="hub-card-head">
+          <h2>Past Live Classes</h2>
+        </div>
+        <div class="hub-card-body" style="padding:1rem;">
+          {% if past_live_classes %}
+            {% for lc in past_live_classes %}
+            <div class="past-item">
+              <div>
+                <p class="past-title">{{ lc.title }}</p>
+                <p class="past-date">Ended {{ lc.ended_at|date:"M d, Y H:i" }}</p>
+              </div>
+              <span style="font-size:.75rem;color:var(--text-muted,#9ca3af);">{{ lc.viewer_count }} viewers</span>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">📡</div>
+            <p>No past live classes yet.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div>
+</div>
+
+<!-- Start Live Class Modal -->
+<div class="modal-backdrop" id="startModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Start Live Class</h2>
+      <button class="modal-close" onclick="closeModal('startModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form action="{% url 'start_live_class' %}" method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+          <label>Class Title *</label>
+          <input type="text" name="title" class="form-control" placeholder="e.g. Physics — Wave Optics" required>
+        </div>
+        <div class="form-group">
+          <label>Classroom (optional)</label>
+          <select name="classroom_id" class="form-control">
+            <option value="">— No specific classroom —</option>
+            {% for cls in classrooms %}
+              <option value="{{ cls.id }}">{{ cls.title }} ({{ cls.class_code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <p style="font-size:.82rem;color:var(--text-muted,#6b7280);margin:.5rem 0 0;line-height:1.5;">
+          After starting, you'll get RTMP credentials to use with OBS or any streaming software.
+        </p>
+        <div class="modal-foot" style="padding:1rem 0 0;border:none;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('startModal')">Cancel</button>
+          <button type="submit" class="btn btn-green">▶ Go Live</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// Modal
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// Toast
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+
+// Copy field
+function copyField(btn) {
+  const input = btn.previousElementSibling;
+  const wasPass = input.type === 'password';
+  if (wasPass) input.type = 'text';
+  input.select();
+  try { navigator.clipboard ? navigator.clipboard.writeText(input.value) : document.execCommand('copy'); } catch(_){}
+  if (wasPass) input.type = 'password';
+  const orig = btn.textContent; btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = orig, 2000);
+}
+
+// Toggle stream key visibility
+function toggleKey(btn) {
+  const input = document.getElementById('streamKeyInput');
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = 'Hide'; }
+  else { input.type = 'password'; btn.textContent = 'Show'; }
+}
+
+// File selected
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const nameEl = document.getElementById('uploadFileName');
+  nameEl.textContent = '📎 ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)';
+  nameEl.style.display = 'block';
+  document.getElementById('uploadBtn').disabled = false;
+}
+
+// Drag & drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('video/')) {
+    const dt = new DataTransfer(); dt.items.add(file);
+    document.getElementById('videoFileInput').files = dt.files;
+    onFileSelected(document.getElementById('videoFileInput'));
+  }
+});
+
+// Upload with progress
+function submitUpload() {
+  const form = document.getElementById('uploadForm');
+  const title = form.querySelector('[name=title]').value.trim();
+  const fileInput = document.getElementById('videoFileInput');
+  if (!title) { showToast('Please enter a title.', 'error'); return; }
+  if (!fileInput.files.length) { showToast('Please select a video file.', 'error'); return; }
+
+  const fd = new FormData(form);
+  const xhr = new XMLHttpRequest();
+  const progressWrap = document.getElementById('uploadProgress');
+  const fill = document.getElementById('progressFill');
+  const label = document.getElementById('progressLabel');
+  const btn = document.getElementById('uploadBtn');
+
+  progressWrap.style.display = 'block';
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+
+  xhr.upload.addEventListener('progress', e => {
+    if (e.lengthComputable) {
+      const pct = Math.round(e.loaded / e.total * 100);
+      fill.style.width = pct + '%';
+      label.textContent = pct + '% — ' + (e.loaded / 1024 / 1024).toFixed(1) + ' MB / ' + (e.total / 1024 / 1024).toFixed(1) + ' MB';
+    }
+  });
+
+  xhr.addEventListener('load', () => {
+    progressWrap.style.display = 'none';
+    btn.disabled = false; btn.textContent = '⬆ Upload Lecture';
+    if (xhr.status === 200) {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (data.success) { showToast('Lecture uploaded!'); setTimeout(() => location.reload(), 1200); return; }
+      } catch(_){}
+    }
+    showToast('Upload failed. Please try again.', 'error');
+  });
+
+  xhr.addEventListener('error', () => {
+    progressWrap.style.display = 'none';
+    btn.disabled = false; btn.textContent = '⬆ Upload Lecture';
+    showToast('Network error during upload.', 'error');
+  });
+
+  xhr.open('POST', '{% url "upload_lecture" %}');
+  xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+  xhr.setRequestHeader('X-CSRFToken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+  xhr.send(fd);
+}
+
+// Delete video
+function deleteVideo(id) {
+  if (!confirm('Delete this lecture? This cannot be undone.')) return;
+  fetch('{% url "delete_uploaded_lecture" 0 %}'.replace('/0/', '/' + id + '/'), {
+    method: 'POST',
+    headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value, 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      const el = document.getElementById('vid-' + id);
+      if (el) el.remove();
+      showToast('Lecture deleted.');
+    }
+  });
+}
+
+// WebSocket viewer count
+{% if active_class %}
+(function(){
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  let ws;
+  function connect() {
+    try { ws = new WebSocket(proto + '//' + location.host + '/ws/live-class/{{ active_class.stream_key|escapejs }}/'); } catch(e){ return; }
+    ws.onmessage = e => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'viewer_count') {
+          const el = document.getElementById('viewer-count');
+          if (el) el.textContent = '👁 ' + d.count + ' viewer' + (d.count === 1 ? '' : 's');
+        }
+      } catch(_){}
+    };
+    ws.onclose = () => setTimeout(connect, 5000);
+  }
+  connect();
+})();
+{% endif %}
+</script>
+{% endblock %}
