@@ -4,22 +4,24 @@
 $PROJECT = $PSScriptRoot
 Set-Location $PROJECT
 
-$_pyPaths = @(
-    "C:\Users\$env:USERNAME\AppData\Local\Python\pythoncore-3.14-64\python.exe",
-    "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python313\python.exe",
-    "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python312\python.exe",
-    "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python311\python.exe",
-    "C:\Python313\python.exe",
-    "C:\Python312\python.exe"
-)
-$PYTHON = $null
-foreach ($c in $_pyPaths) { if (Test-Path $c) { $PYTHON = $c; break } }
+# Detect Python automatically
+$PYTHON = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $PYTHON -or $PYTHON -like "*WindowsApps*") {
+    # Fallback search if not in PATH or if it's the empty Windows Store wrapper
+    $_pyPaths = @(
+        "C:\Users\$env:USERNAME\AppData\Local\Python\pythoncore-3.14-64\python.exe",
+        "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python313\python.exe",
+        "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python312\python.exe",
+        "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python311\python.exe",
+        "C:\Python313\python.exe",
+        "C:\Python312\python.exe"
+    )
+    foreach ($c in $_pyPaths) { if (Test-Path $c) { $PYTHON = $c; break } }
+}
+
 if (-not $PYTHON) {
-    $PYTHON = (Get-Command python -ErrorAction SilentlyContinue).Source
-    if ($PYTHON -like "*WindowsApps*") {
-        $py = (Get-Command py -ErrorAction SilentlyContinue).Source
-        if ($py) { $PYTHON = $py }
-    }
+    $py = (Get-Command py -ErrorAction SilentlyContinue).Source
+    if ($py) { $PYTHON = $py }
 }
 $_scripts = Join-Path (Split-Path $PYTHON -Parent) "Scripts"
 $DAPHNE = Join-Path $_scripts "daphne.exe"
@@ -74,6 +76,22 @@ foreach ($port in @(8000, 8001)) { Kill-Port $port }
 Start-Sleep -Seconds 1
 Write-OK "Ports cleared"
 
+Write-Step 0.5 7 "Firewall check..."
+$ports_to_open = @(
+    @{ name="Edumi-Web"; port=8000; proto="TCP" },
+    @{ name="Edumi-Camera"; port=8001; proto="TCP" },
+    @{ name="LiveKit-Signaling"; port=7880; proto="TCP" },
+    @{ name="LiveKit-Media-UDP"; port="7881,7882"; proto="UDP" },
+    @{ name="LiveKit-Media-TCP"; port="7881,7882"; proto="TCP" }
+)
+foreach ($r in $ports_to_open) {
+    if (-not (Get-NetFirewallRule -DisplayName $r.name -ErrorAction SilentlyContinue)) {
+        Write-Host "         FIX  Opening $($r.name)..." -ForegroundColor Yellow
+        New-NetFirewallRule -DisplayName $r.name -Direction Inbound -LocalPort $r.port -Protocol $r.proto -Action Allow -Enabled True -ErrorAction SilentlyContinue
+    }
+}
+Write-OK "Firewall ports verified"
+
 Write-Step 1 7 "Redis"
 $redisSvc = Get-Service Redis -ErrorAction SilentlyContinue
 if ($null -eq $redisSvc) { Write-Warn "Redis not found - run: winget install Redis.Redis" }
@@ -81,7 +99,14 @@ elseif ($redisSvc.Status -ne 'Running') { Start-Service Redis; Start-Sleep -Seco
 else { Write-OK "Redis already running :6379" }
 
 Write-Step 2 7 "LiveKit SFU  (:7880)"
-$LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+# Prefer Ethernet IP, then Wi-Fi, then anything else
+$LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like '*Ethernet*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+if (-not $LAN_IP) { 
+    $LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like '*Wi-Fi*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+}
+if (-not $LAN_IP) { 
+    $LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+}
 if (-not $LAN_IP) { $LAN_IP = "127.0.0.1" }
 if (-not (Test-Path $LIVEKIT)) {
     Write-Fail "livekit-server.exe not found"
@@ -122,12 +147,13 @@ if (Wait-Port 8001 25) { Write-OK "Camera service running :8001" } else { Write-
 
 Write-Step 6 7 "Celery worker"
 if ($CELERY -and (Test-Path $CELERY)) {
-    Start-Process -FilePath $CELERY -ArgumentList "-A", "school_project", "worker", "-l", "warning", "-P", "solo", "--without-heartbeat" -WindowStyle Hidden
+    Start-Process -FilePath $CELERY -ArgumentList "-A", "school_project", "worker", "-l", "error", "-P", "solo", "--without-heartbeat" -WindowStyle Hidden
     Start-Sleep -Seconds 2
     Write-OK "Celery worker started"
 } else { Write-Warn "Celery not found - skipping" }
 
 Write-Step 7 7 "Daphne ASGI  (:8000)"
+Write-OK "Starting web server..."
 Write-Host ""
 Write-Host "  ================================================" -ForegroundColor Green
 Write-Host "  Edumi is RUNNING" -ForegroundColor Green
@@ -144,7 +170,8 @@ Write-Host "  ================================================" -ForegroundColor
 Write-Host ""
 
 try {
-    & $DAPHNE -b 0.0.0.0 -p 8000 school_project.asgi:application
+    # Run Daphne in foreground quiet mode to keep script alive
+    & $DAPHNE -b 0.0.0.0 -p 8000 -v 0 school_project.asgi:application
 } catch {
     Write-Fail "Daphne failed to start: $_"
 } finally {

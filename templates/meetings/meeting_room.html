@@ -704,32 +704,27 @@
             const { token, url, iceServers } = tokenData;
 
             updateConnectionStatus('Establishing secure connection...', 60);
-            room = new Room({
+            room = new Room();
+
+            // Connection settings optimized for ngrok stability
+            const connectOptions = {
+                autoSubscribe: true,
                 adaptiveStream: true,
                 dynacast: true,
-                videoCaptureDefaults: {
-                    resolution: { width: 1920, height: 1080, frameRate: 60 },
-                },
+                iceTransportPolicy: 'all', // Allow all paths but prioritize relay
                 publishDefaults: {
-                    simulcast: false,
-                    videoCodec: 'vp9',
-                    videoEncoding: {
-                        maxBitrate: 8_000_000,
-                        maxFramerate: 60,
-                    },
+                    simulcast: true,
+                    videoCodec: 'vp8',
                 },
-                stopLocalTrackOnUnpublish: true,
-                connectTimeout: 20000,
-            });
-
-            setupRoomEventHandlers(room);
-            await room.connect(url, token, {
-                autoSubscribe: true,
                 rtcConfig: {
                     iceServers: iceServers && iceServers.length > 0 ? iceServers : [{ urls: 'stun:stun.l.google.com:19302' }],
-                    iceTransportPolicy: 'relay',
                 },
-            });
+            };
+
+            setupRoomEventHandlers(room);
+            console.log("Connecting with options:", connectOptions);
+            await room.connect(url, token, connectOptions);
+            console.log("Connection successful!");
             
             updateConnectionStatus('Connection stabilized. Starting media...', 90);
             connectSignaling();
@@ -930,6 +925,7 @@
                 tag.textContent = 'Your Screen';
                 box.appendChild(tag);
             }
+
             const el = track.attach();
             el.dataset.kind = 'video';
             el.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;background:#000;';

@@ -20,6 +20,7 @@ from accounts.notification_utils import (
 )
 from django.conf import settings
 from livekit.api import AccessToken, VideoGrants
+import datetime
 import random
 import string
 import base64
@@ -534,7 +535,7 @@ def livekit_token(request, meeting_code):
             can_publish_data=True,
             room_admin=is_host,
         ))
-        .with_ttl(86400) # 24 hours
+        .with_ttl(datetime.timedelta(hours=24))
         .to_jwt()
     )
 

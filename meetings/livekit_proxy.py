@@ -24,7 +24,10 @@ LIVEKIT_INTERNAL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://127.0.0.1:7880')
 class LiveKitProxyConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
-        lk_path = self.scope["url_route"]["kwargs"].get("lk_path") or "/rtc"
+        lk_path = self.scope["url_route"]["kwargs"].get("lk_path") or ""
+        if not lk_path or lk_path == "/":
+            lk_path = "/rtc"
+        
         qs = self.scope.get("query_string", b"").decode()
         subprotocols = self.scope.get("subprotocols", [])
 

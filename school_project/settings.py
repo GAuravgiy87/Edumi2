@@ -30,27 +30,30 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-@j!l-9t=qs!b&lkynb=zq
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split(',')
+ALLOWED_HOSTS = ['*']
 
 # Disable SSL redirect for development (enable in production)
 SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = [
-    'https://localhost',
-    'https://localhost:8443',
-    'https://127.0.0.1',
-    'https://127.0.0.1:8443',
-    'https://10.7.32.175',
-    'https://10.7.32.175:8443',
-    'https://10.17.2.47',
-    'https://10.17.2.47:8443',
     'https://*.ngrok.io',
     'https://*.ngrok-free.app',
     'https://*.ngrok-free.dev',
+    'http://localhost',
+    'http://127.0.0.1',
 ]
+# Add any local IP to trusted origins automatically
+import socket
+try:
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    CSRF_TRUSTED_ORIGINS.append(f'http://{local_ip}')
+    CSRF_TRUSTED_ORIGINS.append(f'https://{local_ip}')
+except:
+    pass
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
