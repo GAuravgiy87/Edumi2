@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
     <!-- LiveKit JS SDK (browser bundle) -->
-    <script src="https://unpkg.com/livekit-client@2.0.4/dist/livekit-client.umd.js" data-turbo-track="reload"></script>
+    <script src="https://unpkg.com/livekit-client@1.15.8/dist/livekit-client.umd.js" data-turbo-track="reload"></script>
 
     <style>
         /* AI Monitoring Styles */
@@ -365,17 +365,15 @@
 </head>
 
 <body class="meeting-body">
-    <!-- Direct Join Loading Indicator -->
-    <div id="join-status-overlay" style="position:fixed; inset:0; background:#0f172a; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;">
-        <div class="spinner" style="width:40px; height:40px; border-width:4px; margin-bottom:20px;"></div>
-        <div id="join-status-text" style="font-size:18px; font-weight:600;">Connecting to {{ meeting.title }}...</div>
-        <div id="join-error-area" class="hidden" style="margin-top:20px;">
-            <button onclick="handleJoinClick()" style="background:#6366f1; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600;">Retry Connection</button>
+    <!-- Connection Status (Non-intrusive) -->
+    <div id="connection-status-container" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999; pointer-events: none;">
+        <div id="connection-progress-bar" style="height: 3px; width: 0%; background: linear-gradient(90deg, #6366f1, #10b981); transition: width 0.5s ease;"></div>
+        <div id="connection-toast" style="margin: 15px auto; width: fit-content; padding: 8px 16px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; color: white; font-size: 12px; font-weight: 600; opacity: 0; transform: translateY(-20px); transition: all 0.3s ease; pointer-events: auto;">
+            <span id="connection-toast-text">Connecting...</span>
+            <button id="connection-retry-btn" onclick="handleJoinClick()" style="margin-left: 10px; background: #6366f1; color: white; border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; display: none;">Retry</button>
         </div>
     </div>
 
-    <!-- Reconnecting Overlay (disabled) -->
-    <div id="reconnect-overlay" style="display:none !important;"></div>
 
     <div class="meet-container">
 
@@ -622,58 +620,102 @@
         // ── Init ──────────────────────────────────────────────────────────────────────
         // ── Entry Point ───────────────────────────────────────────────────────────────
         window.addEventListener('load', () => {
-            setTimeout(handleJoinClick, 100);
+            // Check for insecure context (WebRTC requires HTTPS or localhost)
+            if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                updateConnectionStatus('⚠️ Insecure Context: Use HTTPS or localhost to enable Video/Audio', 100, true);
+                console.error("Insecure Context detected! WebRTC will likely fail. Use HTTPS (e.g. ngrok URL).");
+            } else {
+                setTimeout(handleJoinClick, 100);
+            }
         });
+
+        // Browsers block AudioContext until a user gesture. 
+        // We resume it on the first click anywhere in the document.
+        window.addEventListener('click', async () => {
+            if (room) {
+                try {
+                    await room.startAudio();
+                    console.log("AudioContext resumed by user gesture");
+                } catch (e) {
+                    console.warn("Audio resume failed:", e);
+                }
+            }
+        }, { once: true });
+
+        function updateConnectionStatus(text, progress, isError = false) {
+            const bar = document.getElementById('connection-progress-bar');
+            const toast = document.getElementById('connection-toast');
+            const toastText = document.getElementById('connection-toast-text');
+            const retryBtn = document.getElementById('connection-retry-btn');
+            
+            if (bar) {
+                bar.style.width = `${progress}%`;
+                bar.style.opacity = progress >= 100 ? '0' : '1';
+            }
+            if (toastText) toastText.textContent = text;
+            if (toast) {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+                toast.style.background = isError ? 'rgba(220, 38, 38, 0.9)' : 'rgba(15, 23, 42, 0.9)';
+                if (retryBtn) retryBtn.style.display = isError ? 'inline-block' : 'none';
+            }
+            
+            if (progress >= 100 && !isError) {
+                setTimeout(() => {
+                    if (toast) {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateY(-20px)';
+                    }
+                }, 3000);
+            }
+        }
 
         async function handleJoinClick() {
             if (isJoined) return;
-            const statusText = document.getElementById('join-status-text');
-            const errorArea = document.getElementById('join-error-area');
-            const overlay = document.getElementById('join-status-overlay');
+
+            // Strict check for Secure Context (HTTPS or Localhost)
+            const isSecure = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (!isSecure) {
+                updateConnectionStatus('❌ ERROR: Secure Context Required. You MUST use the ngrok HTTPS URL to join.', 100, true);
+                alert("CRITICAL ERROR: WebRTC and Media (Camera/Mic) are blocked on insecure connections. \n\nPlease use your NGROK URL (https://...) to access the meeting room.");
+                return;
+            }
+
+            // Silent progress bar update
+            const bar = document.getElementById('connection-progress-bar');
+            if (bar) { bar.style.width = '30%'; bar.style.opacity = '1'; }
 
             try {
-                if (statusText) statusText.textContent = 'Connecting directly...';
-                if (errorArea) errorArea.classList.add('hidden');
-                
                 await init();
-                
                 isJoined = true;
-                if (overlay) overlay.style.display = 'none';
+                if (bar) bar.style.width = '100%';
+                setTimeout(() => { if (bar) bar.style.opacity = '0'; }, 1000);
             } catch (err) {
                 console.error("Join Error:", err);
-                if (statusText) statusText.innerHTML = `<span style="color:#ef4444">Error: ${err.message}</span>`;
-                if (errorArea) errorArea.classList.remove('hidden');
+                updateConnectionStatus(`Connection Failed: ${err.message}. (Check if LiveKit is running)`, 100, true);
             }
         }
 
         async function init() {
+            updateConnectionStatus('Authenticating...', 40);
             const tokenRes = await fetch(TOKEN_URL);
             const tokenData = await tokenRes.json();
             if (tokenData.error) throw new Error(tokenData.error);
             const { token, url, iceServers } = tokenData;
 
+            updateConnectionStatus('Establishing secure connection...', 60);
             room = new Room({
-                adaptiveStream: false,   // disable adaptive downscaling — keep full quality
-                dynacast: false,         // disable dynamic layer dropping
+                adaptiveStream: true,
+                dynacast: true,
                 videoCaptureDefaults: {
                     resolution: { width: 1920, height: 1080, frameRate: 60 },
                 },
-                audioCaptureDefaults: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 48000,
-                    channelCount: 2,
-                },
                 publishDefaults: {
-                    simulcast: false,        // single full-quality stream, no downscaled layers
-                    videoCodec: 'vp9',       // VP9 — better quality/bitrate than H264
+                    simulcast: false,
+                    videoCodec: 'vp9',
                     videoEncoding: {
-                        maxBitrate: 8_000_000,   // 8 Mbps for 1080p60
+                        maxBitrate: 8_000_000,
                         maxFramerate: 60,
-                    },
-                    audioPreset: {
-                        maxBitrate: 320_000,     // 320 kbps stereo audio
                     },
                 },
                 stopLocalTrackOnUnpublish: true,
@@ -682,18 +724,23 @@
 
             setupRoomEventHandlers(room);
             await room.connect(url, token, {
-                iceServers: iceServers || [],
-                forceTCP: true, // Force TCP for local stability
+                autoSubscribe: true,
+                rtcConfig: {
+                    iceServers: iceServers && iceServers.length > 0 ? iceServers : [{ urls: 'stun:stun.l.google.com:19302' }],
+                    iceTransportPolicy: 'relay',
+                },
             });
             
-            // Start signaling and then media (non-blocking if possible)
+            updateConnectionStatus('Connection stabilized. Starting media...', 90);
             connectSignaling();
+            
+            // Short delay to ensure signaling is fully stable before publishing
+            await new Promise(r => setTimeout(r, 1000));
             
             try {
                 await safeInitMedia();
             } catch (mediaErr) {
-                console.warn("Direct media init failed (gesture needed?):", mediaErr);
-                showNotification("Click anywhere to enable Camera/Mic if they didn't start.", "warning");
+                console.warn("Media init failed:", mediaErr);
             }
 
             renderLocalParticipant();
@@ -716,34 +763,38 @@
         }
 
         async function safeInitMedia() {
+            console.log("Force-initializing media...");
             try {
                 if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-                    throw new Error("Media devices unavailable (check HTTPS/localhost)");
+                    throw new Error("Media devices unavailable");
                 }
                 
-                // Resume AudioContext
-                try { await room.startAudio(); } catch (e) { console.warn("Audio start deferred"); }
+                // Try Camera
+                try {
+                    await room.localParticipant.setCameraEnabled(true);
+                    isCameraOn = true;
+                    console.log("Camera FORCE OK");
+                } catch (e) {
+                    console.warn("Camera failed:", e.message);
+                    isCameraOn = false;
+                }
 
-                await room.localParticipant.enableCameraAndMicrophone({
-                    video: {
-                        width: { ideal: 1920, min: 1280 },
-                        height: { ideal: 1080, min: 720 },
-                        frameRate: { ideal: 60, min: 30 },
-                        facingMode: 'user',
-                    },
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        sampleRate: 48000,
-                        channelCount: 2,
-                    },
-                });
-                isMicOn = true; isCameraOn = true;
+                // Try Mic
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(true);
+                    isMicOn = true;
+                    console.log("Mic FORCE OK");
+                } catch (e) {
+                    console.warn("Mic failed:", e.message);
+                    isMicOn = false;
+                }
+
+                if (!isMicOn && !isCameraOn) {
+                    showNotification("Joined as listener. (Camera/Mic not detected)", "info");
+                }
             } catch (err) {
-                console.warn("Media Fail:", err);
+                console.warn("Media force-init skipped:", err.message);
                 isMicOn = false; isCameraOn = false;
-                showNotification("Joined as listen-only. No camera/mic access.", "warning");
             }
             updateControlButtons();
         }

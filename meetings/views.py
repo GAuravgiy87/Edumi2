@@ -534,38 +534,46 @@ def livekit_token(request, meeting_code):
             can_publish_data=True,
             room_admin=is_host,
         ))
+        .with_ttl(86400) # 24 hours
         .to_jwt()
     )
 
-    # Derive the LiveKit URL.
-    # For localhost, we can connect directly to bypass the proxy.
-    # For any other host (LAN, ngrok), we use the proxy.
-    host = request.get_host().split(':')[0]
-    if host in ['localhost', '127.0.0.1']:
-        livekit_url = "ws://127.0.0.1:7880"
-    else:
-        is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
-        scheme = 'wss' if is_secure else 'ws'
-        livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
-    # For local/LAN testing, we skip STUN to force 'host' candidates.
-    # Private IP ranges: 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16.x.x
-    is_private = host in ['localhost', '127.0.0.1'] or \
-                 host.startswith('192.168.') or \
-                 host.startswith('10.') or \
-                 (host.startswith('172.') and host.split('.')[1].isdigit() and 16 <= int(host.split('.')[1]) <= 31)
+    # Always route through the Django proxy (/livekit-proxy).
+    # The browser MUST NOT connect directly to LiveKit on port 7880.
+    # ws:// for HTTP (localhost/LAN), wss:// for HTTPS.
+    is_secure = request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https'
+    scheme = 'wss' if is_secure else 'ws'
+    livekit_url = f"{scheme}://{request.get_host()}/livekit-proxy"
+    
+    # Robust ICE servers including multiple TURN providers
+    ice_servers = [
+        {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:openrelay.metered.ca:80'},
+        # OpenRelay TURN (UDP/TCP)
+        {
+            'urls': 'turn:openrelay.metered.ca:80',
+            'username': 'openrelayproject',
+            'credential': 'openrelayproject'
+        },
+        {
+            'urls': 'turn:openrelay.metered.ca:443',
+            'username': 'openrelayproject',
+            'credential': 'openrelayproject'
+        },
+        {
+            'urls': 'turn:openrelay.metered.ca:443?transport=tcp',
+            'username': 'openrelayproject',
+            'credential': 'openrelayproject'
+        },
+        # Backup TURN
+        {
+            'urls': 'turn:turn.metered.ca:80',
+            'username': 'openrelayproject',
+            'credential': 'openrelayproject'
+        }
+    ]
 
-    ice_servers = []
-    if not is_private:
-        ice_servers = [
-            {'urls': 'stun:stun.l.google.com:19302'},
-            {'urls': 'stun:stun1.l.google.com:19302'}
-        ]
-
-    return JsonResponse({
-        'token': token, 
-        'url': livekit_url, 
-        'iceServers': ice_servers
-    })
+    return JsonResponse({'token': token, 'url': livekit_url, 'iceServers': ice_servers})
 
 @login_required
 def meeting_attendance(request, meeting_code):

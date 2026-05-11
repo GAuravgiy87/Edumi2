@@ -28,37 +28,58 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
         qs = self.scope.get("query_string", b"").decode()
         subprotocols = self.scope.get("subprotocols", [])
 
-        target = f"{LIVEKIT_INTERNAL}{lk_path}"
+        # Detailed debug logging to a file
+        debug_log = os.path.join(os.getcwd(), "livekit_proxy_debug.log")
+        def log_debug(msg):
+            with open(debug_log, "a") as f:
+                f.write(f"{msg}\n")
+            proxy_logger.info(msg)
+
+        log_debug(f"--- New Connection attempt for {lk_path} ---")
+
+        targets = [
+            f"{LIVEKIT_INTERNAL}{lk_path}",
+            f"ws://localhost:7880{lk_path}",
+            f"ws://127.0.0.1:7880{lk_path}"
+        ]
         if qs:
-            target += f"?{qs}"
+            targets = [f"{t}?{qs}" for t in targets]
 
-        proxy_logger.info(f"[LiveKitProxy] Connecting to LiveKit: {target} (Protocols: {subprotocols})")
+        connected = False
+        for target in targets:
+            try:
+                log_debug(f"Attempting: {target}")
+                connect_kwargs = {
+                    "ping_interval": 10,
+                    "ping_timeout": 10,
+                    "max_size": 10 * 1024 * 1024,
+                    "open_timeout": 15,
+                }
+                if subprotocols:
+                    connect_kwargs["subprotocols"] = subprotocols
 
-        try:
-            # Connect to LiveKit, only passing subprotocols if the browser provided them
-            connect_kwargs = {
-                "ping_interval": 20,
-                "ping_timeout": 20,
-                "max_size": 10 * 1024 * 1024,
-                "open_timeout": 10,
-            }
-            if subprotocols:
-                connect_kwargs["subprotocols"] = subprotocols
+                self._lk_ws = await websockets.connect(target, **connect_kwargs)
+                connected = True
+                log_debug(f"SUCCESS: Connected to {target}")
+                break
+            except Exception as e:
+                log_debug(f"FAILED {target}: {type(e).__name__}: {str(e)}")
 
-            self._lk_ws = await websockets.connect(target, **connect_kwargs)
-            
-            # Negotiated subprotocol
-            selected_proto = getattr(self._lk_ws, 'subprotocol', None)
-            proxy_logger.info(f"[LiveKitProxy] Connected (Selected Protocol: {selected_proto})")
-            
-            # Accept the browser connection
-            await self.accept(subprotocol=selected_proto)
-            
-        except Exception as e:
-            proxy_logger.error(f"[LiveKitProxy] Connection FAILED to {target}: {type(e).__name__}: {str(e)}")
+        if not connected:
+            log_debug(f"CRITICAL: All targets failed for {lk_path}")
             await self.close(code=1011)
             return
 
+        # Warm-up delay to stabilize the tunnel
+        await asyncio.sleep(0.5)
+        
+        # Negotiate subprotocol strictly
+        selected_proto = getattr(self._lk_ws, 'subprotocol', None)
+        if not selected_proto and "v1.livekit.io" in subprotocols:
+            selected_proto = "v1.livekit.io"
+            
+        await self.accept(subprotocol=selected_proto)
+        
         self._lk_task = asyncio.ensure_future(self._lk_to_browser())
 
     async def disconnect(self, code):
@@ -88,11 +109,13 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
                     else:
                         await self.send(text_data=msg)
                 except Exception as e:
-                    # This often happens if the browser closes the connection mid-stream
-                    proxy_logger.debug(f"[LiveKitProxy] Send to browser failed: {str(e)}")
+                    with open("livekit_proxy_debug.log", "a") as f:
+                        f.write(f"SEND ERROR: {str(e)}\n")
                     break 
         except Exception as e:
-            proxy_logger.error(f"[LiveKitProxy] LiveKit -> Browser stream error: {str(e)}")
+            with open("livekit_proxy_debug.log", "a") as f:
+                f.write(f"STREAM ERROR: {str(e)}\n")
         finally:
-            proxy_logger.info("[LiveKitProxy] Session finished")
+            with open("livekit_proxy_debug.log", "a") as f:
+                f.write("--- Session finished ---\n")
             await self.close()

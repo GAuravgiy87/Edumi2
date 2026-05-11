@@ -8,11 +8,11 @@ rtc:
   use_external_ip: false
 
 keys:
-  devkey: devsecret32charsshallbeusedhere1
+  devkey: devsecret_must_be_32_characters_long_1234
 
 room:
   empty_timeout: 300
   max_participants: 100
 
 logging:
-  level: debug
+  level: warn

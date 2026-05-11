@@ -313,10 +313,10 @@
 
         function _scheduleNotifReconnect() {
             clearTimeout(window._notifReconnectTimer);
-            if (!window._notifReconnectDelay) window._notifReconnectDelay = 3000;
+            if (!window._notifReconnectDelay) window._notifReconnectDelay = 10000;
             window._notifReconnectTimer = setTimeout(function() {
                 connectNotificationWS();
-                window._notifReconnectDelay = Math.min(window._notifReconnectDelay * 1.5, 30000);
+                window._notifReconnectDelay = Math.min(window._notifReconnectDelay * 2, 60000);
             }, window._notifReconnectDelay);
         }
 

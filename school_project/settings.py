@@ -34,8 +34,8 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split('
 
 # Disable SSL redirect for development (enable in production)
 SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = [
@@ -356,8 +356,8 @@ CELERY_TIMEZONE = TIME_ZONE
 LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:7880')
 
 # LIVEKIT_INTERNAL_URL: where the Django proxy connects to reach LiveKit.
-# Only change this if LiveKit runs on a different host/port.
-LIVEKIT_INTERNAL_URL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://localhost:7880')
+# Using 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on Windows.
+LIVEKIT_INTERNAL_URL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://127.0.0.1:7880')
 
 LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey')
 LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_characters_long_1234')
