@@ -99,13 +99,10 @@ elseif ($redisSvc.Status -ne 'Running') { Start-Service Redis; Start-Sleep -Seco
 else { Write-OK "Redis already running :6379" }
 
 Write-Step 2 7 "LiveKit SFU  (:7880)"
-# Prefer Ethernet IP, then Wi-Fi, then anything else
-$LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like '*Ethernet*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+# Bulletproof IP detection: Only take Preferred IPv4, prioritize Ethernet, exclude ghost IPs
+$LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.AddressState -eq 'Preferred' -and $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.*' -and $_.IPAddress -notlike '10.7.33.*' } | Select-Object -First 1).IPAddress
 if (-not $LAN_IP) { 
-    $LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like '*Wi-Fi*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
-}
-if (-not $LAN_IP) { 
-    $LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+    $LAN_IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.AddressState -eq 'Preferred' -and $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
 }
 if (-not $LAN_IP) { $LAN_IP = "127.0.0.1" }
 if (-not (Test-Path $LIVEKIT)) {
@@ -156,15 +153,18 @@ Write-Step 7 7 "Daphne ASGI  (:8000)"
 Write-OK "Starting web server..."
 Write-Host ""
 Write-Host "  ================================================" -ForegroundColor Green
-Write-Host "  Edumi is RUNNING" -ForegroundColor Green
+Write-Host "  ================================================" -ForegroundColor Green
+Write-Host "  Edumi is RUNNING (All-on-One IP Mode)" -ForegroundColor Green
 Write-Host "  ------------------------------------------------" -ForegroundColor Green
-Write-Host "  Local  : http://localhost:8000" -ForegroundColor White
-Write-Host "  LAN    : http://${LAN_IP}:8000" -ForegroundColor White
+Write-Host "  >>> RECOMMENDED URL: http://${LAN_IP}:8000 <<<" -ForegroundColor White
 Write-Host "  ------------------------------------------------" -ForegroundColor Green
-Write-Host "  LiveKit: :7880  node_ip=$LAN_IP" -ForegroundColor Gray
-Write-Host "  Camera : :8001" -ForegroundColor Gray
+Write-Host "  Local Control : http://localhost:8000" -ForegroundColor White
+Write-Host "  Network Access: http://${LAN_IP}:8000" -ForegroundColor White
 Write-Host "  ------------------------------------------------" -ForegroundColor Green
-Write-Host "  Remote: port-forward 8000, 7881, 7882" -ForegroundColor Yellow
+Write-Host "  Video Server  : Synchronized on ${LAN_IP}" -ForegroundColor Gray
+Write-Host "  Camera Service: Synchronized on :8001" -ForegroundColor Gray
+Write-Host "  ------------------------------------------------" -ForegroundColor Green
+Write-Host "  Remote Access : Use your ngrok HTTPS URL" -ForegroundColor Yellow
 Write-Host "  Ctrl+C to stop" -ForegroundColor Yellow
 Write-Host "  ================================================" -ForegroundColor Green
 Write-Host ""
