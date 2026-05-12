@@ -178,6 +178,7 @@
 </div>
 
 <script>
+(function() {
     // Initialize Direct Feed from Camera Microservice
     (function initFeed() {
         const cameraServicePort = 8001;
@@ -231,5 +232,9 @@
         input.value = '';
         lucide.createIcons();
     }
+    
+    // Export function to window
+    window.sendMessage = sendMessage;
+})();
 </script>
 {% endblock %}

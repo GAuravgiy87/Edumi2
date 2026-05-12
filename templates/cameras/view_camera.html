@@ -76,6 +76,7 @@
 </div>
 
 <script>
+(function() {
 let imageLoaded = false;
 let loadAttempts = 0;
 const maxAttempts = 3;
@@ -306,6 +307,17 @@ function changeQuality() {
     statusMsg.style.display = 'block';
     setTimeout(() => statusMsg.style.display = 'none', 3000);
 }
+
+    // Export functions to window
+    window.testCamera = testCamera;
+    window.changeQuality = changeQuality;
+
+    // Clean up intervals when Turbo navigates away
+    document.addEventListener("turbo:before-cache", function cleanup() {
+        if (serverCheckInterval) clearInterval(serverCheckInterval);
+        document.removeEventListener("turbo:before-cache", cleanup);
+    });
+})();
 </script>
 
 <style>
