@@ -262,64 +262,68 @@
 </style>
 
 <script>
-let headcountEnabled = false;
-let headcountInterval = null;
+(function() {
+    let headcountEnabled = false;
+    let headcountInterval = null;
 
-function toggleHeadcount() {
-    const feed = document.getElementById('cameraFeed');
-    const toggle = document.getElementById('headcountToggle');
-    const badge = document.getElementById('headcountBadge');
-    
-    headcountEnabled = !headcountEnabled;
-    
-    if (headcountEnabled) {
-        // Switch to headcount feed
-        feed.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
-        toggle.classList.add('active');
-        toggle.querySelector('.toggle-text').textContent = 'Disable Detection';
-        toggle.querySelector('.toggle-icon').textContent = '👁️‍🗨️';
-        badge.style.display = 'flex';
+    function toggleHeadcount() {
+        const feed = document.getElementById('cameraFeed');
+        const toggle = document.getElementById('headcountToggle');
+        const badge = document.getElementById('headcountBadge');
         
-        // Note: Count is displayed on the video feed itself by the server
-    } else {
-        // Switch back to normal feed
-        feed.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
-        toggle.classList.remove('active');
-        toggle.querySelector('.toggle-text').textContent = 'Enable Detection';
-        toggle.querySelector('.toggle-icon').textContent = '👁️';
-        badge.style.display = 'none';
+        if (!feed || !toggle || !badge) return;
+        
+        headcountEnabled = !headcountEnabled;
+        
+        if (headcountEnabled) {
+            // Switch to headcount feed
+            feed.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
+            toggle.classList.add('active');
+            const toggleText = toggle.querySelector('.toggle-text');
+            const toggleIcon = toggle.querySelector('.toggle-icon');
+            if (toggleText) toggleText.textContent = 'Disable Detection';
+            if (toggleIcon) toggleIcon.textContent = '👁️‍🗨️';
+            badge.style.display = 'flex';
+        } else {
+            // Switch back to normal feed
+            feed.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
+            toggle.classList.remove('active');
+            const toggleText = toggle.querySelector('.toggle-text');
+            const toggleIcon = toggle.querySelector('.toggle-icon');
+            if (toggleText) toggleText.textContent = 'Enable Detection';
+            if (toggleIcon) toggleIcon.textContent = '👁️';
+            badge.style.display = 'none';
+        }
     }
-}
 
-function simulateHeadCount() {
-    // DISABLED - Using actual detection from server
-    // This function is kept for compatibility but does nothing
-    return;
-}
+    // Handle image load errors
+    const cameraFeed = document.getElementById('cameraFeed');
+    if (cameraFeed) {
+        cameraFeed.onerror = function() {
+            console.error('Camera feed error');
+            // Retry after 2 seconds
+            setTimeout(() => {
+                if (headcountEnabled) {
+                    this.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
+                } else {
+                    this.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
+                }
+            }, 2000);
+        };
+    }
 
-// Handle image load errors
-const cameraFeed = document.getElementById('cameraFeed');
-if (cameraFeed) {
-    cameraFeed.onerror = function() {
-        console.error('Camera feed error');
-        // Retry after 2 seconds
-        setTimeout(() => {
-            if (headcountEnabled) {
-                this.src = "{% url 'mobile_cameras:headcount_feed' mobile_camera.id %}?t=" + Date.now();
-            } else {
-                this.src = "{% url 'mobile_cameras:feed' mobile_camera.id %}?t=" + Date.now();
-            }
-        }, 2000);
+    // Quality Control
+    window.changeQuality = function() {
+        const picker = document.getElementById('quality-picker');
+        if (!picker) return;
+        const quality = picker.value;
+        const img = document.querySelector('.camera-feed');
+        const baseUrl = 'http://localhost:8001/api/mobile-cameras/{{ mobile_camera.id }}/feed/';
+        if (img) img.src = `${baseUrl}?q=${quality}&t=${new Date().getTime()}`;
     };
-}
-</script>
 
-<script>
-function changeQuality() {
-    const quality = document.getElementById('quality-picker').value;
-    const img = document.querySelector('.camera-feed');
-    const baseUrl = 'http://localhost:8001/api/mobile-cameras/{{ mobile_camera.id }}/feed/';
-    img.src = `${baseUrl}?q=${quality}&t=${new Date().getTime()}`;
-}
+    // Export functions to window
+    window.toggleHeadcount = toggleHeadcount;
+})();
 </script>
 {% endblock %}
