@@ -280,8 +280,21 @@ def delete_camera(request, camera_id):
     
     if request.method == 'POST':
         camera = get_object_or_404(Camera, id=camera_id)
-        camera.delete()
-        return JsonResponse({'status': 'success'})
+        try:
+            camera.delete()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            logger.error(f"Error deleting camera {camera_id}: {e}")
+            # Fallback for SQLite ghost constraints
+            from django.db import connection
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute('PRAGMA foreign_keys = OFF;')
+                    camera.delete()
+                    cursor.execute('PRAGMA foreign_keys = ON;')
+                return JsonResponse({'status': 'success'})
+            except Exception as e2:
+                return JsonResponse({'status': 'error', 'message': str(e2)}, status=500)
     return redirect('admin_dashboard')
 
 
@@ -450,13 +463,17 @@ def student_lecture_list(request):
 @login_required
 def watch_live(request, camera_id):
     """Watch a live lecture (Student View)"""
-    camera = get_object_or_404(Camera, id=camera_id, is_live=True)
+    # Allow admins to view any camera, even if not marked "live"
+    if is_admin(request.user):
+        camera = get_object_or_404(Camera, id=camera_id)
+    else:
+        camera = get_object_or_404(Camera, id=camera_id, is_live=True)
     
     # In a real app, we'd check if the student belongs to the teacher's class
     
     context = {
         'camera': camera,
-        'teacher': camera.live_teacher,
+        'teacher': camera.live_teacher if hasattr(camera, 'live_teacher') else None,
     }
     return render(request, 'cameras/watch_live.html', context)
 

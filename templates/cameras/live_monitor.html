@@ -31,7 +31,7 @@
             </div>
             <div class="card-footer">
                 <span class="ip-info">{{ camera.ip_address }}</span>
-                <a href="{% url 'camera_live_view' camera.id %}" class="btn-expand">Full Screen</a>
+                <a href="{% url 'watch_live' camera.id %}" class="btn-expand">Full Screen</a>
             </div>
         </div>
         {% empty %}
@@ -84,9 +84,11 @@
     }
 
     .monitor-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
-        gap: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
     }
 
     .monitor-card {

@@ -59,11 +59,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://localhost:8443",
     "https://127.0.0.1",
     "https://127.0.0.1:8443",
-    "https://10.17.2.47",
-    "https://10.17.2.47:8443",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://10.17.2.47:8000",
+    "http://10.7.11.141:8000",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for development

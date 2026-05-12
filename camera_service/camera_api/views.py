@@ -313,10 +313,10 @@ def camera_feed(request, camera_id):
                         frame_count += 1
                         if frame_count % 100 == 0:
                             logger.info(f"Camera {camera_id}: streamed {frame_count} frames")
+                        
+                        # Use a simpler, more robust MJPEG boundary
                         yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n'
-                               b'Content-Length: ' + str(len(frame)).encode() + b'\r\n'
-                               b'\r\n' + frame + b'\r\n')
+                               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
                         time.sleep(delay)
                     else:
                         # Frame lost, wait briefly

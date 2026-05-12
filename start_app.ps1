@@ -38,10 +38,9 @@ Write-Host "[3/7] Starting LiveKit SFU (localhost:7880)..." -ForegroundColor Yel
 Start-Process -FilePath $LIVEKIT -ArgumentList "--config","livekit.yaml" -WindowStyle Minimized
 Start-Sleep -Seconds 3
 
-# 4. Run Migrations & Setup Admin
+# 4. Run Migrations
 Write-Host "[4/7] Preparing Database..." -ForegroundColor Yellow
 python manage.py migrate
-python setup_admin.py
 
 # 5. Start Celery Worker
 Write-Host "[5/7] Starting Celery Worker..." -ForegroundColor Yellow

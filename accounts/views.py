@@ -30,7 +30,20 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
+            # Ensure superusers have a staff/teacher profile if it's missing
+            if user.is_superuser:
+                if not hasattr(user, 'userprofile'):
+                    UserProfile.objects.create(user=user, user_type='teacher', display_name=f"Admin {user.username}")
+                if not user.is_staff:
+                    user.is_staff = True
+                    user.save()
+            
+            # Add a message to confirm login (optional)
+            messages.success(request, f"Welcome back, {user.username}!")
+            
             # Redirect based on user type
+            # Note: For Turbo compatibility, we use status=303 See Other if needed
+            # but Django's redirect() generally works fine if it leads to a GET request.
             if user.is_superuser:
                 return redirect('admin_panel')
             if hasattr(user, 'userprofile'):
@@ -40,7 +53,8 @@ def login_view(request):
                     return redirect('student_dashboard')
             return redirect('home')
         else:
-            return render(request, 'accounts/login.html', {'error': 'Invalid username or password'})
+            # For Hotwire/Turbo compatibility: If form submission fails, return 422 Unprocessable Entity
+            return render(request, 'accounts/login.html', {'error': 'Invalid username or password'}, status=422)
     
     return render(request, 'accounts/login.html')
 

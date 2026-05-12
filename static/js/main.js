@@ -58,38 +58,62 @@ function showNotification(message, type = 'info') {
         z-index: 9999;
         animation: slideIn 0.3s ease;
     `;
-    
-    document.body.appendChild(notification);
-    
+
+    // Safe append - handle case where body might not be ready during Turbo transitions
+    const target = document.body || document.documentElement;
+    target.appendChild(notification);
+
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
     }, 3000);
 }
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
+// Add CSS animations (using a unique name to avoid Turbo re-declaration issues)
+(function initAnimations() {
+    if (document.getElementById('edumi-animations')) return;
     
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
+    const animationStyle = document.createElement('style');
+    animationStyle.id = 'edumi-animations';
+    animationStyle.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
         }
+    `;
+    
+    // Safe append - handle case where head might not be ready
+    var appended = false;
+    if (document.head) {
+        document.head.appendChild(animationStyle);
+        appended = true;
     }
-`;
-document.head.appendChild(style);
+    if (!appended && document.documentElement) {
+        document.documentElement.appendChild(animationStyle);
+        appended = true;
+    }
+    if (!appended) {
+        // Last resort - wait for DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.head) document.head.appendChild(animationStyle);
+            else document.documentElement.appendChild(animationStyle);
+        });
+    }
+})();

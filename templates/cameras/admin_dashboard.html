@@ -33,7 +33,8 @@
         background: white;
         border-radius: 1rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
+        /* Removed overflow:hidden to allow dropdowns to show outside the table */
+        position: relative;
     }
     .camera-table {
         width: 100%;
@@ -131,8 +132,8 @@
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         border-radius: 0.5rem;
         border: 1px solid #e2e8f0;
-        z-index: 10;
-        min-width: 150px;
+        z-index: 999; /* Higher z-index to stay on top */
+        min-width: 160px;
     }
     .dropdown-menu.show { display: block; }
     .dropdown-item {
@@ -186,8 +187,8 @@
                         <div style="font-size: 0.75rem; color: #64748b;">{{ camera.get_camera_type_display }}</div>
                     </td>
                     <td>
-                        {% if camera.is_active %}
-                        <span class="status-badge status-online">Online</span>
+                        {% if camera.ip_address and camera.stream_path %}
+                        <span class="status-badge status-online">● Live</span>
                         {% else %}
                         <span class="status-badge status-offline">Offline</span>
                         {% endif %}
@@ -200,7 +201,7 @@
                     </td>
                     <td>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <a href="{% url 'camera_live_view' camera.id %}" class="action-btn" title="View Feed">
+                            <a href="{% url 'watch_live' camera.id %}" class="action-btn" title="View Feed">
                                 <i data-lucide="eye" style="width: 18px;"></i>
                             </a>
                             <div class="three-dots">
@@ -428,8 +429,8 @@
         }
     }
 </script>
-{% endblock %}
 
+<style>
 .btn-delete {
     background: #dc3545;
     color: white;

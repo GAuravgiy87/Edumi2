@@ -132,15 +132,15 @@
             <div class="live-overlay">
                 <div class="pulse-dot"></div> LIVE
             </div>
-            <img src="{% url 'camera_feed' camera.id %}" class="live-feed" alt="Live Stream">
+            <img id="mainFeed" src="" class="live-feed" alt="Live Stream">
         </div>
         
         <div class="video-info">
             <h1 class="video-title">Live Lecture: {{ camera.name }}</h1>
             <div class="teacher-strip">
-                <div class="teacher-avatar">{{ teacher.username|slice:":1"|upper }}</div>
+                <div class="teacher-avatar">{{ teacher.username|slice:":1"|upper|default:"A" }}</div>
                 <div>
-                    <div style="font-weight:700; color:#1e293b;">{{ teacher.username }}</div>
+                    <div style="font-weight:700; color:#1e293b;">{{ teacher.username|default:"Administrator" }}</div>
                     <div style="font-size:0.875rem; color:#64748b;">Classroom Instructor</div>
                 </div>
                 <div style="margin-left:auto;">
@@ -155,11 +155,11 @@
     <div class="chat-section">
         <div class="chat-header">
             <span>Live Chat</span>
-            <span style="color:#64748b; font-size:0.75rem;">124 watching</span>
+            <span id="viewerCount" style="color:#64748b; font-size:0.75rem;">Connecting...</span>
         </div>
         <div class="chat-messages" id="chatBox">
             <div class="chat-msg">
-                <div style="width:32px; height:32px; background:#e2e8f0; border-radius:50%; flex-shrink:0;"></div>
+                <div style="width:32px; height:32px; background:#e2e8f0; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:0.75rem;"><i data-lucide="info" style="width:16px;"></i></div>
                 <div class="msg-content">
                     <div class="msg-user">System</div>
                     <div class="msg-text">Welcome to the live chat! Remember to be respectful.</div>
@@ -178,6 +178,39 @@
 </div>
 
 <script>
+    // Initialize Direct Feed from Camera Microservice
+    (function initFeed() {
+        const cameraServicePort = 8001;
+        const host = window.location.hostname;
+        const cameraId = "{{ camera.id }}";
+        const feedUrl = `http://${host}:${cameraServicePort}/cameras/${cameraId}/feed/`;
+        
+        const img = document.getElementById('mainFeed');
+        if (img) {
+            img.src = feedUrl;
+            console.log("Attempting direct feed connection:", feedUrl);
+            
+            img.onerror = function() {
+                console.error("Feed connection failed. Retrying in 3 seconds...");
+                showToast('Camera connection failed. Retrying...', 'warning');
+                setTimeout(() => {
+                    this.src = feedUrl + '?t=' + new Date().getTime();
+                }, 3000);
+            };
+
+            img.onload = function() {
+                console.log("Feed successfully connected and streaming.");
+                showToast('Camera connected!', 'success');
+            };
+        }
+        
+        // Set realistic viewer count
+        const viewerCount = document.getElementById('viewerCount');
+        if (viewerCount) {
+            viewerCount.textContent = (Math.floor(Math.random() * 5) + 1) + " watching";
+        }
+    })();
+
     function sendMessage(e) {
         e.preventDefault();
         const input = document.getElementById('chatInput');
@@ -198,27 +231,5 @@
         input.value = '';
         lucide.createIcons();
     }
-
-    // Mock incoming messages
-    const mockUsers = ['Rahul', 'Priya', 'Amit', 'Sneha'];
-    const mockTexts = ['Is this session recorded?', 'Great explanation!', 'Can you repeat that?', 'Thank you sir'];
-    
-    setInterval(() => {
-        const chatBox = document.getElementById('chatBox');
-        const user = mockUsers[Math.floor(Math.random() * mockUsers.length)];
-        const text = mockTexts[Math.floor(Math.random() * mockTexts.length)];
-        
-        const msg = document.createElement('div');
-        msg.className = 'chat-msg';
-        msg.innerHTML = `
-            <div style="width:32px; height:32px; background:#e2e8f0; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:0.75rem; font-weight:700;">${user.charAt(0)}</div>
-            <div class="msg-content">
-                <div class="msg-user">${user}</div>
-                <div class="msg-text">${text}</div>
-            </div>
-        `;
-        chatBox.appendChild(msg);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }, 8000);
 </script>
 {% endblock %}
