@@ -11,4 +11,8 @@ urlpatterns = [
     # Mobile Cameras
     path('mobile-cameras/<int:mobile_camera_id>/feed/', views.mobile_camera_feed, name='mobile_camera_feed'),
     path('mobile-cameras/<int:mobile_camera_id>/test/', views.test_mobile_camera, name='test_mobile_camera'),
+    
+    # Head Counting (Microservice)
+    path('head-count/start/<str:camera_type>/<int:camera_id>/', views.start_head_count, name='start_head_count'),
+    path('head-count/stop/<str:camera_type>/<int:camera_id>/', views.stop_head_count, name='stop_head_count'),
 ]

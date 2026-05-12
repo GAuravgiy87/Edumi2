@@ -1,0 +1,202 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .lecture-library-container {
+        padding: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .search-bar-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        margin-bottom: 2.5rem;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .search-input-group {
+        flex: 1;
+        min-width: 300px;
+        position: relative;
+    }
+    .search-input {
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 3rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        outline: none;
+        font-size: 1rem;
+    }
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+    }
+    .filter-select {
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        outline: none;
+        min-width: 200px;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .live-dot {
+        width: 10px; height: 10px;
+        background: #ef4444;
+        border-radius: 50%;
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.5); opacity: 0.5; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    
+    .lecture-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+    .lecture-card {
+        background: white;
+        border-radius: 1rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid #e2e8f0;
+    }
+    .lecture-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    .thumbnail-wrapper {
+        position: relative;
+        aspect-ratio: 16/9;
+        background: #0f172a;
+    }
+    .thumbnail-wrapper img {
+        width: 100%; height: 100%; object-fit: cover;
+    }
+    .live-badge {
+        position: absolute;
+        top: 0.75rem; left: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        background: #ef4444;
+        color: white;
+        font-size: 0.75rem; font-weight: 800;
+        border-radius: 4px;
+    }
+    .duration-badge {
+        position: absolute;
+        bottom: 0.5rem; right: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .card-body { padding: 1rem; }
+    .lecture-title {
+        font-weight: 700; font-size: 1rem;
+        color: #1e293b; margin-bottom: 0.5rem;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .lecture-meta {
+        font-size: 0.875rem; color: #64748b;
+        display: flex; flex-direction: column; gap: 0.25rem;
+    }
+    .teacher-link:hover { color: #6366f1; text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="lecture-library-container">
+    <div class="search-bar-section">
+        <form action="." method="GET" style="display:contents;">
+            <div class="search-input-group">
+                <i data-lucide="search" class="search-icon"></i>
+                <input type="text" name="q" class="search-input" placeholder="Search by title, teacher, or room..." value="{{ query }}">
+            </div>
+            <select name="teacher" class="filter-select" onchange="this.form.submit()">
+                <option value="">All Teachers</option>
+                {% for t in teachers %}
+                <option value="{{ t.id }}" {% if selected_teacher == t.id|stringformat:"s" %}selected{% endif %}>{{ t.username }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" style="display:none;"></button>
+        </form>
+    </div>
+
+    {% if live_sessions %}
+    <h2 class="section-title"><span class="live-dot"></span> Live Now</h2>
+    <div class="lecture-grid">
+        {% for cam in live_sessions %}
+        <a href="{% url 'watch_live' cam.id %}" class="lecture-card">
+            <div class="thumbnail-wrapper">
+                <img src="{% url 'camera_feed' cam.id %}" alt="Live Preview">
+                <span class="live-badge">LIVE</span>
+            </div>
+            <div class="card-body">
+                <div class="lecture-title">{{ cam.name }} - Live Lecture</div>
+                <div class="lecture-meta">
+                    <span><i data-lucide="user" style="width:14px;"></i> {{ cam.live_teacher.username }}</span>
+                    <span><i data-lucide="clock" style="width:14px;"></i> Started: {{ cam.created_at|date:"H:i" }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <h2 class="section-title"><i data-lucide="video"></i> Recorded Lectures</h2>
+    <div class="lecture-grid">
+        {% for rec in recordings %}
+        <a href="{% url 'watch_recording' rec.id %}" class="lecture-card">
+            <div class="thumbnail-wrapper">
+                {% if rec.thumbnail %}
+                <img src="{{ rec.thumbnail.url }}" alt="{{ rec.title }}">
+                {% else %}
+                <img src="{% static 'images/video-placeholder.jpg' %}" alt="Thumbnail">
+                {% endif %}
+                {% if rec.duration %}
+                <span class="duration-badge">{{ rec.duration }}</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="lecture-title">{{ rec.title }}</div>
+                <div class="lecture-meta">
+                    <span class="teacher-link" onclick="event.preventDefault(); window.location='{% url 'teacher_profile' rec.teacher.id %}'">
+                        <i data-lucide="user" style="width:14px;"></i> {{ rec.teacher.username }}
+                    </span>
+                    <span><i data-lucide="calendar" style="width:14px;"></i> {{ rec.created_at|date:"M d, Y" }}</span>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: #94a3b8;">
+            <i data-lucide="video-off" style="width:48px; height:48px; margin-bottom:1rem; opacity:0.5;"></i>
+            <p>No lectures found matching your search.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

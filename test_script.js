@@ -16,8 +16,10 @@ const AFTER_LEAVE  = _d.afterLeaveUrl;
 const CSRF         = _d.csrf;
 
 // LiveKit SDK globals (from UMD bundle)
-const { Room, RoomEvent, Track, TrackEvent, LocalTrack,
-        createLocalScreenTracks, VideoPresets, ConnectionState } = LivekitClient;
+var LiveKitBundle = window.LiveKitBundle || window.LiveKit || window.LiveKitClient || window.livekit;
+
+var { Room, RoomEvent, Track, TrackEvent, LocalTrack,
+        createLocalScreenTracks, VideoPresets, ConnectionState } = LiveKitBundle || {};
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let room = null;
@@ -38,6 +40,16 @@ let canShare = initialCanShare;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+    if (!LiveKitBundle) {
+        LiveKitBundle = window.LiveKitBundle || window.LiveKit || window.LiveKitClient || window.livekit;
+        if (LiveKitBundle && LiveKitBundle.Room) {
+            ({ Room, RoomEvent, Track, TrackEvent, LocalTrack,
+               createLocalScreenTracks, VideoPresets, ConnectionState } = LiveKitBundle);
+        } else {
+            console.error("LiveKit SDK missing in test_script.js");
+            return;
+        }
+    }
     // ── Signaling WebSocket ──────────────────────────────────────────────────
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${meetingCode}/`);

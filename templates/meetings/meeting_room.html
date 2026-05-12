@@ -9,8 +9,68 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
-    <!-- LiveKit JS SDK (browser bundle) -->
-    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+    
+    <!-- LiveKit JS SDK (browser bundle) - Multiple CDNs for reliability -->
+    <script id="livekit-sdk" 
+            src="https://cdn.jsdelivr.net/npm/livekit-client@1.15.11/dist/livekit-client.umd.min.js"
+            onload="console.log('LiveKit SDK (v1.15) loaded via Primary CDN')"
+            onerror="this.onerror=null; this.src='https://unpkg.com/livekit-client@1.15.11/dist/livekit-client.umd.min.js'; console.warn('Primary CDN failed, trying backup...');">
+    </script>
+
+    <script>
+        // Robust SDK Mapping and Global Initialization
+        window.LiveKitBundle = null;
+        
+        function mapLiveKitSDK() {
+            // 1. Direct check of common global names
+            var bundle = window.LiveKit || window.LiveKitClient || window.livekit || window.livekitClient;
+            
+            // 2. Deep discovery: look for any object on window that has 'Room' and 'Track'
+            if (!bundle || !bundle.Room) {
+                console.log("Starting deep discovery for LiveKit SDK...");
+                for (var key in window) {
+                    if (key.toLowerCase().indexOf('livekit') !== -1 && window[key] && window[key].Room) {
+                        bundle = window[key];
+                        console.log("Deep discovery found SDK at window." + key);
+                        break;
+                    }
+                }
+            }
+
+            // 3. Structural validation and mapping
+            if (bundle) {
+                // If it's the v2 bundle, symbols like Room, Track are directly on the bundle
+                if (bundle.Room) {
+                    window.LiveKitBundle = bundle;
+                    console.log("LiveKit SDK successfully mapped via Room property.");
+                    return true;
+                }
+                
+                // Sometimes it's nested (version dependent)
+                if (bundle.LiveKit && bundle.LiveKit.Room) {
+                    window.LiveKitBundle = bundle.LiveKit;
+                    console.log("LiveKit SDK successfully mapped via nested LiveKit property.");
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Periodic check to ensure mapping happens as soon as script executes
+        var sdkCheckInterval = setInterval(function() {
+            if (mapLiveKitSDK()) {
+                clearInterval(sdkCheckInterval);
+            }
+        }, 100);
+
+        // Fail-safe: stop checking after 10 seconds
+        setTimeout(function() {
+            clearInterval(sdkCheckInterval);
+            if (!window.LiveKitBundle) {
+                console.error("LiveKit SDK failed to initialize after 10s.");
+            }
+        }, 10000);
+    </script>
 
     <style>
         /* AI Monitoring Styles */
@@ -63,7 +123,7 @@
         .video-box { position: relative; overflow: hidden; }
     </style>
 </head>
-<body class="meeting-body">
+<body class="meeting-body" data-turbo="false">
 <div class="meet-container">
 
     <!-- Top Bar -->
@@ -197,28 +257,61 @@ const AFTER_LEAVE  = _d.afterLeaveUrl;
 const CSRF         = _d.csrf;
 
 // LiveKit SDK globals (from UMD bundle)
-const { Room, RoomEvent, Track, TrackEvent, LocalTrack,
-        createLocalScreenTracks, VideoPresets, ConnectionState } = LivekitClient;
+// LiveKit SDK globals (from UMD bundle)
+var LiveKitBundle = window.LiveKitBundle || window.LiveKit || window.LiveKitClient;
+
+// Destructure with fallbacks
+var { Room, RoomEvent, Track, TrackEvent, LocalTrack,
+        createLocalScreenTracks, VideoPresets, ConnectionState } = LiveKitBundle || {};
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let room = null;
-let isMicOn    = true;
-let isCameraOn = true;
-let isScreenSharing = false;
-let screenTrackPub  = null;
-let isSleeping = false;
-let unreadMessages = 0;
-let timerInterval  = null;
-let timerSeconds   = 0;
-let signalingWs    = null;
+var room = null;
+var isMicOn    = true;
+var isCameraOn = true;
+var isScreenSharing = false;
+var screenTrackPub  = null;
+var isSleeping = false;
+var unreadMessages = 0;
+var timerInterval  = null;
+var timerSeconds   = 0;
+var signalingWs    = null;
 
 // Permission State (Always allowed as per teacher request)
-let canSpeak = true;
-let canVideo = true;
-let canShare = true;
+var canSpeak = true;
+var canVideo = true;
+var canShare = true;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+    // If SDK is still not found, try one last mapping attempt
+    if (!window.LiveKitBundle) {
+        mapLiveKitSDK();
+    }
+    
+    if (window.LiveKitBundle) {
+        console.log("LiveKitBundle symbols:", Object.keys(window.LiveKitBundle).filter(k => k[0] === k[0].toUpperCase()).slice(0, 15));
+        // Extract symbols from the mapped bundle
+        try {
+            Room = window.LiveKitBundle.Room;
+            RoomEvent = window.LiveKitBundle.RoomEvent;
+            Track = window.LiveKitBundle.Track;
+            TrackEvent = window.LiveKitBundle.TrackEvent;
+            LocalTrack = window.LiveKitBundle.LocalTrack;
+            createLocalScreenTracks = window.LiveKitBundle.createLocalScreenTracks;
+            VideoPresets = window.LiveKitBundle.VideoPresets;
+            ConnectionState = window.LiveKitBundle.ConnectionState;
+            
+            if (!Room) throw new Error("Room constructor missing from bundle");
+        } catch (err) {
+            console.error("Extraction failed:", err);
+            window.LiveKitBundle = null; // Reset to force retry
+            return;
+        }
+    } else {
+        console.error('LiveKit SDK missing! Retrying init in 1.5 seconds...');
+        setTimeout(init, 1500);
+        return;
+    }
     // ── Signaling WebSocket ──────────────────────────────────────────────────
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${meetingCode}/`);
@@ -281,15 +374,20 @@ async function init() {
     // Publish local camera + mic if permitted
     try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            showNotification('Camera/Mic blocked! Please use HTTPS or localhost.', 'error');
-            console.warn('mediaDevices API is missing. Usually happens on non-HTTPS connections.');
+            showNotification('Security Block: Camera/Mic requires HTTPS or localhost.', 'error');
         } else {
             if (isMicOn) await room.localParticipant.setMicrophoneEnabled(true);
             if (isCameraOn) await room.localParticipant.setCameraEnabled(true);
         }
     } catch (e) {
-        console.error('Camera/Mic error:', e);
-        showNotification('Could not start camera/mic: ' + e.message, 'warning');
+        console.error('Initial Camera/Mic error:', e);
+        if (e.name === 'NotFoundError') {
+            showNotification('No Camera/Mic found! Please plug in a device.', 'warning');
+        } else if (e.name === 'NotAllowedError') {
+            showNotification('Permission Denied! Please allow camera access in browser.', 'error');
+        } else {
+            showNotification('Media Error: ' + e.message, 'warning');
+        }
     }
 
     // Update UI buttons to reflect actual initial state
@@ -304,7 +402,9 @@ async function init() {
     renderLocalParticipant();
 
     // Render any participants already in the room
-    room.remoteParticipants.forEach(p => onParticipantConnected(p));
+    if (room.remoteParticipants) {
+        room.remoteParticipants.forEach(p => onParticipantConnected(p));
+    }
 
     updateParticipantCount();
     startTimer();
@@ -351,23 +451,39 @@ function getOrCreateBox(identity, displayName, isLocal) {
 }
 
 function renderLocalParticipant() {
+    if (!room || !room.localParticipant) return;
     const lp  = room.localParticipant;
     const box = getOrCreateBox(lp.identity, currentUsername, true);
 
     // Attach camera track if already published
-    lp.videoTrackPublications.forEach(pub => {
-        if (pub.track && pub.source === Track.Source.Camera) {
-            attachTrackToBox(pub.track, box, true);
-        }
-    });
+    if (lp.videoTrackPublications) {
+        lp.videoTrackPublications.forEach(pub => {
+            if (pub.track && pub.source === Track.Source.Camera) {
+                attachTrackToBox(pub.track, box, true);
+            }
+        });
+    }
 
     // Also listen for future local track publications (e.g. screen share)
-    lp.on('localTrackPublished', pub => {
-        if (pub.source === Track.Source.ScreenShare && pub.track) {
-            showLocalScreenShare(pub.track);
+    lp.on(window.LiveKitBundle.ParticipantEvent.LocalTrackPublished || 'localTrackPublished', pub => {
+        console.log('Local track published:', pub.source, pub.trackSid);
+        if (pub.source === Track.Source.ScreenShare) {
+            // Wait for track to be available
+            if (pub.track) {
+                showLocalScreenShare(pub.track);
+            } else {
+                // If not ready, use publication.onTrackSubscribed if v1.x or just poll
+                const checkTrack = setInterval(() => {
+                    if (pub.track) {
+                        showLocalScreenShare(pub.track);
+                        clearInterval(checkTrack);
+                    }
+                }, 100);
+                setTimeout(() => clearInterval(checkTrack), 5000);
+            }
         }
     });
-    lp.on('localTrackUnpublished', pub => {
+    lp.on(window.LiveKitBundle.ParticipantEvent.LocalTrackUnpublished || 'localTrackUnpublished', pub => {
         if (pub.source === Track.Source.ScreenShare) {
             hideLocalScreenShare();
         }
@@ -402,6 +518,7 @@ function detachTrackFromBox(track, box) {
 
 // ── Local screen share preview ────────────────────────────────────────────────
 function showLocalScreenShare(track) {
+    console.log('Rendering local screen share UI...');
     // Create a dedicated screen-share box for the presenter
     let box = document.getElementById('local-screen-box');
     if (!box) {
@@ -413,7 +530,12 @@ function showLocalScreenShare(track) {
         tag.className = 'video-nametag';
         tag.textContent = 'Your Screen';
         box.appendChild(tag);
+        document.getElementById('sidebarVideoArea').appendChild(box);
     }
+    
+    // Clear existing video elements in the box
+    box.querySelectorAll('video').forEach(v => v.remove());
+    
     const el = track.attach();
     el.dataset.kind = 'video';
     el.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;background:#000;';
@@ -455,17 +577,20 @@ function hideLocalScreenShare() {
 
 // ── Participant events ────────────────────────────────────────────────────────
 function onParticipantConnected(participant) {
+    if (!participant) return;
     console.log('Participant joined:', participant.identity);
     getOrCreateBox(participant.identity, participant.name || participant.identity, false);
     updateParticipantsList();
     updateParticipantCount();
 
     // Subscribe to any already-published tracks
-    participant.trackPublications.forEach(pub => {
-        if (pub.isSubscribed && pub.track) {
-            onTrackSubscribed(pub.track, pub, participant);
-        }
-    });
+    if (participant.trackPublications) {
+        participant.trackPublications.forEach(pub => {
+            if (pub.isSubscribed && pub.track) {
+                onTrackSubscribed(pub.track, pub, participant);
+            }
+        });
+    }
 }
 
 function onParticipantDisconnected(participant) {
@@ -479,16 +604,20 @@ function onParticipantDisconnected(participant) {
 
 function onTrackSubscribed(track, publication, participant) {
     // Never process our own tracks here — handled by renderLocalParticipant
-    if (participant.identity === room.localParticipant.identity) return;
+    if (room && room.localParticipant && participant.identity === room.localParticipant.identity) return;
+
+    console.log(`Subscribed to track: ${track.kind} from ${participant.identity} (Source: ${publication.source})`);
 
     const box = getOrCreateBox(participant.identity, participant.name || participant.identity, false);
     if (track.kind === Track.Kind.Video) {
         attachTrackToBox(track, box, false);
-        if (publication.source === Track.Source.ScreenShare) {
+        // If it's a screen share, automatically enlarge it in the main area
+        if (publication.source === Track.Source.ScreenShare || publication.source === 'screen_share') {
+            console.log('Enlarging remote screen share...');
             moveToMain(box, participant.name || participant.identity, true);
         }
     } else if (track.kind === Track.Kind.Audio) {
-        track.attach(); // LiveKit appends audio element to document automatically
+        track.attach(); 
     }
 }
 
@@ -592,6 +721,8 @@ function getAllBoxes() {
 }
 
 function updateLayout() {
+    if (!room || !room.localParticipant) return;
+    
     const boxes = getAllBoxes();
     const container = document.getElementById('videoGridContainer');
     const mainArea = document.getElementById('mainVideoArea');
@@ -602,7 +733,8 @@ function updateLayout() {
     // If main area is empty, pick a video to enlarge
     if (mainArea.children.length === 0 && boxes.length > 0) {
         // Prioritize remote participants over local camera
-        const remoteBox = boxes.find(b => b.dataset.identity !== room.localParticipant.identity && b.dataset.identity !== 'local-screen');
+        const localIdentity = room.localParticipant.identity;
+        const remoteBox = boxes.find(b => b.dataset.identity !== localIdentity && b.dataset.identity !== 'local-screen');
         const targetBox = remoteBox || boxes[0];
         const isScreenShare = targetBox.dataset.identity === 'local-screen';
         const label = targetBox.querySelector('.video-nametag') ? targetBox.querySelector('.video-nametag').textContent : '';
@@ -661,20 +793,37 @@ async function toggleScreenShare() {
     if (!isScreenSharing) {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                throw new Error("Screen sharing is not supported on this browser (or you are not on HTTPS).");
+                throw new Error("Screen sharing is not supported or blocked (check HTTPS/localhost).");
             }
-            const [screenTrack] = await createLocalScreenTracks({ audio: false });
+
+            // Get the creation function with fallbacks
+            const createScreen = createLocalScreenTracks || (window.LiveKitBundle && window.LiveKitBundle.createLocalScreenTracks);
+            
+            if (typeof createScreen !== 'function') {
+                throw new Error("Screen share function not found in SDK.");
+            }
+
+            const tracks = await createScreen({ audio: false });
+            const screenTrack = Array.isArray(tracks) ? tracks[0] : tracks;
+            
+            if (!screenTrack) throw new Error("No screen track created.");
+
             screenTrackPub = await room.localParticipant.publishTrack(screenTrack, {
                 screenShareEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 },
             });
             isScreenSharing = true;
             document.getElementById('screenBtn').classList.add('active');
-            // Layout is handled by the localTrackPublished event → showLocalScreenShare()
-            screenTrack.mediaStreamTrack.addEventListener('ended', stopScreenShare);
+            
+            // Handle manual stop from browser UI
+            const mediaTrack = screenTrack.mediaStreamTrack || screenTrack;
+            mediaTrack.addEventListener('ended', stopScreenShare);
+            
             showNotification('Screen sharing started', 'info');
         } catch(e) {
             console.error('Screen share error:', e);
-            if (e.name !== 'NotAllowedError') showNotification('Could not share screen: ' + e.message, 'error');
+            let msg = e.message;
+            if (e.name === 'NotAllowedError') msg = "Permission denied by user.";
+            showNotification('Screen share failed: ' + msg, 'error');
         }
     } else {
         stopScreenShare();
@@ -871,7 +1020,7 @@ function updateParticipantsList() {
             </div>
         </div>`;
 
-    if (room) {
+    if (room && room.remoteParticipants) {
         room.remoteParticipants.forEach(p => {
             const item = document.createElement('div');
             item.className = 'participant-item';
@@ -893,8 +1042,12 @@ function updateParticipantsList() {
 }
 
 function updateParticipantCount() {
-    const count = room ? room.remoteParticipants.size + 1 : 1;
-    document.getElementById('participantCount').textContent = count;
+    try {
+        const remoteCount = (room && room.remoteParticipants) ? room.remoteParticipants.size : 0;
+        document.getElementById('participantCount').textContent = remoteCount + 1;
+    } catch (e) {
+        document.getElementById('participantCount').textContent = '1';
+    }
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────

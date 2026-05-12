@@ -87,7 +87,7 @@
                             ▶ Start Counting
                         </button>
                     {% endif %}
-                    <a href="{% url 'view_camera' camera.id %}" class="btn btn-secondary">👁 View</a>
+                    <a href="{% url 'camera_live_view' camera.id %}" class="btn btn-secondary">👁 View</a>
                 </div>
             </div>
             {% endfor %}
@@ -108,11 +108,11 @@
             <div class="camera-card" id="mobile-{{ camera.id }}">
                 <div class="camera-header">
                     <h3>{{ camera.name }}</h3>
-                    <span class="camera-type">{{ camera.get_camera_type_display }}</span>
+                    <span class="camera-ip">{{ camera.ip_address }}:{{ camera.port }}</span>
                 </div>
                 <div class="camera-body">
                     <div class="camera-preview">
-                        <img src="{% url 'mobile_cameras:feed' camera.id %}" alt="{{ camera.name }}" class="preview-feed">
+                        <img src="{% url 'camera_feed' camera.id %}" alt="{{ camera.name }}" class="preview-feed">
                     </div>
                 </div>
                 <div class="camera-footer">
@@ -132,14 +132,14 @@
                             ▶ Start Counting
                         </button>
                     {% endif %}
-                    <a href="{% url 'mobile_cameras:view' camera.id %}" class="btn btn-secondary">👁 View</a>
+                    <a href="{% url 'camera_live_view' camera.id %}" class="btn btn-secondary">👁 View</a>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
         <div class="no-data">
-            <p>No mobile cameras available. Contact admin to add mobile cameras.</p>
+            <p>No mobile cameras available. Use IP Webcam or DroidCam.</p>
         </div>
         {% endif %}
     </div>

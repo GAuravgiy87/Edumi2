@@ -1,0 +1,224 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .video-page-container {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        height: calc(100vh - 100px);
+        background: #f8fafc;
+    }
+    .video-main {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        overflow-y: auto;
+    }
+    .player-container {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: #000;
+        border-radius: 1rem;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    .live-feed {
+        width: 100%; height: 100%; object-fit: contain;
+    }
+    .live-overlay {
+        position: absolute;
+        top: 1rem; left: 1rem;
+        padding: 0.25rem 0.75rem;
+        background: #ef4444;
+        color: white;
+        font-weight: 800;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    .pulse-dot {
+        width: 8px; height: 8px; background: white; border-radius: 50%;
+        animation: pulse 1s infinite;
+    }
+    
+    .video-info {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        border: 1px solid #e2e8f0;
+    }
+    .video-title { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-bottom: 1rem; }
+    .teacher-strip {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #f1f5f9;
+    }
+    .teacher-avatar {
+        width: 48px; height: 48px;
+        background: #6366f1;
+        color: white;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 1.25rem;
+    }
+    
+    .chat-section {
+        background: white;
+        border-radius: 1rem;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .chat-header {
+        padding: 1rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 700;
+        display: flex; justify-content: space-between;
+    }
+    .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .chat-msg {
+        display: flex; gap: 0.75rem;
+    }
+    .msg-content { flex: 1; }
+    .msg-user { font-weight: 700; font-size: 0.875rem; color: #1e293b; }
+    .msg-text { font-size: 0.875rem; color: #475569; }
+    
+    .chat-input-area {
+        padding: 1rem;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+    .chat-input-group {
+        display: flex; gap: 0.5rem;
+    }
+    .chat-input {
+        flex: 1;
+        padding: 0.625rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        outline: none;
+    }
+    .btn-send {
+        padding: 0.5rem;
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="video-page-container">
+    <div class="video-main">
+        <div class="player-container">
+            <div class="live-overlay">
+                <div class="pulse-dot"></div> LIVE
+            </div>
+            <img src="{% url 'camera_feed' camera.id %}" class="live-feed" alt="Live Stream">
+        </div>
+        
+        <div class="video-info">
+            <h1 class="video-title">Live Lecture: {{ camera.name }}</h1>
+            <div class="teacher-strip">
+                <div class="teacher-avatar">{{ teacher.username|slice:":1"|upper }}</div>
+                <div>
+                    <div style="font-weight:700; color:#1e293b;">{{ teacher.username }}</div>
+                    <div style="font-size:0.875rem; color:#64748b;">Classroom Instructor</div>
+                </div>
+                <div style="margin-left:auto;">
+                    <button class="btn-action" style="background:#f1f5f9; color:#475569; padding:0.5rem 1rem; border-radius:0.5rem; font-weight:600;">
+                        <i data-lucide="share-2" style="width:18px; vertical-align:middle;"></i> Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-section">
+        <div class="chat-header">
+            <span>Live Chat</span>
+            <span style="color:#64748b; font-size:0.75rem;">124 watching</span>
+        </div>
+        <div class="chat-messages" id="chatBox">
+            <div class="chat-msg">
+                <div style="width:32px; height:32px; background:#e2e8f0; border-radius:50%; flex-shrink:0;"></div>
+                <div class="msg-content">
+                    <div class="msg-user">System</div>
+                    <div class="msg-text">Welcome to the live chat! Remember to be respectful.</div>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <form onsubmit="sendMessage(event)" class="chat-input-group">
+                <input type="text" id="chatInput" class="chat-input" placeholder="Say something...">
+                <button type="submit" class="btn-send">
+                    <i data-lucide="send" style="width:20px;"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function sendMessage(e) {
+        e.preventDefault();
+        const input = document.getElementById('chatInput');
+        if(!input.value.trim()) return;
+
+        const chatBox = document.getElementById('chatBox');
+        const msg = document.createElement('div');
+        msg.className = 'chat-msg';
+        msg.innerHTML = `
+            <div style="width:32px; height:32px; background:#6366f1; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:white; font-size:0.75rem; font-weight:700;">${"{{ user.username }}".charAt(0).toUpperCase()}</div>
+            <div class="msg-content">
+                <div class="msg-user">{{ user.username }}</div>
+                <div class="msg-text">${input.value}</div>
+            </div>
+        `;
+        chatBox.appendChild(msg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        input.value = '';
+        lucide.createIcons();
+    }
+
+    // Mock incoming messages
+    const mockUsers = ['Rahul', 'Priya', 'Amit', 'Sneha'];
+    const mockTexts = ['Is this session recorded?', 'Great explanation!', 'Can you repeat that?', 'Thank you sir'];
+    
+    setInterval(() => {
+        const chatBox = document.getElementById('chatBox');
+        const user = mockUsers[Math.floor(Math.random() * mockUsers.length)];
+        const text = mockTexts[Math.floor(Math.random() * mockTexts.length)];
+        
+        const msg = document.createElement('div');
+        msg.className = 'chat-msg';
+        msg.innerHTML = `
+            <div style="width:32px; height:32px; background:#e2e8f0; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:0.75rem; font-weight:700;">${user.charAt(0)}</div>
+            <div class="msg-content">
+                <div class="msg-user">${user}</div>
+                <div class="msg-text">${text}</div>
+            </div>
+        `;
+        chatBox.appendChild(msg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }, 8000);
+</script>
+{% endblock %}

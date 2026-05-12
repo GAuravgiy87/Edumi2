@@ -5,9 +5,22 @@ urlpatterns = [
     # RTSP Camera URLs
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('add-camera/', views.add_camera, name='add_camera'),
+    path('edit-camera/<int:camera_id>/', views.edit_camera, name='edit_camera'),
     path('delete-camera/<int:camera_id>/', views.delete_camera, name='delete_camera'),
+    path('teacher-dashboard/', views.teacher_camera_dashboard, name='teacher_camera_dashboard'),
+    path('control-room/<int:camera_id>/', views.teacher_control_room, name='teacher_control_room'),
+    path('stop-streaming/<int:camera_id>/', views.stop_streaming, name='stop_streaming'),
+    path('start-recording/<int:camera_id>/', views.start_camera_recording, name='start_camera_recording'),
+    path('stop-recording/<int:camera_id>/', views.stop_camera_recording, name='stop_camera_recording'),
+    path('publish-recording/', views.publish_recording, name='publish_recording'),
+    
+    # Student Side
+    path('lectures/', views.student_lecture_list, name='student_lecture_list'),
+    path('watch-live/<int:camera_id>/', views.watch_live, name='watch_live'),
+    path('watch-recording/<int:recording_id>/', views.watch_recording, name='watch_recording'),
+    path('teacher/<int:teacher_id>/', views.teacher_profile, name='teacher_profile'),
+
     path('camera-feed/<int:camera_id>/', views.camera_feed, name='camera_feed'),
-    path('view-camera/<int:camera_id>/', views.view_camera, name='view_camera'),
     path('test-camera/<int:camera_id>/', views.test_camera, name='test_camera'),
     path('test-feed/', views.test_feed_page, name='test_feed_page'),
     path('live-monitor/', views.live_monitor, name='live_monitor'),

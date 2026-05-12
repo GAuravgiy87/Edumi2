@@ -242,12 +242,16 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-# ─── LiveKit SFU ────────────────────────────────────────────────────────────
-# LIVEKIT_URL: what the *browser* connects to.
-# Default to local proxy which handles RTC traffic over port 8000
+# LiveKit Settings
 LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:8000/livekit-proxy')
 LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey')
 LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_characters_long_1234')
+
+# Camera Head Count Settings
+HEAD_COUNT_INTERVAL = 30
+ATTENTION_THRESHOLD = 0.6
+EMOTION_LOGGING_ENABLED = True
+
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>
 FACE_ENCRYPTION_KEY = os.environ.get('FACE_ENCRYPTION_KEY', '')

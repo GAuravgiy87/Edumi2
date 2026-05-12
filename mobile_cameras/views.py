@@ -31,24 +31,8 @@ def can_view_mobile_camera(user, mobile_camera):
 
 @login_required
 def mobile_camera_dashboard(request):
-    """Dashboard for managing mobile cameras"""
-    if not is_admin(request.user):
-        return redirect('login')
-    
-    mobile_cameras = MobileCamera.objects.all()
-    teachers = User.objects.filter(userprofile__user_type='teacher')
-    
-    # Get permissions for each mobile camera
-    mobile_camera_permissions = {}
-    for mobile_camera in mobile_cameras:
-        mobile_camera_permissions[mobile_camera.id] = mobile_camera.get_authorized_teachers()
-    
-    context = {
-        'mobile_cameras': mobile_cameras,
-        'teachers': teachers,
-        'mobile_camera_permissions': mobile_camera_permissions,
-    }
-    return render(request, 'mobile_cameras/dashboard.html', context)
+    """Redirect to the unified camera dashboard"""
+    return redirect('admin_dashboard')
 
 
 def test_mobile_camera_paths(ip, port, username, password):
@@ -203,45 +187,17 @@ def delete_mobile_camera(request, mobile_camera_id):
 
 
 def mobile_camera_feed(request, mobile_camera_id):
-    """Proxy mobile camera feed from camera service on port 8001"""
+    """Gateway to the dedicated Camera Service for mobile cameras."""
     mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
     
     # Check permission
     if not can_view_mobile_camera(request.user, mobile_camera):
-        return JsonResponse({'error': 'You do not have permission to view this camera'}, status=403)
+        return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    import requests
+    # Redirect to dedicated camera service (port 8001)
+    camera_service_url = f"http://{request.get_host().split(':')[0]}:8001/mobile-cameras/{mobile_camera_id}/feed/"
     
-    def generate_frames():
-        """Proxy frames from camera service"""
-        try:
-            camera_service_url = f'http://localhost:8001/api/mobile-cameras/{mobile_camera_id}/feed/'
-            response = requests.get(camera_service_url, stream=True, timeout=30)
-            
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    yield chunk
-                    
-        except requests.exceptions.ConnectionError:
-            logger.error(f"Camera service not running on port 8001")
-            error_msg = (
-                b'--frame\r\n'
-                b'Content-Type: text/plain\r\n\r\n'
-                b'ERROR: Camera service not running on port 8001.\r\n'
-            )
-            yield error_msg
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error proxying mobile camera {mobile_camera_id}: {e}")
-        except GeneratorExit:
-            logger.info(f"Client disconnected from mobile camera {mobile_camera_id}")
-
-    response = StreamingHttpResponse(
-        generate_frames(),
-        content_type='multipart/x-mixed-replace; boundary=frame'
-    )
-    response['Cache-Control'] = 'no-cache'
-    response['X-Accel-Buffering'] = 'no'
-    return response
+    return redirect(camera_service_url)
 
 
 @login_required

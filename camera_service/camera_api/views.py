@@ -667,3 +667,59 @@ def test_mobile_camera(request, mobile_camera_id):
         })
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
+
+# ─────────────────────────────────────────────────────────────
+# HEAD COUNTING API (Microservice implementation)
+# ─────────────────────────────────────────────────────────────
+
+def start_head_count(request, camera_type, camera_id):
+    """Start head counting session in the dedicated service"""
+    from django.contrib.auth.models import User
+    from meetings.models import Classroom
+    
+    # Get camera details
+    if camera_type == 'rtsp':
+        camera = Camera.objects.get(id=camera_id)
+        stream_url = camera.get_full_rtsp_url()
+        camera_name = camera.name
+    elif camera_type == 'mobile':
+        from mobile_cameras.models import MobileCamera
+        camera = MobileCamera.objects.get(id=camera_id)
+        stream_url = camera.get_stream_url()
+        camera_name = camera.name
+    else:
+        return JsonResponse({'error': 'Invalid camera type'}, status=400)
+    
+    # Get optional metadata from request
+    user_id = request.GET.get('user_id')
+    user = User.objects.get(id=user_id) if user_id else None
+    
+    classroom_id = request.GET.get('classroom_id')
+    classroom = Classroom.objects.get(id=classroom_id) if classroom_id else None
+    
+    interval = int(request.GET.get('interval', 30))
+    
+    # Start session in the singleton head_count_manager
+    success, result = head_count_manager.start_session(
+        camera_type=camera_type,
+        camera_id=camera_id,
+        stream_url=stream_url,
+        camera_name=camera_name,
+        user=user,
+        classroom=classroom,
+        interval=interval
+    )
+    
+    if success:
+        return JsonResponse({'success': True, 'session_id': result})
+    else:
+        return JsonResponse({'error': result}, status=400)
+
+def stop_head_count(request, camera_type, camera_id):
+    """Stop head counting session in the dedicated service"""
+    success, message = head_count_manager.stop_session(camera_type, camera_id)
+    
+    if success:
+        return JsonResponse({'success': True, 'message': message})
+    else:
+        return JsonResponse({'error': message}, status=400)

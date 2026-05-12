@@ -1,253 +1,434 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
-{% load camera_extras %}
 
-{% block page_title %}Camera Management{% endblock %}
+{% block extra_css %}
+<style>
+    .camera-mgmt-container {
+        padding: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .mgmt-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .btn-add {
+        background: #6366f1;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+    }
+    .btn-add:hover { background: #4f46e5; }
+    
+    .camera-table-card {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+    .camera-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+    .camera-table th {
+        background: #f8fafc;
+        padding: 1rem;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.875rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .camera-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .status-online { background: #dcfce7; color: #15803d; }
+    .status-offline { background: #fee2e2; color: #b91c1c; }
+    
+    .action-btn {
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        border: 1px solid #e2e8f0;
+        background: white;
+        cursor: pointer;
+        color: #64748b;
+        transition: all 0.2s;
+    }
+    .action-btn:hover { background: #f8fafc; color: #6366f1; border-color: #6366f1; }
+    
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal.show { display: flex; }
+    .modal-content {
+        background: white;
+        border-radius: 1rem;
+        width: 100%;
+        max-width: 500px;
+        padding: 2rem;
+        position: relative;
+    }
+    .modal-header {
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #1e293b; }
+    .form-control {
+        width: 100%;
+        padding: 0.625rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        outline: none;
+    }
+    .form-control:focus { border-color: #6366f1; ring: 2px solid #6366f1; }
+    .btn-save {
+        width: 100%;
+        padding: 0.75rem;
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .three-dots {
+        position: relative;
+        display: inline-block;
+    }
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: 100%;
+        background: white;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        z-index: 10;
+        min-width: 150px;
+    }
+    .dropdown-menu.show { display: block; }
+    .dropdown-item {
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #475569;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .dropdown-item:hover { background: #f8fafc; color: #6366f1; }
+    .dropdown-item.delete { color: #ef4444; }
+    .dropdown-item.delete:hover { background: #fef2f2; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="admin-container">
-    <div class="admin-header">
-        <h1>Edumi Admin Dashboard</h1>
+<div class="camera-mgmt-container">
+    <div class="mgmt-header">
         <div>
-            <a href="{% url 'mobile_cameras:dashboard' %}" class="btn-add-camera" style="margin-right: 10px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-                Mobile Cameras
-            </a>
-            <a href="{% url 'live_monitor' %}" class="btn-add-camera" style="margin-right: 10px; background: #00b894;">Live Monitor</a>
-            <a href="{% url 'add_camera' %}" class="btn-add-camera">+ Add Camera</a>
+            <h1 style="font-size: 1.875rem; font-weight: 700; color: #1e293b;">Camera Management</h1>
+            <p style="color: #64748b;">Add and manage RTSP and Mobile IP cameras</p>
         </div>
+        <button class="btn-add" onclick="openAddModal()">
+            <i data-lucide="plus"></i> Add Camera
+        </button>
     </div>
-    
-    <div class="cameras-grid">
-        {% for camera in cameras %}
-        <div class="camera-card">
-            <div class="camera-info">
-                <h3>{{ camera.name }}</h3>
-                <p class="camera-url">{{ camera.rtsp_url }}</p>
-                <p class="camera-status">
-                    {% if camera.is_active %}
-                        <span class="status-active">● Active</span>
-                    {% else %}
-                        <span class="status-inactive">● Inactive</span>
-                    {% endif %}
-                </p>
-            </div>
-            <div class="camera-actions">
-                <button class="btn-test" onclick="testCamera({{ camera.id }})">🧪 Test</button>
-                <a href="{% url 'view_camera' camera.id %}" class="btn-view">View Feed</a>
-                <a href="{% url 'manage_permissions' camera.id %}" class="btn-permissions">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    Permissions
-                </a>
-                <a href="{% url 'delete_camera' camera.id %}" class="btn-delete" onclick="return confirm('Are you sure?')">Delete</a>
-            </div>
-            {% if camera_permissions %}
-            <div class="camera-permissions-info">
-                <p class="permissions-count">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                    {{ camera_permissions|get_item:camera.id|length }} teacher(s) authorized
-                </p>
-            </div>
-            {% endif %}
-            <div id="test-result-{{ camera.id }}" class="test-result" style="display:none;"></div>
+
+    <div class="camera-table-card">
+        <table class="camera-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>IP / Type</th>
+                    <th>Status</th>
+                    <th>Permissions</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for camera in cameras %}
+                <tr>
+                    <td style="color: #64748b; font-family: monospace;">#{{ camera.id }}</td>
+                    <td>
+                        <div style="font-weight: 600; color: #1e293b;">{{ camera.name }}</div>
+                    </td>
+                    <td>
+                        <div style="font-size: 0.875rem; color: #1e293b;">{{ camera.ip_address }}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ camera.get_camera_type_display }}</div>
+                    </td>
+                    <td>
+                        {% if camera.is_active %}
+                        <span class="status-badge status-online">Online</span>
+                        {% else %}
+                        <span class="status-badge status-offline">Offline</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; color: #64748b; font-size: 0.875rem;">
+                            <i data-lucide="users" style="width: 16px;"></i>
+                            {{ camera.get_authorized_teachers.count }} Teachers
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <a href="{% url 'camera_live_view' camera.id %}" class="action-btn" title="View Feed">
+                                <i data-lucide="eye" style="width: 18px;"></i>
+                            </a>
+                            <div class="three-dots">
+                                <button class="action-btn" onclick="toggleDropdown(event, {{ camera.id }})">
+                                    <i data-lucide="more-vertical" style="width: 18px;"></i>
+                                </button>
+                                <div id="dropdown-{{ camera.id }}" class="dropdown-menu">
+                                    <div class="dropdown-item" onclick="openEditModal({{ camera.id }})">
+                                        <i data-lucide="edit-2" style="width: 14px;"></i> Edit Camera
+                                    </div>
+                                    <div class="dropdown-item" onclick="openAssignModal({{ camera.id }})">
+                                        <i data-lucide="user-plus" style="width: 14px;"></i> Assign Teacher
+                                    </div>
+                                    <div class="dropdown-item delete" onclick="deleteCamera({{ camera.id }})">
+                                        <i data-lucide="trash-2" style="width: 14px;"></i> Delete
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="padding: 3rem; text-align: center; color: #94a3b8;">
+                        <i data-lucide="camera-off" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>No cameras added yet. Click "Add Camera" to begin.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="cameraModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle" style="font-weight: 700;">Add Camera</h2>
+            <button class="action-btn" onclick="closeModal()" style="border:none;">✕</button>
         </div>
-        {% empty %}
-        <div class="no-cameras">
-            <p>No cameras added yet. Click "Add Camera" to get started.</p>
+        <form id="cameraForm" onsubmit="saveCamera(event)">
+            {% csrf_token %}
+            <input type="hidden" id="cameraId" name="camera_id">
+            <div class="form-group">
+                <label>Camera Name</label>
+                <input type="text" id="camName" name="name" class="form-control" required placeholder="Room 101">
+            </div>
+            <div class="form-group">
+                <label>Camera Type</label>
+                <select id="camType" name="camera_type" class="form-control" onchange="handleTypeChange()">
+                    <option value="rtsp">RTSP Camera</option>
+                    <option value="ip_webcam">IP Webcam (Android)</option>
+                    <option value="droidcam">DroidCam (iPhone)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>IP Address</label>
+                <input type="text" id="camIp" name="ip_address" class="form-control" required placeholder="192.168.1.100">
+            </div>
+            <div class="form-group">
+                <label>Port</label>
+                <input type="number" id="camPort" name="port" class="form-control" value="554">
+            </div>
+            <div id="rtspAuth" class="form-group">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="camUser" name="username" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="camPass" name="password" class="form-control">
+                </div>
+            </div>
+            <button type="submit" class="btn-save">Process & Save Camera</button>
+        </form>
+    </div>
+</div>
+
+<!-- Assign Teacher Modal -->
+<div id="assignModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Assign Teachers</h2>
+            <button class="action-btn" onclick="closeAssignModal()" style="border:none;">✕</button>
         </div>
-        {% endfor %}
+        <form id="assignForm" onsubmit="saveAssignment(event)">
+            {% csrf_token %}
+            <input type="hidden" id="assignCamId" name="camera_id">
+            <div class="form-group">
+                <label>Select Teachers</label>
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 0.5rem;">
+                    {% for teacher in teachers %}
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <input type="checkbox" name="teachers" value="{{ teacher.id }}" id="t-{{ teacher.id }}">
+                        <label for="t-{{ teacher.id }}" style="margin: 0; font-weight: normal;">{{ teacher.username }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <button type="submit" class="btn-save">Update Permissions</button>
+        </form>
     </div>
 </div>
 
 <script>
-function testCamera(cameraId) {
-    const resultDiv = document.getElementById('test-result-' + cameraId);
-    resultDiv.style.display = 'block';
-    resultDiv.innerHTML = '<span style="color: #6c757d;">Testing connection...</span>';
-    
-    fetch('/cameras/test-camera/' + cameraId + '/')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Test result:', data);
-            
-            if (data.overall_status === 'success') {
-                let msg = '✓ Working via ' + data.working_methods.join(', ');
-                if (data.results) {
-                    const successResult = data.results.find(r => r.status === 'success');
-                    if (successResult && successResult.frame_size) {
-                        msg += ' (' + successResult.frame_size + ')';
-                    }
-                }
-                resultDiv.innerHTML = '<span style="color: #28a745; font-weight: 600;">' + msg + '</span>';
-            } else if (data.status === 'success') {
-                resultDiv.innerHTML = '<span style="color: #28a745; font-weight: 600;">✓ ' + (data.message || 'Connected') + '</span>';
-            } else {
-                let msg = '✗ ' + (data.message || 'Failed');
-                if (data.hint) msg += ' <br><small style="color:#856404;">💡 ' + data.hint + '</small>';
-                resultDiv.innerHTML = '<span style="color: #dc3545;">' + msg + '</span>';
-            }
-        })
-        .catch(error => {
-            resultDiv.innerHTML = '<span style="color: #dc3545;">✗ Camera service not running on port 8001</span>';
+    function toggleDropdown(e, id) {
+        e.stopPropagation();
+        document.querySelectorAll('.dropdown-menu').forEach(m => {
+            if(m.id !== 'dropdown-' + id) m.classList.remove('show');
         });
-}
+        document.getElementById('dropdown-' + id).classList.toggle('show');
+    }
+
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+    });
+
+    function handleTypeChange() {
+        const type = document.getElementById('camType').value;
+        const portInput = document.getElementById('camPort');
+        const rtspAuth = document.getElementById('rtspAuth');
+        
+        if(type === 'rtsp') {
+            portInput.value = 554;
+            rtspAuth.style.display = 'block';
+        } else if(type === 'ip_webcam') {
+            portInput.value = 8080;
+            rtspAuth.style.display = 'none';
+        } else if(type === 'droidcam') {
+            portInput.value = 4747;
+            rtspAuth.style.display = 'none';
+        }
+    }
+
+    function openAddModal() {
+        document.getElementById('modalTitle').innerText = 'Add Camera';
+        document.getElementById('cameraForm').reset();
+        document.getElementById('cameraId').value = '';
+        handleTypeChange();
+        document.getElementById('cameraModal').classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('cameraModal').classList.remove('show');
+    }
+
+    async function openEditModal(id) {
+        const res = await fetch(`/cameras/edit-camera/${id}/`);
+        const data = await res.json();
+        
+        document.getElementById('modalTitle').innerText = 'Edit Camera';
+        document.getElementById('cameraId').value = data.id;
+        document.getElementById('camName').value = data.name;
+        document.getElementById('camType').value = data.camera_type;
+        document.getElementById('camIp').value = data.ip_address;
+        document.getElementById('camPort').value = data.port;
+        document.getElementById('camUser').value = data.username;
+        document.getElementById('camPass').value = data.password;
+        
+        handleTypeChange();
+        document.getElementById('cameraModal').classList.add('show');
+    }
+
+    async function saveCamera(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const id = formData.get('camera_id');
+        const url = id ? `/cameras/edit-camera/${id}/` : '/cameras/add-camera/';
+        
+        const res = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        if(res.ok) {
+            window.location.reload();
+        }
+    }
+
+    async function openAssignModal(id) {
+        const res = await fetch(`/cameras/edit-camera/${id}/`);
+        const data = await res.json();
+        
+        document.getElementById('assignCamId').value = id;
+        // Uncheck all
+        document.querySelectorAll('#assignForm input[type="checkbox"]').forEach(c => c.checked = false);
+        // Check assigned
+        data.assigned_teachers.forEach(tid => {
+            const cb = document.getElementById('t-' + tid);
+            if(cb) cb.checked = true;
+        });
+        
+        document.getElementById('assignModal').classList.add('show');
+    }
+
+    function closeAssignModal() {
+        document.getElementById('assignModal').classList.remove('show');
+    }
+
+    async function saveAssignment(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const id = formData.get('camera_id');
+        
+        const res = await fetch(`/cameras/edit-camera/${id}/`, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        if(res.ok) {
+            window.location.reload();
+        }
+    }
+
+    async function deleteCamera(id) {
+        if(confirm('Are you sure you want to delete this camera?')) {
+            const res = await fetch(`/cameras/delete-camera/${id}/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            if(res.ok) window.location.reload();
+        }
+    }
 </script>
-
-<style>
-.admin-container {
-    max-width: 1200px;
-    margin: 2rem auto;
-    padding: 2rem;
-}
-
-.admin-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    background: #ffffff;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 1px solid #e9ecef;
-}
-
-.admin-header h1 {
-    color: #212529;
-    font-size: 2rem;
-    font-weight: 600;
-}
-
-.btn-add-camera {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-add-camera svg {
-    width: 20px;
-    height: 20px;
-}
-
-.btn-add-camera:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-}
-
-.cameras-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
-}
-
-.camera-card {
-    background: #ffffff;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 1px solid #e9ecef;
-    transition: all 0.2s;
-}
-
-.camera-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-    transform: translateY(-2px);
-}
-
-.camera-info h3 {
-    color: #212529;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-}
-
-.camera-url {
-    color: #6c757d;
-    font-size: 0.85rem;
-    word-break: break-all;
-    margin-bottom: 0.5rem;
-}
-
-.camera-status {
-    margin-top: 0.5rem;
-}
-
-.status-active {
-    color: #28a745;
-    font-weight: 600;
-}
-
-.status-inactive {
-    color: #dc3545;
-    font-weight: 600;
-}
-
-.camera-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1rem;
-    flex-wrap: wrap;
-}
-
-.btn-view, .btn-delete, .btn-permissions, .btn-test {
-    flex: 1;
-    min-width: 80px;
-    padding: 0.6rem;
-    text-align: center;
-    border-radius: 6px;
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.btn-test {
-    background: #17a2b8;
-    color: white;
-}
-
-.btn-test:hover {
-    background: #138496;
-    transform: translateY(-1px);
-}
-
-.btn-view {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.btn-view:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.btn-permissions {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-}
-
-.btn-permissions:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4);
-}
-
-.btn-permissions svg {
-    width: 16px;
-    height: 16px;
-}
+{% endblock %}
 
 .btn-delete {
     background: #dc3545;

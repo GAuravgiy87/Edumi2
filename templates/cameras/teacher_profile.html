@@ -1,0 +1,128 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .profile-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    .profile-header {
+        background: white;
+        border-radius: 1.5rem;
+        padding: 2.5rem;
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        margin-bottom: 2.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        border: 1px solid #e2e8f0;
+    }
+    .profile-avatar {
+        width: 120px; height: 120px;
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 3rem; font-weight: 800; color: white;
+        box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+    }
+    .profile-info h1 { font-size: 2rem; font-weight: 800; color: #1e293b; margin-bottom: 0.5rem; }
+    .profile-stats { display: flex; gap: 2rem; color: #64748b; font-weight: 600; }
+    
+    .tab-section { margin-top: 2rem; }
+    .tab-header {
+        display: flex; gap: 2rem;
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 2rem;
+    }
+    .tab-btn {
+        padding: 1rem 0;
+        font-weight: 700;
+        color: #64748b;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
+    
+    .lecture-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+    .lecture-card {
+        background: white;
+        border-radius: 1rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        border: 1px solid #e2e8f0;
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.2s;
+    }
+    .lecture-card:hover { transform: translateY(-4px); }
+    .thumb { aspect-ratio: 16/9; background: #0f172a; position: relative; }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .live-badge {
+        position: absolute; top: 0.5rem; left: 0.5rem;
+        background: #ef4444; color: white; padding: 0.25rem 0.5rem;
+        border-radius: 4px; font-weight: 800; font-size: 0.75rem;
+    }
+    .card-body { padding: 1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <div class="profile-avatar">{{ target_teacher.username|slice:":1"|upper }}</div>
+        <div class="profile-info">
+            <h1>{{ target_teacher.username }}</h1>
+            <p style="color:#64748b; margin-bottom:1rem;">Senior Instructor • Edumi Academic Team</p>
+            <div class="profile-stats">
+                <span>{{ recordings.count }} Recordings</span>
+                <span>{% if live_cameras %}1 Session Live{% else %}Offline{% endif %}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-section">
+        <div class="tab-header">
+            <div class="tab-btn active">All Lectures</div>
+            <div class="tab-btn">About</div>
+        </div>
+
+        <div class="lecture-grid">
+            {% for cam in live_cameras %}
+            <a href="{% url 'watch_live' cam.id %}" class="lecture-card">
+                <div class="thumb">
+                    <img src="{% url 'camera_feed' cam.id %}" alt="Live">
+                    <span class="live-badge">LIVE</span>
+                </div>
+                <div class="card-body">
+                    <div style="font-weight:700;">Live Session: {{ cam.name }}</div>
+                    <div style="font-size:0.875rem; color:#64748b;">Streaming Now</div>
+                </div>
+            </a>
+            {% endfor %}
+
+            {% for rec in recordings %}
+            <a href="{% url 'watch_recording' rec.id %}" class="lecture-card">
+                <div class="thumb">
+                    {% if rec.thumbnail %}
+                    <img src="{{ rec.thumbnail.url }}" alt="{{ rec.title }}">
+                    {% else %}
+                    <img src="{% static 'images/video-placeholder.jpg' %}" alt="Thumbnail">
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div style="font-weight:700;">{{ rec.title }}</div>
+                    <div style="font-size:0.875rem; color:#64748b;">{{ rec.created_at|date:"M d, Y" }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -77,13 +77,5 @@ def admin_live_meetings(request):
 
 @login_required
 def admin_all_cameras(request):
-    """Show all cameras"""
-    if not check_admin(request.user):
-        return redirect('login')
-    
-    cameras = Camera.objects.all().order_by('-created_at')
-    
-    return render(request, 'accounts/admin_all_cameras.html', {
-        'cameras': cameras,
-        'total_count': cameras.count()
-    })
+    """Redirect to the new unified camera dashboard"""
+    return redirect('admin_dashboard')

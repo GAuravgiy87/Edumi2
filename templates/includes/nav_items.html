@@ -26,9 +26,13 @@
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
                     <span class="sidebar-nav-text">Meeting Logs</span>
                 </a>
-                <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+                <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item {% if '/cameras/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
                     <span class="sidebar-nav-text">Camera Fleet</span>
+                </a>
+                <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
+                    <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
+                    <span class="sidebar-nav-text">Live Monitor</span>
                 </a>
             </div>
         {% endif %}
@@ -52,6 +56,10 @@
                 <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
                     <span class="sidebar-nav-text">Live Sessions</span>
+                </a>
+                <a href="{% url 'teacher_camera_dashboard' %}" class="sidebar-nav-item {% if '/control-room/' in request.path or '/teacher-dashboard/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
+                    <span class="sidebar-nav-text">Camera Control</span>
                 </a>
                 <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
@@ -79,6 +87,10 @@
                 <a href="{% url 'student_meetings' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
                     <span class="sidebar-nav-text">Live Classes</span>
+                </a>
+                <a href="{% url 'student_lecture_list' %}" class="sidebar-nav-item {% if '/lectures/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="play-circle"></i></span>
+                    <span class="sidebar-nav-text">Lectures</span>
                 </a>
                 <a href="{% url 'face_setup' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="user-check"></i></span>

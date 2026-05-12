@@ -1,0 +1,401 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .control-room-container {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        height: calc(100vh - 100px);
+        background: #f1f5f9;
+    }
+    .main-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    .video-monitor {
+        background: #000;
+        border-radius: 1.5rem;
+        overflow: hidden;
+        position: relative;
+        flex: 1;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+        border: 4px solid #fff;
+    }
+    .monitor-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .rec-indicator {
+        position: absolute;
+        top: 1.5rem;
+        left: 1.5rem;
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(0,0,0,0.5);
+        padding: 0.5rem 1rem;
+        border-radius: 9999px;
+        color: white;
+        font-weight: 700;
+        backdrop-filter: blur(4px);
+    }
+    .rec-indicator.active { display: flex; animation: pulse 2s infinite; }
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    .video-feed {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    
+    .controls-bar {
+        background: white;
+        padding: 1.25rem;
+        border-radius: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .btn-action {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-stream { background: #6366f1; color: white; }
+    .btn-record { background: #ef4444; color: white; }
+    .btn-record.recording { background: #991b1b; }
+    
+    .quality-select {
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        font-weight: 600;
+        outline: none;
+    }
+
+    .side-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        overflow-y: auto;
+    }
+    .panel-card {
+        background: white;
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .panel-title {
+        font-size: 0.875rem;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .chat-box {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 300px;
+    }
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    /* Publish Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 1000;
+        align-items: center; justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: white;
+        border-radius: 1.5rem;
+        width: 100%;
+        max-width: 500px;
+        padding: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="control-room-container">
+    <div class="main-panel">
+        <div class="video-monitor">
+            <div class="monitor-overlay">
+                <div id="recIndicator" class="rec-indicator">
+                    <span style="width:12px; height:12px; background:#ef4444; border-radius:50%;"></span>
+                    REC <span id="recTimer">00:00</span>
+                </div>
+            </div>
+            <img id="mainFeed" src="{% url 'camera_feed' camera.id %}" class="video-feed" alt="Camera Feed">
+        </div>
+
+        <div class="controls-bar">
+            <div style="display:flex; gap:1rem;">
+                <button id="streamBtn" class="btn-action btn-stream" onclick="toggleStreaming()">
+                    <i data-lucide="radio"></i> Start Live Stream
+                </button>
+                <button id="recordBtn" class="btn-action btn-record" onclick="toggleRecording()">
+                    <i data-lucide="circle"></i> Start Recording
+                </button>
+            </div>
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <label style="font-weight:600; font-size:0.875rem;">Quality:</label>
+                <select class="quality-select" id="qualitySelect">
+                    {% for q in qualities %}
+                    <option value="{{ q }}" {% if q == default_quality %}selected{% endif %}>{{ q }}</option>
+                    {% endfor %}
+                </select>
+                <button class="action-btn" title="Snapshot" onclick="takeSnapshot()">
+                    <i data-lucide="camera"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="side-panel">
+        <div class="panel-card">
+            <div class="panel-title"><i data-lucide="info"></i> Camera Info</div>
+            <div style="font-size: 0.875rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                    <span style="color:#64748b;">Name:</span>
+                    <span style="font-weight:600;">{{ camera.name }}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Source:</span>
+                    <span style="font-weight:600;">{{ camera.get_camera_type_display }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-card" style="flex: 1; display:flex; flex-direction:column;">
+            <div class="panel-title"><i data-lucide="bar-chart-2"></i> Engagement Analytics</div>
+            <div id="analytics" style="padding-top: 1rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
+                    <span style="color:#64748b; font-size:0.875rem;">Head Count:</span>
+                    <span id="liveHeadCount" style="font-weight:800; color:#6366f1; font-size:1.25rem;">0</span>
+                </div>
+                <div style="margin-bottom:1.5rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+                        <span style="color:#64748b; font-size:0.75rem;">Attention Level:</span>
+                        <span id="attentionPercent" style="font-weight:700; color:#10b981; font-size:0.75rem;">0%</span>
+                    </div>
+                    <div style="width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                        <div id="attentionBar" style="width:0%; height:100%; background:#10b981; transition:width 0.5s;"></div>
+                    </div>
+                </div>
+                <div id="emotionLabels" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+                    <!-- Emojis will appear here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-card" style="flex: 1; display:flex; flex-direction:column;">
+            <div class="panel-title"><i data-lucide="users"></i> Live Students (0)</div>
+            <div id="studentList" style="flex:1; overflow-y:auto; color:#94a3b8; text-align:center; font-size:0.875rem; padding-top:2rem;">
+                Waiting for students to join...
+            </div>
+        </div>
+
+        <div class="panel-card chat-box">
+            <div class="panel-title"><i data-lucide="message-square"></i> Live Chat</div>
+            <div class="chat-messages" id="chatMessages">
+                <div style="text-align:center; color:#94a3b8; font-size:0.75rem;">Session chat will appear here</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Publish Modal -->
+<div id="publishModal" class="modal">
+    <div class="modal-content">
+        <h2 style="font-weight:800; margin-bottom:1rem;">Publish Recording</h2>
+        <p style="color:#64748b; font-size:0.875rem; margin-bottom:1.5rem;">Your recording is ready. Add a title and description to share it with your students.</p>
+        <form onsubmit="finishPublish(event)">
+            <div style="margin-bottom:1.25rem;">
+                <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Lecture Title</label>
+                <input type="text" id="pubTitle" class="form-control" style="width:100%; padding:0.75rem; border:1px solid #e2e8f0; border-radius:0.5rem;" required placeholder="e.g. Physics - Laws of Motion">
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Description</label>
+                <textarea id="pubDesc" style="width:100%; padding:0.75rem; border:1px solid #e2e8f0; border-radius:0.5rem; height:100px;" placeholder="What was this lecture about?"></textarea>
+            </div>
+            <div style="display:flex; gap:1rem;">
+                <button type="button" class="btn-action" style="flex:1; background:#f1f5f9; color:#475569;" onclick="closePublish()">Save Draft</button>
+                <button type="submit" class="btn-action" style="flex:1; background:#6366f1; color:white;">Publish Now</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let isStreaming = false;
+    let isRecording = false;
+    let recStartTime = null;
+    let recTimerInterval = null;
+
+    function toggleStreaming() {
+        isStreaming = !isStreaming;
+        const btn = document.getElementById('streamBtn');
+        if (isStreaming) {
+            btn.innerHTML = '<i data-lucide="square"></i> Stop Live Stream';
+            btn.style.background = '#475569';
+            showNotification('Live streaming started', 'success');
+        } else {
+            btn.innerHTML = '<i data-lucide="radio"></i> Start Live Stream';
+            btn.style.background = '#6366f1';
+            fetch(`/cameras/stop-streaming/{{ camera.id }}/`);
+            showNotification('Live streaming stopped', 'info');
+        }
+        lucide.createIcons();
+    }
+
+    // Call stop streaming when window closes
+    window.addEventListener('beforeunload', () => {
+        if(isStreaming) fetch(`/cameras/stop-streaming/{{ camera.id }}/`);
+    });
+
+    function toggleRecording() {
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
+        }
+    }
+
+    let currentRecordingId = null;
+
+    async function startRecording() {
+        const quality = document.getElementById('qualitySelect').value;
+        
+        const formData = new FormData();
+        formData.append('quality', quality);
+        
+        const res = await fetch(`/cameras/start-recording/{{ camera.id }}/`, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+            isRecording = true;
+            recStartTime = new Date();
+            
+            document.getElementById('recordBtn').classList.add('recording');
+            document.getElementById('recordBtn').innerHTML = '<i data-lucide="square"></i> Stop Recording';
+            document.getElementById('recIndicator').classList.add('active');
+            
+            recTimerInterval = setInterval(updateRecTimer, 1000);
+            showNotification(data.message, 'success');
+        } else {
+            showNotification(data.message, 'error');
+        }
+        lucide.createIcons();
+    }
+
+    async function stopRecording() {
+        const res = await fetch(`/cameras/stop-recording/{{ camera.id }}/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+            isRecording = false;
+            clearInterval(recTimerInterval);
+            currentRecordingId = data.recording_id;
+            
+            document.getElementById('recordBtn').classList.remove('recording');
+            document.getElementById('recordBtn').innerHTML = '<i data-lucide="circle"></i> Start Recording';
+            document.getElementById('recIndicator').classList.remove('active');
+            
+            document.getElementById('publishModal').style.display = 'flex';
+        } else {
+            showNotification(data.message, 'error');
+        }
+        lucide.createIcons();
+    }
+
+    async function finishPublish(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('recording_id', currentRecordingId);
+        formData.append('title', document.getElementById('pubTitle').value);
+        formData.append('description', document.getElementById('pubDesc').value);
+        
+        const res = await fetch('/cameras/publish-recording/', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+            showNotification(data.message, 'success');
+            document.getElementById('publishModal').style.display = 'none';
+        } else {
+            showNotification(data.message, 'error');
+        }
+    }
+
+    function takeSnapshot() {
+        showNotification('Snapshot saved!', 'success');
+    }
+
+    // Mock Engagement Analytics Data (In real app, this comes via WebSocket)
+    setInterval(() => {
+        if (!isStreaming && !isRecording) return;
+        
+        const count = Math.floor(Math.random() * 5) + 15;
+        const attention = Math.floor(Math.random() * 30) + 70;
+        
+        document.getElementById('liveHeadCount').innerText = count;
+        document.getElementById('attentionPercent').innerText = attention + '%';
+        document.getElementById('attentionBar').style.width = attention + '%';
+        
+        const emotions = ['😊', '🤔', '😲', '😴', '📝'];
+        const labels = document.getElementById('emotionLabels');
+        labels.innerHTML = '';
+        for(let i=0; i<3; i++) {
+            const span = document.createElement('span');
+            span.style.padding = '0.25rem 0.5rem';
+            span.style.background = '#f1f5f9';
+            span.style.borderRadius = '0.25rem';
+            span.style.fontSize = '1.25rem';
+            span.innerText = emotions[Math.floor(Math.random() * emotions.length)];
+            labels.appendChild(span);
+        }
+    }, 3000);
+</script>
+{% endblock %}

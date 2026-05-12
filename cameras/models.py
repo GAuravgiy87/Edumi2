@@ -2,34 +2,52 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class Camera(models.Model):
+    CAMERA_TYPE_CHOICES = (
+        ('rtsp', 'RTSP Camera'),
+        ('ip_webcam', 'IP Webcam (Android)'),
+        ('droidcam', 'DroidCam (iPhone)'),
+    )
+    
     name = models.CharField(max_length=100)
-    rtsp_url = models.CharField(max_length=500)
-    username = models.CharField(max_length=100, blank=True)
-    password = models.CharField(max_length=100, blank=True)
+    camera_type = models.CharField(max_length=20, choices=CAMERA_TYPE_CHOICES, default='rtsp')
     ip_address = models.CharField(max_length=50)
     port = models.IntegerField(default=554)
-    stream_path = models.CharField(max_length=200, default='/stream')
+    username = models.CharField(max_length=100, blank=True)
+    password = models.CharField(max_length=100, blank=True)
+    stream_path = models.CharField(max_length=200, blank=True)
+    livekit_room = models.CharField(max_length=100, blank=True) # Linked LiveKit room
+    is_live = models.BooleanField(default=False)
+    live_teacher = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='live_cameras')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
         return self.name
     
-    def get_full_rtsp_url(self):
+    def get_stream_url(self):
         from urllib.parse import quote
-        if self.username and self.password:
-            # Quote username and password to handle special chars like '@'
-            safe_user = quote(self.username)
-            safe_pass = quote(self.password)
-            return f"rtsp://{safe_user}:{safe_pass}@{self.ip_address}:{self.port}{self.stream_path}"
-        return f"rtsp://{self.ip_address}:{self.port}{self.stream_path}"
+        if self.camera_type == 'rtsp':
+            if self.username and self.password:
+                safe_user = quote(self.username)
+                safe_pass = quote(self.password)
+                return f"rtsp://{safe_user}:{safe_pass}@{self.ip_address}:{self.port}{self.stream_path}"
+            return f"rtsp://{self.ip_address}:{self.port}{self.stream_path}"
+        elif self.camera_type == 'ip_webcam':
+            # IP Webcam standard: http://ip:port/video
+            return f"http://{self.ip_address}:{self.port}/video"
+        elif self.camera_type == 'droidcam':
+            # DroidCam standard: http://ip:port/mjpegfeed
+            return f"http://{self.ip_address}:{self.port}/mjpegfeed"
+        return ""
+    
+    def get_full_rtsp_url(self):
+        """Alias for compatibility with camera service"""
+        return self.get_stream_url()
     
     def has_permission(self, user):
         """Check if user has permission to access this camera"""
-        # Admin always has access
         if user.is_superuser:
             return True
-        # Check if teacher has explicit permission
         return CameraPermission.objects.filter(camera=self, teacher=user).exists()
     
     def get_authorized_teachers(self):
@@ -51,6 +69,28 @@ class CameraPermission(models.Model):
     
     def __str__(self):
         return f"{self.teacher.username} - {self.camera.name}"
+
+
+class CameraRecording(models.Model):
+    camera = models.ForeignKey(Camera, on_delete=models.CASCADE)
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    video_file = models.FileField(upload_to='recordings/%Y/%m/%d/')
+    thumbnail = models.ImageField(upload_to='recordings/thumbnails/', blank=True)
+    duration = models.DurationField(null=True, blank=True)
+    file_size = models.BigIntegerField(null=True, blank=True) # In bytes
+    is_published = models.BooleanField(default=False)
+    recording_status = models.CharField(max_length=20, choices=(
+        ('recording', 'Recording'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ), default='completed')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} - {self.teacher.username}"
 
 
 class HeadCountLog(models.Model):
