@@ -204,6 +204,7 @@
 </style>
 
 <script>
+(function() {
     let serverOnline = true;
     
     function checkServerStatus() {
@@ -276,12 +277,22 @@
     });
 
     // Initial count
-    document.getElementById('scan-status').innerText = 'Monitoring {{ cameras|length }} active cameras';
+    const scanStatus = document.getElementById('scan-status');
+    if (scanStatus) {
+        scanStatus.innerText = 'Monitoring {{ cameras|length }} active cameras';
+    }
     
     // Check server status every 5 seconds
-    setInterval(checkServerStatus, 5000);
+    const statusInterval = setInterval(checkServerStatus, 5000);
     
     // Initial check after 2 seconds
     setTimeout(checkServerStatus, 2000);
+
+    // Clean up interval when Turbo navigates away
+    document.addEventListener("turbo:before-cache", function cleanup() {
+        clearInterval(statusInterval);
+        document.removeEventListener("turbo:before-cache", cleanup);
+    });
+})();
 </script>
 {% endblock %}
