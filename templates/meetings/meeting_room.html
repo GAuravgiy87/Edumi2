@@ -152,27 +152,6 @@
                     <span>Chat</span>
                     <span class="notification-badge" id="chatBadge" style="display:none; margin-left:auto;">0</span>
                 </button>
-                
-                {% if is_host %}
-                <div class="menu-divider"></div>
-                <button class="menu-item" id="sleepBtn" onclick="toggleSleepMode(); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-                    <span>Sleep Mode</span>
-                </button>
-                <button class="menu-item" id="ftToggleBtn" onclick="toggleFaceTracking(); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    <span>Face Tracking</span>
-                </button>
-                <div class="menu-divider"></div>
-                <button class="menu-item" id="muteAllBtn" onclick="toggleGlobalControl('mute_all'); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                    <span>Mute All</span>
-                </button>
-                <button class="menu-item" id="camOffAllBtn" onclick="toggleGlobalControl('camera_off_all'); toggleMoreOptions();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M7 2l10 10L7 22"/><path d="M23 7l-7 5 7 5V7z"/></svg>
-                    <span>Stop All Cams</span>
-                </button>
-                {% endif %}
             </div>
         </div>
 
@@ -199,8 +178,6 @@
     data-after-leave-url="{% if meeting.classroom %}{% url 'classroom_detail' meeting.classroom.id %}{% elif is_host %}{% url 'teacher_classrooms' %}{% else %}{% url 'student_classrooms' %}{% endif %}"
     data-csrf="{{ csrf_token }}"
     data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
-    data-permission-url="{% url 'update_participant_permission' meeting.id 0 %}"
-    data-global-control-url="{% url 'toggle_global_control' meeting.id %}"
     data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
     data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}">
 </script>
@@ -212,9 +189,6 @@ const meetingCode = _d.meetingCode;
 const currentUserId   = _d.userId;
 const currentUsername = _d.username;
 const isHost      = _d.isHost === 'true';
-const initialCanSpeak = _d.canSpeak === 'true';
-const initialCanVideo = _d.canVideo === 'true';
-const initialCanShare = _d.canShare === 'true';
 const TOKEN_URL   = _d.tokenUrl;
 const LEAVE_URL    = _d.leaveUrl;
 const SLEEP_URL    = _d.sleepUrl;
@@ -238,10 +212,10 @@ let timerInterval  = null;
 let timerSeconds   = 0;
 let signalingWs    = null;
 
-// Permission State (Enforced locally for students)
-let canSpeak = initialCanSpeak;
-let canVideo = initialCanVideo;
-let canShare = initialCanShare;
+// Permission State (Always allowed as per teacher request)
+let canSpeak = true;
+let canVideo = true;
+let canShare = true;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -264,6 +238,13 @@ async function init() {
     if (data.error) { showNotification('Access denied: ' + data.error, 'error'); return; }
 
     const { token, url } = data;
+
+    // Show registration warning for students if not registered
+    {% if not is_host and not user.is_superuser %}
+    if (data.face_not_registered || "{{ face_not_registered }}" === "True") {
+        showNotification('Face not registered! Please register in Attendance Settings for automatic attendance.', 'warning');
+    }
+    {% endif %}
 
     room = new Room({
         adaptiveStream: true,          // auto-adjust quality per subscriber bandwidth
@@ -580,41 +561,6 @@ function handleSignalingMessage(data) {
                 showNotification(`User kicked: ${data.user_id}`, 'info');
             }
             break;
-        case 'permission_update':
-            if (data.user_id == currentUserId) {
-                handleLocalPermissionUpdate(data.permission_type, data.value, data.message);
-            }
-            break;
-        case 'global_control_update':
-            handleGlobalControlUpdate(data.control_type, data.value, data.message);
-            break;
-    }
-}
-
-async function handleLocalPermissionUpdate(type, allowed, message) {
-    showNotification(message, allowed ? 'success' : 'warning');
-    if (type === 'audio') {
-        canSpeak = allowed;
-        if (!allowed && isMicOn) toggleMic();
-    } else if (type === 'video') {
-        canVideo = allowed;
-        if (!allowed && isCameraOn) toggleCamera();
-    } else if (type === 'screenshare') {
-        canShare = allowed;
-        if (!allowed && isScreenSharing) stopScreenShare();
-    }
-}
-
-async function handleGlobalControlUpdate(type, value, message) {
-    if (isHost) return; // Host isn't affected by global student controls
-    
-    showNotification(message, value ? 'warning' : 'info');
-    if (type === 'mute_all' && value) {
-        if (isMicOn) toggleMic();
-    } else if (type === 'camera_off_all' && value) {
-        if (isCameraOn) toggleCamera();
-    } else if (type === 'screenshare_off_all' && value) {
-        if (isScreenSharing) stopScreenShare();
     }
 }
 
@@ -668,52 +614,50 @@ function updateLayout() {
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 async function toggleMic() {
-    if (!canSpeak && !isHost) {
-        showNotification('Teacher has blocked your microphone', 'error');
-        return;
+    try {
+        isMicOn = !isMicOn;
+        await room.localParticipant.setMicrophoneEnabled(isMicOn);
+        const btn = document.getElementById('micBtn');
+        btn.classList.toggle('off', !isMicOn);
+        const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+        const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+        btn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
+    } catch (e) {
+        console.error('Mic toggle error:', e);
+        isMicOn = !isMicOn; // Revert state
+        if (e.name === 'NotFoundError') {
+            showNotification('No microphone found on this device.', 'warning');
+        } else {
+            showNotification('Could not access microphone.', 'error');
+        }
     }
-    isMicOn = !isMicOn;
-    await room.localParticipant.setMicrophoneEnabled(isMicOn);
-    const btn = document.getElementById('micBtn');
-    btn.classList.toggle('off', !isMicOn);
-    const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-    const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-    btn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
 }
 
 async function toggleCamera() {
-    if (!canVideo && !isHost) {
-        showNotification('Teacher has blocked your camera', 'error');
-        return;
-    }
-    isCameraOn = !isCameraOn;
-    await room.localParticipant.setCameraEnabled(isCameraOn);
-    const btn = document.getElementById('camBtn');
-    btn.classList.toggle('off', !isCameraOn);
-    const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
-    const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
-    btn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
+    try {
+        isCameraOn = !isCameraOn;
+        await room.localParticipant.setCameraEnabled(isCameraOn);
+        const btn = document.getElementById('camBtn');
+        btn.classList.toggle('off', !isCameraOn);
+        const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+        const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
+        btn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
 
-    // Force stop track to turn off physical camera light
-    if (!isCameraOn) {
-        room.localParticipant.videoTrackPublications.forEach(pub => {
-            if (pub.source === Track.Source.Camera && pub.track && pub.track.mediaStreamTrack) {
-                pub.track.mediaStreamTrack.enabled = false;
-                pub.track.mediaStreamTrack.stop();
-            }
-        });
+        // Update UI
+        const localBox = document.getElementById(`video-box-${room.localParticipant.identity}`);
+        if (localBox) localBox.classList.toggle('cam-off', !isCameraOn);
+    } catch (e) {
+        console.error('Camera toggle error:', e);
+        isCameraOn = !isCameraOn; // Revert state
+        if (e.name === 'NotFoundError') {
+            showNotification('No camera found on this device.', 'warning');
+        } else {
+            showNotification('Could not access camera.', 'error');
+        }
     }
-
-    // Update UI
-    const localBox = document.getElementById(`video-box-${room.localParticipant.identity}`);
-    if (localBox) localBox.classList.toggle('cam-off', !isCameraOn);
 }
 
 async function toggleScreenShare() {
-    if (!canShare && !isHost) {
-        showNotification('Teacher has blocked screen sharing', 'error');
-        return;
-    }
     if (!isScreenSharing) {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
@@ -823,20 +767,6 @@ async function kickUser(userId) {
     });
     
     if (res.ok) showNotification('Student kicked successfully', 'success');
-}
-
-async function updatePermission(userId, type, value) {
-    const url = _d.permissionUrl.replace('0', userId);
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, value })
-    });
-    
-    if (res.ok) {
-        showNotification(`Permission updated for student`, 'success');
-        updateParticipantsList();
-    }
 }
 
 async function unbanUser(userId) {
@@ -952,8 +882,6 @@ function updateParticipantsList() {
                 </div>
                 ${isHost ? `
                 <div class="participant-actions">
-                    <button class="action-btn" onclick="updatePermission('${p.identity}', 'audio', true)" title="Allow Mic">🎤</button>
-                    <button class="action-btn" onclick="updatePermission('${p.identity}', 'video', true)" title="Allow Cam">📷</button>
                     <button class="action-btn danger" onclick="kickUser('${p.identity}')" title="Kick Out">🚫</button>
                 </div>
                 ` : ''}`;

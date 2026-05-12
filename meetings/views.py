@@ -588,7 +588,16 @@ def livekit_token(request, meeting_code):
         .to_jwt()
     )
 
-    return JsonResponse({'token': token, 'url': settings.LIVEKIT_URL})
+    # Dynamic URL: If LIVEKIT_URL uses localhost, swap it with the actual host used to access the page
+    # This ensures students on other machines can connect.
+    lk_url = settings.LIVEKIT_URL
+    if 'localhost' in lk_url or '127.0.0.1' in lk_url:
+        host = request.get_host() # e.g. "192.168.1.5:8000"
+        if 'livekit-proxy' in lk_url:
+            proto = 'wss' if request.is_secure() else 'ws'
+            lk_url = f"{proto}://{host}/livekit-proxy"
+
+    return JsonResponse({'token': token, 'url': lk_url})
 
 @login_required
 def meeting_attendance(request, meeting_code):
@@ -901,81 +910,6 @@ def kick_participant(request, meeting_id, user_id):
     )
     
     return JsonResponse({'status': 'success', 'message': f'{user_to_kick.username} kicked successfully'})
-
-@login_required
-@require_http_methods(["POST"])
-def update_participant_permission(request, meeting_id, user_id):
-    """Grant or revoke specific permissions for a participant"""
-    meeting = get_object_or_404(Meeting, id=meeting_id)
-    if meeting.teacher != request.user and not request.user.is_superuser:
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-    
-    participant = get_object_or_404(MeetingParticipant, meeting=meeting, user_id=user_id)
-    
-    import json
-    data = json.loads(request.body)
-    perm_type = data.get('type') # 'audio', 'video', 'screenshare'
-    value = data.get('value') # True/False
-    
-    if perm_type == 'audio':
-        participant.audio_permitted = value
-    elif perm_type == 'video':
-        participant.video_permitted = value
-    elif perm_type == 'screenshare':
-        participant.screenshare_permitted = value
-    
-    participant.save()
-    
-    # Notify through websocket
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f'meeting_{meeting.meeting_code}',
-        {
-            'type': 'permission_update',
-            'user_id': user_id,
-            'permission_type': perm_type,
-            'value': value,
-            'message': f'Teacher has {"granted" if value else "revoked"} your {perm_type} permission.'
-        }
-    )
-    
-    return JsonResponse({'status': 'success'})
-
-@login_required
-@require_http_methods(["POST"])
-def toggle_global_control(request, meeting_id):
-    """Enable or disable global controls (mute all, camera off all, etc.)"""
-    meeting = get_object_or_404(Meeting, id=meeting_id)
-    if meeting.teacher != request.user and not request.user.is_superuser:
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-    
-    import json
-    data = json.loads(request.body)
-    control_type = data.get('type') # 'mute_all', 'camera_off_all', 'screenshare_off_all'
-    value = data.get('value')
-    
-    if control_type == 'mute_all':
-        meeting.global_mute = value
-    elif control_type == 'camera_off_all':
-        meeting.global_camera_off = value
-    elif control_type == 'screenshare_off_all':
-        meeting.global_screenshare_off = value
-    
-    meeting.save()
-    
-    # Notify through websocket
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f'meeting_{meeting.meeting_code}',
-        {
-            'type': 'global_control_update',
-            'control_type': control_type,
-            'value': value,
-            'message': f'Teacher has {"enabled" if value else "disabled"} global {control_type.replace("_", " ")}.'
-        }
-    )
-    
-    return JsonResponse({'status': 'success'})
 
 @login_required
 @require_http_methods(["POST"])

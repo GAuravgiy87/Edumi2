@@ -152,9 +152,9 @@ class MeetingParticipant(models.Model):
     total_duration_seconds = models.IntegerField(default=0)
     
     # Per-participant permissions (managed by teacher)
-    audio_permitted = models.BooleanField(default=False)
-    video_permitted = models.BooleanField(default=False)
-    screenshare_permitted = models.BooleanField(default=False)
+    audio_permitted = models.BooleanField(default=True)
+    video_permitted = models.BooleanField(default=True)
+    screenshare_permitted = models.BooleanField(default=True)
     
     class Meta:
         unique_together = ['meeting', 'user']

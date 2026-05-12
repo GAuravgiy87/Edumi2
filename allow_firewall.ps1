@@ -52,8 +52,7 @@ foreach ($r in $rules) {
 # Also allow the executables themselves
 $exes = @(
     @{ Name="Edumi-LiveKit-Exe";  Path="$PSScriptRoot\livekit-bin\livekit-server.exe" },
-    @{ Name="Edumi-Python";       Path=(Get-Command python).Source },
-    @{ Name="Edumi-Ngrok";        Path="C:\Users\hp123\Downloads\ngrok-v3-stable-windows-amd64\ngrok.exe" }
+    @{ Name="Edumi-Python";       Path=(Get-Command python).Source }
 )
 
 foreach ($e in $exes) {

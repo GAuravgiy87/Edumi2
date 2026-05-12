@@ -15,10 +15,9 @@ All technical specifications, architectural diagrams, installation steps, and ap
 
 ### 🚀 Quick Start
 If you just want to run the system immediately:
-1. Right-click `start_all.ps1` and select **Run with PowerShell**.
-2. Copy the **ngrok URL** provided in the console.
-3. Open the URL in your browser.
-4. Default Admin: `EdumiAdmin` / `Gaurav@0000`
+1. Right-click `start_app.ps1` and select **Run with PowerShell**.
+2. Open **http://localhost:8000** in your browser.
+3. Default Admin: `EdumiAdmin` / `Gaurav@0000`
 
 ---
 

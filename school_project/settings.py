@@ -30,7 +30,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-@j!l-9t=qs!b&lkynb=zq
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,10.17.2.47,*').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split(',')
 
 # Disable SSL redirect for development (enable in production)
 SECURE_SSL_REDIRECT = False
@@ -39,17 +39,10 @@ CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = [
-    'https://localhost',
-    'https://localhost:8443',
-    'https://127.0.0.1',
-    'https://127.0.0.1:8443',
-    'https://10.7.32.175',
-    'https://10.7.32.175:8443',
-    'https://10.17.2.47',
-    'https://10.17.2.47:8443',
-    'https://*.ngrok.io',
-    'https://*.ngrok-free.app',
-    'https://*.ngrok-free.dev',
+    'http://localhost',
+    'http://localhost:8000',
+    'http://127.0.0.1',
+    'http://127.0.0.1:8000',
 ]
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
@@ -118,23 +111,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'school_project.wsgi.application'
 ASGI_APPLICATION = 'school_project.asgi.application'
 
-REDIS_URL = os.environ.get('REDIS_URL', '')
-if REDIS_URL:
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                "hosts": [REDIS_URL],
-            },
-        }
+# Channels Configuration
+# We use InMemoryChannelLayer for local development to avoid issues with 
+# outdated Redis versions (e.g. Redis 3.x on Windows).
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     }
-else:
-    # No Redis available — use in-memory channel layer (single-process only)
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
-        }
-    }
+}
 
 
 # Database
@@ -233,20 +217,26 @@ LOGGING = {
     'loggers': {
         'cameras': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'WARNING',
             'propagate': False,
         },
         'django': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'ERROR',
             'propagate': False,
         },
     },
 }
 
 # Celery Configuration Options
-CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'memory://')
-CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'cache+memory://')
+# Celery supports Redis 3.x, so we can keep using it for background tasks.
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -254,10 +244,8 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # ─── LiveKit SFU ────────────────────────────────────────────────────────────
 # LIVEKIT_URL: what the *browser* connects to.
-# When running behind ngrok, set this to your ngrok URL + /livekit-proxy
-# e.g.  wss://xxxx.ngrok-free.app/livekit-proxy
-# The proxy in asgi.py forwards it to ws://localhost:7880 internally.
-LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:7880')
+# Default to local proxy which handles RTC traffic over port 8000
+LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:8000/livekit-proxy')
 LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey')
 LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_characters_long_1234')
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
