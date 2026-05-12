@@ -208,30 +208,41 @@ def edit_camera(request, camera_id):
     camera = get_object_or_404(Camera, id=camera_id)
     
     if request.method == 'POST':
-        camera.name = request.POST.get('name')
-        camera.camera_type = request.POST.get('camera_type')
-        camera.ip_address = request.POST.get('ip_address')
-        camera.port = int(request.POST.get('port'))
-        camera.username = request.POST.get('username', '')
-        camera.password = request.POST.get('password', '')
-        
-        # If RTSP and details changed, re-detect path
-        if camera.camera_type == 'rtsp':
-            detected_path, _ = test_rtsp_paths(camera.ip_address, camera.port, camera.username, camera.password)
-            if detected_path:
-                camera.stream_path = detected_path
-                camera.is_active = True
-        
-        # Assign teachers
-        teacher_ids = request.POST.getlist('teachers')
-        # Clear old permissions
-        CameraPermission.objects.filter(camera=camera).delete()
-        # Add new permissions
-        for t_id in teacher_ids:
-            teacher = User.objects.get(id=t_id)
-            CameraPermission.objects.create(camera=camera, teacher=teacher, granted_by=request.user)
+        # Check if we are updating camera details or just permissions
+        # If 'name' is in POST, we are updating details
+        if 'name' in request.POST:
+            camera.name = request.POST.get('name')
+            camera.camera_type = request.POST.get('camera_type')
+            camera.ip_address = request.POST.get('ip_address')
+            port_val = request.POST.get('port')
+            if port_val:
+                camera.port = int(port_val)
+            camera.username = request.POST.get('username', '')
+            camera.password = request.POST.get('password', '')
             
-        camera.save()
+            # If RTSP and details changed, re-detect path
+            if camera.camera_type == 'rtsp':
+                detected_path, _ = test_rtsp_paths(camera.ip_address, camera.port, camera.username, camera.password)
+                if detected_path:
+                    camera.stream_path = detected_path
+                    camera.is_active = True
+            
+            camera.save()
+        
+        # Always handle teacher assignments if 'teachers' is in POST or if it's the assignment form
+        # The assignment form has a hidden input 'camera_id' and a list of 'teachers'
+        if 'teachers' in request.POST or ('name' not in request.POST and 'camera_id' in request.POST):
+            teacher_ids = request.POST.getlist('teachers')
+            # Clear old permissions
+            CameraPermission.objects.filter(camera=camera).delete()
+            # Add new permissions
+            for t_id in teacher_ids:
+                try:
+                    teacher = User.objects.get(id=t_id)
+                    CameraPermission.objects.create(camera=camera, teacher=teacher, granted_by=request.user)
+                except User.DoesNotExist:
+                    continue
+                    
         return JsonResponse({'status': 'success', 'message': 'Camera updated successfully'})
     
     # Return camera data for modal
