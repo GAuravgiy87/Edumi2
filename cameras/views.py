@@ -516,13 +516,45 @@ def live_participants(request, camera_id):
 @login_required
 def student_lecture_list(request):
     """List all available live sessions and recorded lectures for students"""
+    from meetings.models import Meeting, ClassroomMembership
+    
     query = request.GET.get('q', '')
     teacher_id = request.GET.get('teacher', '')
     
-    # Get all live cameras
+    # Get classrooms where user is an approved member
+    my_classroom_ids = ClassroomMembership.objects.filter(
+        student=request.user, 
+        status='approved'
+    ).values_list('classroom_id', flat=True)
+
+    # 1. Filter Live Cameras
+    # We need to hide cameras that are linked to classrooms the student isn't in
     live_sessions = Camera.objects.filter(is_live=True).select_related('live_teacher')
     
-    # Get all published recordings
+    # Identify rooms that are linked to classrooms
+    classroom_rooms = Meeting.objects.filter(
+        classroom__isnull=False,
+        status='live'
+    ).values('meeting_code', 'classroom_id')
+    
+    room_to_classroom = {r['meeting_code']: r['classroom_id'] for r in classroom_rooms}
+    
+    filtered_live = []
+    for cam in live_sessions:
+        if cam.livekit_room in room_to_classroom:
+            # This camera is in a classroom session
+            if room_to_classroom[cam.livekit_room] in my_classroom_ids:
+                filtered_live.append(cam)
+        else:
+            # Standalone camera or not linked to an active classroom meeting
+            filtered_live.append(cam)
+    
+    # 2. Filter Recordings
+    # recordings = CameraRecording.objects.filter(is_published=True).select_related('teacher', 'camera')
+    # For recordings, if the camera used is traditionally for a classroom, should we hide it?
+    # Usually recordings are published by teachers explicitly, but let's stick to the "meetings" logic.
+    # If a recording's camera has a livekit_room that belongs to a classroom, maybe check?
+    # For now, let's keep recordings as they are unless they have a direct classroom link (which they don't yet).
     recordings = CameraRecording.objects.filter(is_published=True).select_related('teacher', 'camera')
     
     if query:
@@ -531,20 +563,22 @@ def student_lecture_list(request):
             Q(teacher__username__icontains=query) |
             Q(camera__name__icontains=query)
         )
-        live_sessions = live_sessions.filter(
-            Q(name__icontains=query) | 
-            Q(live_teacher__username__icontains=query)
-        )
+        # Re-filter the filtered_live list for query
+        filtered_live = [
+            cam for cam in filtered_live 
+            if query.lower() in cam.name.lower() or 
+               (cam.live_teacher and query.lower() in cam.live_teacher.username.lower())
+        ]
         
     if teacher_id:
         recordings = recordings.filter(teacher_id=teacher_id)
-        live_sessions = live_sessions.filter(live_teacher_id=teacher_id)
+        filtered_live = [cam for cam in filtered_live if str(cam.live_teacher_id) == str(teacher_id)]
 
     # Get list of teachers for filtering
     teachers = User.objects.filter(userprofile__user_type='teacher')
 
     return render(request, 'cameras/student_lecture_list.html', {
-        'live_sessions': live_sessions,
+        'live_sessions': filtered_live,
         'recordings': recordings,
         'teachers': teachers,
         'query': query,

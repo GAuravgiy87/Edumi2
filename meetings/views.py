@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.utils import timezone
@@ -398,8 +399,17 @@ def student_meetings(request):
     if not hasattr(request.user, 'userprofile') or request.user.userprofile.user_type != 'student':
         return redirect('login')
     
-    # Get all scheduled and live non-classroom meetings
-    meetings = Meeting.objects.filter(status__in=['scheduled', 'live'], classroom__isnull=True)
+    # Get classrooms where user is an approved member
+    my_classroom_ids = ClassroomMembership.objects.filter(
+        student=request.user, 
+        status='approved'
+    ).values_list('classroom_id', flat=True)
+    
+    # Get all scheduled and live meetings (standalone OR in user's classrooms)
+    meetings = Meeting.objects.filter(
+        Q(classroom__isnull=True) | Q(classroom_id__in=my_classroom_ids),
+        status__in=['scheduled', 'live']
+    )
     return render(request, 'meetings/student_meetings.html', {'meetings': meetings})
 
 @login_required
@@ -493,6 +503,8 @@ def join_meeting(request, meeting_code):
         'meeting': meeting,
         'participant': participant,
         'is_host': is_host,
+        'host_id': str(meeting.teacher.id),
+        'user_type': request.user.userprofile.user_type if hasattr(request.user, 'userprofile') else 'student',
         'livekit_url': settings.LIVEKIT_URL,
         'face_not_registered': face_not_registered,
     })

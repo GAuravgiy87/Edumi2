@@ -9,6 +9,14 @@
     .profile-banner {
         background-image: url('{{ banner_url|default:"/static/img/academic_profile_banner.png" }}');
     }
+    .info-icon.face-registered {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .info-icon.face-not-registered {
+        background: #fee2e2;
+        color: #991b1b;
+    }
 </style>
 {% endblock %}
 
@@ -258,7 +266,7 @@
                 <div style="text-align: center; padding: 1rem 0;">
                     <div style="font-size: 3rem; font-weight: 800; color: var(--p-primary);">{{ completion }}%</div>
                     <div style="width: 100%; height: 8px; background: var(--p-primary-light); border-radius: 4px; margin: 1rem 0; overflow: hidden;">
-                        <div style="width: {{ completion }}%; height: 100%; background: var(--p-primary); border-radius: 4px;"></div>
+                        <div style="width: {{ completion }}%; height: 100%; background: var(--p-primary); border-radius: 4px;" data-completion="{{ completion }}"></div>
                     </div>
                     <p style="font-size: 0.8125rem; color: var(--p-text-muted);">
                         {% if completion < 100 %}Complete your profile to stand out!{% else %}Your profile is fully optimized!{% endif %}
@@ -299,7 +307,7 @@
                 <h2 class="card-title"><i data-lucide="lock"></i> Trust & Security</h2>
                 <div class="info-list">
                     <div class="info-item">
-                        <div class="info-icon" style="background: {% if face_registered %}#dcfce7{% else %}#fee2e2{% endif %}; color: {% if face_registered %}#166534{% else %}#991b1b{% endif %};">
+                        <div class="info-icon {% if face_registered %}face-registered{% else %}face-not-registered{% endif %}">
                             <i data-lucide="{% if face_registered %}shield-check{% else %}shield-alert{% endif %}"></i>
                         </div>
                         <div class="info-content">
@@ -375,6 +383,13 @@
 // Logic to handle Lucide icons and Form State
 document.addEventListener('DOMContentLoaded', function() {
     lucide.createIcons();
+    
+    // Fix CSS issues with Django template variables by setting values via JS
+    var completionDiv = document.querySelector('[data-completion]');
+    if (completionDiv) {
+        var completion = completionDiv.getAttribute('data-completion');
+        completionDiv.style.width = completion + '%';
+    }
     
     const form = document.getElementById('profileForm');
     if (form) {

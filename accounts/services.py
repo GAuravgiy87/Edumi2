@@ -35,10 +35,25 @@ def get_teacher_stats(user):
 
 def get_student_stats(user):
     """Get statistics for the student dashboard."""
+    from meetings.models import ClassroomMembership, Meeting
+    from django.db.models import Q
+    
+    # Get classrooms where user is an approved member
+    my_classroom_ids = ClassroomMembership.objects.filter(
+        student=user, 
+        status='approved'
+    ).values_list('classroom_id', flat=True)
+    
+    # Meetings are available if they are standalone OR in student's classrooms
+    available_meetings = Meeting.objects.filter(
+        Q(classroom__isnull=True) | Q(classroom_id__in=my_classroom_ids),
+        status__in=['scheduled', 'live']
+    ).count()
+    
     return {
-        'available_meetings': Meeting.objects.filter(status__in=['scheduled', 'live'], classroom__isnull=True).count(),
-        'attended_meetings': user.meetingparticipant_set.filter(meeting__classroom__isnull=True).count(),
-        'enrolled_courses': 6,  # Placeholder/Future logic
+        'available_meetings': available_meetings,
+        'attended_meetings': user.meetingparticipant_set.count(),
+        'enrolled_courses': len(my_classroom_ids),
         'completed_assignments': 15,  # Placeholder/Future logic
     }
 

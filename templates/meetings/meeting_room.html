@@ -74,41 +74,151 @@
 
     <style>
         /* AI Monitoring Styles */
-        #face-att-badge {
-            position: fixed; bottom: 100px; right: 24px; z-index: 1000;
-            display: flex; align-items: center; gap: 10px;
-            padding: 12px 20px; border-radius: 16px;
-            font-size: 13px; font-weight: 600; color: #fff;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 300px;
-        }
-        #face-att-badge.state-active    { border-color: rgba(99, 102, 241, 0.4); }
-        #face-att-badge.state-progress  { border-color: rgba(245, 158, 11, 0.4); }
-        #face-att-badge.state-success   { border-color: rgba(16, 185, 129, 0.4); }
-        #face-att-badge.state-warning   { border-color: rgba(239, 68, 68, 0.4); }
-        
-        .fa-dot {
-            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-            background: #6366f1; animation: fa-pulse 2s infinite;
-        }
-        .state-success .fa-dot { background: #10b981; animation: none; }
-        .state-warning .fa-dot { background: #ef4444; }
-        @keyframes fa-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+    #face-att-badge {
+        position: fixed; bottom: 100px; right: 24px; z-index: 1000;
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 20px; border-radius: 16px;
+        font-size: 13px; font-weight: 600; color: #fff;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 300px;
+    }
+    #face-att-badge.state-active    { border-color: rgba(99, 102, 241, 0.4); }
+    #face-att-badge.state-progress  { border-color: rgba(245, 158, 11, 0.4); }
+    #face-att-badge.state-success   { border-color: rgba(16, 185, 129, 0.4); }
+    #face-att-badge.state-warning   { border-color: rgba(239, 68, 68, 0.4); }
+    
+    .fa-dot {
+        width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        background: #6366f1; animation: fa-pulse 2s infinite;
+    }
+    .state-success .fa-dot { background: #10b981; animation: none; }
+    .state-warning .fa-dot { background: #ef4444; }
+    @keyframes fa-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
 
-        #face-att-progress-bar {
-            height: 4px; background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px; margin-top: 6px; overflow: hidden;
-        }
-        #face-att-progress-fill {
-            height: 100%; background: linear-gradient(90deg, #6366f1, #10b981);
-            width: 0%; transition: width 0.5s ease;
-        }
+    #face-att-progress-bar {
+        height: 4px; background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px; margin-top: 6px; overflow: hidden;
+    }
+    #face-att-progress-fill {
+        height: 100%; background: linear-gradient(90deg, #6366f1, #10b981);
+        width: 0%; transition: width 0.5s ease;
+    }
 
-        /* Face Tracking Overlays */
+    /* Participant List Dark Mode UI Fix */
+    .meet-sidebar {
+        background: #111827 !important; /* Darker Slate/Gray */
+        color: #f8fafc !important;
+        border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .sidebar-header {
+        background: #0f172a !important; /* Dark Slate 900 */
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 16px !important;
+    }
+    .sidebar-tab {
+        color: #94a3b8 !important;
+    }
+    .sidebar-tab:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #fff !important;
+    }
+    .sidebar-tab.active {
+        background: rgba(99, 102, 241, 0.2) !important;
+        color: #818cf8 !important;
+    }
+    .close-sidebar {
+        color: #94a3b8 !important;
+    }
+    .close-sidebar:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+        color: #fff !important;
+    }
+    .participants-count {
+        background: #1e293b !important;
+        color: #cbd5e1 !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+        padding: 12px 16px !important;
+    }
+    .participant-item {
+        margin: 4px 8px !important;
+        padding: 10px !important;
+        border-radius: 8px !important;
+    }
+    .participant-item:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+    }
+    .participant-name {
+        color: #f8fafc !important;
+        font-weight: 500 !important;
+    }
+    .host-label {
+        background: rgba(99, 102, 241, 0.2) !important;
+        color: #818cf8 !important;
+        border: 1px solid rgba(99, 102, 241, 0.3) !important;
+    }
+    .chat-messages {
+        background: #111827 !important;
+        padding: 16px !important;
+    }
+    .chat-msg-text {
+        background: #1f2937 !important; /* Gray 800 */
+        color: #f1f5f9 !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 12px !important;
+        padding: 10px 14px !important;
+    }
+    .chat-msg.own .chat-msg-text {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    .chat-input-box {
+        background: #0f172a !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 16px !important;
+    }
+    .chat-input-box input {
+        background: #1f2937 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #f8fafc !important;
+        border-radius: 20px !important;
+        padding: 10px 16px !important;
+    }
+    .chat-input-box input::placeholder {
+        color: #6b7280 !important;
+    }
+    .chat-input-box input:focus {
+        border-color: #6366f1 !important;
+        background: #111827 !important;
+    }
+    .send-btn {
+        background: #6366f1 !important;
+        border-radius: 20px !important;
+        padding: 0 20px !important;
+        height: 40px !important;
+    }
+    .chat-msg-header strong {
+        color: #94a3b8 !important;
+    }
+    .chat-msg-time {
+        color: #6b7280 !important;
+    }
+
+    /* Video Box Controls */
+    .video-box {
+        background: #000 !important;
+    }
+    .video-nametag {
+        background: rgba(15, 23, 42, 0.8) !important;
+        backdrop-filter: blur(8px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Face Tracking Overlays */
         .ft-canvas-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 10; border-radius: inherit;
@@ -228,6 +338,8 @@
     data-user-id="{{ user.id }}"
     data-username="{{ user.username }}"
     data-is-host="{% if is_host %}true{% else %}false{% endif %}"
+    data-user-type="{{ user_type }}"
+    data-host-id="{{ host_id }}"
     data-can-speak="{% if participant.audio_permitted %}true{% else %}false{% endif %}"
     data-can-video="{% if participant.video_permitted %}true{% else %}false{% endif %}"
     data-can-share="{% if participant.screenshare_permitted %}true{% else %}false{% endif %}"
@@ -249,6 +361,8 @@ const meetingCode = _d.meetingCode;
 const currentUserId   = _d.userId;
 const currentUsername = _d.username;
 const isHost      = _d.isHost === 'true';
+const userType    = _d.userType;
+const hostId      = _d.hostId;
 const TOKEN_URL   = _d.tokenUrl;
 const LEAVE_URL    = _d.leaveUrl;
 const SLEEP_URL    = _d.sleepUrl;
@@ -447,6 +561,7 @@ function getOrCreateBox(identity, displayName, isLocal) {
 
     document.getElementById('sidebarVideoArea').appendChild(box);
     updateLayout();
+    updateParticipantsList(); // Update list when new box is created
     return box;
 }
 
@@ -488,6 +603,74 @@ function renderLocalParticipant() {
             hideLocalScreenShare();
         }
     });
+}
+
+function updateParticipantsList() {
+    const list = document.getElementById('participantsList');
+    if (!list || !room) return;
+    
+    list.innerHTML = '';
+    
+    // Add local participant
+    const lp = room.localParticipant;
+    addParticipantToList(lp, true);
+    
+    // Add remote participants
+    room.remoteParticipants.forEach(p => {
+        // Privacy Logic: Students only see Host
+        if (!isHost && userType === 'student') {
+            if (p.identity !== hostId) return;
+        }
+        addParticipantToList(p, false);
+    });
+    
+    updateParticipantCount();
+}
+
+function addParticipantToList(participant, isLocal) {
+    const list = document.getElementById('participantsList');
+    const item = document.createElement('div');
+    item.className = 'participant-item';
+    
+    const identity = participant.identity;
+    const name = isLocal ? 'You' : (participant.name || identity);
+    const isHost = participant.metadata && participant.metadata.includes('host');
+    
+    item.innerHTML = `
+        <div class="participant-avatar">
+            <img src="https://ui-avatars.com/api/?name=${name}&background=6366f1&color=fff" alt="${name}">
+        </div>
+        <div class="participant-info">
+            <div class="participant-name">
+                ${name}
+                ${isLocal ? '<span class="host-label">You</span>' : ''}
+                ${participant.identity == _d.hostId ? '<span class="host-label">Host</span>' : ''}
+            </div>
+        </div>
+        <div class="participant-status" id="status-${identity}">
+            <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+    `;
+    
+    list.appendChild(item);
+}
+
+function updateParticipantCount() {
+    let count = (room ? room.remoteParticipants.size : 0) + 1;
+    
+    // Privacy Logic: Students only see themselves and host
+    if (!isHost && userType === 'student') {
+        let hasHost = false;
+        if (room) {
+            room.remoteParticipants.forEach(p => {
+                if (p.identity === hostId) hasHost = true;
+            });
+        }
+        count = hasHost ? 2 : 1;
+    }
+
+    const el = document.getElementById('participantCount');
+    if (el) el.textContent = count;
 }
 
 function attachTrackToBox(track, box, isLocal) {
@@ -578,6 +761,15 @@ function hideLocalScreenShare() {
 // ── Participant events ────────────────────────────────────────────────────────
 function onParticipantConnected(participant) {
     if (!participant) return;
+    
+    // Privacy Logic: Students only see Host
+    if (!isHost && userType === 'student') {
+        if (participant.identity !== hostId) {
+            console.log('Hiding student participant:', participant.identity);
+            return; 
+        }
+    }
+
     console.log('Participant joined:', participant.identity);
     getOrCreateBox(participant.identity, participant.name || participant.identity, false);
     updateParticipantsList();
@@ -605,6 +797,11 @@ function onParticipantDisconnected(participant) {
 function onTrackSubscribed(track, publication, participant) {
     // Never process our own tracks here — handled by renderLocalParticipant
     if (room && room.localParticipant && participant.identity === room.localParticipant.identity) return;
+
+    // Privacy Logic: Students only see Host
+    if (!isHost && userType === 'student') {
+        if (participant.identity !== hostId) return;
+    }
 
     console.log(`Subscribed to track: ${track.kind} from ${participant.identity} (Source: ${publication.source})`);
 
@@ -659,9 +856,7 @@ function onActiveSpeakersChanged(speakers) {
 function onDataReceived(payload, participant) {
     try {
         const msg = JSON.parse(new TextDecoder().decode(payload));
-        if (msg.type === 'chat') {
-            appendChatMessage(msg.username, msg.message, msg.userId === currentUserId);
-        } else if (msg.type === 'meeting_sleeping') {
+        if (msg.type === 'meeting_sleeping') {
             isSleeping = true;
             showNotification('Meeting has been put to sleep by the host', 'warning');
         } else if (msg.type === 'meeting_unfrozen') {
@@ -682,6 +877,9 @@ function onConnectionStateChanged(state) {
 // ── Signaling Handlers ────────────────────────────────────────────────────────
 function handleSignalingMessage(data) {
     switch(data.type) {
+        case 'chat':
+            appendChatMessage(data.username, data.message, data.user_id == currentUserId);
+            break;
         case 'kick_user':
             if (data.user_id == currentUserId) {
                 alert(data.message);
@@ -847,12 +1045,20 @@ async function stopScreenShare() {
 async function sendChatMessage() {
     const input = document.getElementById('chatInput');
     const text  = input.value.trim();
-    if (!text || !room) return;
+    if (!text || !signalingWs || signalingWs.readyState !== WebSocket.OPEN) {
+        if (!signalingWs || signalingWs.readyState !== WebSocket.OPEN) {
+            showNotification('Chat connection not ready. Please wait.', 'warning');
+        }
+        return;
+    }
     input.value = '';
 
-    const payload = JSON.stringify({ type: 'chat', username: currentUsername, userId: currentUserId, message: text });
-    await room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
-    appendChatMessage(currentUsername, text, true);
+    const payload = JSON.stringify({ 
+        type: 'chat', 
+        message: text,
+        timestamp: new Date().toISOString()
+    });
+    signalingWs.send(payload);
 }
 
 function appendChatMessage(username, text, isOwn) {
@@ -860,16 +1066,24 @@ function appendChatMessage(username, text, isOwn) {
     const div   = document.createElement('div');
     div.className = 'chat-msg' + (isOwn ? ' own' : '');
     div.innerHTML = `
-        <div class="chat-msg-header"><strong>${username}</strong><span class="chat-msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span></div>
+        <div class="chat-msg-header"><strong style="color: #cbd5e1;">${username}</strong><span class="chat-msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span></div>
         <div class="chat-msg-text">${text}</div>`;
     panel.appendChild(div);
     panel.scrollTop = panel.scrollHeight;
 
-    if (!isOwn && document.getElementById('chatPanel').style.display === 'none') {
+    // Fixed badge notification logic
+    const sidebar = document.getElementById('meetSidebar');
+    const chatPanel = document.getElementById('chatPanel');
+    const isSidebarHidden = sidebar.style.display === 'none';
+    const isChatPanelHidden = chatPanel.classList.contains('active') === false;
+
+    if (!isOwn && (isSidebarHidden || isChatPanelHidden)) {
         unreadMessages++;
         const badge = document.getElementById('chatBadge');
-        badge.textContent = unreadMessages;
-        badge.style.display = 'block';
+        if (badge) {
+            badge.textContent = unreadMessages;
+            badge.style.display = 'block';
+        }
     }
 }
 

@@ -51,7 +51,7 @@ def notify_meeting_started(meeting, classroom=None):
                     "data": {
                         "meeting_id": meeting.id,
                         "title": meeting.title,
-                        "classroom": classroom.name
+                        "classroom": classroom.title
                     }
                 }
             )

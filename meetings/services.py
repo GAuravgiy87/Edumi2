@@ -30,7 +30,7 @@ def get_classroom_detail_context(classroom, user):
         att_total_count = approved_students.count()
         
         meetings = classroom.meetings.all().annotate(
-            att_present=Count('attendancerecord', filter=Q(attendancerecord__status__in=['present', 'late']))
+            att_present=Count('face_attendance_records', filter=Q(face_attendance_records__status__in=['present', 'late']))
         ).order_by('-created_at')
         
         for m in meetings:
