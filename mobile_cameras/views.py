@@ -219,11 +219,11 @@ def live_monitor(request):
     
     # Filter mobile cameras based on user permissions
     if is_admin(request.user):
-        mobile_cameras = MobileCamera.objects.filter(is_active=True)
+        mobile_cameras = MobileCamera.objects.all()
     elif hasattr(request.user, 'userprofile'):
         if request.user.userprofile.user_type == 'teacher':
             mobile_camera_ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
-            mobile_cameras = MobileCamera.objects.filter(id__in=mobile_camera_ids, is_active=True)
+            mobile_cameras = MobileCamera.objects.filter(id__in=mobile_camera_ids)
         elif request.user.userprofile.user_type == 'student':
             mobile_cameras = MobileCamera.objects.filter(is_active=True)
         else:
@@ -434,7 +434,10 @@ def grant_permission(request, mobile_camera_id):
             defaults={'granted_by': request.user}
         )
         
-        return JsonResponse({'success': True})
+        return JsonResponse({
+            'success': True,
+            'message': f'Access granted to {teacher.get_full_name() or teacher.username}'
+        })
     
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
@@ -443,14 +446,19 @@ def grant_permission(request, mobile_camera_id):
 def revoke_permission(request, mobile_camera_id, teacher_id):
     """Revoke a teacher's permission to view a mobile camera"""
     if not is_admin(request.user):
-        return redirect('login')
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
     
     mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
     teacher = get_object_or_404(User, id=teacher_id)
     
-    MobileCameraPermission.objects.filter(mobile_camera=mobile_camera, teacher=teacher).delete()
+    deleted_count, _ = MobileCameraPermission.objects.filter(mobile_camera=mobile_camera, teacher=teacher).delete()
     
-    return redirect('mobile_cameras:manage_permissions', mobile_camera_id=mobile_camera_id)
+    if deleted_count > 0:
+        return JsonResponse({
+            'success': True,
+            'message': f'Access revoked from {teacher.get_full_name() or teacher.username}'
+        })
+    return JsonResponse({'success': False, 'message': 'Permission not found'})
 
 
 @login_required
@@ -460,12 +468,20 @@ def manage_permissions(request, mobile_camera_id):
         return redirect('login')
     
     mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
+    # Get all teachers
     teachers = User.objects.filter(userprofile__user_type='teacher')
+    
+    # Get authorized teachers
     authorized_teachers = mobile_camera.get_authorized_teachers()
+    
+    # Get unauthorized teachers
+    authorized_teacher_ids = authorized_teachers.values_list('id', flat=True)
+    unauthorized_teachers = teachers.exclude(id__in=authorized_teacher_ids)
     
     context = {
         'mobile_camera': mobile_camera,
         'teachers': teachers,
         'authorized_teachers': authorized_teachers,
+        'unauthorized_teachers': unauthorized_teachers,
     }
     return render(request, 'mobile_cameras/manage_permissions.html', context)

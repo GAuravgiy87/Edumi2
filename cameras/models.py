@@ -86,7 +86,7 @@ class CameraRecording(models.Model):
         ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
-    ), default='completed')
+    ), default='recording')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

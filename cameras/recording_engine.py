@@ -57,19 +57,23 @@ class RecordingEngine:
         res = quality_map.get(quality, '1280x720')
 
         # FFmpeg command for RTSP to MP4 with A/V sync
-        # Uses 'copy' codec for video if possible to save CPU, or libx264 for resizing
         stream_url = camera.get_stream_url()
         
-        cmd = [
-            'ffmpeg', '-y',
-            '-rtsp_transport', 'tcp',
+        # Base command
+        cmd = ['ffmpeg', '-y']
+        
+        # Add RTSP transport if it's an RTSP stream
+        if stream_url.startswith('rtsp'):
+            cmd.extend(['-rtsp_transport', 'tcp'])
+            
+        cmd.extend([
             '-i', stream_url,
             '-s', res,
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
             '-c:a', 'aac', '-b:a', '128k',
             '-movflags', '+faststart',
             self.output_path
-        ]
+        ])
 
         try:
             # Create the Recording record
@@ -83,13 +87,22 @@ class RecordingEngine:
             self.start_time = timezone.now()
 
             # Start FFmpeg as a background process
+            # We use DEVNULL for stdout/stderr to prevent pipe overflow hangs
             self.process = subprocess.Popen(
                 cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL, 
+                stderr=subprocess.DEVNULL,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             )
             
+            # Small delay to see if process crashes immediately
+            time.sleep(1)
+            if self.process.poll() is not None:
+                # Process died immediately
+                rec.recording_status = 'failed'
+                rec.save()
+                return False, "FFmpeg failed to start. Check camera stream URL."
+
             logger.info(f"Started FFmpeg recording for camera {camera.id} at {self.output_path}")
             return True, "Recording started"
         except Exception as e:
@@ -111,34 +124,60 @@ class RecordingEngine:
     def _stop(self):
         if self.process:
             try:
+                logger.info(f"Stopping recording for camera {self.camera_id}")
+                
                 # Gracefully stop FFmpeg (send 'q' or SIGTERM)
                 if os.name == 'nt':
+                    # On Windows, we send CTRL_BREAK to the process group
                     self.process.send_signal(signal.CTRL_BREAK_EVENT)
                 else:
                     self.process.terminate()
                 
-                self.process.wait(timeout=5)
+                try:
+                    self.process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    logger.warning(f"FFmpeg did not stop gracefully for camera {self.camera_id}. Killing...")
+                    self.process.kill()
                 
                 # Update database
                 rec = CameraRecording.objects.get(id=self.recording_id)
-                rec.recording_status = 'processing'
-                rec.duration = timezone.now() - self.start_time
                 
-                # Set the file field
-                relative_path = os.path.relpath(self.output_path, settings.MEDIA_ROOT)
-                rec.video_file.name = relative_path.replace('\\', '/')
-                
-                # Check file size
+                # Check if file exists and has size
                 if os.path.exists(self.output_path):
-                    rec.file_size = os.path.getsize(self.output_path)
-                
-                rec.save()
-                
-                # Trigger background processing ( Celery task )
-                from .tasks import process_recording_task
-                process_recording_task.delay(rec.id)
-                
-                return True
+                    file_size = os.path.getsize(self.output_path)
+                    if file_size > 0:
+                        rec.recording_status = 'processing'
+                        rec.duration = timezone.now() - self.start_time
+                        
+                        # Set the file field
+                        relative_path = os.path.relpath(self.output_path, settings.MEDIA_ROOT)
+                        rec.video_file.name = relative_path.replace('\\', '/')
+                        rec.file_size = file_size
+                        rec.save()
+                        
+                        # Trigger background processing
+                        try:
+                            from .tasks import process_recording_task
+                            process_recording_task.delay(rec.id)
+                            logger.info(f"Recording {self.recording_id} stopped and sent to processing")
+                        except Exception as e:
+                            logger.error(f"Failed to trigger Celery task: {e}")
+                            # Fallback: process manually if Celery fails
+                            rec.recording_status = 'completed'
+                            rec.save()
+                        
+                        return True
+                    else:
+                        logger.error(f"Recording file for camera {self.camera_id} is empty")
+                        rec.recording_status = 'failed'
+                        rec.save()
+                        return False
+                else:
+                    logger.error(f"Recording file for camera {self.camera_id} does not exist at {self.output_path}")
+                    rec.recording_status = 'failed'
+                    rec.save()
+                    return False
+                    
             except Exception as e:
                 logger.error(f"Error stopping recording: {e}")
                 return False

@@ -107,8 +107,13 @@
             <div class="camera-preview">
                 <img src="{% static 'images/camera-placeholder.jpg' %}" alt="Preview">
                 <div class="camera-badge">
-                    <span style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%;"></span>
-                    ONLINE
+                    {% if camera.is_active %}
+                        <span style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%;"></span>
+                        ONLINE
+                    {% else %}
+                        <span style="width: 8px; height: 8px; background: #f87171; border-radius: 50%;"></span>
+                        OFFLINE
+                    {% endif %}
                 </div>
             </div>
             <div class="camera-body">
@@ -117,9 +122,15 @@
                     <i data-lucide="map-pin" style="width: 14px; display: inline-block; vertical-align: middle;"></i>
                     {{ camera.ip_address }} • {{ camera.get_camera_type_display }}
                 </p>
-                <a href="{% url 'teacher_control_room' camera.id %}" class="btn-control">
-                    Open Control Room
-                </a>
+                {% if camera.is_mobile %}
+                    <a href="{% url 'mobile_cameras:view_mobile_camera' camera.id %}" class="btn-control">
+                        View Mobile Feed
+                    </a>
+                {% else %}
+                    <a href="{% url 'teacher_control_room' camera.id %}" class="btn-control">
+                        Open Control Room
+                    </a>
+                {% endif %}
             </div>
         </div>
         {% empty %}

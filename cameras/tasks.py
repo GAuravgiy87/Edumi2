@@ -20,13 +20,19 @@ def process_recording_task(recording_id):
         os.makedirs(thumbnail_dir, exist_ok=True)
         thumbnail_path = os.path.join(thumbnail_dir, thumbnail_filename)
         
+        # Try to get frame at 1 second, or 0 if it fails
         thumb_cmd = [
             'ffmpeg', '-y', '-i', video_path,
-            '-ss', '00:00:02', '-vframes', '1',
+            '-ss', '00:00:01', '-vframes', '1',
             '-q:v', '2', thumbnail_path
         ]
         
-        subprocess.run(thumb_cmd, capture_output=True)
+        result = subprocess.run(thumb_cmd, capture_output=True)
+        
+        if not os.path.exists(thumbnail_path):
+            # Fallback to start of video
+            thumb_cmd[4] = '00:00:00'
+            subprocess.run(thumb_cmd, capture_output=True)
         
         if os.path.exists(thumbnail_path):
             rec.thumbnail.name = os.path.join('recordings', 'thumbnails', thumbnail_filename).replace('\\', '/')

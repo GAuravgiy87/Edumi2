@@ -203,27 +203,41 @@
             <div id="analytics" style="padding-top: 1rem;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
                     <span style="color:#64748b; font-size:0.875rem;">Head Count:</span>
-                    <span id="liveHeadCount" style="font-weight:800; color:#6366f1; font-size:1.25rem;">0</span>
+                    <span id="liveHeadCount" style="font-weight:800; color:#6366f1; font-size:1.25rem;">--</span>
                 </div>
                 <div style="margin-bottom:1.5rem;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
                         <span style="color:#64748b; font-size:0.75rem;">Attention Level:</span>
-                        <span id="attentionPercent" style="font-weight:700; color:#10b981; font-size:0.75rem;">0%</span>
+                        <span id="attentionPercent" style="font-weight:700; color:#10b981; font-size:0.75rem;">--%</span>
                     </div>
                     <div style="width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
                         <div id="attentionBar" style="width:0%; height:100%; background:#10b981; transition:width 0.5s;"></div>
                     </div>
                 </div>
                 <div id="emotionLabels" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
-                    <!-- Emojis will appear here -->
+                    <span id="noAnalyticsMsg" style="color:#94a3b8; font-size:0.75rem;">Start streaming to see analytics</span>
                 </div>
             </div>
         </div>
 
         <div class="panel-card" style="flex: 1; display:flex; flex-direction:column;">
-            <div class="panel-title"><i data-lucide="users"></i> Live Students (0)</div>
-            <div id="studentList" style="flex:1; overflow-y:auto; color:#94a3b8; text-align:center; font-size:0.875rem; padding-top:2rem;">
-                Waiting for students to join...
+            <div class="panel-title"><i data-lucide="users"></i> Live Students (<span id="studentCount">{{ student_count }}</span>)</div>
+            <div id="studentList" style="flex:1; overflow-y:auto; color:#94a3b8; font-size:0.875rem; padding-top:1rem;">
+                {% if active_participants %}
+                    {% for username in active_participants %}
+                    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; background:#f8fafc; border-radius:0.5rem; margin-bottom:0.5rem;">
+                        <span style="width:8px; height:8px; background:#4ade80; border-radius:50%;"></span>
+                        <span style="font-weight:600;">{{ username }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if student_count > 10 %}
+                    <div style="text-align:center; color:#64748b; font-size:0.75rem; margin-top:0.5rem;">+{{ student_count|add:"-10" }} more</div>
+                    {% endif %}
+                {% else %}
+                <div style="text-align:center; color:#94a3b8; font-size:0.875rem; padding-top:2rem;">
+                    Waiting for students to join...
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -264,18 +278,50 @@
     let recStartTime = null;
     let recTimerInterval = null;
 
-    function toggleStreaming() {
-        isStreaming = !isStreaming;
-        const btn = document.getElementById('streamBtn');
-        if (isStreaming) {
-            btn.innerHTML = '<i data-lucide="square"></i> Stop Live Stream';
-            btn.style.background = '#475569';
-            showNotification('Live streaming started', 'success');
+    function updateRecTimer() {
+        if (!recStartTime) return;
+        const now = new Date();
+        const diff = Math.floor((now - recStartTime) / 1000);
+        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+        const secs = (diff % 60).toString().padStart(2, '0');
+        document.getElementById('recTimer').innerText = `${mins}:${secs}`;
+    }
+
+    function showNotification(message, type) {
+        // Use the global showToast system from base_sidebar.html
+        if (typeof showToast === 'function') {
+            const title = type === 'success' ? 'Success' : (type === 'error' ? 'Error' : 'Notification');
+            showToast(title, message, type === 'info' ? 'info' : type);
         } else {
-            btn.innerHTML = '<i data-lucide="radio"></i> Start Live Stream';
-            btn.style.background = '#6366f1';
-            fetch(`/cameras/stop-streaming/{{ camera.id }}/`);
-            showNotification('Live streaming stopped', 'info');
+            // Fallback to alert if showToast is not available
+            alert(message);
+        }
+    }
+
+    async function toggleStreaming() {
+        const btn = document.getElementById('streamBtn');
+        if (!isStreaming) {
+            // Start Streaming
+            const res = await fetch(`/cameras/start-streaming/{{ camera.id }}/`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                isStreaming = true;
+                btn.innerHTML = '<i data-lucide="square"></i> Stop Live Stream';
+                btn.style.background = '#475569';
+                showNotification(data.message, 'success');
+            } else {
+                showNotification(data.message, 'error');
+            }
+        } else {
+            // Stop Streaming
+            const res = await fetch(`/cameras/stop-streaming/{{ camera.id }}/`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                isStreaming = false;
+                btn.innerHTML = '<i data-lucide="radio"></i> Start Live Stream';
+                btn.style.background = '#6366f1';
+                showNotification(data.message, 'info');
+            }
         }
         lucide.createIcons();
     }
@@ -373,29 +419,57 @@
         showNotification('Snapshot saved!', 'success');
     }
 
-    // Mock Engagement Analytics Data (In real app, this comes via WebSocket)
-    setInterval(() => {
-        if (!isStreaming && !isRecording) return;
-        
-        const count = Math.floor(Math.random() * 5) + 15;
-        const attention = Math.floor(Math.random() * 30) + 70;
-        
-        document.getElementById('liveHeadCount').innerText = count;
-        document.getElementById('attentionPercent').innerText = attention + '%';
-        document.getElementById('attentionBar').style.width = attention + '%';
-        
-        const emotions = ['😊', '🤔', '😲', '😴', '📝'];
-        const labels = document.getElementById('emotionLabels');
-        labels.innerHTML = '';
-        for(let i=0; i<3; i++) {
-            const span = document.createElement('span');
-            span.style.padding = '0.25rem 0.5rem';
-            span.style.background = '#f1f5f9';
-            span.style.borderRadius = '0.25rem';
-            span.style.fontSize = '1.25rem';
-            span.innerText = emotions[Math.floor(Math.random() * emotions.length)];
-            labels.appendChild(span);
+    // Real-time updates via polling or WebSocket
+    // Head count and analytics come from the camera service when streaming
+    let analyticsInterval = null;
+    
+    async function fetchAnalytics() {
+        if (!isStreaming) return;
+        try {
+            const res = await fetch(`/cameras/head-count/api/rtsp/{{ camera.id }}/`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.head_count !== undefined) {
+                    document.getElementById('liveHeadCount').innerText = data.head_count;
+                }
+                if (data.attention_score !== undefined) {
+                    document.getElementById('attentionPercent').innerText = data.attention_score + '%';
+                    document.getElementById('attentionBar').style.width = data.attention_score + '%';
+                }
+            }
+        } catch(e) {
+            // Silently fail - analytics are optional
         }
-    }, 3000);
+    }
+    
+    async function fetchLiveParticipants() {
+        if (!isStreaming) return;
+        try {
+            const res = await fetch(`/cameras/live-participants/{{ camera.id }}/`);
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('studentCount').innerText = data.count || 0;
+                const list = document.getElementById('studentList');
+                if (data.participants && data.participants.length > 0) {
+                    list.innerHTML = data.participants.map(p =>
+                        `<div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; background:#f8fafc; border-radius:0.5rem; margin-bottom:0.5rem;">
+                            <span style="width:8px; height:8px; background:#4ade80; border-radius:50%;"></span>
+                            <span style="font-weight:600;">${p.username}</span>
+                        </div>`
+                    ).join('');
+                }
+            }
+        } catch(e) {
+            // Silently fail
+        }
+    }
+    
+    // Fetch analytics every 5 seconds when streaming
+    setInterval(() => {
+        if (isStreaming) {
+            fetchAnalytics();
+            fetchLiveParticipants();
+        }
+    }, 5000);
 </script>
 {% endblock %}
