@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Edumi | Biometric Security</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#363941",
+                        "tertiary-fixed": "#ffddb8",
+                        "secondary-container": "#00a572",
+                        "inverse-on-surface": "#2e3038",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface-container": "#1d2027",
+                        "on-background": "#e1e2ec",
+                        "surface-variant": "#32353c",
+                        "on-surface": "#e1e2ec",
+                        "on-tertiary-container": "#3e2400",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed": "#002113",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "surface-container-low": "#191b23",
+                        "inverse-primary": "#005ac2",
+                        "outline-variant": "#424754",
+                        "on-primary": "#002e6a",
+                        "outline": "#8c909f",
+                        "primary-container": "#4d8eff",
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface-tint": "#adc6ff",
+                        "surface-container-highest": "#32353c",
+                        "primary": "#adc6ff",
+                        "surface-container-lowest": "#0b0e15",
+                        "on-primary-fixed-variant": "#004395",
+                        "on-tertiary": "#472a00",
+                        "on-secondary": "#003824",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "on-surface-variant": "#c2c6d6",
+                        "secondary": "#4edea3",
+                        "on-tertiary-fixed": "#2a1700",
+                        "tertiary": "#ffb95f",
+                        "on-secondary-container": "#00311f",
+                        "on-error-container": "#ffdad6",
+                        "surface-dim": "#10131a",
+                        "surface-container-high": "#272a31",
+                        "on-primary-fixed": "#001a42",
+                        "secondary-fixed": "#6ffbbe",
+                        "inverse-surface": "#e1e2ec",
+                        "background": "#10131a",
+                        "on-error": "#690005",
+                        "primary-fixed": "#d8e2ff",
+                        "tertiary-container": "#ca8100",
+                        "surface": "#10131a",
+                        "on-primary-container": "#00285d",
+                        "error-container": "#93000a",
+                        "secondary-fixed-dim": "#4edea3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "margin-desktop": "32px",
+                        "card-padding": "1.25rem"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "body-base": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(29, 32, 39, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .scanning-hud {
+            border: 2px solid #adc6ff;
+            box-shadow: 0 0 20px rgba(173, 198, 255, 0.3);
+        }
+        .pulsing-indicator {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.95); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-base overflow-x-hidden">
+<!-- Top Navigation Anchor (Shared Component) -->
+<nav class="bg-surface/80 backdrop-blur-md flex items-center justify-between px-margin-desktop h-16 w-full docked full-width top-0 sticky z-50 border-b border-outline-variant/20">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary">Edumi</span>
+<div class="hidden md:flex gap-6">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-secondary border-b-2 border-secondary pb-1 hover:text-primary transition-colors duration-200" href="#">Live Monitor</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Network</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-error-container text-on-error-container px-4 py-2 font-label-caps text-label-caps active:scale-95 transition-transform">Emergency Broadcast</button>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" data-icon="notifications_active">notifications_active</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" data-icon="settings_input_component">settings_input_component</span>
+<div class="w-8 h-8 rounded-full bg-surface-variant border border-outline-variant flex items-center justify-center overflow-hidden">
+<img alt="User Profile Avatar" class="w-full h-full object-cover" data-alt="A professional digital headshot of a student for a high-tech academic profile. The individual has a focused, intelligent expression, wearing modern dark clothing. The background is a clean, softly lit studio environment with cool blue tones, matching a professional AI-driven command center aesthetic. The lighting is crisp and detailed, emphasizing clarity and security." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDv3FN8xuKgapQAy9j7dtwiLGGPAflEC-E5dOyDM6pkijvz1h6RrwaGcoJx_GPS_2Hl5lnTaBNRtrxFmWDVyi8D4laOO59DknfgThqkjd32w_cUVwFV0VlRGTOrLkCi0NZYE_azoDT-VC1oblTwuyV-ZW1RCh5VfUChFpoMmdGrBi8wRHnt-psTPYBxgA5z7Te-4LGywp5Bb2Y37cuaY_zKIUAR__MIZuNGZiqJeF2ZHzDbQsLSceQvetMqExJm_qF6-bciLajHWzQF"/>
+</div>
+</div>
+</nav>
+<!-- Side Navigation Shell (Shared Component) -->
+<aside class="h-screen w-64 flex flex-col fixed left-0 top-0 z-40 bg-surface-container border-r border-outline-variant/20 hidden md:flex pt-20">
+<div class="flex flex-col h-full py-gutter px-4">
+<div class="mb-8">
+<h2 class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</h2>
+<p class="text-on-surface-variant font-body-sm opacity-70">Academic Command</p>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-caps text-label-caps">Command Center</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="school">school</span>
+<span class="font-label-caps text-label-caps">Classrooms</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="font-label-caps text-label-caps">Live Stream</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-label-caps text-label-caps">AI Analytics</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</div>
+</nav>
+<button class="bg-primary text-on-primary font-label-caps text-label-caps py-3 mb-6 active:scale-95 transition-transform">Create Classroom</button>
+<div class="mt-auto border-t border-outline-variant/20 pt-4 flex flex-col gap-2">
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+<span class="font-body-sm text-body-sm">Support</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-sm text-body-sm">System Logout</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 min-h-screen p-margin-mobile md:p-margin-desktop bg-surface-container-lowest">
+<!-- Page Header -->
+<header class="mb-8 max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-end gap-4">
+<div class="flex-1">
+<span class="font-label-caps text-label-caps text-secondary mb-2 block tracking-widest uppercase">Security Protocol v4.2.0</span>
+<h1 class="font-display-lg text-display-lg text-on-background">Biometric Verification</h1>
+<p class="text-on-surface-variant font-body-base mt-2">Classroom: <span class="text-primary">Advanced Quantum Computing - Section B</span></p>
+</div>
+<div class="flex gap-2">
+<div class="flex items-center gap-2 bg-surface-container px-4 py-2 rounded-lg border border-outline-variant/30">
+<div class="w-2 h-2 rounded-full bg-secondary pulsing-indicator"></div>
+<span class="font-data-mono text-data-mono text-secondary">SYSTEM ARMED</span>
+</div>
+</div>
+</header>
+<!-- Bento Grid Layout for Security States -->
+<div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Central Scanner Module (Pre-Join Verification State) -->
+<section class="lg:col-span-8 glass-panel p-card-padding rounded-xl flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden">
+<!-- Background Grid Effect -->
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, #adc6ff 1px, transparent 0); background-size: 24px 24px;"></div>
+<!-- Status Message Overlay -->
+<div class="absolute top-8 left-8 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="verified_user">verified_user</span>
+<span class="font-data-mono text-data-mono text-secondary">FACIAL ID ACTIVE</span>
+</div>
+<!-- Scanning HUD & Webcam Preview -->
+<div class="relative group">
+<!-- Corner Brackets -->
+<div class="absolute -top-4 -left-4 w-12 h-12 border-t-2 border-l-2 border-primary"></div>
+<div class="absolute -top-4 -right-4 w-12 h-12 border-t-2 border-right-2 border-primary"></div>
+<div class="absolute -bottom-4 -left-4 w-12 h-12 border-b-2 border-l-2 border-primary"></div>
+<div class="absolute -bottom-4 -right-4 w-12 h-12 border-b-2 border-r-2 border-primary"></div>
+<!-- Circular Preview Container -->
+<div class="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-surface-bright relative z-10 scanning-hud">
+<img class="w-full h-full object-cover" data-alt="A cinematic, high-contrast close-up of a young adult male student's face looking directly into a camera for facial recognition. The lighting is dramatic, with a soft blue key light from a screen illuminating his features against a dark, tech-oriented classroom background. Fine digital scanning lines and biometric point overlays are visible as subtle translucent graphics over his face. The overall mood is serious and professional, emphasizing a high-security AI command center environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzEtPmRMXfi4hNC6RhvRGbvalt2My2fgjHVV2b9dfuKA9AWea_hRgflMwl900gUOeeqQEJZ3WOoF1GbbjR-TL4T9KZNAGzM6C6stjyFBR-4X0gHYXI7TLL-K1a0jmZDjeH-NFaAw8xS-Wz9HhVVyK8gGm3qug4YWCF1knLtv1gG_OGUJuiEQPksMG_0piRFex_dlGXEAinwxRAT9hQOnA3YXAlNjTvETIv_TXMLQvgGY5zDQKly1QbEjw3JAMwy0vkRgGCGde4AtaC"/>
+<!-- HUD Scanning Line -->
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-primary/20 to-transparent h-12 w-full -translate-y-full animate-[scan_3s_ease-in-out_infinite] blur-sm"></div>
+<!-- Status Badge (Match in Progress) -->
+<div class="absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+<div class="text-center">
+<span class="material-symbols-outlined text-primary text-4xl mb-2" data-icon="sync">sync</span>
+<p class="font-data-mono text-data-mono text-primary">MATCHING...</p>
+</div>
+</div>
+</div>
+<!-- Biometric Dots (HUD Decoration) -->
+<div class="absolute top-0 right-0 -translate-y-12 translate-x-12 hidden md:block">
+<div class="grid grid-cols-3 gap-1">
+<div class="w-1.5 h-1.5 bg-secondary rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-secondary rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-secondary/30 rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-secondary rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-secondary/30 rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-secondary/30 rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Footer Status -->
+<div class="mt-12 text-center">
+<h3 class="font-headline-md text-headline-md text-secondary">Face Detected</h3>
+<p class="font-body-sm text-on-surface-variant max-w-xs mx-auto mt-2">Identity match probability: 98.4%. Please remain still for final encryption check.</p>
+<!-- Progress Bar -->
+<div class="w-64 h-1 bg-surface-variant rounded-full mt-6 mx-auto overflow-hidden">
+<div class="h-full bg-secondary w-[85%]"></div>
+</div>
+</div>
+</section>
+<!-- Sidebar Info/Setup Panels -->
+<aside class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- Setup Progress / Info Card -->
+<div class="glass-panel p-card-padding rounded-xl">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-4">Registration Status</h4>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-body-sm text-on-surface">Base Image Set</span>
+</div>
+<span class="text-on-surface-variant text-[12px] font-data-mono">COMPLETED</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="radio_button_checked">radio_button_checked</span>
+<span class="font-body-sm text-on-surface">3D Mesh Alignment</span>
+</div>
+<span class="text-primary text-[12px] font-data-mono">IN PROGRESS</span>
+</div>
+<div class="flex items-center justify-between opacity-50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="font-body-sm text-on-surface">Encryption Keys</span>
+</div>
+<span class="text-outline text-[12px] font-data-mono">PENDING</span>
+</div>
+</div>
+<button class="w-full bg-surface-bright/20 border border-outline-variant/30 text-on-surface font-label-caps text-label-caps py-3 mt-6 hover:bg-surface-bright/40 transition-colors">
+                        Re-calibrate Camera
+                    </button>
+</div>
+<!-- Security Tips / State Summary -->
+<div class="bg-primary-container/10 border border-primary/20 p-card-padding rounded-xl">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-primary" data-icon="info">info</span>
+<h4 class="font-label-caps text-label-caps text-primary">Pre-Join Protocol</h4>
+</div>
+<p class="font-body-sm text-on-surface-variant leading-relaxed">
+                        To maintain academic integrity, Edumi uses 256-bit encrypted biometric hashes. No raw facial data is stored on our servers. 
+                    </p>
+<ul class="mt-4 space-y-2">
+<li class="flex items-start gap-2 text-[13px] text-on-surface-variant">
+<span class="text-primary">•</span> Ensure ambient lighting is sufficient.
+                        </li>
+<li class="flex items-start gap-2 text-[13px] text-on-surface-variant">
+<span class="text-primary">•</span> Remove glasses or hats for first-time setup.
+                        </li>
+</ul>
+</div>
+<!-- Success State Simulation (Small Panel) -->
+<div class="glass-panel p-card-padding rounded-xl border-secondary/30 bg-secondary/5">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-secondary/20 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary text-2xl" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div>
+<h5 class="font-label-caps text-label-caps text-secondary">Ready to Join</h5>
+<p class="text-[12px] text-on-surface-variant mt-1">Verification token generated.</p>
+</div>
+</div>
+<button class="w-full bg-secondary text-on-secondary font-label-caps text-label-caps py-3 mt-4 active:scale-95 transition-transform">
+                        Enter Classroom
+                    </button>
+</div>
+</aside>
+</div>
+<!-- System Logs Footer (Asymmetric Layout element) -->
+<footer class="max-w-5xl mx-auto mt-gutter glass-panel p-4 rounded-xl border-t-0">
+<div class="flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex gap-6 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-outline uppercase">Latency</span>
+<span class="font-data-mono text-data-mono text-primary">12ms</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-outline uppercase">Crypto Strength</span>
+<span class="font-data-mono text-data-mono text-primary">AES-256</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-outline uppercase">Sensor Type</span>
+<span class="font-data-mono text-data-mono text-primary">RGB-IR Hybrid</span>
+</div>
+</div>
+<p class="text-[11px] font-data-mono text-on-surface-variant/40 text-center md:text-right">
+                    Secure Session: 8f2-xa9-001 | Node: US-EAST-1 | © 2024 Edumi Security Systems
+                </p>
+</div>
+</footer>
+</main>
+<style>
+        @keyframes scan {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(300%); }
+        }
+    </style>
+</body></html>

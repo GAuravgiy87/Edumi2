@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Edumi AI - Teacher Live Control Room</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#ffdad6",
+                    "on-primary-fixed-variant": "#004395",
+                    "on-primary-fixed": "#001a42",
+                    "surface-container-lowest": "#0b0e15",
+                    "surface-bright": "#363941",
+                    "on-error": "#690005",
+                    "surface-container-high": "#272a31",
+                    "secondary": "#4edea3",
+                    "surface-dim": "#10131a",
+                    "on-secondary-fixed-variant": "#005236",
+                    "surface-container": "#1d2027",
+                    "on-surface-variant": "#c2c6d6",
+                    "inverse-surface": "#e1e2ec",
+                    "on-surface": "#e1e2ec",
+                    "on-secondary-fixed": "#002113",
+                    "secondary-container": "#00a572",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "surface-container-low": "#191b23",
+                    "surface": "#10131a",
+                    "outline-variant": "#424754",
+                    "on-secondary-container": "#00311f",
+                    "primary-container": "#4d8eff",
+                    "on-secondary": "#003824",
+                    "primary": "#adc6ff",
+                    "error-container": "#93000a",
+                    "surface-container-highest": "#32353c",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "inverse-primary": "#005ac2",
+                    "on-primary": "#002e6a",
+                    "error": "#ffb4ab",
+                    "on-tertiary-fixed": "#2a1700",
+                    "surface-tint": "#adc6ff",
+                    "tertiary": "#ffb95f",
+                    "on-primary-container": "#00285d",
+                    "on-tertiary": "#472a00",
+                    "on-tertiary-container": "#3e2400",
+                    "surface-variant": "#32353c",
+                    "background": "#10131a",
+                    "inverse-on-surface": "#2e3038",
+                    "tertiary-container": "#ca8100",
+                    "secondary-fixed": "#6ffbbe",
+                    "secondary-fixed-dim": "#4edea3",
+                    "outline": "#8c909f",
+                    "on-background": "#e1e2ec",
+                    "primary-fixed": "#d8e2ff",
+                    "tertiary-fixed": "#ffddb8",
+                    "primary-fixed-dim": "#adc6ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "gutter": "16px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "32px",
+                    "card-padding": "1.25rem"
+            },
+            "fontFamily": {
+                    "display-lg": ["Inter"],
+                    "data-mono": ["JetBrains Mono"],
+                    "body-base": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "label-caps": ["Inter"]
+            },
+            "fontSize": {
+                    "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(29, 32, 39, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-active {
+            box-shadow: 0 0 15px rgba(78, 222, 163, 0.3);
+        }
+        .hud-scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(59, 130, 246, 0.05) 50%);
+            background-size: 100% 4px;
+        }
+        .shimmer-bar {
+            background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 50%, #3b82f6 100%);
+            background-size: 200% 100%;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-base overflow-hidden">
+<!-- TopAppBar Shell -->
+<header class="bg-surface/80 backdrop-blur-md text-primary docked full-width top-0 sticky z-50 border-b border-outline-variant/20 flex items-center justify-between px-margin-desktop h-16 w-full">
+<div class="flex items-center gap-gutter">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Edumi</h1>
+<nav class="hidden md:flex gap-8 ml-8">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Live Monitor</a>
+<a class="text-secondary border-b-2 border-secondary pb-1 font-body-sm" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<button class="bg-error-container text-on-error-container px-4 py-2 font-label-caps text-label-caps rounded-lg flex items-center gap-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">emergency_share</span>
+                Emergency Broadcast
+            </button>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-colors">notifications_active</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-colors">settings_input_component</span>
+<img alt="User Profile Avatar" class="w-8 h-8 rounded-full border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5ogcSFRYSjm2qB4tXUzGCOcnEaDun3pZt3-NfMxPo8NKCWugg26TTB81EqOcukxLfe3a-TB4ZTpEdjEMwUW9lJXydTg4B_gqX_q4xFOrDjgORgv8HDxb8SU_W1l1lLVxBWAxpF6VpEm088HCPiV6MvhiIZTDZ_-FZhSKqjnzIwARs-nmRS0Ncvvei8TVy7yQL8ha8aGGapp82fBQJUv1wOwKI6vVNkHIIlyNduU8WOwtYnR5BegUx-y2iVczuWzUtspH4NNZqjEPa"/>
+</div>
+</div>
+</header>
+<div class="flex h-[calc(100vh-64px)] w-full">
+<!-- SideNavBar Shell -->
+<aside class="bg-surface-container h-screen w-64 flex flex-col sticky left-0 top-0 z-40 border-r border-outline-variant/20 hidden md:flex">
+<div class="flex flex-col h-full py-gutter px-4">
+<div class="mb-8 px-2">
+<h2 class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</h2>
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest mt-1">Academic Command</p>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-caps text-label-caps">Command Center</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200 rounded-r-lg" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-label-caps text-label-caps">Classrooms</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200 rounded-r-lg" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="font-label-caps text-label-caps">Live Stream</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-caps text-label-caps">AI Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+</div>
+<div class="mt-auto pt-gutter border-t border-outline-variant/10 flex flex-col gap-1">
+<button class="bg-primary text-on-primary font-label-caps text-label-caps py-3 rounded-lg mb-4 active:scale-95 transition-transform">Create Classroom</button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant font-medium hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">help_center</span>
+<span class="font-body-sm text-body-sm">Support</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant font-medium hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-sm text-body-sm">System Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area: Cockpit -->
+<main class="flex-1 flex overflow-hidden bg-background relative">
+<!-- Center Stage: WebRTC Stream Area -->
+<section class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+<div class="relative flex-1 bg-surface-container-lowest rounded-xl border border-outline-variant/30 overflow-hidden group">
+<!-- HUD Overlays -->
+<div class="absolute inset-0 pointer-events-none hud-scanline opacity-20"></div>
+<!-- Video Placeholder -->
+<div class="absolute inset-0 flex items-center justify-center">
+<img class="w-full h-full object-cover opacity-60 grayscale group-hover:grayscale-0 transition-all duration-700" data-alt="A professional university professor conducting a lecture in a high-tech studio environment. The lighting is dramatic and cool-toned with subtle blue highlights, creating a cinematic mission-control atmosphere. The background features blurred digital displays and sleek modern architecture, maintaining a sophisticated dark-mode aesthetic with tech-blue accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQp7SjpPW95cm4XNPd2oJMZ2VaPpeqM-L0To9OnN8I0-_nyUnhzoMOkBgP7guF2UiHTsF_BSXcjnZZaeFn1qMFEZOyXbZOIPG5wOkmosSqB5vKrVTV0ILmvd3Ug6SCQxW0q6IlMSAgk9Acr3mlMGZjCyAc7LBogekDb6gdoNwHQCF2N7d-gtrGPcfrHnscpZjwW7uMit5PaJdzZSabbb9oRiWqba27P_dmLCCvF9jleU00Km2xsz78gnPJ5jOuSZs1xvF0NoacjOzY"/>
+</div>
+<!-- Live Indicators -->
+<div class="absolute top-6 left-6 flex items-center gap-4 z-10">
+<div class="bg-error/20 border border-error/50 px-3 py-1.5 rounded-full flex items-center gap-2">
+<div class="w-2.5 h-2.5 bg-error rounded-full animate-pulse shadow-[0_0_8px_#ffb4ab]"></div>
+<span class="font-data-mono text-data-mono text-error uppercase">REC</span>
+<span class="font-data-mono text-data-mono text-white ml-1">01:42:55</span>
+</div>
+<div class="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
+<span class="material-symbols-outlined text-secondary text-sm">wifi_tethering</span>
+<span class="font-data-mono text-data-mono text-white">4K ULTRA HD • 60 FPS</span>
+</div>
+</div>
+<!-- HUD Focus Ring -->
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<div class="w-64 h-64 border-2 border-primary/20 rounded-full flex items-center justify-center">
+<div class="w-48 h-48 border border-primary/40 rounded-full border-dashed"></div>
+</div>
+</div>
+<!-- Bottom Stream Controls -->
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-surface-container/80 backdrop-blur-xl p-2 rounded-full border border-outline-variant/30 shadow-2xl">
+<button class="p-3 rounded-full bg-surface-bright/20 hover:bg-surface-bright/40 text-on-surface transition-colors">
+<span class="material-symbols-outlined">mic</span>
+</button>
+<button class="p-3 rounded-full bg-surface-bright/20 hover:bg-surface-bright/40 text-on-surface transition-colors">
+<span class="material-symbols-outlined">videocam</span>
+</button>
+<button class="px-8 py-3 rounded-full bg-error text-white font-label-caps text-label-caps flex items-center gap-2 active:scale-95 transition-all">
+<span class="material-symbols-outlined">stop_circle</span>
+                            Stop Live Stream
+                        </button>
+<button class="p-3 rounded-full bg-surface-bright/20 hover:bg-surface-bright/40 text-on-surface transition-colors">
+<span class="material-symbols-outlined">screen_share</span>
+</button>
+<button class="p-3 rounded-full bg-surface-bright/20 hover:bg-surface-bright/40 text-on-surface transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Participant Control Bar -->
+<div class="h-24 glass-panel rounded-xl flex items-center px-6 gap-6">
+<div class="flex flex-col gap-1 min-w-[100px]">
+<span class="font-label-caps text-[9px] text-on-surface-variant uppercase tracking-widest">Controls</span>
+<button class="text-error font-label-caps text-label-caps hover:underline text-left">Mute All</button>
+</div>
+<div class="h-10 w-[1px] bg-outline-variant/30"></div>
+<div class="flex-1 flex items-center gap-3 overflow-x-auto no-scrollbar py-2">
+<!-- Student Avatars -->
+<div class="flex -space-x-3">
+<div class="relative group cursor-pointer">
+<img alt="Student" class="w-12 h-12 rounded-full border-2 border-surface-container object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhEoKQwHdPWyELVa3ly7i4tt9pAPiWGbmaK8hDzWy9w8FTDmrAA1gNX4AviEU67-HstlCiSHpYD3GK6erMZUv4khogoZkPGTmbbnXikCG7axjmhxWpEMrtWnxOz5nEtdun9nZ23ZbCCaPvt_j7dF3FuNRwOHVlKU1pOu2kyvARDdURvL8pICzdjZdepz5umO7HRIkMHQCndwfFRMw-b6tnHsoqmg31etDS1SxsqqBjbT_JCiku43l0fNtvQFuAQFqNwFVcB9s1mZqo"/>
+<div class="absolute -top-1 -right-1 w-4 h-4 bg-secondary border-2 border-surface-container rounded-full"></div>
+<div class="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white text-lg">mic_off</span>
+</div>
+</div>
+<!-- More Avatars -->
+<div class="relative group cursor-pointer">
+<img alt="Student" class="w-12 h-12 rounded-full border-2 border-surface-container object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDj-Y4cL71D7ihjGcbVl34Wfro5oxWiRpPx7m6mrVzsCtTwEvp6_5kOn-6PGCWEddBhIFZOlB0lhPplrJEq7eLzsf315kb3_DIy-9E1oVs9HbBga2BoH5u0RbaLkf4xCSuv-ZDnS09mUfJrLm7JQexYJEyPaQaO7dsVB2ALYQJEnG6g1slydiT67MUW_ZBtXu_ZgOMajM6P51ZlgnhmWy2Z6oq9XXy9TwoNWNRsLlHD08JlJkxveFgn73CjY5o0kabHstob62AVFUzC"/>
+<div class="absolute -top-1 -right-1 w-4 h-4 bg-secondary border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="relative group cursor-pointer">
+<img alt="Student" class="w-12 h-12 rounded-full border-2 border-surface-container object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAX5ygYgPKtmZ1WMtTvCmd44l34TvIg0GZbsPwe-gYQzguccrEC77Ow5GAdb4KegctRlCPmJ7WjbA4-jyLQm-hgIa1Zw4V9tGpNAXGyOVNqju4qVZ0LXzTCGmjhwEQpvPHo8crfzm5k4ZEBz2uexL4dU-kQfxUkEglscqHXP6YRnV2hQ1iu6kGvKaEIMD_1v8NAIjv4ayHTrnqOsH7KUlRunilzbKeZQ8-18Da0C8uQY3Fi7Hc6tTHiqiwQpKTYMuoA61gfss084pxu"/>
+<div class="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="relative group cursor-pointer">
+<img alt="Student" class="w-12 h-12 rounded-full border-2 border-surface-container object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdbYs339J3ZRt2xe0LCMYSbodZpj9SWo-NtW4nzseweS768Etu7vq2SxyouDHeRxvePuOpGg-hPS_L2xGeNvuuNQabzspy0Uq1IzUaZ4bVwV-DIpvDrZjDF97l__Gqm2VM6sYSgw6WwKWDixNraXTlNBaGqu7Ot04WDtVYfPOUeegKybd5geeOgGM8EhtcKu6qDzdEVILir7YthST6SrS7pJ5Q-QyJq45Dh5_LQ9XmZuabaaRJbpwvl9F9atqnlrIkrRKXhTzdFwzI"/>
+<div class="absolute -top-1 -right-1 w-4 h-4 bg-secondary border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="relative group cursor-pointer">
+<img alt="Student" class="w-12 h-12 rounded-full border-2 border-surface-container object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZhmP3DsivhfqlZ9P3NRPBdm6kgz8p9fHIw_c1ZJ403JOUk1WtjkAxGZGUJYNU7qr0v3_UD_ht_UxO4UakicX8_nsukav8q47-lhpq549soHyAEWoXWUnuGOjJ3arCeaCNt614iRXo-V-gL8sCu8J1tKdghr8CDvpc-ITONhB0B7O-ckmCpYPTo3gLNgIFnfCg6p-_oQ_iJqLhZmMsFdElc4PQLYzHSaj89VxsEkegNFmWXrFryOd9ShoME2Yo5nisklEMI30ifGC5"/>
+<div class="absolute -top-1 -right-1 w-4 h-4 bg-secondary border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="w-12 h-12 rounded-full border-2 border-surface-container bg-surface-bright/20 flex items-center justify-center font-data-mono text-data-mono text-on-surface-variant">
+                                +23
+                            </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Sidebar: AI Analytics -->
+<aside class="w-80 border-l border-outline-variant/20 bg-surface-container/40 p-4 flex flex-col gap-4 overflow-y-auto">
+<h3 class="font-label-caps text-label-caps text-primary tracking-widest px-1">AI Live Analytics</h3>
+<!-- Head Count Card -->
+<div class="bg-surface-container-high p-card-padding rounded-xl border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-caps text-[10px] text-on-surface-variant">LIVE ATTENDANCE</span>
+<span class="material-symbols-outlined text-secondary text-lg">group</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-display-lg font-display-lg text-on-surface">28</span>
+<span class="text-on-surface-variant font-body-sm">/ 30 students</span>
+</div>
+<div class="w-full bg-surface-container mt-4 h-1.5 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[93%] rounded-full shadow-[0_0_8px_#4edea3]"></div>
+</div>
+</div>
+<!-- Attention Gauge Card -->
+<div class="bg-surface-container-high p-card-padding rounded-xl border border-outline-variant/10 relative overflow-hidden">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-caps text-[10px] text-on-surface-variant">ATTENTION COEFFICIENT</span>
+<span class="material-symbols-outlined text-primary text-lg">psychology</span>
+</div>
+<div class="flex items-center justify-center py-6">
+<div class="relative w-32 h-32">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container" cx="64" cy="64" fill="transparent" r="56" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary" cx="64" cy="64" fill="transparent" r="56" stroke="currentColor" stroke-dasharray="351.8" stroke-dashoffset="56.2" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-headline-md font-bold text-on-surface">84%</span>
+<span class="text-[9px] text-secondary font-label-caps uppercase">Optimal</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-2">
+<div class="text-center p-2 rounded bg-surface/30">
+<p class="text-[9px] text-on-surface-variant">EYE CONTACT</p>
+<p class="font-data-mono text-xs text-primary">High</p>
+</div>
+<div class="text-center p-2 rounded bg-surface/30">
+<p class="text-[9px] text-on-surface-variant">DISTRACTION</p>
+<p class="font-data-mono text-xs text-error">Low</p>
+</div>
+</div>
+</div>
+<!-- Focus Scoring Chart -->
+<div class="bg-surface-container-high p-card-padding rounded-xl border border-outline-variant/10 flex-1">
+<div class="flex justify-between items-start mb-6">
+<span class="font-label-caps text-[10px] text-on-surface-variant">FOCUS SCORING HISTORY</span>
+<span class="material-symbols-outlined text-on-surface-variant text-lg">monitoring</span>
+</div>
+<div class="h-40 w-full flex items-end gap-1 px-1">
+<!-- Simplified Mock Chart bars -->
+<div class="flex-1 bg-primary/20 h-[60%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full bg-primary h-[80%] rounded-t-sm group-hover:bg-secondary transition-colors"></div>
+</div>
+<div class="flex-1 bg-primary/20 h-[75%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full bg-primary h-[90%] rounded-t-sm group-hover:bg-secondary transition-colors"></div>
+</div>
+<div class="flex-1 bg-primary/20 h-[40%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full bg-primary h-[50%] rounded-t-sm group-hover:bg-secondary transition-colors"></div>
+</div>
+<div class="flex-1 bg-primary/20 h-[90%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full bg-primary h-[95%] rounded-t-sm group-hover:bg-secondary transition-colors"></div>
+</div>
+<div class="flex-1 bg-primary/20 h-[65%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full bg-primary h-[70%] rounded-t-sm group-hover:bg-secondary transition-colors"></div>
+</div>
+<div class="flex-1 bg-primary/20 h-[80%] rounded-t-sm relative group">
+<div class="absolute bottom-0 w-full bg-primary h-[85%] rounded-t-sm group-hover:bg-secondary transition-colors"></div>
+</div>
+</div>
+<div class="flex justify-between mt-2 font-data-mono text-[9px] text-on-surface-variant">
+<span>14:00</span>
+<span>14:15</span>
+<span>14:30</span>
+<span>14:45</span>
+</div>
+</div>
+<!-- AI System Log -->
+<div class="mt-auto pt-4">
+<div class="flex items-center gap-2 mb-2">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-data-mono text-[10px] text-secondary uppercase tracking-tighter">AI Core Online</span>
+</div>
+<div class="text-[10px] font-data-mono text-on-surface-variant/60 leading-tight">
+                        [14:42:01] Processing multi-modal attention data...<br/>
+                        [14:42:05] Focus spike detected in Section B.<br/>
+                        [14:42:10] Real-time transcript sync active.
+                    </div>
+</div>
+</aside>
+<!-- Floating Chat Widget -->
+<div class="absolute bottom-6 right-6 w-72 h-96 glass-panel rounded-xl flex flex-col shadow-2xl z-20 border border-primary/20 overflow-hidden">
+<div class="p-3 bg-primary/10 border-b border-primary/20 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">chat_bubble</span>
+<span class="font-label-caps text-label-caps text-on-surface">Live Chat</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 bg-secondary rounded-full"></div>
+<span class="font-data-mono text-[10px]">124 msg</span>
+</div>
+</div>
+<div class="flex-1 p-3 overflow-y-auto flex flex-col gap-4">
+<!-- Chat Messages -->
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-baseline">
+<span class="font-bold text-[11px] text-secondary">Sarah M.</span>
+<span class="text-[9px] text-on-surface-variant">14:40</span>
+</div>
+<div class="bg-surface p-2 rounded-lg text-sm text-on-surface border border-outline-variant/10">
+                            Can you explain the last diagram again?
+                        </div>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-baseline">
+<span class="font-bold text-[11px] text-primary">Prof. Smith</span>
+<span class="text-[9px] text-on-surface-variant">14:41</span>
+</div>
+<div class="bg-primary/20 p-2 rounded-lg text-sm text-on-surface border border-primary/10">
+                            Sure Sarah, let's look at the focal point once more.
+                        </div>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-baseline">
+<span class="font-bold text-[11px] text-secondary">James T.</span>
+<span class="text-[9px] text-on-surface-variant">14:42</span>
+</div>
+<div class="bg-surface p-2 rounded-lg text-sm text-on-surface border border-outline-variant/10">
+                            The WebRTC latency is incredible!
+                        </div>
+</div>
+</div>
+<div class="p-3 border-t border-outline-variant/20 bg-surface-container">
+<div class="relative flex items-center">
+<input class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-on-surface-variant/40" placeholder="Type a message..." type="text"/>
+<button class="absolute right-2 text-primary hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg">send</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

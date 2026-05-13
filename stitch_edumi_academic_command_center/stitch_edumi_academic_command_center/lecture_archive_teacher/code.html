@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Edumi AI - Lecture Archive</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#002113",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "surface-container-low": "#191b23",
+                    "inverse-primary": "#005ac2",
+                    "outline-variant": "#424754",
+                    "on-primary": "#002e6a",
+                    "outline": "#8c909f",
+                    "surface-bright": "#363941",
+                    "tertiary-fixed": "#ffddb8",
+                    "secondary-container": "#00a572",
+                    "inverse-on-surface": "#2e3038",
+                    "on-secondary-fixed-variant": "#005236",
+                    "surface-container": "#1d2027",
+                    "on-background": "#e1e2ec",
+                    "surface-variant": "#32353c",
+                    "on-surface": "#e1e2ec",
+                    "on-tertiary-container": "#3e2400",
+                    "error": "#ffb4ab",
+                    "surface-dim": "#10131a",
+                    "surface-container-high": "#272a31",
+                    "on-primary-fixed": "#001a42",
+                    "secondary-fixed": "#6ffbbe",
+                    "inverse-surface": "#e1e2ec",
+                    "background": "#10131a",
+                    "on-error": "#690005",
+                    "primary-fixed": "#d8e2ff",
+                    "tertiary-container": "#ca8100",
+                    "surface": "#10131a",
+                    "on-primary-container": "#00285d",
+                    "error-container": "#93000a",
+                    "secondary-fixed-dim": "#4edea3",
+                    "primary-container": "#4d8eff",
+                    "primary-fixed-dim": "#adc6ff",
+                    "surface-tint": "#adc6ff",
+                    "surface-container-highest": "#32353c",
+                    "primary": "#adc6ff",
+                    "surface-container-lowest": "#0b0e15",
+                    "on-primary-fixed-variant": "#004395",
+                    "on-tertiary": "#472a00",
+                    "on-secondary": "#003824",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "on-surface-variant": "#c2c6d6",
+                    "secondary": "#4edea3",
+                    "on-tertiary-fixed": "#2a1700",
+                    "tertiary": "#ffb95f",
+                    "on-secondary-container": "#00311f",
+                    "on-error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "card-padding": "1.25rem",
+                    "margin-desktop": "32px",
+                    "unit": "4px",
+                    "margin-mobile": "16px",
+                    "gutter": "16px"
+            },
+            "fontFamily": {
+                    "label-caps": ["Inter"],
+                    "body-base": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "data-mono": ["JetBrains Mono"],
+                    "headline-md": ["Inter"],
+                    "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                    "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-active {
+            box-shadow: 0 0 15px rgba(173, 198, 255, 0.2);
+        }
+        .shimmer-bar {
+            background: linear-gradient(90deg, transparent, rgba(173, 198, 255, 0.4), transparent);
+            background-size: 200% 100%;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-base antialiased min-h-screen overflow-x-hidden">
+<!-- TopAppBar Shell -->
+<header class="bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 docked full-width top-0 sticky z-50 flex items-center justify-between px-margin-desktop h-16 w-full">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary">Edumi</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Live Monitor</a>
+<a class="text-secondary border-b-2 border-secondary pb-1 font-body-sm" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary px-4 py-2 text-on-primary font-label-caps text-label-caps rounded-lg active:scale-95 transition-transform duration-150">Emergency Broadcast</button>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">notifications_active</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">settings_input_component</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">account_circle</span>
+</div>
+</div>
+</header>
+<div class="flex min-h-[calc(100vh-64px)]">
+<!-- SideNavBar Shell -->
+<aside class="bg-surface-container h-screen w-64 flex flex-col fixed left-0 top-16 z-40 border-r border-outline-variant/20 flex flex-col h-full py-gutter px-4">
+<div class="mb-8">
+<h2 class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</h2>
+<p class="text-on-surface-variant font-body-sm opacity-70">Academic Command</p>
+</div>
+<nav class="flex-1 space-y-2">
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 group">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-sm">Command Center</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">school</span>
+<span class="font-body-sm">Classrooms</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">videocam</span>
+<span class="font-body-sm">Live Stream</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-sm">AI Analytics</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-sm">Settings</span>
+</div>
+</nav>
+<button class="bg-primary text-on-primary font-label-caps text-label-caps py-3 rounded-lg mt-4 mb-8">Create Classroom</button>
+<div class="border-t border-outline-variant/20 pt-4 space-y-2">
+<div class="flex items-center gap-3 px-4 py-2 text-on-surface-variant font-body-sm hover:text-primary cursor-pointer">
+<span class="material-symbols-outlined">help_center</span>
+<span>Support</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-2 text-error font-body-sm hover:opacity-80 cursor-pointer">
+<span class="material-symbols-outlined">logout</span>
+<span>System Logout</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 flex-1 p-margin-desktop bg-surface-dim">
+<div class="max-w-7xl mx-auto">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-gutter mb-8">
+<div>
+<span class="font-label-caps text-label-caps text-secondary uppercase tracking-widest">Repository v4.2</span>
+<h1 class="font-display-lg text-display-lg text-on-surface mt-1">Lecture Archive</h1>
+<p class="text-on-surface-variant font-body-base max-w-xl">Centralized library for high-definition session recordings, AI-driven behavioral insights, and curriculum distribution controls.</p>
+</div>
+<div class="flex gap-3">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="bg-surface-container-lowest border border-outline-variant/30 rounded-lg pl-10 pr-4 py-2 text-body-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all w-64" placeholder="Search archive..." type="text"/>
+</div>
+<button class="glass-card flex items-center gap-2 px-4 py-2 rounded-lg text-on-surface hover:bg-surface-bright/20 transition-all border-outline-variant/30">
+<span class="material-symbols-outlined">tune</span>
+<span class="font-body-sm">Filters</span>
+</button>
+</div>
+</div>
+<!-- Stats Overview Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-8">
+<div class="glass-card p-card-padding rounded-xl border-l-4 border-primary">
+<p class="font-label-caps text-label-caps text-on-surface-variant">Total Storage</p>
+<h3 class="font-headline-md text-headline-md mt-1 text-on-surface">1.2 TB</h3>
+<div class="w-full bg-surface-container-high h-1 rounded-full mt-3 overflow-hidden">
+<div class="bg-primary h-full w-3/4"></div>
+</div>
+</div>
+<div class="glass-card p-card-padding rounded-xl border-l-4 border-secondary">
+<p class="font-label-caps text-label-caps text-on-surface-variant">Total Lectures</p>
+<h3 class="font-headline-md text-headline-md mt-1 text-on-surface">248</h3>
+<p class="text-secondary font-data-mono text-xs mt-2">+12 this week</p>
+</div>
+<div class="glass-card p-card-padding rounded-xl border-l-4 border-tertiary">
+<p class="font-label-caps text-label-caps text-on-surface-variant">Avg. Attention</p>
+<h3 class="font-headline-md text-headline-md mt-1 text-on-surface">84.2%</h3>
+<p class="text-tertiary font-data-mono text-xs mt-2">Nominal range</p>
+</div>
+<div class="glass-card p-card-padding rounded-xl border-l-4 border-error">
+<p class="font-label-caps text-label-caps text-on-surface-variant">Pending Pubs</p>
+<h3 class="font-headline-md text-headline-md mt-1 text-on-surface">06</h3>
+<p class="text-error font-data-mono text-xs mt-2">Requires review</p>
+</div>
+</div>
+<!-- Archive Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<!-- Card 1 -->
+<div class="glass-card rounded-xl overflow-hidden flex flex-col group hover:border-primary/50 transition-all">
+<div class="relative aspect-video">
+<img class="w-full h-full object-cover" data-alt="A professional university classroom interior seen from a cinematic high-angle perspective. The room features dark modern desks, ambient blue accent lighting, and a large digital screen displaying complex mathematical equations. The atmosphere is sophisticated and focused, captured in a high-tech dark-mode aesthetic with crisp lines and subtle lens flares." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-umEaeHEVOaz0oAhjICS7Z7ml3pgMilowY2EzEY8Qd3GliGBYOwE8tG-vGfhavRQboW8Jst2knQjajjVug5DnTHUMANhrG81ZRHDLjF-llgPleb0d_TzG9P0gmX8nZhFDGxTh0GaZ1NAnEZ3NTy48jlWR_yAo7YmUBsZbgCrb8Vao3hnG6cC632XSlb00dC1xBFZ4iX6dLWN6OmKG0x5DLluHhCQqdOAi9biKy35d8JTYXtFesPQCwTqiROvBAuBbMiv60XtNCaI3"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<div class="absolute bottom-3 left-3 flex items-center gap-2">
+<span class="bg-primary/90 text-on-primary px-2 py-0.5 rounded text-[10px] font-bold">HD REPLAY</span>
+<span class="bg-surface-container/90 text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold">58:12</span>
+</div>
+<button class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-primary/20 backdrop-blur-md flex items-center justify-center border border-primary/40 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<div class="p-card-padding flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-body-base font-bold text-on-surface truncate">Advanced Quantum Algorithms</h4>
+<span class="material-symbols-outlined text-outline text-sm">more_vert</span>
+</div>
+<div class="flex items-center gap-4 text-xs font-data-mono text-on-surface-variant mb-4">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">calendar_today</span> Oct 12, 2023</span>
+<span class="flex items-center gap-1 text-secondary"><span class="material-symbols-outlined text-sm">analytics</span> 89% Focus</span>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/20 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-4 bg-secondary rounded-full relative cursor-pointer">
+<div class="absolute right-1 top-1 w-2 h-2 bg-on-secondary rounded-full"></div>
+</div>
+<span class="font-label-caps text-[10px] text-on-surface-variant">PUBLISHED</span>
+</div>
+<div class="flex gap-2">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer text-lg">download</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer text-lg">share</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="glass-card rounded-xl overflow-hidden flex flex-col group hover:border-primary/50 transition-all">
+<div class="relative aspect-video">
+<img class="w-full h-full object-cover" data-alt="A futuristic data visualization dashboard glowing in a dark research laboratory setting. Multiple screens show pulsing nodes, neural network connections, and streaming binary code in shades of deep blue and vibrant emerald green. The lighting is low and moody, reflecting off metallic surfaces to create a sense of advanced artificial intelligence and high-speed data processing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqVwui7GoZ7-tFTuX0r0_IUdxCjpRFcZA0kDLkkzcIpM38VqqcWfCfTY6JYFmbWJmx_1ynZWlmDc3apOPMDZqbdXE9rHL_Q2-b1V-ReEP8RyO0F_xxx02dKcXhtgQ4G0vMFfi7kzVgCwXBV1_nu4HVvylyCYDMqMQDdqmMUQ5t-IhqxWJCMoWLRc0QxdNVvnKoMiEd5-t2lKaFzamv0zAPl7JbHnkYKr5I75zGzJm7UOQW64840IchkaQzJ8ZIDUMqJml36HnT5jqk"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<div class="absolute bottom-3 left-3 flex items-center gap-2">
+<span class="bg-primary/90 text-on-primary px-2 py-0.5 rounded text-[10px] font-bold">AI GENERATED</span>
+<span class="bg-surface-container/90 text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold">42:05</span>
+</div>
+<button class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-primary/20 backdrop-blur-md flex items-center justify-center border border-primary/40 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<div class="p-card-padding flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-body-base font-bold text-on-surface truncate">Neural Ethics Seminar</h4>
+<span class="material-symbols-outlined text-outline text-sm">more_vert</span>
+</div>
+<div class="flex items-center gap-4 text-xs font-data-mono text-on-surface-variant mb-4">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">calendar_today</span> Oct 10, 2023</span>
+<span class="flex items-center gap-1 text-tertiary"><span class="material-symbols-outlined text-sm">analytics</span> 76% Focus</span>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/20 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-4 bg-outline-variant/30 rounded-full relative cursor-pointer">
+<div class="absolute left-1 top-1 w-2 h-2 bg-on-surface-variant rounded-full"></div>
+</div>
+<span class="font-label-caps text-[10px] text-on-surface-variant">PRIVATE</span>
+</div>
+<div class="flex gap-2">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer text-lg">download</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer text-lg">share</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="glass-card rounded-xl overflow-hidden flex flex-col group hover:border-primary/50 transition-all">
+<div class="relative aspect-video">
+<img class="w-full h-full object-cover" data-alt="A close-up shot of a high-performance computer server rack in a dark data center. Rows of small LED lights blink in emerald and cyan against a matte black hardware chassis. The depth of field is shallow, emphasizing the precision engineering and mission-critical nature of the infrastructure, all within a sleek, futuristic command center aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCjs9hSNeizthfQObz67yCmd28a56t00eOW85i5dGMdmjsnG6-_tec7pTiUAn4ag_d3ZA4hoMKGFhGq1fRwQRw2TB4MtilNQ4Ngyqw8YqnHYdPNO50NY0CLw0RRpg65kK3BDnXGxOo5hN3fEPi10RdnBUU2x0zuEpMH3yyP7lswgII979U_0Vs-gALF_asu7D3oqqqi1agYtHaU5CSvSlG6YWKjmXHONqVtmLeWcRVWFDZLJHYfrrLlrH57D4c5kkbQOGWUZnPbI2oR"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<div class="absolute bottom-3 left-3 flex items-center gap-2">
+<span class="bg-primary/90 text-on-primary px-2 py-0.5 rounded text-[10px] font-bold">HD REPLAY</span>
+<span class="bg-surface-container/90 text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold">1:15:30</span>
+</div>
+<button class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-primary/20 backdrop-blur-md flex items-center justify-center border border-primary/40 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<div class="p-card-padding flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-body-base font-bold text-on-surface truncate">Cybersecurity Fundamentals</h4>
+<span class="material-symbols-outlined text-outline text-sm">more_vert</span>
+</div>
+<div class="flex items-center gap-4 text-xs font-data-mono text-on-surface-variant mb-4">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">calendar_today</span> Oct 08, 2023</span>
+<span class="flex items-center gap-1 text-secondary"><span class="material-symbols-outlined text-sm">analytics</span> 92% Focus</span>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/20 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-4 bg-secondary rounded-full relative cursor-pointer">
+<div class="absolute right-1 top-1 w-2 h-2 bg-on-secondary rounded-full"></div>
+</div>
+<span class="font-label-caps text-[10px] text-on-surface-variant">PUBLISHED</span>
+</div>
+<div class="flex gap-2">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer text-lg">download</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer text-lg">share</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 4 (Processing State) -->
+<div class="glass-card rounded-xl overflow-hidden flex flex-col opacity-60">
+<div class="relative aspect-video bg-surface-container-high flex items-center justify-center flex-col">
+<span class="material-symbols-outlined text-primary text-4xl animate-pulse mb-2">sync</span>
+<span class="font-data-mono text-xs text-primary">ENCODING ARCHIVE... 45%</span>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-surface-container">
+<div class="bg-primary h-full w-[45%] shimmer-bar" style="background-image: linear-gradient(90deg, transparent, rgba(173, 198, 255, 0.4), transparent); background-size: 200% 100%;"></div>
+</div>
+</div>
+<div class="p-card-padding flex-1">
+<h4 class="font-headline-md text-body-base font-bold text-on-surface">Data Structures &amp; Big-O</h4>
+<p class="text-xs font-data-mono text-on-surface-variant mt-2 italic">Session recorded today at 10:00 AM</p>
+</div>
+</div>
+</div>
+<!-- Floating Task Panel (Asymmetric Design Element) -->
+<div class="fixed bottom-8 right-8 glass-card p-4 rounded-xl w-80 glow-active border-primary/20 z-50">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">history</span>
+<span class="font-label-caps text-label-caps">Activity Log</span>
+</div>
+<span class="material-symbols-outlined text-outline text-sm cursor-pointer">close</span>
+</div>
+<div class="space-y-3">
+<div class="flex gap-3">
+<div class="w-1 h-8 bg-secondary rounded"></div>
+<div>
+<p class="text-[10px] text-on-surface font-bold">PUBLISHED: Advanced Quantum...</p>
+<p class="text-[9px] text-on-surface-variant">Successfully deployed to Year 3 students.</p>
+</div>
+</div>
+<div class="flex gap-3">
+<div class="w-1 h-8 bg-tertiary rounded"></div>
+<div>
+<p class="text-[10px] text-on-surface font-bold">ANALYZING: Neural Ethics...</p>
+<p class="text-[9px] text-on-surface-variant">Extracting student focus heatmap data.</p>
+</div>
+</div>
+<div class="flex gap-3">
+<div class="w-1 h-8 bg-error rounded"></div>
+<div>
+<p class="text-[10px] text-on-surface font-bold">ERROR: Mobile Web Replay</p>
+<p class="text-[9px] text-on-surface-variant">Low bitrate alert on CDN-Edge-04.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

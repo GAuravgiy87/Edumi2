@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meeting Oversight | Edumi AI Command</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-active {
+            box-shadow: 0 0 15px rgba(78, 222, 163, 0.2);
+        }
+        .shimmer-progress {
+            background: linear-gradient(90deg, transparent, rgba(173, 198, 255, 0.3), transparent);
+            background-size: 200% 100%;
+        }
+        body {
+            background-color: #10131a;
+            color: #e1e2ec;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed": "#002113",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "surface-container-low": "#191b23",
+                      "inverse-primary": "#005ac2",
+                      "outline-variant": "#424754",
+                      "on-primary": "#002e6a",
+                      "outline": "#8c909f",
+                      "surface-bright": "#363941",
+                      "tertiary-fixed": "#ffddb8",
+                      "secondary-container": "#00a572",
+                      "inverse-on-surface": "#2e3038",
+                      "on-secondary-fixed-variant": "#005236",
+                      "surface-container": "#1d2027",
+                      "on-background": "#e1e2ec",
+                      "surface-variant": "#32353c",
+                      "on-surface": "#e1e2ec",
+                      "on-tertiary-container": "#3e2400",
+                      "error": "#ffb4ab",
+                      "surface-dim": "#10131a",
+                      "surface-container-high": "#272a31",
+                      "on-primary-fixed": "#001a42",
+                      "secondary-fixed": "#6ffbbe",
+                      "inverse-surface": "#e1e2ec",
+                      "background": "#10131a",
+                      "on-error": "#690005",
+                      "primary-fixed": "#d8e2ff",
+                      "tertiary-container": "#ca8100",
+                      "surface": "#10131a",
+                      "on-primary-container": "#00285d",
+                      "error-container": "#93000a",
+                      "secondary-fixed-dim": "#4edea3",
+                      "primary-container": "#4d8eff",
+                      "primary-fixed-dim": "#adc6ff",
+                      "surface-tint": "#adc6ff",
+                      "surface-container-highest": "#32353c",
+                      "primary": "#adc6ff",
+                      "surface-container-lowest": "#0b0e15",
+                      "on-primary-fixed-variant": "#004395",
+                      "on-tertiary": "#472a00",
+                      "on-secondary": "#003824",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "on-surface-variant": "#c2c6d6",
+                      "secondary": "#4edea3",
+                      "on-tertiary-fixed": "#2a1700",
+                      "tertiary": "#ffb95f",
+                      "on-secondary-container": "#00311f",
+                      "on-error-container": "#ffdad6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "card-padding": "1.25rem",
+                      "margin-desktop": "32px",
+                      "unit": "4px",
+                      "margin-mobile": "16px",
+                      "gutter": "16px"
+              },
+              "fontFamily": {
+                      "label-caps": ["Inter"],
+                      "body-base": ["Inter"],
+                      "display-lg": ["Inter"],
+                      "data-mono": ["JetBrains Mono"],
+                      "headline-md": ["Inter"],
+                      "body-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                      "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="font-body-base text-on-surface antialiased">
+<!-- TopAppBar -->
+<header class="bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 docked full-width top-0 sticky z-50 flex items-center justify-between px-margin-desktop h-16 w-full">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary">Edumi</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-secondary border-b-2 border-secondary pb-1 font-body-sm" href="#">Live Monitor</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Network</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-2 font-label-caps text-label-caps uppercase active:scale-95 transition-transform duration-150">
+                Emergency Broadcast
+            </button>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors duration-200" data-icon="notifications_active">notifications_active</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors duration-200" data-icon="settings_input_component">settings_input_component</span>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant/30">
+<img alt="User Profile Avatar" data-alt="A professional close-up headshot of a person with a neutral, focused expression in a corporate setting. The lighting is soft and diffused, highlighting clean facial features against a dark, out-of-focus office background. The overall aesthetic is professional, high-fidelity, and fits a high-tech corporate command center environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLhWn4L4rYMiUz3dZhLjfHq7_HzANrf5FxRrmNmG3ETsX6pwmyu8sBWccpawzb0GEQmxU-V6U19FBR06_ykTOMfAdh7s2x844qauBPk4NCJZO0YKW3jGz3IxDuVFvKGRXQ_WsGUx8nH3_Qp7xz0AMY8nfuNI6d7kP0CzdPVz3h0s05jOvg8HTNEGKXAjDvKYKYJ6vqzXGf5j3HBgc5Huy4jwvzSYepm7oUFCdJza31KZtBvGW3ATM47cOvRr5rZSjNwgGPeKnzJ-M8"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="bg-surface-container h-screen w-64 flex flex-col fixed left-0 top-0 z-40 border-r border-outline-variant/20">
+<div class="flex flex-col h-full py-gutter px-4">
+<div class="mb-8 flex flex-col gap-1">
+<span class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</span>
+<span class="text-on-surface-variant font-label-caps text-[10px] opacity-70">Academic Command</span>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-sm">Command Center</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined" data-icon="school">school</span>
+<span class="font-body-sm">Classrooms</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="font-body-sm">Live Stream</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-body-sm">AI Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-sm">Settings</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-2">
+<button class="bg-primary-container text-on-primary-container font-label-caps text-label-caps py-3 mb-4 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                        Create Classroom
+                    </button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant font-body-sm hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant font-body-sm hover:text-error transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>System Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-64 p-margin-desktop bg-surface-dim">
+<!-- Oversight Header -->
+<div class="flex justify-between items-end mb-8">
+<div>
+<h1 class="font-display-lg text-display-lg text-on-surface">Meeting Oversight</h1>
+<p class="text-on-surface-variant font-body-sm mt-1">Real-time management of 124 active academic sessions</p>
+</div>
+<div class="flex gap-4">
+<div class="glass-panel px-4 py-2 flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-secondary uppercase">Global Load</span>
+<span class="font-data-mono text-data-mono text-secondary">42.8%</span>
+</div>
+<div class="glass-panel px-4 py-2 flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-primary uppercase">Avg Latency</span>
+<span class="font-data-mono text-data-mono text-primary">24ms</span>
+</div>
+</div>
+</div>
+<!-- Dashboard Grid -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Live Monitor Table (Bento Layout) -->
+<div class="col-span-12 glass-panel p-card-padding">
+<div class="flex justify-between items-center mb-6">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-md text-headline-md">Active Streams</h2>
+<div class="flex items-center gap-2 px-2 py-1 bg-secondary/10 rounded-full">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-label-caps text-label-caps text-secondary uppercase">Live Syncing</span>
+</div>
+</div>
+<div class="flex gap-2">
+<input class="bg-surface-container-lowest border border-outline-variant/30 text-body-sm px-4 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Filter by host or class..." type="text"/>
+<button class="bg-surface-container-high border border-outline-variant/30 px-3 flex items-center">
+<span class="material-symbols-outlined text-[20px]" data-icon="tune">tune</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/20">
+<th class="pb-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Stream Identification</th>
+<th class="pb-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Host / Capacity</th>
+<th class="pb-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Signal Health</th>
+<th class="pb-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Server Metrics</th>
+<th class="pb-4 font-label-caps text-label-caps text-on-surface-variant uppercase text-right">Administrative Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<!-- Stream Row 1 -->
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-5">
+<div class="flex flex-col">
+<span class="font-body-base font-bold text-primary">Advanced AI Ethics - Sec A</span>
+<span class="font-data-mono text-[11px] text-on-surface-variant uppercase tracking-widest">RM-2940-LX</span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex flex-col">
+<span class="font-body-sm text-on-surface">Dr. Elena Rodriguez</span>
+<span class="text-on-surface-variant text-[12px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="group">group</span>
+                                                42 / 50 participants
+                                            </span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex items-center gap-3">
+<div class="flex flex-col flex-1 max-w-[100px]">
+<div class="flex justify-between mb-1">
+<span class="font-label-caps text-[9px] uppercase">Strength</span>
+<span class="font-data-mono text-[9px] text-secondary">98%</span>
+</div>
+<div class="h-1 bg-surface-container-high w-full overflow-hidden">
+<div class="h-full bg-secondary w-[98%]"></div>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary" data-icon="signal_cellular_4_bar">signal_cellular_4_bar</span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="font-label-caps text-[9px] text-on-surface-variant uppercase">Latency</span>
+<span class="font-data-mono text-data-mono text-primary">18ms</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[9px] text-on-surface-variant uppercase">Load</span>
+<span class="font-data-mono text-data-mono text-secondary">12%</span>
+</div>
+</div>
+</td>
+<td class="py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="bg-surface-container-high text-on-surface border border-outline-variant/30 px-3 py-1.5 font-label-caps text-label-caps hover:bg-surface-bright transition-colors">JOIN AS MONITOR</button>
+<button class="bg-error/10 text-error border border-error/30 px-3 py-1.5 font-label-caps text-label-caps hover:bg-error hover:text-on-error transition-colors">FREEZE</button>
+</div>
+</td>
+</tr>
+<!-- Stream Row 2 -->
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-5">
+<div class="flex flex-col">
+<span class="font-body-base font-bold text-primary opacity-50 italic">Data Science Lab (SUSPENDED)</span>
+<span class="font-data-mono text-[11px] text-on-surface-variant uppercase tracking-widest opacity-50">RM-1122-PX</span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex flex-col opacity-50">
+<span class="font-body-sm text-on-surface">Prof. Marcus Thorne</span>
+<span class="text-on-surface-variant text-[12px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="group">group</span>
+                                                128 / 200 participants
+                                            </span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex items-center gap-3">
+<div class="flex flex-col flex-1 max-w-[100px]">
+<div class="flex justify-between mb-1 opacity-50">
+<span class="font-label-caps text-[9px] uppercase">Strength</span>
+<span class="font-data-mono text-[9px] text-error">0%</span>
+</div>
+<div class="h-1 bg-surface-container-high w-full"></div>
+</div>
+<span class="material-symbols-outlined text-error opacity-50" data-icon="signal_cellular_0_bar">signal_cellular_0_bar</span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex gap-4 opacity-50">
+<div class="flex flex-col">
+<span class="font-label-caps text-[9px] text-on-surface-variant uppercase">Latency</span>
+<span class="font-data-mono text-data-mono">--</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[9px] text-on-surface-variant uppercase">Load</span>
+<span class="font-data-mono text-data-mono">0%</span>
+</div>
+</div>
+</td>
+<td class="py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="bg-surface-container-high text-on-surface border border-outline-variant/30 px-3 py-1.5 font-label-caps text-label-caps hover:bg-surface-bright transition-colors" disabled="">JOIN AS MONITOR</button>
+<button class="bg-secondary text-on-secondary px-3 py-1.5 font-label-caps text-label-caps hover:bg-secondary/90 transition-colors">UNFREEZE</button>
+</div>
+</td>
+</tr>
+<!-- Stream Row 3 -->
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-5">
+<div class="flex flex-col">
+<span class="font-body-base font-bold text-primary">Global History 101</span>
+<span class="font-data-mono text-[11px] text-on-surface-variant uppercase tracking-widest">RM-8854-BK</span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex flex-col">
+<span class="font-body-sm text-on-surface">Dr. Sarah Jenkins</span>
+<span class="text-on-surface-variant text-[12px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="group">group</span>
+                                                312 / 350 participants
+                                            </span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex items-center gap-3">
+<div class="flex flex-col flex-1 max-w-[100px]">
+<div class="flex justify-between mb-1">
+<span class="font-label-caps text-[9px] uppercase">Strength</span>
+<span class="font-data-mono text-[9px] text-tertiary">74%</span>
+</div>
+<div class="h-1 bg-surface-container-high w-full overflow-hidden">
+<div class="h-full bg-tertiary w-[74%]"></div>
+</div>
+</div>
+<span class="material-symbols-outlined text-tertiary" data-icon="signal_cellular_3_bar">signal_cellular_3_bar</span>
+</div>
+</td>
+<td class="py-5">
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="font-label-caps text-[9px] text-on-surface-variant uppercase">Latency</span>
+<span class="font-data-mono text-data-mono text-tertiary">142ms</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[9px] text-on-surface-variant uppercase">Load</span>
+<span class="font-data-mono text-data-mono text-tertiary">84%</span>
+</div>
+</div>
+</td>
+<td class="py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="bg-surface-container-high text-on-surface border border-outline-variant/30 px-3 py-1.5 font-label-caps text-label-caps hover:bg-surface-bright transition-colors">JOIN AS MONITOR</button>
+<button class="bg-error/10 text-error border border-error/30 px-3 py-1.5 font-label-caps text-label-caps hover:bg-error hover:text-on-error transition-colors">FREEZE</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Secondary Data Module (Grid) -->
+<div class="col-span-12 lg:col-span-8 glass-panel p-card-padding">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4">Node Distribution &amp; Performance</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-lowest p-4 border border-outline-variant/20">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">US-EAST-1 (Active)</span>
+<div class="mt-2 flex items-center justify-between">
+<span class="font-display-lg text-[24px] text-secondary">24</span>
+<span class="material-symbols-outlined text-secondary" data-icon="dns">dns</span>
+</div>
+<div class="mt-2 h-1 bg-surface-container-high w-full">
+<div class="h-full bg-secondary w-1/3"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-4 border border-outline-variant/20">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">EU-CENTRAL-1 (Idle)</span>
+<div class="mt-2 flex items-center justify-between">
+<span class="font-display-lg text-[24px] text-primary">08</span>
+<span class="material-symbols-outlined text-primary" data-icon="dns">dns</span>
+</div>
+<div class="mt-2 h-1 bg-surface-container-high w-full">
+<div class="h-full bg-primary w-1/6"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-4 border border-outline-variant/20 border-l-4 border-l-tertiary">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">WebRTC Latency Spike</span>
+<div class="mt-2 flex items-center justify-between">
+<span class="font-display-lg text-[24px] text-tertiary">+14%</span>
+<span class="material-symbols-outlined text-tertiary" data-icon="warning">warning</span>
+</div>
+<p class="text-[10px] text-on-surface-variant mt-1">Check Asia-Pacific backbone routing</p>
+</div>
+</div>
+</div>
+<!-- AI Insights / Real-time Alerts -->
+<div class="col-span-12 lg:col-span-4 glass-panel p-card-padding">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4">AI Security Oversight</h3>
+<div class="space-y-4">
+<div class="flex gap-3 items-start p-3 bg-error/5 border border-error/20">
+<span class="material-symbols-outlined text-error" data-icon="gavel">gavel</span>
+<div>
+<p class="font-body-sm font-bold text-error">Unusual Audio Pattern</p>
+<p class="text-[12px] text-on-surface-variant">Room RM-2940 reported high frequency discordance. AI isolating channel...</p>
+</div>
+</div>
+<div class="flex gap-3 items-start p-3 bg-secondary/5 border border-secondary/20">
+<span class="material-symbols-outlined text-secondary" data-icon="verified_user">verified_user</span>
+<div>
+<p class="font-body-sm font-bold text-secondary">Attendance Authenticated</p>
+<p class="text-[12px] text-on-surface-variant">99.8% biometric match across all active classrooms. Security protocols green.</p>
+</div>
+</div>
+<div class="flex gap-3 items-start p-3 bg-primary/5 border border-primary/20">
+<span class="material-symbols-outlined text-primary" data-icon="lightbulb">lightbulb</span>
+<div>
+<p class="font-body-sm font-bold text-primary">Load Recommendation</p>
+<p class="text-[12px] text-on-surface-variant">Spinning down 3 inactive nodes to conserve power credits for tonight's exam.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Floating Map Preview (Contextual Tooltip Style) -->
+<div class="fixed bottom-8 right-8 z-50">
+<div class="glass-panel p-2 shadow-2xl group cursor-pointer overflow-hidden max-w-[200px] hover:max-w-[400px] transition-all duration-500">
+<div class="relative">
+<img class="w-full grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all" data-alt="A dark, stylized tactical map display on a digital screen, showing global data nodes connected by glowing blue and cyan lines across a minimalist silhouette of continents. The lighting is low and high-tech, with sharp data points highlighted in amber and emerald green to represent server status. The aesthetic is clean, engineered, and fits the Command Center vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhKnNOa-XFBQn7scXXXTemYsGiVUHlgcyCbSyFUQDkzNSBZDC2DvrG67Swx2YPixr1hYpvpyZnoUYGrYisAir0ZMlNZ9RUrDYGEkdvq-R1jlwO5Z-dI7DqdZl-UBpYROvomFfCDSBwoFvVyuMeueQTa9GqvppSEUfszQxwC7edlVAArI9lky_Li_iObDwEhFNkICFI6kt9julS-6J6dQcBMgbLFHKHK_1Y2DGTVsEeBW9YappvrNYSvDipSR0fp7CkAJ2T99Y5QYrA"/>
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<span class="font-label-caps text-label-caps bg-surface-container/80 px-2 py-1">GLOBAL OPS MAP</span>
+</div>
+</div>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Edumi AI - Classroom Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed": "#002113",
+            "on-tertiary-fixed-variant": "#653e00",
+            "surface-container-low": "#191b23",
+            "inverse-primary": "#005ac2",
+            "outline-variant": "#424754",
+            "on-primary": "#002e6a",
+            "outline": "#8c909f",
+            "surface-bright": "#363941",
+            "tertiary-fixed": "#ffddb8",
+            "secondary-container": "#00a572",
+            "inverse-on-surface": "#2e3038",
+            "on-secondary-fixed-variant": "#005236",
+            "surface-container": "#1d2027",
+            "on-background": "#e1e2ec",
+            "surface-variant": "#32353c",
+            "on-surface": "#e1e2ec",
+            "on-tertiary-container": "#3e2400",
+            "error": "#ffb4ab",
+            "surface-dim": "#10131a",
+            "surface-container-high": "#272a31",
+            "on-primary-fixed": "#001a42",
+            "secondary-fixed": "#6ffbbe",
+            "inverse-surface": "#e1e2ec",
+            "background": "#10131a",
+            "on-error": "#690005",
+            "primary-fixed": "#d8e2ff",
+            "tertiary-container": "#ca8100",
+            "surface": "#10131a",
+            "on-primary-container": "#00285d",
+            "error-container": "#93000a",
+            "secondary-fixed-dim": "#4edea3",
+            "primary-container": "#4d8eff",
+            "primary-fixed-dim": "#adc6ff",
+            "surface-tint": "#adc6ff",
+            "surface-container-highest": "#32353c",
+            "primary": "#adc6ff",
+            "surface-container-lowest": "#0b0e15",
+            "on-primary-fixed-variant": "#004395",
+            "on-tertiary": "#472a00",
+            "on-secondary": "#003824",
+            "tertiary-fixed-dim": "#ffb95f",
+            "on-surface-variant": "#c2c6d6",
+            "secondary": "#4edea3",
+            "on-tertiary-fixed": "#2a1700",
+            "tertiary": "#ffb95f",
+            "on-secondary-container": "#00311f",
+            "on-error-container": "#ffdad6"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "card-padding": "1.25rem",
+            "margin-desktop": "32px",
+            "unit": "4px",
+            "margin-mobile": "16px",
+            "gutter": "16px"
+          },
+          "fontFamily": {
+            "label-caps": ["Inter"],
+            "body-base": ["Inter"],
+            "display-lg": ["Inter"],
+            "data-mono": ["JetBrains Mono"],
+            "headline-md": ["Inter"],
+            "body-sm": ["Inter"]
+          },
+          "fontSize": {
+            "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+            "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}],
+            "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+            "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+            "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+            "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-panel {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .glow-primary {
+      box-shadow: 0 0 15px -3px rgba(173, 198, 255, 0.3);
+    }
+    .glow-secondary {
+      box-shadow: 0 0 15px -3px rgba(78, 222, 163, 0.3);
+    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #424754; border-radius: 2px; }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-base antialiased">
+<!-- SideNavBar Navigation Shell -->
+<aside class="h-screen w-64 flex flex-col fixed left-0 top-0 z-40 bg-surface-container border-r border-outline-variant/20 flex flex-col h-full py-gutter px-4">
+<div class="mb-8 px-2">
+<div class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant mt-1">Academic Command</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-sm text-body-sm">Command Center</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="school">school</span>
+<span class="font-body-sm text-body-sm">Classrooms</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="font-body-sm text-body-sm">Live Stream</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-body-sm text-body-sm">AI Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-sm text-body-sm">Settings</span>
+</a>
+</nav>
+<div class="mt-auto space-y-1 pt-4 border-t border-outline-variant/10">
+<button class="w-full bg-primary text-on-primary font-bold py-3 px-4 mb-6 transition-transform active:scale-95 text-center flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+        Create Classroom
+      </button>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+<span class="font-body-sm text-body-sm">Support</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-medium hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-sm text-body-sm">System Logout</span>
+</a>
+</div>
+</aside>
+<!-- TopAppBar Content Shell -->
+<header class="bg-surface/80 backdrop-blur-md text-primary docked full-width top-0 sticky z-50 border-b border-outline-variant/20 flex items-center justify-between px-margin-desktop h-16 w-full ml-64 max-w-[calc(100%-16rem)]">
+<div class="flex items-center gap-8">
+<div class="flex items-center bg-surface-container-lowest px-3 py-1.5 border border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-sm" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm font-body-sm text-on-surface w-64" placeholder="Search parameters..." type="text"/>
+</div>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-secondary border-b-2 border-secondary pb-1" href="#">Live Monitor</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-error-container text-on-error-container px-4 py-1.5 font-label-caps text-label-caps flex items-center gap-2 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined text-sm" data-icon="broadcast_on_home">broadcast_on_home</span>
+        Emergency Broadcast
+      </button>
+<div class="flex items-center gap-2 border-l border-outline-variant/20 pl-4">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer" data-icon="notifications_active">notifications_active</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer" data-icon="settings_input_component">settings_input_component</span>
+<div class="h-8 w-8 bg-surface-variant rounded-full overflow-hidden border border-primary/20">
+<img alt="User Profile Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCjSsCsiX9e0SjzI6me6-mqcWhRg1zz-DwXN8Urtf_LQZsqWJ4kJZ3sHmZmmKE2Um2ITHySZ4EB7N2abqmU51nq-9OU6vXIow7WIB4MHYOu9A8ZFnx2ajn6J4gyH-A9-qp0xvV3EoZBMua7d7f02lo91-Nbp24bqEjskabEbwWHgz6YuIcmvIMsFhP1NkbGWmgwydcIk6FhtAdI1QHIbjAD4phEWa9QIiAy9s1jxGfnRN_AFX9OAqJO5gVAYgnz5Qt2ysJg5p_9sNRV"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 p-margin-desktop min-h-screen">
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Summary Metrics -->
+<div class="col-span-12 lg:col-span-8 grid grid-cols-3 gap-gutter">
+<div class="glass-panel p-card-padding">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-2">ACTIVE CLASSROOMS</p>
+<div class="flex items-end justify-between">
+<span class="font-display-lg text-display-lg text-primary">12</span>
+<span class="font-data-mono text-data-mono text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="trending_up">trending_up</span>
+              +2
+            </span>
+</div>
+</div>
+<div class="glass-panel p-card-padding">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-2">TOTAL STUDENTS</p>
+<div class="flex items-end justify-between">
+<span class="font-display-lg text-display-lg text-primary">482</span>
+<span class="font-data-mono text-data-mono text-outline">v94.2%</span>
+</div>
+</div>
+<div class="glass-panel p-card-padding">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-2">AI LATENCY</p>
+<div class="flex items-end justify-between">
+<span class="font-display-lg text-display-lg text-secondary">24ms</span>
+<div class="flex gap-1 h-2 items-end mb-2">
+<div class="w-1 bg-secondary h-full"></div>
+<div class="w-1 bg-secondary h-2/3"></div>
+<div class="w-1 bg-secondary/30 h-1/2"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Action: Schedule Meeting Widget -->
+<div class="col-span-12 lg:col-span-4 glass-panel p-card-padding row-span-2">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-primary">Meeting Deck</h3>
+<span class="material-symbols-outlined text-outline" data-icon="calendar_month">calendar_month</span>
+</div>
+<div class="space-y-4">
+<div class="bg-surface-container-lowest p-3 border-l-4 border-primary">
+<p class="font-label-caps text-label-caps text-primary">NEXT EVENT</p>
+<p class="font-body-base text-body-base font-bold">Neural Networks Lab</p>
+<div class="flex items-center gap-4 mt-2 text-on-surface-variant font-data-mono text-data-mono">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs" data-icon="schedule">schedule</span> 14:00</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs" data-icon="group">group</span> 42/45</span>
+</div>
+</div>
+<div class="grid grid-cols-7 gap-1 mt-6 text-center">
+<span class="text-[10px] text-outline font-bold">M</span>
+<span class="text-[10px] text-outline font-bold">T</span>
+<span class="text-[10px] text-outline font-bold">W</span>
+<span class="text-[10px] text-outline font-bold">T</span>
+<span class="text-[10px] text-outline font-bold">F</span>
+<span class="text-[10px] text-outline font-bold">S</span>
+<span class="text-[10px] text-outline font-bold">S</span>
+<div class="py-2 text-xs text-on-surface-variant">12</div>
+<div class="py-2 text-xs text-on-surface-variant">13</div>
+<div class="py-2 text-xs text-primary font-bold bg-primary/10 border border-primary/20">14</div>
+<div class="py-2 text-xs text-on-surface-variant">15</div>
+<div class="py-2 text-xs text-on-surface-variant">16</div>
+<div class="py-2 text-xs text-on-surface-variant">17</div>
+<div class="py-2 text-xs text-on-surface-variant">18</div>
+</div>
+<button class="w-full bg-surface-container-highest border border-outline-variant/30 py-3 font-label-caps text-label-caps hover:bg-surface-bright transition-colors">
+            NEW SCHEDULE
+          </button>
+</div>
+</div>
+<!-- Active Classrooms List -->
+<div class="col-span-12 lg:col-span-8 space-y-gutter">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-headline-md">Active Classrooms</h2>
+<div class="flex gap-2">
+<button class="px-3 py-1 bg-surface-container-high text-on-surface font-label-caps text-label-caps border border-outline-variant/30">GRID</button>
+<button class="px-3 py-1 bg-primary text-on-primary font-label-caps text-label-caps border border-primary">LIST</button>
+</div>
+</div>
+<!-- Classroom Card 1 -->
+<div class="glass-panel hover:border-primary/40 transition-all duration-300">
+<div class="flex items-center p-card-padding">
+<div class="w-16 h-16 bg-surface-container-lowest flex items-center justify-center border border-outline-variant/20 mr-6">
+<span class="material-symbols-outlined text-3xl text-primary" data-icon="neurology">neurology</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-3">
+<h4 class="font-headline-md text-headline-md">Advanced AI &amp; Ethics 401</h4>
+<span class="bg-secondary-container/20 text-secondary-fixed-dim px-2 py-0.5 font-label-caps text-[10px] border border-secondary/30 glow-secondary">SYNCHRONIZED</span>
+</div>
+<p class="text-on-surface-variant text-body-sm font-body-sm mt-1">Status: Session in progress • 38 Students active</p>
+</div>
+<div class="flex flex-col items-end gap-2">
+<div class="flex -space-x-2">
+<img class="w-6 h-6 rounded-full border border-background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1HXPnjcc20AIitcp5m4C0eEAnoyJUAOuL37qT6IdIr_7gqMzu6nmwVrSoHAb4-L-cKTtEfNWtoiJj2c8U5bCLMLLAQwUJStsVNTZOrF0iQ3aKM6oiKHB5MlKAHvIvhD4CzrwsvyhXut9T76EGxWytty4w_CHQ02RKFcJDRdALUii62knkUazcdfNA6mr8Avg4G4I-x-T7htixVs-zwwOx9dsf1s2qFmmcj62fTSbsuvOM1TJTj8TCWp2_pSFsT8D3o6gfxjc3zvNI"/>
+<img class="w-6 h-6 rounded-full border border-background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqP_7Wc35GKhroj_HEvv7XGTIuiN8-u6JDWinJzqHz5CPGr4O-w1Q5p30eupbVhYfAz25VTo_Laqz71l8VCQCaAgselfm7uOx5InDvtVOnzt4JvIaEyMoTB19ZdGTwwp81drCie4NV6RpswkH1Ugteh2r5zNOdJu0ei11HCL0lDvQ9hN8emF9BUtU5ZY_7JIFVAsorH4XCpdaM0myraDS_1MiIvNjq3CmaK0ssjEcSBxwyYF7KlC_5lntMbjBGfTJftJeiSkNAn0C_"/>
+<img class="w-6 h-6 rounded-full border border-background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-GfwY4yPWdxbTQpYTsEZ8S8tYNWRrl9Kq-NUkWjrvZz26Hk_tpmwMy3zr7DAfuaCqwGTsOpkzZ5ByBvzr5XhDNu7czhHiWLUFMCWzdTBH3xgu9ss4XwrDoNj1muRhGxm7gAV7p01dk_o6KKqjFXdCnTt9gvPs6GmjPSxhA6AD0y4S6loRXJ3JK6X1e6fdy_2mQ6tXmC_vj9uAIzuzL0WyKRlsbItZ6hoi9h-ThKGfwbEs5UaHhZx4s_GzwPoqr3d7N_UotyPx2aZL"/>
+<div class="w-6 h-6 rounded-full bg-surface-variant border border-background flex items-center justify-center text-[10px] text-on-surface-variant">+35</div>
+</div>
+<button class="text-primary font-label-caps text-label-caps flex items-center gap-1 hover:underline">
+                MANAGE <span class="material-symbols-outlined text-xs" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="h-1 bg-surface-container-lowest w-full">
+<div class="h-full bg-primary glow-primary w-3/4"></div>
+</div>
+</div>
+<!-- Classroom Card 2 -->
+<div class="glass-panel hover:border-primary/40 transition-all duration-300">
+<div class="flex items-center p-card-padding">
+<div class="w-16 h-16 bg-surface-container-lowest flex items-center justify-center border border-outline-variant/20 mr-6">
+<span class="material-symbols-outlined text-3xl text-primary" data-icon="database">database</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-3">
+<h4 class="font-headline-md text-headline-md">Data Structures (Beta)</h4>
+<span class="bg-tertiary-container/20 text-tertiary px-2 py-0.5 font-label-caps text-[10px] border border-tertiary/30">IDLE</span>
+</div>
+<p class="text-on-surface-variant text-body-sm font-body-sm mt-1">Status: Next session tomorrow 09:00 • 120 Students enrolled</p>
+</div>
+<div class="flex flex-col items-end gap-2">
+<div class="flex -space-x-2">
+<img class="w-6 h-6 rounded-full border border-background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASb-oycUYDtBhVxgQc1qEtK4OtkY5gUrt-CVDjz5laX2b9plz3nv_GOKnJRaho-KCcBaLyN3L1QGE9Q9TMWGz_ctJcC55idV4lCQsOCcA0nuUZWf3wd-81TcBVrLM9Hh3bJ0M3sjnpGYSjbDoOjv6ZPbDY1lZP-yeuaiV_jokwaLVoWVYMdXASb7V9sjiAZvn0hfm9srnKxHxHX8a-2SkrLju1X32wos56m9cgO5Y9lO_Mx6FIydnT_OIEzB16gip0fRpeSN19x-b-"/>
+<img class="w-6 h-6 rounded-full border border-background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNZcA1J_Fme97BNIUqxauLJXEzlVRy9-TyXxEAItK0wKXwRXH9G5-KvWS8JTan2GSYRVHTpMQklg1h319yWBKu27dKdmX5u-UDFFMg8miGb6k7poqN24Yz919HfwOsF9hYWkjzeL3eG0Fqt3aKU2HsxVyowodlJKFsRmApcLwQ1sw4lXsZavv6fj_R3Sk04T3ANdtFzvAbD_8ulyAHVb9EQytGCThRVterpXfGtOThbKM_IVUk8g03L34Fjocd3D2a7hG-eJQdc1VQ"/>
+<div class="w-6 h-6 rounded-full bg-surface-variant border border-background flex items-center justify-center text-[10px] text-on-surface-variant">+118</div>
+</div>
+<button class="text-primary font-label-caps text-label-caps flex items-center gap-1 hover:underline">
+                MANAGE <span class="material-symbols-outlined text-xs" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="h-1 bg-surface-container-lowest w-full">
+<div class="h-full bg-outline-variant w-0"></div>
+</div>
+</div>
+</div>
+<!-- Student Join Requests Queue (Verification Preview) -->
+<div class="col-span-12 glass-panel p-card-padding">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-4">
+<h3 class="font-headline-md text-headline-md text-primary">Join Verification Queue</h3>
+<span class="bg-error/10 text-error px-2 py-1 font-label-caps text-[10px] border border-error/20 flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-error rounded-full"></span> 4 PENDING
+            </span>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface font-label-caps text-label-caps transition-colors">VIEW ALL HISTORY</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter">
+<!-- Request Item -->
+<div class="bg-surface-container-low border border-outline-variant/30 overflow-hidden">
+<div class="relative aspect-video bg-surface-container-highest">
+<img class="w-full h-full object-cover opacity-50 blur-[1px]" data-alt="A futuristic biometric identification interface displaying a digital scan of a student's face. The screen is filled with glowing blue facial recognition mapping points and high-tech UI elements. The lighting is cold and clinical, with neon tech-blue highlights over a dark, charcoal background, suggesting a secure AI verification process." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHQaha04vfmaMOL3UJCaZOTXZi92-h5jGmj3eyqz7-Dyed2VL_Cp2GPcFddHqakXCR1bn8zEuaeQgRN_EtpqleWZS8v9507gVAopc-XVDrRxlZWKhOl2yc6_UiO6PAmgcSFpz_JCsYRmWNoIXp1i8iPYeb9Wxyi1h-l90J2DxPawwQ1axZsdN_kSSaPoFB8dT3KU1tXVnnSRn8FDdbhXzc4zoWWwH9Eb9IZvMlGKMOJtAog6-TiO-Ws_TJ-4ccRY5No05j_giR34zZ"/>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<div class="w-16 h-16 border-2 border-secondary/50 border-dashed rounded-lg animate-pulse mb-2"></div>
+<span class="bg-secondary text-on-secondary px-2 py-0.5 font-label-caps text-[10px]">FACE ID VERIFIED</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-body-base text-body-base font-bold">Elena Vance</h5>
+<p class="font-data-mono text-data-mono text-on-surface-variant text-[11px] mb-4">ID: EDU-9402-B</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-secondary text-on-secondary py-2 font-label-caps text-label-caps active:scale-95 transition-all">APPROVE</button>
+<button class="flex-1 border border-outline-variant py-2 font-label-caps text-label-caps hover:bg-error/10 hover:text-error hover:border-error/40 active:scale-95 transition-all">DENY</button>
+</div>
+</div>
+</div>
+<!-- Request Item 2 -->
+<div class="bg-surface-container-low border border-outline-variant/30 overflow-hidden">
+<div class="relative aspect-video bg-surface-container-highest">
+<img class="w-full h-full object-cover opacity-50 blur-[1px]" data-alt="A mission-critical AI security screen showing a digital facial recognition frame centered on a subject. Glowing data telemetry overlays the image with amber warning indicators. The aesthetic is high-performance command center with deep blacks and sharp contrast. Soft bioluminescent glows emanate from the interface icons against a minimalist, engineered background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuALxdp3AeRHloY22IZ3B_GSa-Lpw6bv8-dg2aLhVQOGQuLXTCItpg-rJHsAc7sX5cEvO_8gC3h7wmNf_yexvV1ns3V6qT7ih7i6sZPFr8mOCQKztwnuPphHr0ou9LN0ZQNv4gy_AYXALRqEyM5yUf2HSKKtIx1J1WuKj-GdkheMaLy4B0us2x-cXnSmrpVUlsPOlfYsQRjnFv6_O6P_oQ-2irKhhp61IJw_JXxPlXa0eJcctBDpkrJYxz2uH8GKSckF5xmp_GDE7vHM"/>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<div class="w-16 h-16 border-2 border-tertiary/50 border-dashed rounded-lg mb-2"></div>
+<span class="bg-tertiary text-on-tertiary px-2 py-0.5 font-label-caps text-[10px]">PROCESSING...</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-body-base text-body-base font-bold">Marcus Holloway</h5>
+<p class="font-data-mono text-data-mono text-on-surface-variant text-[11px] mb-4">ID: EDU-2210-X</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-secondary text-on-secondary py-2 font-label-caps text-label-caps active:scale-95 transition-all opacity-50 cursor-not-allowed">APPROVE</button>
+<button class="flex-1 border border-outline-variant py-2 font-label-caps text-label-caps active:scale-95 transition-all">DENY</button>
+</div>
+</div>
+</div>
+<!-- Request Item 3 -->
+<div class="bg-surface-container-low border border-outline-variant/30 overflow-hidden">
+<div class="relative aspect-video bg-surface-container-highest">
+<img class="w-full h-full object-cover opacity-50 blur-[1px]" data-alt="An advanced AI identity verification module with a sophisticated glassmorphism interface. The subject's face is framed by intricate white digital crosshairs and data streams in a dark, tech-focused environment. The lighting is low-key with intense sapphire blue accents, creating an atmosphere of high-tech security and precision in a modern digital educational hub." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdxRoe-FOxwCN4lERz4MGl27AdgZPfqnvmz5-O87_kzok3CDxeaCEnCWG00i4rT2ON51AI8MwBmmPtQ2eyLkI1Uoh4mFtSFBtUghFI0TPD1bysNqDgpm9rfeTQOxZP49p8inEqAD_TfZm98gJEcifTW3Jl5PUvKfS2742e_gnoFZsN0FbJud3TDImatrZsMlQ9smSGrsHplyfwmPDyX34Tu83WWGx6X9aBBrtRu5-PIv4HgSdWtfrGxYEysZuSRCwFnjMpI4r7Ic8i"/>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<div class="w-16 h-16 border-2 border-secondary/50 border-dashed rounded-lg mb-2"></div>
+<span class="bg-secondary text-on-secondary px-2 py-0.5 font-label-caps text-[10px]">FACE ID VERIFIED</span>
+</div>
+</div>
+<div class="p-4">
+<h5 class="font-body-base text-body-base font-bold">Sarah Connor</h5>
+<p class="font-data-mono text-data-mono text-on-surface-variant text-[11px] mb-4">ID: EDU-4491-K</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-secondary text-on-secondary py-2 font-label-caps text-label-caps active:scale-95 transition-all">APPROVE</button>
+<button class="flex-1 border border-outline-variant py-2 font-label-caps text-label-caps active:scale-95 transition-all">DENY</button>
+</div>
+</div>
+</div>
+<!-- Empty State / Add Action -->
+<div class="bg-surface-container-low border border-dashed border-outline-variant/40 flex flex-col items-center justify-center p-6 text-center">
+<span class="material-symbols-outlined text-outline text-4xl mb-2" data-icon="group_add">group_add</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Queue monitoring active.<br/>No more pending requests.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom FAB (Contextual for Classrooms) -->
+<button class="fixed bottom-margin-desktop right-margin-desktop w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg glow-primary flex items-center justify-center active:scale-95 transition-transform z-50">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</body></html>

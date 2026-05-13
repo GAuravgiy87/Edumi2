@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Edumi AI - User Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-blue {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 10px rgba(78, 222, 163, 0.15);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#002113",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "surface-container-low": "#191b23",
+                        "inverse-primary": "#005ac2",
+                        "outline-variant": "#424754",
+                        "on-primary": "#002e6a",
+                        "outline": "#8c909f",
+                        "surface-bright": "#363941",
+                        "tertiary-fixed": "#ffddb8",
+                        "secondary-container": "#00a572",
+                        "inverse-on-surface": "#2e3038",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface-container": "#1d2027",
+                        "on-background": "#e1e2ec",
+                        "surface-variant": "#32353c",
+                        "on-surface": "#e1e2ec",
+                        "on-tertiary-container": "#3e2400",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#10131a",
+                        "surface-container-high": "#272a31",
+                        "on-primary-fixed": "#001a42",
+                        "secondary-fixed": "#6ffbbe",
+                        "inverse-surface": "#e1e2ec",
+                        "background": "#10131a",
+                        "on-error": "#690005",
+                        "primary-fixed": "#d8e2ff",
+                        "tertiary-container": "#ca8100",
+                        "surface": "#10131a",
+                        "on-primary-container": "#00285d",
+                        "error-container": "#93000a",
+                        "secondary-fixed-dim": "#4edea3",
+                        "primary-container": "#4d8eff",
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface-tint": "#adc6ff",
+                        "surface-container-highest": "#32353c",
+                        "primary": "#adc6ff",
+                        "surface-container-lowest": "#0b0e15",
+                        "on-primary-fixed-variant": "#004395",
+                        "on-tertiary": "#472a00",
+                        "on-secondary": "#003824",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "on-surface-variant": "#c2c6d6",
+                        "secondary": "#4edea3",
+                        "on-tertiary-fixed": "#2a1700",
+                        "tertiary": "#ffb95f",
+                        "on-secondary-container": "#00311f",
+                        "on-error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "card-padding": "1.25rem",
+                        "margin-desktop": "32px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Inter"],
+                        "body-base": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-base selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 docked full-width top-0 sticky z-50 flex items-center justify-between px-margin-desktop h-16 w-full">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary">Edumi</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Live Monitor</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-error-container text-on-error-container px-4 py-2 font-label-caps text-label-caps rounded-lg hover:brightness-110 active:scale-95 transition-all">
+                Emergency Broadcast
+            </button>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">notifications_active</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">settings_input_component</span>
+<img alt="User Profile Avatar" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5T4AS_12BGdRV0xSH5AfEUPYnx74YYDySnuiR9fHjNNYrpSdcJ5Kek8XYw4G2qjsSotYkhfEA35u5ay3rA1xej7OdX-1Xo-bNy8rdyH5jtMAQmjUIbJe7VxmKktPeoWywLtrc3A-ZM9cWAaC8SWMGXO3u-K0_feIXmujS6v8Ct1zChUcZ-z2_6H8hELtyhdqAbzrR4zn9qxvsxbQrQMKve-4YZgnXnUYpYDqlDTqOYQOl-Azr2ADdlV1P7VSaY-dYEBVXClToXUUX"/>
+</div>
+</div>
+</header>
+<div class="flex">
+<!-- SideNavBar -->
+<aside class="bg-surface-container h-screen w-64 flex flex-col fixed left-0 top-0 z-40 border-r border-outline-variant/20 pt-16">
+<div class="flex flex-col h-full py-gutter px-4">
+<div class="mb-8 px-2">
+<h2 class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</h2>
+<p class="text-on-surface-variant font-label-caps text-label-caps opacity-70">Academic Command</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-sm text-body-sm">Command Center</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-body-sm text-body-sm">Classrooms</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="font-body-sm text-body-sm">Live Stream</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-sm text-body-sm">AI Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-sm text-body-sm">Settings</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant/10 pt-4 space-y-1">
+<button class="w-full bg-primary text-on-primary py-2 px-4 rounded-lg font-label-caps text-label-caps mb-4 hover:brightness-110">
+                        Create Classroom
+                    </button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant font-medium hover:text-primary" href="#">
+<span class="material-symbols-outlined">help_center</span>
+<span class="font-body-sm text-body-sm">Support</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant font-medium hover:text-error" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-sm text-body-sm">System Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 flex-1 p-margin-desktop bg-surface-dim min-h-screen">
+<div class="max-w-7xl mx-auto space-y-gutter">
+<!-- Page Header & Filters -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-gutter">
+<div>
+<h1 class="font-display-lg text-display-lg text-on-surface">User Management</h1>
+<p class="text-on-surface-variant mt-2 max-w-xl">Centralized administration of students, educators, and system entities with real-time biometric verification oversight.</p>
+</div>
+<div class="flex flex-wrap gap-3">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">filter_list</span>
+<select class="bg-surface-container-high border-none text-on-surface font-label-caps text-label-caps pl-10 pr-8 py-2 rounded shadow-sm focus:ring-2 focus:ring-primary appearance-none">
+<option>ALL ROLES</option>
+<option>STUDENTS</option>
+<option>TEACHERS</option>
+<option>ADMINS</option>
+</select>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">verified_user</span>
+<select class="bg-surface-container-high border-none text-on-surface font-label-caps text-label-caps pl-10 pr-8 py-2 rounded shadow-sm focus:ring-2 focus:ring-primary appearance-none">
+<option>VERIFICATION STATUS</option>
+<option>VERIFIED</option>
+<option>PENDING</option>
+<option>FLAGGED</option>
+</select>
+</div>
+<button class="bg-primary/10 text-primary border border-primary/20 px-4 py-2 font-label-caps text-label-caps rounded flex items-center gap-2 hover:bg-primary/20">
+<span class="material-symbols-outlined text-sm">rule</span>
+                            BATCH ACTION
+                        </button>
+</div>
+</section>
+<!-- Data Table Control Card -->
+<div class="glass-panel rounded overflow-hidden">
+<!-- Search & Action Bar -->
+<div class="bg-surface-container-highest/50 px-gutter py-4 border-b border-outline-variant/20 flex items-center justify-between">
+<div class="relative w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-lg pl-10 pr-4 py-2 text-body-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-on-surface placeholder:text-outline-variant" placeholder="Search by UID, name, or hardware signature..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-on-surface-variant font-data-mono text-data-mono">TOTAL: 1,429 NODES</span>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">refresh</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">download</span>
+</button>
+</div>
+</div>
+<!-- Density Focused Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high/30 text-on-surface-variant font-label-caps text-label-caps border-b border-outline-variant/10">
+<th class="px-gutter py-4 font-bold"><input class="bg-surface-container-lowest border-outline-variant rounded" type="checkbox"/></th>
+<th class="px-gutter py-4 font-bold">USER ENTITY</th>
+<th class="px-gutter py-4 font-bold">ROLE / ACCESS</th>
+<th class="px-gutter py-4 font-bold">BIOMETRIC SIG</th>
+<th class="px-gutter py-4 font-bold">REGISTRY DATE</th>
+<th class="px-gutter py-4 font-bold">STATUS</th>
+<th class="px-gutter py-4 font-bold text-right">SYSTEM ACTIONS</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10 font-body-sm">
+<!-- Row 1 -->
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-gutter py-4"><input class="bg-surface-container-lowest border-outline-variant rounded" type="checkbox"/></td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden border border-outline-variant/30">
+<img alt="Student Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDromyC9xuIn1ry0g7IOVWWnY2ShWChbg4n0sAN6s5lYjPRPvt_zc1UOkTN1gXaVjMu_7cfEXSbbvPjJH6DVT9HJiukcHS3E21nzcUMMzzQ58X4Xu35urEFRS3snAC0FblEsfjProGalwK6g5RpjVeDXU5jxfbGk4XVgBObAnR3mZYm_gWMbKDG9wbJpouKq3lhfCSE4J79IjiLXCBm2AFP1lVZOQVDUJCUFjduX0T_l6V2R5XVYdUYH-YXVk6Wy9dq0EKSMTwdcQy2"/>
+</div>
+<div>
+<div class="text-on-surface font-semibold">Dr. Alistair Vance</div>
+<div class="text-outline-variant font-data-mono text-[11px]">UID: ED-8842-X</div>
+</div>
+</div>
+</td>
+<td class="px-gutter py-4">
+<span class="bg-tertiary-container text-on-tertiary-container px-2 py-0.5 rounded font-label-caps text-[10px]">FACULTY</span>
+</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-secondary">
+<span class="material-symbols-outlined text-[18px]">fingerprint</span>
+<span class="font-data-mono text-data-mono">MATCHED: 99.8%</span>
+</div>
+</td>
+<td class="px-gutter py-4 font-data-mono text-on-surface-variant">2023-11-14</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-secondary">
+<div class="w-2 h-2 rounded-full bg-secondary glow-emerald"></div>
+<span class="font-label-caps text-[10px]">ACTIVE</span>
+</div>
+</td>
+<td class="px-gutter py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:text-primary" title="Edit Permissions"><span class="material-symbols-outlined text-lg">admin_panel_settings</span></button>
+<button class="p-1 hover:text-primary" title="Edit Profile"><span class="material-symbols-outlined text-lg">edit</span></button>
+<button class="p-1 hover:text-error" title="Revoke Access"><span class="material-symbols-outlined text-lg">block</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-gutter py-4"><input class="bg-surface-container-lowest border-outline-variant rounded" type="checkbox"/></td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden border border-outline-variant/30">
+<img alt="Student Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAG7acpDd6KThKTfft9B60P7NhJitKtfIrcpOxL4fssssy2S3x5A0hSrBJb2u0BGbRLHZl02JJAacSCgjcCwoOCwn7nfRCMtjQlVn1MpqURm_81ieRmAVrbukLxR1VU93-7J3xmU9h3KH_62MnoHcpuWvVFsq1X-bU1agj_QNvQxnQvYmuwazUpmaOXfjZ_H9zR6xkQIVDOu25msv0HRJJfiFcfJZDnyvUNSLkX3Ct9X_f5xCXve8Hg3napVhUW-ylZCXMAAXKii2Pp"/>
+</div>
+<div>
+<div class="text-on-surface font-semibold">Sarah Jenkins</div>
+<div class="text-outline-variant font-data-mono text-[11px]">UID: ED-1102-S</div>
+</div>
+</div>
+</td>
+<td class="px-gutter py-4">
+<span class="bg-primary-container text-on-primary-container px-2 py-0.5 rounded font-label-caps text-[10px]">STUDENT</span>
+</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-tertiary">
+<span class="material-symbols-outlined text-[18px]">face</span>
+<span class="font-data-mono text-data-mono">PENDING SCAN</span>
+</div>
+</td>
+<td class="px-gutter py-4 font-data-mono text-on-surface-variant">2024-02-01</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-tertiary">
+<div class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></div>
+<span class="font-label-caps text-[10px]">ONBOARDING</span>
+</div>
+</td>
+<td class="px-gutter py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:text-primary"><span class="material-symbols-outlined text-lg">admin_panel_settings</span></button>
+<button class="p-1 hover:text-primary"><span class="material-symbols-outlined text-lg">edit</span></button>
+<button class="p-1 hover:text-error"><span class="material-symbols-outlined text-lg">block</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-gutter py-4"><input class="bg-surface-container-lowest border-outline-variant rounded" type="checkbox"/></td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden border border-outline-variant/30">
+<img alt="Student Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYXrv8KNeJtyaaJCfHbd6IuFlddE0KCAU6sJAVu4AIkexFTbFl6JrDCEY7toVaJqmxiPQpnjO51dK66kDpBhVpOkIfuGRlnH4v0pzBxDLvD96f6_Yzj9YSevHmNBMv609PSyg-nluCXfvPcvl_qd6RZkdNE6TyHwbamVnoamNTUTqT-KnUyCc-Qctj4DS8GbG_b3SxCuO49fcx5vcgDTdCgyzq2xFQMt4vrn9k_CZcrBYomqzKjphaZMQhjxS6kQFKbAeeLCyjteYV"/>
+</div>
+<div>
+<div class="text-on-surface font-semibold">Marcus Holloway</div>
+<div class="text-outline-variant font-data-mono text-[11px]">UID: ED-0044-A</div>
+</div>
+</div>
+</td>
+<td class="px-gutter py-4">
+<span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded font-label-caps text-[10px]">SYS ADMIN</span>
+</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-secondary">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span class="font-data-mono text-data-mono">ROOT VERIFIED</span>
+</div>
+</td>
+<td class="px-gutter py-4 font-data-mono text-on-surface-variant">2023-01-10</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-secondary">
+<div class="w-2 h-2 rounded-full bg-secondary glow-emerald"></div>
+<span class="font-label-caps text-[10px]">ONLINE</span>
+</div>
+</td>
+<td class="px-gutter py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:text-primary"><span class="material-symbols-outlined text-lg">admin_panel_settings</span></button>
+<button class="p-1 hover:text-primary"><span class="material-symbols-outlined text-lg">edit</span></button>
+<button class="p-1 hover:text-error"><span class="material-symbols-outlined text-lg">block</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 4 Flagged -->
+<tr class="bg-error-container/5 hover:bg-error-container/10 transition-colors group">
+<td class="px-gutter py-4"><input class="bg-surface-container-lowest border-outline-variant rounded" type="checkbox"/></td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden border border-error/30">
+<img alt="Flagged Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcV6AeLjns2zbwbZ6UpmEbqStwTxCE75KfmqoQhQy7O4b131o8seCUhdVXoXhJGSFmFdhUKXpS90guTkTSS0YW_otif74yoFUdrZ0BtLnC1rSZ-AYuTn4ExCqnF_huwULstjRsF-yPbsdQ7WSUJ4SnZX1vJTFQs2Bvz9VZqn9QzeN2wPc-ywD5JL7SwYPS-rouj1coLmBTmnHDs_jwO5l-1gD4gcHFcgtbUNGu6MyI3BoyImCxQCtK-tlkivp5SqFLabAKmYFbQcPf"/>
+</div>
+<div>
+<div class="text-error font-semibold">Unknown Entity</div>
+<div class="text-outline-variant font-data-mono text-[11px]">UID: UNAUTH-992</div>
+</div>
+</div>
+</td>
+<td class="px-gutter py-4">
+<span class="bg-error-container text-on-error-container px-2 py-0.5 rounded font-label-caps text-[10px]">RESTRICTED</span>
+</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-error">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+<span class="font-data-mono text-data-mono">MISMATCH DETECTED</span>
+</div>
+</td>
+<td class="px-gutter py-4 font-data-mono text-on-surface-variant">2024-05-19</td>
+<td class="px-gutter py-4">
+<div class="flex items-center gap-2 text-error">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+<span class="font-label-caps text-[10px]">FLAGGED</span>
+</div>
+</td>
+<td class="px-gutter py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:text-primary"><span class="material-symbols-outlined text-lg">policy</span></button>
+<button class="p-1 hover:text-error"><span class="material-symbols-outlined text-lg">delete_forever</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="bg-surface-container-high/30 px-gutter py-4 border-t border-outline-variant/20 flex items-center justify-between">
+<span class="text-on-surface-variant font-label-caps text-[10px]">SHOWING 1-25 OF 1,429 NODES</span>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant/20 text-outline-variant hover:bg-surface-bright/10"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+<button class="w-8 h-8 flex items-center justify-center rounded bg-primary text-on-primary font-data-mono text-[12px]">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant/20 text-on-surface-variant hover:bg-surface-bright/10 font-data-mono text-[12px]">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant/20 text-on-surface-variant hover:bg-surface-bright/10 font-data-mono text-[12px]">3</button>
+<span class="px-2 self-center text-outline-variant">...</span>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant/20 text-on-surface-variant hover:bg-surface-bright/10 font-data-mono text-[12px]">58</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant/20 text-outline-variant hover:bg-surface-bright/10"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+</div>
+</div>
+</div>
+<!-- Bento Grid Details Section -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- User Verification Activity -->
+<div class="md:col-span-2 glass-panel p-card-padding rounded space-y-4">
+<div class="flex items-center justify-between">
+<h3 class="font-label-caps text-label-caps text-primary">Biometric Stream History</h3>
+<span class="text-secondary font-data-mono text-[11px] flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span> LIVE MONITORING</span>
+</div>
+<div class="h-48 flex items-end gap-2 border-l border-b border-outline-variant/20 pb-2 pl-2">
+<div class="flex-1 bg-primary/20 rounded-t h-1/2 relative group">
+<div class="absolute -top-6 left-1/2 -translate-x-1/2 hidden group-hover:block bg-surface-container text-[10px] px-1 rounded">82%</div>
+</div>
+<div class="flex-1 bg-primary/30 rounded-t h-3/4"></div>
+<div class="flex-1 bg-primary/20 rounded-t h-2/3"></div>
+<div class="flex-1 bg-secondary/40 rounded-t h-full"></div>
+<div class="flex-1 bg-primary/20 rounded-t h-1/2"></div>
+<div class="flex-1 bg-primary/30 rounded-t h-2/3"></div>
+<div class="flex-1 bg-error/40 rounded-t h-1/4"></div>
+<div class="flex-1 bg-primary/20 rounded-t h-1/2"></div>
+<div class="flex-1 bg-primary/30 rounded-t h-3/4"></div>
+<div class="flex-1 bg-secondary/40 rounded-t h-full"></div>
+</div>
+<div class="flex justify-between text-outline-variant font-data-mono text-[10px]">
+<span>00:00 UTC</span>
+<span>06:00 UTC</span>
+<span>12:00 UTC</span>
+<span>18:00 UTC</span>
+<span>NOW</span>
+</div>
+</div>
+<!-- "God-Mode" Edit Preview -->
+<div class="glass-panel p-card-padding rounded border-primary/30 glow-blue">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-label-caps text-label-caps text-secondary">God-Mode Access</h3>
+<span class="material-symbols-outlined text-secondary">security</span>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-4 border-b border-outline-variant/20 pb-4">
+<img alt="Profile Detail" class="w-16 h-16 rounded border-2 border-primary" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQAZ6UH41IM7FOyl134nHspLzVwkuOCqYHY8HkyBwy4K0L-xcQpVpU6_SB8iclKTz5BiF01giWHotGY9UuUtj82KWt4pnNYVWnTvu1xhA7wYJ9P8cPvIgxS7hdfx9Fj1pDRv2QlhWYvD7i8cx78KRwMWGCic-B_P266DutsQFoAfj8m2SbuIdSnEofQFS7Pvy3JpRXw7Jtf6S4D88_vYuNbL2pHmbHMvwMSBSQHCoC0a-Ompguwjh1dxgecxQZp7aKU4wDVWdnwu0k"/>
+<div>
+<p class="font-bold text-on-surface">Dr. Alistair Vance</p>
+<p class="text-data-mono text-[11px] text-primary">PRIVILEGE LEVEL: 9</p>
+</div>
+</div>
+<div class="space-y-3">
+<div>
+<label class="font-label-caps text-[10px] text-outline-variant">HARDWARE SIGNATURE</label>
+<div class="bg-surface-container-lowest p-2 rounded font-data-mono text-xs text-secondary mt-1">HW-ID: 77-8B-C2-91-FA-E4</div>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<button class="bg-surface-container-highest py-2 rounded font-label-caps text-[10px] hover:bg-primary/20 transition-colors">RESET PIN</button>
+<button class="bg-surface-container-highest py-2 rounded font-label-caps text-[10px] hover:bg-primary/20 transition-colors">RE-SCAN</button>
+</div>
+<button class="w-full bg-primary text-on-primary py-3 rounded font-label-caps text-label-caps hover:brightness-110 shadow-lg shadow-primary/20">SAVE SYSTEM CHANGES</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+<!-- Floating Action for New User -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform z-50">
+<span class="material-symbols-outlined text-3xl">person_add</span>
+</button>
+</body></html>

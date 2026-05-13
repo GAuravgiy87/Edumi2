@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#363941",
+                    "tertiary-fixed": "#ffddb8",
+                    "secondary-container": "#00a572",
+                    "inverse-on-surface": "#2e3038",
+                    "on-secondary-fixed-variant": "#005236",
+                    "surface-container": "#1d2027",
+                    "on-background": "#e1e2ec",
+                    "surface-variant": "#32353c",
+                    "on-surface": "#e1e2ec",
+                    "on-tertiary-container": "#3e2400",
+                    "error": "#ffb4ab",
+                    "on-secondary-fixed": "#002113",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "surface-container-low": "#191b23",
+                    "inverse-primary": "#005ac2",
+                    "outline-variant": "#424754",
+                    "on-primary": "#002e6a",
+                    "outline": "#8c909f",
+                    "primary-container": "#4d8eff",
+                    "primary-fixed-dim": "#adc6ff",
+                    "surface-tint": "#adc6ff",
+                    "surface-container-highest": "#32353c",
+                    "primary": "#adc6ff",
+                    "surface-container-lowest": "#0b0e15",
+                    "on-primary-fixed-variant": "#004395",
+                    "on-tertiary": "#472a00",
+                    "on-secondary": "#003824",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "on-surface-variant": "#c2c6d6",
+                    "secondary": "#4edea3",
+                    "on-tertiary-fixed": "#2a1700",
+                    "tertiary": "#ffb95f",
+                    "on-secondary-container": "#00311f",
+                    "on-error-container": "#ffdad6",
+                    "surface-dim": "#10131a",
+                    "surface-container-high": "#272a31",
+                    "on-primary-fixed": "#001a42",
+                    "secondary-fixed": "#6ffbbe",
+                    "inverse-surface": "#e1e2ec",
+                    "background": "#10131a",
+                    "on-error": "#690005",
+                    "primary-fixed": "#d8e2ff",
+                    "tertiary-container": "#ca8100",
+                    "surface": "#10131a",
+                    "on-primary-container": "#00285d",
+                    "error-container": "#93000a",
+                    "secondary-fixed-dim": "#4edea3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "unit": "4px",
+                    "gutter": "16px",
+                    "margin-desktop": "32px",
+                    "card-padding": "1.25rem"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "data-mono": ["JetBrains Mono"],
+                    "headline-md": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "body-base": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glass-panel {
+            background: rgba(29, 32, 39, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(78, 222, 163, 0.2), transparent);
+            background-size: 200% 100%;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-base overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface/80 backdrop-blur-md docked full-width top-0 sticky z-50 border-b border-outline-variant/20 flex items-center justify-between px-margin-desktop h-16 w-full">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary">Edumi</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-secondary border-b-2 border-secondary pb-1 hover:text-primary transition-colors duration-200" href="#">Live Monitor</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-error-container text-on-error-container px-4 py-1.5 rounded-lg font-label-caps text-label-caps hover:brightness-110 active:scale-95 transition-all">
+                Emergency Broadcast
+            </button>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined hover:text-primary cursor-pointer">notifications_active</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer">settings_input_component</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer">account_circle</span>
+</div>
+</div>
+</header>
+<div class="flex h-[calc(100vh-64px)] overflow-hidden">
+<!-- SideNavBar (Suppressed for transactional "Live" view, showing slim indicator or keeping active) -->
+<aside class="h-screen w-64 flex flex-col fixed left-0 top-16 z-40 bg-surface-container border-r border-outline-variant/20 flex flex-col h-full py-gutter px-4 hidden lg:flex">
+<div class="mb-8 px-2">
+<h2 class="font-label-caps text-label-caps text-outline mb-1">CURRENT SESSION</h2>
+<p class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</p>
+<p class="text-on-surface-variant font-body-sm">Academic Command</p>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-3 p-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-sm">Command Center</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">school</span>
+<span class="font-body-sm">Classrooms</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200">
+<span class="material-symbols-outlined">videocam</span>
+<span class="font-body-sm">Live Stream</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-sm">AI Analytics</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-sm">Settings</span>
+</div>
+</nav>
+<button class="w-full bg-primary text-on-primary py-3 rounded-xl font-label-caps mb-8 hover:brightness-110 active:scale-95 transition-all">
+                Create Classroom
+            </button>
+<div class="border-t border-outline-variant/20 pt-4 space-y-1">
+<div class="flex items-center gap-3 p-3 text-on-surface-variant font-medium hover:text-primary transition-all">
+<span class="material-symbols-outlined">help_center</span>
+<span class="font-body-sm">Support</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant font-medium hover:text-primary transition-all">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-sm">System Logout</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 lg:ml-64 p-6 bg-surface-dim overflow-hidden flex flex-col gap-6">
+<!-- Live Status Bar -->
+<div class="flex items-center justify-between bg-surface-container-high rounded-xl p-4 border border-outline-variant/10">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
+</span>
+<span class="font-label-caps text-label-caps text-secondary">LIVE</span>
+</div>
+<div class="h-4 w-[1px] bg-outline-variant/30"></div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-outline">ELAPSED TIME</span>
+<span class="font-data-mono text-data-mono text-primary">01:24:42</span>
+</div>
+<div class="h-4 w-[1px] bg-outline-variant/30"></div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-sm">network_check</span>
+<span class="font-body-sm text-on-surface-variant">42ms Latency</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 bg-surface-container rounded-full px-3 py-1 border border-outline-variant/20">
+<span class="material-symbols-outlined text-sm text-on-surface-variant">group</span>
+<span class="font-data-mono text-xs text-on-surface">1,204</span>
+</div>
+<button class="flex items-center gap-2 bg-primary-container text-on-primary-container px-4 py-2 rounded-lg font-label-caps text-label-caps hover:brightness-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm">front_hand</span>
+                        Raise Hand
+                    </button>
+</div>
+</div>
+<!-- Dashboard Layout (Bento Grid Style) -->
+<div class="flex-1 grid grid-cols-12 grid-rows-6 gap-6 overflow-hidden">
+<!-- Primary Video Stream -->
+<div class="col-span-12 lg:col-span-8 row-span-4 bg-black rounded-2xl relative overflow-hidden group border border-outline-variant/20">
+<img class="w-full h-full object-cover opacity-90" data-alt="A professional university professor delivering a high-energy physics lecture on a digital chalkboard. The lighting is cinematic with blue and purple rim lights, creating a high-tech academic atmosphere. 4k resolution, shallow depth of field, minimalist laboratory background with glowing data screens. Command center aesthetic with clean lines and tech-forward visuals." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMyIH7AQFH-QgmRbiAM0boXwz1bMPg9pR_uIYxzgDlQ6u9RBvn1sLbj7PvtDvX0zr4CJCsrt5ywzC2omUGnEQ_bT7S-YK10BcpNO3kLXCWWAUJ-LBacKZgjMt992ZhROP73Sk-ViX_QfR_6FR1tII6LoIIkRIVCyMIzAYCKCVvDngNf5-qTQxMMZfKj_PP1ZoJKh_zG-gZGGGkAVb-OuRJfXjtNTtsitK-U7_Fl6tk1mGgCFzYP8jpdY5gsS_IMM347vfO4IHWqKqY"/>
+<!-- Teacher Name Tag -->
+<div class="absolute bottom-6 left-6 flex items-center gap-3 glass-panel px-4 py-2 rounded-full">
+<div class="w-8 h-8 rounded-full border border-primary overflow-hidden">
+<img alt="Prof. Aris" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3bfaClnMv5djdk5cdJ0ACWLiwqaMrvOSg0Qvwxes4pQiXYLIUey-x6uuETgawNL57uNxMxxP2J4UHR40mGLGmtt_XCDVHro8GJzlWxTH1fs9doTUy887hIOB4wLbaAw7ELFul0CZgD-mj1L8VGsQDnbxeiHuiByZf2CCtWkOJPfiXzCdvtY9wmzkDMBCUV6JTxeVOwBzDyLBOO2vOhAcZLBozVWoT5E5XjWzmepnwVMA_QMMHhhLSGG6j0D-yKB14dK-VzYJzVJbv"/>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-primary">INSTRUCTOR</span>
+<span class="font-body-sm font-bold text-white">Dr. Elena Sterling</span>
+</div>
+</div>
+<!-- Overlay Controls -->
+<div class="absolute bottom-6 right-6 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-3 rounded-full glass-panel text-white hover:bg-surface-bright"><span class="material-symbols-outlined">volume_up</span></button>
+<button class="p-3 rounded-full glass-panel text-white hover:bg-surface-bright"><span class="material-symbols-outlined">closed_caption</span></button>
+<button class="p-3 rounded-full glass-panel text-white hover:bg-surface-bright"><span class="material-symbols-outlined">fullscreen</span></button>
+</div>
+</div>
+<!-- Chat Sidebar -->
+<div class="col-span-12 lg:col-span-4 row-span-6 glass-panel rounded-2xl flex flex-col overflow-hidden">
+<div class="p-4 border-b border-outline-variant/20 flex justify-between items-center bg-surface-container/30">
+<span class="font-label-caps text-label-caps text-on-surface">LIVE INTERACTION</span>
+<span class="material-symbols-outlined text-outline text-sm">more_vert</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-label-caps text-[10px] text-tertiary">MODERATOR</span>
+<span class="font-body-sm font-bold text-on-surface">System AI</span>
+</div>
+<div class="bg-tertiary-container/10 p-3 rounded-xl rounded-tl-none border border-tertiary/20">
+<p class="text-body-sm text-on-surface-variant">Welcome to the session. Dr. Sterling is now discussing quantum entanglement. Feel free to use 'Ask Question'.</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 items-end">
+<div class="flex items-center gap-2">
+<span class="font-body-sm font-bold text-on-surface">You</span>
+<span class="font-label-caps text-[10px] text-outline">12:44 PM</span>
+</div>
+<div class="bg-primary/10 p-3 rounded-xl rounded-tr-none border border-primary/20">
+<p class="text-body-sm text-on-surface-variant">Can we clarify the observer effect in this context?</p>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-body-sm font-bold text-on-surface">Julian Chen</span>
+<span class="font-label-caps text-[10px] text-outline">12:45 PM</span>
+</div>
+<div class="bg-surface-container-highest p-3 rounded-xl rounded-tl-none border border-outline-variant/10">
+<p class="text-body-sm text-on-surface-variant">I was wondering the same thing! It seems counter-intuitive.</p>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest border-t border-outline-variant/20">
+<div class="relative">
+<input class="w-full bg-surface-dim border border-outline-variant/30 rounded-lg pl-4 pr-12 py-3 focus:ring-1 focus:ring-primary focus:border-primary text-body-sm outline-none" placeholder="Type a message..." type="text"/>
+<button class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-primary hover:text-secondary-fixed transition-colors">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Attention Monitor Widget -->
+<div class="col-span-12 lg:col-span-4 row-span-2 glass-panel rounded-2xl p-5 border border-primary/20 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-label-caps text-label-caps text-primary mb-1">ATTENTION MONITOR</h3>
+<p class="text-xs text-on-surface-variant">AI-Calculated Focus Score</p>
+</div>
+<div class="bg-secondary/10 px-2 py-1 rounded text-secondary font-data-mono text-xs">ACTIVE</div>
+</div>
+<div class="flex items-end gap-1 h-12">
+<div class="flex-1 bg-secondary/20 h-4 rounded-t-sm"></div>
+<div class="flex-1 bg-secondary/40 h-8 rounded-t-sm"></div>
+<div class="flex-1 bg-secondary/30 h-6 rounded-t-sm"></div>
+<div class="flex-1 bg-secondary/60 h-10 rounded-t-sm"></div>
+<div class="flex-1 bg-secondary h-12 rounded-t-sm shadow-[0_0_15px_rgba(78,222,163,0.3)]"></div>
+<div class="flex-1 bg-secondary/80 h-11 rounded-t-sm"></div>
+<div class="flex-1 bg-secondary/60 h-9 rounded-t-sm"></div>
+</div>
+<div class="flex justify-between items-center mt-2">
+<span class="font-display-lg text-display-lg font-bold text-on-surface">94<span class="text-lg font-normal text-outline">%</span></span>
+<div class="text-right">
+<span class="block text-[10px] text-outline uppercase font-bold">Optimization</span>
+<span class="text-secondary font-body-sm font-bold">Optimal Range</span>
+</div>
+</div>
+</div>
+<!-- Secondary Actions / Resource Bento -->
+<div class="col-span-12 lg:col-span-4 row-span-2 glass-panel rounded-2xl p-5 border border-outline-variant/10 flex flex-col justify-between">
+<div class="flex items-center gap-3">
+<div class="p-2 bg-primary/10 rounded-lg">
+<span class="material-symbols-outlined text-primary">quiz</span>
+</div>
+<div>
+<h3 class="font-label-caps text-label-caps text-on-surface">QUICK ACTIONS</h3>
+<p class="text-xs text-on-surface-variant">Session context tools</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3 mt-4">
+<button class="bg-surface-bright/50 border border-outline-variant/20 py-2.5 rounded-lg text-body-sm font-medium hover:bg-surface-bright transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">menu_book</span>
+                            Handouts
+                        </button>
+<button class="bg-surface-bright/50 border border-outline-variant/20 py-2.5 rounded-lg text-body-sm font-medium hover:bg-surface-bright transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">history_edu</span>
+                            AI Notes
+                        </button>
+</div>
+<button class="w-full mt-3 bg-secondary text-on-secondary font-label-caps text-label-caps py-3 rounded-lg hover:brightness-105 active:scale-[0.98] transition-all">
+                        ASK QUESTION (AI QUEUE)
+                    </button>
+</div>
+</div>
+</main>
+</div>
+<!-- Mobile Navigation Shell (BottomNavBar) -->
+<div class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container border-t border-outline-variant/20 flex items-center justify-around h-16 z-50">
+<div class="flex flex-col items-center text-outline">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-label-caps">Home</span>
+</div>
+<div class="flex flex-col items-center text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">videocam</span>
+<span class="text-[10px] font-label-caps">Live</span>
+</div>
+<div class="flex flex-col items-center text-outline">
+<span class="material-symbols-outlined">chat</span>
+<span class="text-[10px] font-label-caps">Chat</span>
+</div>
+<div class="flex flex-col items-center text-outline">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-label-caps">Profile</span>
+</div>
+</div>
+</body></html>

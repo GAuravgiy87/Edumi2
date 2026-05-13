@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Edumi | Hardware &amp; Camera Governance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#ffdad6",
+                    "on-primary-fixed-variant": "#004395",
+                    "on-primary-fixed": "#001a42",
+                    "surface-container-lowest": "#0b0e15",
+                    "surface-bright": "#363941",
+                    "on-error": "#690005",
+                    "surface-container-high": "#272a31",
+                    "secondary": "#4edea3",
+                    "surface-dim": "#10131a",
+                    "on-secondary-fixed-variant": "#005236",
+                    "surface-container": "#1d2027",
+                    "on-surface-variant": "#c2c6d6",
+                    "inverse-surface": "#e1e2ec",
+                    "on-surface": "#e1e2ec",
+                    "on-secondary-fixed": "#002113",
+                    "secondary-container": "#00a572",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "surface-container-low": "#191b23",
+                    "surface": "#10131a",
+                    "outline-variant": "#424754",
+                    "on-secondary-container": "#00311f",
+                    "primary-container": "#4d8eff",
+                    "on-secondary": "#003824",
+                    "primary": "#adc6ff",
+                    "error-container": "#93000a",
+                    "surface-container-highest": "#32353c",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "inverse-primary": "#005ac2",
+                    "on-primary": "#002e6a",
+                    "error": "#ffb4ab",
+                    "on-tertiary-fixed": "#2a1700",
+                    "surface-tint": "#adc6ff",
+                    "tertiary": "#ffb95f",
+                    "on-primary-container": "#00285d",
+                    "on-tertiary": "#472a00",
+                    "on-tertiary-container": "#3e2400",
+                    "surface-variant": "#32353c",
+                    "background": "#10131a",
+                    "inverse-on-surface": "#2e3038",
+                    "tertiary-container": "#ca8100",
+                    "secondary-fixed": "#6ffbbe",
+                    "secondary-fixed-dim": "#4edea3",
+                    "outline": "#8c909f",
+                    "on-background": "#e1e2ec",
+                    "primary-fixed": "#d8e2ff",
+                    "tertiary-fixed": "#ffddb8",
+                    "primary-fixed-dim": "#adc6ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "gutter": "16px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "32px",
+                    "card-padding": "1.25rem"
+            },
+            "fontFamily": {
+                    "display-lg": ["Inter"],
+                    "data-mono": ["JetBrains Mono"],
+                    "body-base": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "label-caps": ["Inter"]
+            },
+            "fontSize": {
+                    "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            background-color: #10131a;
+            color: #e1e2ec;
+        }
+        .glass-panel {
+            background: rgba(29, 32, 39, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .stream-glow {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+        }
+        .active-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .3; }
+        }
+    </style>
+</head>
+<body class="font-body-base overflow-hidden">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="h-screen w-64 flex flex-col fixed left-0 top-0 z-40 bg-surface-container border-r border-outline-variant/20 flex flex-col h-full py-gutter px-4">
+<div class="mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant opacity-70">Academic Command</p>
+</div>
+<button class="mb-8 flex items-center justify-center gap-2 bg-primary text-on-primary py-3 px-4 font-label-caps text-label-caps rounded-lg hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-sm">add</span>
+            Create Classroom
+        </button>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-sm text-body-sm">Command Center</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-body-sm text-body-sm">Classrooms</span>
+</a>
+<!-- Active State: Hardware/Live Stream Context -->
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="font-body-sm text-body-sm">Live Stream</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-sm text-body-sm">AI Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-sm text-body-sm">Settings</span>
+</a>
+</nav>
+<div class="mt-auto space-y-2 pt-4 border-t border-outline-variant/20">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">help_center</span>
+<span class="font-body-sm text-body-sm">Support</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-sm text-body-sm">System Logout</span>
+</a>
+</div>
+</aside>
+<main class="ml-64 flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar (Authority: JSON) -->
+<header class="bg-surface/80 backdrop-blur-md sticky top-0 z-50 border-b border-outline-variant/20 flex items-center justify-between px-margin-desktop h-16 w-full">
+<div class="flex items-center gap-6">
+<span class="font-headline-md text-headline-md font-bold text-primary">Hardware Governance | Global Monitor</span>
+<nav class="hidden md:flex items-center gap-4">
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Status</a>
+<a class="text-secondary border-b-2 border-secondary pb-1 font-body-sm" href="#">Live Monitor</a>
+<a class="text-on-surface-variant font-body-sm hover:text-primary transition-colors duration-200" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="bg-surface-container-low border border-outline-variant/20 rounded-lg pl-10 pr-4 py-1.5 text-body-sm focus:ring-1 focus:ring-primary outline-none w-64 transition-all" placeholder="Search by Campus/Wing..." type="text"/>
+</div>
+<button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-lg font-label-caps text-label-caps hover:opacity-90 transition-transform active:scale-95">
+                    Add New RTSP Camera
+                </button>
+<div class="flex items-center gap-2 border-l border-outline-variant/20 pl-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">notifications_active</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">settings_input_component</span>
+<span class="material-symbols-outlined text-primary cursor-pointer">account_circle</span>
+</div>
+</div>
+</header>
+<!-- Monitoring Workspace -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Grid of 12 Live Feeds -->
+<section class="flex-1 overflow-y-auto p-gutter grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4 bg-surface">
+<!-- Camera Cards (Iterated 12 times) -->
+<!-- Card 1 -->
+<div class="glass-panel rounded-lg overflow-hidden flex flex-col group stream-glow">
+<div class="relative aspect-video bg-surface-container-highest">
+<img class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" data-alt="A cinematic, high-definition security camera viewpoint showing a modern school hallway with sleek minimalist architecture and bright white lighting. The image captures deep blues and sharp neon emerald accents, maintaining a high-tech command center aesthetic with a slight data overlay. The atmosphere is quiet, professional, and secure." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAT7MDX0aRq0WdLQoJ4yM9oxowGJOvM4gK5keIIcnIhBmHo9oiXuD5ET2jiquA2sQTHLfzPvSaSKnYBON5EVNVLs6BDNi8zlDQycPSdojhO4uRqpTxPku5restZo1i37YL_gTKRtP8iRjZZURMAbgf-UyLPCTahZBZAMkToBMEzdxQC-wiqZJQ22J60fWMqHgaS_potWeTL6Vj0IMLRjRL7F3iYFUC8eVaG9ssEjaI3jDgSOx4ouKn-r-uTJutYA0AFCv-Uq2UGZ1Ky"/>
+<div class="absolute top-2 left-2 flex items-center gap-2 bg-surface/60 backdrop-blur px-2 py-1 rounded text-[10px] font-data-mono uppercase tracking-widest border border-white/10">
+<span class="w-2 h-2 rounded-full bg-secondary active-dot"></span>
+                            Live: Hallway A-12
+                        </div>
+<div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[10px] font-data-mono text-secondary">
+                            1080P | 30 FPS
+                        </div>
+</div>
+<div class="p-3 flex items-center justify-between">
+<div>
+<p class="font-label-caps text-label-caps text-on-surface">Campus North - Wing A</p>
+<p class="text-[10px] text-on-surface-variant font-data-mono">UID: RTSP_7721_AX</p>
+</div>
+<button class="bg-surface-bright/20 hover:bg-primary/20 text-on-surface px-3 py-1.5 rounded font-label-caps text-label-caps border border-outline-variant/30 transition-colors">Manage</button>
+</div>
+</div>
+<!-- Repeat simplified for remaining 11 cards to represent the requested 12 grid -->
+<!-- Card 2 -->
+<div class="glass-panel rounded-lg overflow-hidden flex flex-col group">
+<div class="relative aspect-video bg-surface-container-highest">
+<img class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" data-alt="A surveillance view of a high-tech corporate library or university study area with rows of clean desks and integrated lighting. The style is ultra-modern with a dark slate and tech-blue color palette. Soft glowing indicators are visible in the periphery, creating a sophisticated monitoring hub atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-PfBEQOcItCXzqq1u34jM838RzR6rih-vGRxGaxbegd9Z-oncBUCQb8Mk82PBL3jm_iPjnw2RoUqiKcVdW3vmyLG3Cns-zLECJwsbSrYvebFx-KhsYFtj5U8hSbnks-ihRSJ76F0OJr44T5rReUPJBwm0037rS9jdg7-EpmMyJ3qmvcN9fJphBfYp7EIhOqXeylD6jbQHAUciyvYyNLB0--ChBHSDcPYZRZIXeAgxzlMsZ_ZgqbY0yBj032fiusdc0zrSqdOy222_"/>
+<div class="absolute top-2 left-2 flex items-center gap-2 bg-surface/60 backdrop-blur px-2 py-1 rounded text-[10px] font-data-mono uppercase tracking-widest border border-white/10">
+<span class="w-2 h-2 rounded-full bg-secondary active-dot"></span>
+                            Main Library
+                        </div>
+<div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[10px] font-data-mono text-secondary">1080P | 24 FPS</div>
+</div>
+<div class="p-3 flex items-center justify-between">
+<div><p class="font-label-caps text-label-caps text-on-surface">Campus North - Central</p></div>
+<button class="bg-surface-bright/20 hover:bg-primary/20 text-on-surface px-3 py-1.5 rounded font-label-caps text-label-caps border border-outline-variant/30 transition-colors">Manage</button>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="glass-panel rounded-lg overflow-hidden flex flex-col group">
+<div class="relative aspect-video bg-surface-container-highest">
+<img class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" data-alt="Wide-angle security footage of a modern lecture hall with tiered seating and integrated computer systems. The lighting is low and moody, punctuated by glowing screens and blue task lighting. The overall visual style is engineered, precise, and authoritative, matching a cybersecurity monitoring dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLKk9KW4ugSS6y6WohizA1kGG_XqSq2t21Yomz095FePuNThDHDdM2-U4AypJRiVcq3Sy8ipWb_T5bZEeYTop6wr3CEjnyCoYgMKhh86dQ6wltZjzxZxpRV4a10-5yZOGRXVtmLEtdOboGx2pR5vk1bFfpZkY4NLGLXj64PzO1OvyYNhR1mU32Aka-fkLNefXfU_L5huQJLmvM8gDqKz8VQZxY-ObAuy45U95Sbx3pc_5OdnvU2BibwPahbAwCq-EYM1Gh5NydV3MU"/>
+<div class="absolute top-2 left-2 flex items-center gap-2 bg-surface/60 backdrop-blur px-2 py-1 rounded text-[10px] font-data-mono uppercase tracking-widest border border-white/10">
+<span class="w-2 h-2 rounded-full bg-secondary active-dot"></span>
+                            Lab 402
+                        </div>
+<div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[10px] font-data-mono text-secondary">2K | 60 FPS</div>
+</div>
+<div class="p-3 flex items-center justify-between">
+<div><p class="font-label-caps text-label-caps text-on-surface">Campus West - Science</p></div>
+<button class="bg-surface-bright/20 hover:bg-primary/20 text-on-surface px-3 py-1.5 rounded font-label-caps text-label-caps border border-outline-variant/30 transition-colors">Manage</button>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="glass-panel rounded-lg overflow-hidden flex flex-col group">
+<div class="relative aspect-video bg-surface-container-highest">
+<img class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" data-alt="A security camera view overlooking a spacious outdoor courtyard within a futuristic campus. The architecture features glass and brushed steel. The image uses a cool color palette of deep navy and electric blue, conveying a sense of high-performance monitoring and real-time governance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuARJCZ8jSgu-znIIlX73PQOBlmIGZR50jc5mPSre4Sh3vSNm9NDglHm4b8n4XQ8WFGQUfF5N_2-o1mKdJFZu-on473NE9iq6po9Wfbm7RDw6dszsC9aSUrPJfa1HC5g5FUCXyRQGcLmiO5PG9sYkxTtw3C_m3-bYRSGKbEv3dn3NSJGZ-jQfDKzHxAd6-6XdNX13BYE0I_UFHgh1aNbclU6vH_ntU30jARFnsT6kQeIEWG-pBdzY_gr_LMivlauKSO5eXdlUqlBod01"/>
+<div class="absolute top-2 left-2 flex items-center gap-2 bg-surface/60 backdrop-blur px-2 py-1 rounded text-[10px] font-data-mono uppercase tracking-widest border border-white/10">
+<span class="w-2 h-2 rounded-full bg-secondary active-dot"></span>
+                            Courtyard East
+                        </div>
+<div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[10px] font-data-mono text-secondary">1080P | 30 FPS</div>
+</div>
+<div class="p-3 flex items-center justify-between">
+<div><p class="font-label-caps text-label-caps text-on-surface">Campus South - Exterior</p></div>
+<button class="bg-surface-bright/20 hover:bg-primary/20 text-on-surface px-3 py-1.5 rounded font-label-caps text-label-caps border border-outline-variant/30 transition-colors">Manage</button>
+</div>
+</div>
+<!-- Cards 5-12 placeholder layout -->
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Stream Buffering...</p>
+</div>
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Feed: Cafeteria B</p>
+</div>
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Feed: Parking Lot G</p>
+</div>
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Feed: Main Gate</p>
+</div>
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Feed: Server Room</p>
+</div>
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Feed: Gym Lobby</p>
+</div>
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Feed: Staff Lounge</p>
+</div>
+<div class="glass-panel rounded-lg h-48 flex flex-col items-center justify-center border-dashed border-2 border-outline-variant/20">
+<span class="material-symbols-outlined text-outline text-3xl mb-2">videocam_off</span>
+<p class="font-label-caps text-label-caps text-outline">Feed: Terrace North</p>
+</div>
+</section>
+<!-- Floating Delegation Panel -->
+<aside class="w-80 bg-surface-container-low border-l border-outline-variant/20 p-6 flex flex-col gap-6">
+<div>
+<h2 class="font-headline-md text-headline-md text-primary mb-1">Permission Delegation</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Assign governance feeds to authorized faculty.</p>
+</div>
+<div class="space-y-4 overflow-y-auto pr-2">
+<!-- Faculty Item -->
+<div class="glass-panel p-4 rounded-lg flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center border border-primary/20">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<div>
+<p class="font-body-sm font-bold text-on-surface">Dr. Sarah Vance</p>
+<p class="text-[10px] text-on-surface-variant font-label-caps">Department Head</p>
+</div>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded border border-secondary/20">Wing A</span>
+<span class="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded border border-secondary/20">Main Lab</span>
+</div>
+<button class="w-full bg-surface-bright/20 hover:bg-primary/10 text-[11px] font-label-caps py-2 rounded transition-colors">+ Assign Feed</button>
+</div>
+<!-- Faculty Item -->
+<div class="glass-panel p-4 rounded-lg flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center border border-primary/20">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<div>
+<p class="font-body-sm font-bold text-on-surface">Prof. Marcus Thorne</p>
+<p class="text-[10px] text-on-surface-variant font-label-caps">Security Liaison</p>
+</div>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded border border-secondary/20">All Exterior</span>
+</div>
+<button class="w-full bg-surface-bright/20 hover:bg-primary/10 text-[11px] font-label-caps py-2 rounded transition-colors">+ Assign Feed</button>
+</div>
+</div>
+<div class="mt-auto p-4 bg-tertiary/5 border border-tertiary/20 rounded-lg">
+<div class="flex items-center gap-2 text-tertiary mb-2">
+<span class="material-symbols-outlined text-sm">warning</span>
+<span class="font-label-caps text-label-caps">Global Override Active</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">Administrator level override is currently enabled. All delegations are mirrored to the central command hub.</p>
+</div>
+</aside>
+</div>
+</main>
+<!-- Bottom Status Bar (Utility/System Level) -->
+<footer class="fixed bottom-0 left-64 right-0 h-8 bg-surface-container-highest border-t border-outline-variant/20 flex items-center justify-between px-6 z-50">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-[10px] font-data-mono text-on-surface-variant uppercase tracking-widest">System Optimal</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-outline">storage</span>
+<span class="text-[10px] font-data-mono text-on-surface-variant uppercase tracking-widest">NVMR: 82% Free</span>
+</div>
+</div>
+<div class="text-[10px] font-data-mono text-outline">
+            EDUMI COMMAND v2.4.0-STABLE | UTC-0
+        </div>
+</footer>
+</body></html>

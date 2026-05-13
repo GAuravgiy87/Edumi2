@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #10131a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #32353c;
+            border-radius: 10px;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .status-pulse {
+            position: relative;
+        }
+        .status-pulse::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#004395",
+                        "on-primary-fixed": "#001a42",
+                        "surface-container-lowest": "#0b0e15",
+                        "surface-bright": "#363941",
+                        "on-error": "#690005",
+                        "surface-container-high": "#272a31",
+                        "secondary": "#4edea3",
+                        "surface-dim": "#10131a",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface-container": "#1d2027",
+                        "on-surface-variant": "#c2c6d6",
+                        "inverse-surface": "#e1e2ec",
+                        "on-surface": "#e1e2ec",
+                        "on-secondary-fixed": "#002113",
+                        "secondary-container": "#00a572",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "surface-container-low": "#191b23",
+                        "surface": "#10131a",
+                        "outline-variant": "#424754",
+                        "on-secondary-container": "#00311f",
+                        "primary-container": "#4d8eff",
+                        "on-secondary": "#003824",
+                        "primary": "#adc6ff",
+                        "error-container": "#93000a",
+                        "surface-container-highest": "#32353c",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "inverse-primary": "#005ac2",
+                        "on-primary": "#002e6a",
+                        "error": "#ffb4ab",
+                        "on-tertiary-fixed": "#2a1700",
+                        "surface-tint": "#adc6ff",
+                        "tertiary": "#ffb95f",
+                        "on-primary-container": "#00285d",
+                        "on-tertiary": "#472a00",
+                        "on-tertiary-container": "#3e2400",
+                        "surface-variant": "#32353c",
+                        "background": "#10131a",
+                        "inverse-on-surface": "#2e3038",
+                        "tertiary-container": "#ca8100",
+                        "secondary-fixed": "#6ffbbe",
+                        "secondary-fixed-dim": "#4edea3",
+                        "outline": "#8c909f",
+                        "on-background": "#e1e2ec",
+                        "primary-fixed": "#d8e2ff",
+                        "tertiary-fixed": "#ffddb8",
+                        "primary-fixed-dim": "#adc6ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "32px",
+                        "card-padding": "1.25rem"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Inter"],
+                        "data-mono": ["JetBrains Mono"],
+                        "body-base": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "data-mono": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "body-base": ["16px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "body-sm": ["14px", {"lineHeight": "1.4", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "label-caps": ["11px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-base overflow-x-hidden">
+<!-- SideNavBar -->
+<aside class="h-screen w-64 flex flex-col fixed left-0 top-0 z-40 bg-surface-container border-r border-outline-variant/20 py-gutter px-4">
+<div class="mb-10 px-2">
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tighter">Edumi AI</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-1 opacity-60">Academic Command</p>
+</div>
+<nav class="flex-1 space-y-2">
+<!-- Command Center Active -->
+<a class="flex items-center gap-3 px-3 py-3 text-secondary font-bold border-l-4 border-secondary bg-secondary/5 translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-sm text-body-sm">Command Center</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-body-sm text-body-sm">User Management</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="memory">memory</span>
+<span class="font-body-sm text-body-sm">Hardware</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="video_chat">video_chat</span>
+<span class="font-body-sm text-body-sm">Meetings</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant font-medium hover:bg-surface-bright/10 hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="folder_managed">folder_managed</span>
+<span class="font-body-sm text-body-sm">Records</span>
+</a>
+</nav>
+<div class="mt-auto pt-gutter border-t border-outline-variant/10">
+<button class="w-full bg-primary-container text-on-primary-container font-label-caps text-label-caps py-3 mb-4 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                CREATE CLASSROOM
+            </button>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-body-sm hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant font-body-sm hover:text-error transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>System Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex items-center justify-between px-margin-desktop h-16 w-full bg-surface/80 backdrop-blur-md sticky top-0 z-50 border-b border-outline-variant/20">
+<div class="flex items-center gap-6 overflow-x-auto no-scrollbar">
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant/10">
+<div class="w-2 h-2 rounded-full bg-secondary status-pulse after:bg-secondary"></div>
+<span class="font-data-mono text-data-mono text-on-surface-variant">SRV-8000: <span class="text-secondary">OK</span></span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant/10">
+<div class="w-2 h-2 rounded-full bg-secondary status-pulse after:bg-secondary"></div>
+<span class="font-data-mono text-data-mono text-on-surface-variant">AI-8001: <span class="text-secondary">LIVE</span></span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant/10">
+<div class="w-2 h-2 rounded-full bg-secondary status-pulse after:bg-secondary"></div>
+<span class="font-data-mono text-data-mono text-on-surface-variant">DB: <span class="text-secondary">SQLITE</span></span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant/10">
+<div class="w-2 h-2 rounded-full bg-secondary status-pulse after:bg-secondary"></div>
+<span class="font-data-mono text-data-mono text-on-surface-variant">WS: <span class="text-secondary">DAPHNE</span></span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-error-container text-on-error-container px-4 py-2 font-label-caps text-label-caps rounded-lg hover:brightness-110 active:scale-95 transition-all">
+                    EMERGENCY BROADCAST
+                </button>
+<div class="h-8 w-px bg-outline-variant/20"></div>
+<div class="flex gap-2">
+<span class="material-symbols-outlined p-2 text-on-surface-variant hover:text-primary cursor-pointer transition-colors" data-icon="notifications_active">notifications_active</span>
+<span class="material-symbols-outlined p-2 text-on-surface-variant hover:text-primary cursor-pointer transition-colors" data-icon="settings_input_component">settings_input_component</span>
+<img alt="User Profile Avatar" class="w-8 h-8 rounded-full border border-outline-variant/20" data-alt="A high-quality professional portrait of a modern system administrator in a dark, tech-focused environment. The lighting is dramatic, with subtle blue and teal rim lighting highlighting the silhouette. The aesthetic is clean, minimalist, and authoritative, matching a high-end AI command center interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4aqER7b8EweVbAKEjRIDITyrmYt8UNphKbCe9vNBYuG3z2u0sxAe0IubAb-QXd6SuoqL40Qu1VBMmrFD2iZG2cIfpctJEW6CnQIjRnRix80mEc0YC5g7wNGAiaHh2_79nXYGa0kmGABJEQJqy3-giiVyWQ9GfK7dBQUjVmwEHpNueQOGmZebFLu0nxakNZAk9hcFJjlxSIo3whcKhX__BjnbSzHgU4NXZa3AcKsDHxBMT8UxBIdjV3YcoVWBu51_AQSSGue82V_Jy"/>
+</div>
+</div>
+</header>
+<!-- Page Canvas -->
+<div class="p-margin-desktop space-y-gutter">
+<!-- Hero Section: Global Stats -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-gutter">
+<div class="glass-panel p-card-padding rounded-xl flex flex-col justify-between group overflow-hidden relative">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[80px]" data-icon="group">group</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Total Users</span>
+<div class="mt-4 flex items-baseline gap-2">
+<h2 class="font-display-lg text-display-lg text-primary">12.4k</h2>
+<span class="text-secondary text-body-sm font-bold flex items-center">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_upward">arrow_upward</span>
+                            12%
+                        </span>
+</div>
+</div>
+<div class="glass-panel p-card-padding rounded-xl flex flex-col justify-between group overflow-hidden relative">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[80px]" data-icon="school">school</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Students</span>
+<div class="mt-4">
+<h2 class="font-display-lg text-display-lg text-on-surface">10.2k</h2>
+<div class="w-full h-1 bg-outline-variant/20 mt-2 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[82%]"></div>
+</div>
+</div>
+</div>
+<div class="glass-panel p-card-padding rounded-xl flex flex-col justify-between group overflow-hidden relative">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[80px]" data-icon="person">person</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Teachers</span>
+<div class="mt-4">
+<h2 class="font-display-lg text-display-lg text-on-surface">840</h2>
+<p class="text-body-sm text-on-surface-variant">24 Active Now</p>
+</div>
+</div>
+<div class="glass-panel p-card-padding rounded-xl flex flex-col justify-between group overflow-hidden relative">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[80px]" data-icon="live_tv">live_tv</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Live Meetings</span>
+<div class="mt-4 flex items-center gap-4">
+<h2 class="font-display-lg text-display-lg text-secondary">42</h2>
+<div class="flex -space-x-2">
+<img class="w-6 h-6 rounded-full ring-2 ring-surface" data-alt="A detailed digital avatar of a male user in a tech environment, sharp focus, professional lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBERzl9qC8rL1RRZ0VJGGAJSYJmKPfmkTbqoRzTx6FMUxugBXpL2Q88DKixvBgyJFZ1wdE1pz3WlPyPGNi_ZvJloYon_KpnTA10f3JqwMhkOktWPsI1cvT8pTYJZjxyjkl0xymP_Mnwgu8RutRckets9xQkV4eolAbA0DQLpm7lXe65BBkD-HFcbFT_hX8Fa4UVVxVYPDR1hCQp4iTbCei4YS7KYxSyHyMVwnQafuMShjkfbpydKjZqBM1opz4QRup6sQYHv6PGvSSu"/>
+<img class="w-6 h-6 rounded-full ring-2 ring-surface" data-alt="A detailed digital avatar of a female user in a professional setting, clean aesthetic, high contrast." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCRlhN3wPZWYepDRjGa0rBI_9QnQCzNQ-7RIFEGDfFG_4LiZ1jgVc0y4cHv07Af3PvRMQI10NOKG1ID2mOe2c15_ZP_o2dZJ0unu12BjM3Zhrr2pdtle1j6E6FaNY26OIjReh1zmlnL5_TuCANutBF1CU1pb1wg9jT2Obzfy2MDB0vQTa8Mzbj4Pq9t9sVgF5bUG7OCWYVwRmFHH2Zl5eZhijLfGRVugjhwDm_HL1aCDe1B7J1gHQSgD27TZLzPL6y_ycJvTvVJE20"/>
+<div class="w-6 h-6 rounded-full bg-surface-container-highest border border-outline-variant/30 text-[8px] flex items-center justify-center font-bold">+12</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- System Resource Monitor (Bento Style) -->
+<section class="lg:col-span-8 space-y-gutter">
+<div class="glass-panel p-card-padding rounded-xl h-full">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">System Resource Monitor</h3>
+<p class="text-body-sm text-on-surface-variant">Real-time performance telemetry</p>
+</div>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded">LIVE</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-[10px] font-bold rounded">1s POLLING</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- CPU -->
+<div class="space-y-4">
+<div class="flex justify-between font-label-caps text-label-caps text-on-surface-variant">
+<span>CPU Load</span>
+<span class="text-primary">42%</span>
+</div>
+<div class="h-32 flex items-end gap-1 px-1">
+<div class="flex-1 bg-primary/20 h-[30%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/20 h-[45%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/20 h-[38%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/40 h-[60%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/30 h-[52%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/50 h-[75%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/80 h-[42%] rounded-t-sm animate-pulse"></div>
+</div>
+</div>
+<!-- RAM -->
+<div class="space-y-4">
+<div class="flex justify-between font-label-caps text-label-caps text-on-surface-variant">
+<span>RAM Usage</span>
+<span class="text-tertiary">8.4GB / 16GB</span>
+</div>
+<div class="h-32 flex items-center justify-center relative">
+<svg class="w-24 h-24 transform -rotate-90">
+<circle class="text-outline-variant/10" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-tertiary shadow-[0_0_10px_rgba(255,185,95,0.4)]" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="120" stroke-width="8"></circle>
+</svg>
+<div class="absolute font-data-mono text-data-mono text-tertiary">52%</div>
+</div>
+</div>
+<!-- Bandwidth -->
+<div class="space-y-4">
+<div class="flex justify-between font-label-caps text-label-caps text-on-surface-variant">
+<span>Bandwidth</span>
+<span class="text-secondary">428 Mb/s</span>
+</div>
+<div class="h-32 flex flex-col justify-center gap-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-on-surface-variant uppercase tracking-widest"><span>Ingress</span><span class="text-secondary">312 Mb/s</span></div>
+<div class="w-full h-1 bg-outline-variant/10 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[70%]"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-on-surface-variant uppercase tracking-widest"><span>Egress</span><span class="text-primary">116 Mb/s</span></div>
+<div class="w-full h-1 bg-outline-variant/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[30%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Action: Global Broadcast -->
+<div class="glass-panel p-card-padding rounded-xl">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-error" data-icon="campaign">campaign</span>
+<h3 class="font-label-caps text-label-caps text-on-surface tracking-widest uppercase">Quick Action: Global Broadcast</h3>
+</div>
+<div class="relative group">
+<textarea class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-lg p-4 font-body-sm text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[120px] resize-none" placeholder="Type mission-critical broadcast message here..."></textarea>
+<div class="absolute bottom-4 right-4 flex gap-2">
+<button class="bg-surface-container-high px-4 py-2 rounded font-label-caps text-[10px] text-on-surface-variant hover:text-on-surface transition-colors">DRAFT</button>
+<button class="bg-primary px-4 py-2 rounded font-label-caps text-[10px] text-on-primary font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="send">send</span>
+                                    TRANSMIT
+                                </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Live Activity Feed -->
+<section class="lg:col-span-4">
+<div class="glass-panel h-full rounded-xl flex flex-col overflow-hidden">
+<div class="p-card-padding border-b border-outline-variant/10 bg-surface-container/30">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md text-on-surface">Live Activity</h3>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:rotate-180 transition-transform duration-500" data-icon="sync">sync</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-6">
+<!-- Event 1 -->
+<div class="flex gap-4 relative">
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-px bg-outline-variant/10"></div>
+<div class="w-6 h-6 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center shrink-0 z-10">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+</div>
+<div class="space-y-1">
+<p class="font-body-sm text-on-surface">AI Microservice <span class="text-secondary">Node-04</span> scaled up (+2 pods)</p>
+<p class="font-data-mono text-[10px] text-on-surface-variant/60">12:45:02 UTC • EVENT_SCALE_UP</p>
+</div>
+</div>
+<!-- Event 2 -->
+<div class="flex gap-4 relative">
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-px bg-outline-variant/10"></div>
+<div class="w-6 h-6 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0 z-10">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<div class="space-y-1">
+<p class="font-body-sm text-on-surface">Admin <span class="text-primary font-bold">@sarah_sys</span> updated security protocols</p>
+<p class="font-data-mono text-[10px] text-on-surface-variant/60">12:42:15 UTC • AUTH_LOG_09</p>
+</div>
+</div>
+<!-- Event 3 -->
+<div class="flex gap-4 relative">
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-px bg-outline-variant/10"></div>
+<div class="w-6 h-6 rounded-full bg-tertiary/10 border border-tertiary/30 flex items-center justify-center shrink-0 z-10">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+</div>
+<div class="space-y-1">
+<p class="font-body-sm text-on-surface">Database backup completed successfully</p>
+<p class="font-data-mono text-[10px] text-on-surface-variant/60">12:30:00 UTC • SYS_CRON_BKUP</p>
+</div>
+</div>
+<!-- Event 4 -->
+<div class="flex gap-4 relative">
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-px bg-outline-variant/10"></div>
+<div class="w-6 h-6 rounded-full bg-error/10 border border-error/30 flex items-center justify-center shrink-0 z-10">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+</div>
+<div class="space-y-1">
+<p class="font-body-sm text-on-surface">Failed login attempt from <span class="text-error">IP 192.168.1.42</span></p>
+<p class="font-data-mono text-[10px] text-on-surface-variant/60">12:15:22 UTC • SECURITY_WARN</p>
+</div>
+</div>
+<!-- Event 5 -->
+<div class="flex gap-4">
+<div class="w-6 h-6 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center shrink-0 z-10">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+</div>
+<div class="space-y-1">
+<p class="font-body-sm text-on-surface">New classroom "Quantum Computing 101" initialized</p>
+<p class="font-data-mono text-[10px] text-on-surface-variant/60">11:58:04 UTC • CLASS_INIT</p>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-outline-variant/10 text-center">
+<button class="text-label-caps text-label-caps text-primary hover:underline transition-all">VIEW ALL LOGS</button>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- System Footer Stats (Desktop Only) -->
+<footer class="mt-auto px-margin-desktop py-4 bg-surface-container-low border-t border-outline-variant/10 flex items-center justify-between">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-label-caps text-on-surface-variant/40">CLUSTER LOAD</span>
+<div class="w-24 h-1.5 bg-outline-variant/20 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[24%]"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-label-caps text-on-surface-variant/40">STORAGE</span>
+<div class="w-24 h-1.5 bg-outline-variant/20 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[62%]"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant/60">
+<span class="font-data-mono text-[10px]">VER: 4.2.0-STABLE</span>
+<span class="font-data-mono text-[10px]">UPTIME: 14D 02H 12M</span>
+</div>
+</footer>
+</main>
+<!-- FAB for Quick Support (Mobile/Global) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center active:scale-90 transition-transform z-50">
+<span class="material-symbols-outlined text-[28px]" data-icon="support_agent">support_agent</span>
+</button>
+</body></html>
