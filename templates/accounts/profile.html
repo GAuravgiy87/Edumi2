@@ -63,7 +63,7 @@
                         Administrator
                     </span>
                     {% endif %}
-                    {% if face_registered %}
+                    {% if profile.user_type == 'student' and face_registered %}
                     <span class="p-badge p-badge-verified" title="Face Identity Verified">
                         <i data-lucide="user-check"></i>
                         Verified Identity
@@ -293,7 +293,8 @@
                 </div>
             </div>
 
-            <!-- Security Check -->
+            <!-- Security Check (Students Only) -->
+            {% if profile.user_type == 'student' %}
             <div class="profile-card">
                 <h2 class="card-title"><i data-lucide="lock"></i> Trust & Security</h2>
                 <div class="info-list">
@@ -313,6 +314,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
         </div>
 
     </div>
