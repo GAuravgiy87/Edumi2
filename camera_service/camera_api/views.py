@@ -1,5 +1,6 @@
 """Camera streaming views - isolated service"""
 import cv2
+import numpy as np
 import threading
 import time
 import logging
@@ -346,7 +347,7 @@ def test_camera(request, camera_id):
         results = []
         
         # Log the RTSP URL (hide password)
-        safe_url = camera.rtsp_url
+        safe_url = camera.get_full_rtsp_url()
         if '@' in safe_url:
             parts = safe_url.split('@')
             safe_url = parts[0].rsplit(':', 1)[0] + ':***@' + parts[1]
