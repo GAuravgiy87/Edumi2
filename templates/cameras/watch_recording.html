@@ -89,7 +89,7 @@
     <div class="video-main">
         <div class="player-container">
             <video controls poster="{% if recording.thumbnail %}{{ recording.thumbnail.url }}{% endif %}">
-                <source src="{{ recording.video_file.url }}" type="video/mp4">
+                <source src="{% url 'stream_video' recording.id %}" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
         </div>

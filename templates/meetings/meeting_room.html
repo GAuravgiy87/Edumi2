@@ -462,6 +462,11 @@ async function init() {
         publishDefaults: {
             simulcast: true,           // send 3 quality layers — SFU picks the right one per viewer
             videoCodec: 'h264',
+            videoEncoding: VideoPresets.h1080.encoding,
+            screenShareEncoding: {
+                maxBitrate: 4_000_000,
+                maxFramerate: 30,
+            }
         },
     });
 
@@ -1001,13 +1006,18 @@ async function toggleScreenShare() {
                 throw new Error("Screen share function not found in SDK.");
             }
 
-            const tracks = await createScreen({ audio: false });
+            const tracks = await createScreen({ 
+                audio: false,
+                resolution: VideoPresets.h1080.resolution
+            });
             const screenTrack = Array.isArray(tracks) ? tracks[0] : tracks;
             
             if (!screenTrack) throw new Error("No screen track created.");
 
             screenTrackPub = await room.localParticipant.publishTrack(screenTrack, {
-                screenShareEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 },
+                name: 'screen_share',
+                source: Track.Source.ScreenShare,
+                videoEncoding: VideoPresets.h1080.encoding,
             });
             isScreenSharing = true;
             document.getElementById('screenBtn').classList.add('active');

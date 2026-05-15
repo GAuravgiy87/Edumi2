@@ -5,7 +5,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, FileResponse
 from django.contrib.auth.models import User
 from django.db.models import Avg, Max, Min, Count, Q
 from django.utils import timezone
@@ -16,8 +16,184 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from mobile_cameras.models import MobileCamera, MobileCameraPermission
 from .head_count_service import head_count_manager
+import os
+import re
+import logging
 
 logger = logging.getLogger('cameras')
+
+def get_video_stream(file_path, range_header):
+    """Generator to stream video in chunks with support for Range requests"""
+    size = os.path.getsize(file_path)
+    byte_range = re.match(r'bytes=(\d+)-(\d*)', range_header)
+    
+    start, end = 0, size - 1
+    if byte_range:
+        start = int(byte_range.group(1))
+        if byte_range.group(2):
+            end = int(byte_range.group(2))
+    
+    chunk_size = 1024 * 1024 # 1MB
+    if end - start + 1 < chunk_size:
+        chunk_size = end - start + 1
+        
+    with open(file_path, 'rb') as f:
+        f.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            read_size = min(chunk_size, remaining)
+            data = f.read(read_size)
+            if not data:
+                break
+            yield data
+            remaining -= read_size
+
+@login_required
+def stream_video(request, recording_id):
+    """View to serve video files in chunks (YouTube style)"""
+    recording = get_object_or_404(CameraRecording, id=recording_id)
+    
+    # Check permissions (teachers can view their own, students can view published)
+    if not (request.user.is_superuser or 
+            recording.teacher == request.user or 
+            (recording.is_published and hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'student')):
+        return HttpResponse("Unauthorized", status=403)
+        
+    file_path = recording.video_file.path
+    if not os.path.exists(file_path):
+        return HttpResponse("Video file not found", status=404)
+        
+    range_header = request.META.get('HTTP_RANGE', None)
+    size = os.path.getsize(file_path)
+    
+    if range_header:
+        # Partial content response
+        byte_range = re.match(r'bytes=(\d+)-(\d*)', range_header)
+        start = int(byte_range.group(1))
+        end = int(byte_range.group(2)) if byte_range.group(2) else size - 1
+        
+        response = StreamingHttpResponse(
+            get_video_stream(file_path, range_header),
+            status=206,
+            content_type='video/mp4'
+        )
+        response['Content-Range'] = f'bytes {start}-{end}/{size}'
+        response['Accept-Ranges'] = 'bytes'
+        response['Content-Length'] = str(end - start + 1)
+    else:
+        # Full content response
+        response = FileResponse(open(file_path, 'rb'), content_type='video/mp4')
+        response['Content-Length'] = str(size)
+        response['Accept-Ranges'] = 'bytes'
+        
+    return response
+
+@login_required
+def upload_video(request):
+    """View for teachers to upload video lectures"""
+    if not (request.user.is_superuser or (hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher')):
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        description = request.POST.get('description')
+        video_file = request.FILES.get('video_file')
+        camera_id = request.POST.get('camera')
+        
+        if not video_file:
+            return render(request, 'cameras/upload_video.html', {'error': 'Please select a video file.'})
+            
+        camera = None
+        if camera_id:
+            camera = Camera.objects.filter(id=camera_id).first()
+            
+        recording = CameraRecording.objects.create(
+            teacher=request.user,
+            camera=camera,
+            title=title,
+            description=description,
+            video_file=video_file,
+            recording_status='completed',
+            is_published=False # Teacher must manually publish
+        )
+        
+        return redirect('manage_recordings')
+        
+    cameras = Camera.objects.all() if request.user.is_superuser else Camera.objects.filter(camerapermission__teacher=request.user)
+    return render(request, 'cameras/upload_video.html', {'cameras': cameras})
+
+@login_required
+def manage_recordings(request):
+    """View for teachers to manage their recordings and uploads"""
+    if not (request.user.is_superuser or (hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher')):
+        return redirect('dashboard')
+        
+    recordings = CameraRecording.objects.filter(teacher=request.user).order_by('-created_at')
+    return render(request, 'cameras/manage_recordings.html', {'recordings': recordings})
+
+@login_required
+def toggle_recording_publish(request, recording_id):
+    """Toggle the published status of a recording"""
+    recording = get_object_or_404(CameraRecording, id=recording_id)
+    
+    if not (request.user.is_superuser or recording.teacher == request.user):
+        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
+        
+    recording.is_published = not recording.is_published
+    recording.save()
+    
+    return JsonResponse({
+        'status': 'success', 
+        'is_published': recording.is_published,
+        'message': f'Recording {"published" if recording.is_published else "hidden"}'
+    })
+
+@login_required
+def admin_content_manager(request):
+    """Admin view to manage all videos and meetings"""
+    if not request.user.is_superuser:
+        return redirect('dashboard')
+        
+    from meetings.models import Meeting
+    
+    # Get all recordings
+    recordings = CameraRecording.objects.all().select_related('teacher', 'camera').order_by('-created_at')
+    
+    # Get all meetings
+    meetings = Meeting.objects.all().select_related('teacher', 'classroom').order_by('-scheduled_time')
+    
+    return render(request, 'cameras/admin_content_manager.html', {
+        'recordings': recordings,
+        'meetings': meetings
+    })
+
+@login_required
+def delete_recording_admin(request, recording_id):
+    """Admin deletes a recording"""
+    if not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
+        
+    recording = get_object_or_404(CameraRecording, id=recording_id)
+    
+    # Delete file from storage
+    if recording.video_file and os.path.exists(recording.video_file.path):
+        os.remove(recording.video_file.path)
+    if recording.thumbnail and os.path.exists(recording.thumbnail.path):
+        os.remove(recording.thumbnail.path)
+        
+    recording.delete()
+    return JsonResponse({'status': 'success', 'message': 'Recording deleted successfully'})
+
+@login_required
+def delete_meeting_admin(request, meeting_id):
+    """Admin deletes a meeting"""
+    if not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
+        
+    from meetings.models import Meeting
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+    meeting.delete()
+    return JsonResponse({'status': 'success', 'message': 'Meeting deleted successfully'})
 
 def is_admin(user):
     """Check if user is admin"""
@@ -637,8 +813,12 @@ def watch_live(request, camera_id):
 
 @login_required
 def watch_recording(request, recording_id):
-    """Watch a recorded lecture (Student View)"""
-    recording = get_object_or_404(CameraRecording, id=recording_id, is_published=True)
+    """Watch a recorded lecture"""
+    recording = get_object_or_404(CameraRecording, id=recording_id)
+    
+    # Check permissions: owner or published
+    if not (recording.is_published or recording.teacher == request.user or request.user.is_superuser):
+        return HttpResponse("Unauthorized", status=403)
     
     # Recommended videos (same teacher or same camera)
     recommended = CameraRecording.objects.filter(

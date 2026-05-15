@@ -1,0 +1,223 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Content Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    .manager-container { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+    .tabs-nav { display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
+    .tab-link { 
+        padding: 0.75rem 1.5rem; 
+        text-decoration: none; 
+        color: #64748b; 
+        font-weight: 600; 
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+    }
+    .tab-link.active { background: #f1f5f9; color: #6366f1; }
+    .tab-link:hover:not(.active) { background: #f8fafc; color: #1e293b; }
+    
+    .content-table { 
+        width: 100%; 
+        background: white; 
+        border-radius: 1rem; 
+        overflow: hidden; 
+        border: 1px solid #e2e8f0;
+        border-collapse: collapse;
+    }
+    .content-table th { background: #f8fafc; padding: 1rem; text-align: left; font-size: 0.875rem; color: #64748b; font-weight: 700; border-bottom: 1px solid #e2e8f0; }
+    .content-table td { padding: 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.9375rem; color: #1e293b; }
+    
+    .badge { padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+    .badge-video { background: #e0e7ff; color: #4338ca; }
+    .badge-meeting { background: #fef3c7; color: #92400e; }
+    
+    .actions-cell { display: flex; gap: 0.75rem; align-items: center; }
+    .btn-icon { 
+        width: 32px; height: 32px; 
+        display: flex; align-items: center; justify-content: center; 
+        border-radius: 0.5rem; 
+        border: 1px solid #e2e8f0; 
+        color: #64748b; 
+        transition: all 0.2s;
+        background: white;
+    }
+    .btn-icon:hover { background: #f1f5f9; color: #6366f1; border-color: #6366f1; }
+    .btn-icon.delete:hover { background: #fef2f2; color: #ef4444; border-color: #ef4444; }
+    
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-content { 
+        display: none; position: absolute; right: 0; background: white; 
+        min-width: 160px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
+        border-radius: 0.5rem; border: 1px solid #e2e8f0; z-index: 10;
+    }
+    .dropdown:hover .dropdown-content { display: block; }
+    .dropdown-item { 
+        padding: 0.75rem 1rem; color: #475569; text-decoration: none; 
+        display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;
+    }
+    .dropdown-item:hover { background: #f8fafc; color: #1e293b; }
+    .dropdown-item.danger { color: #ef4444; }
+    .dropdown-item.danger:hover { background: #fef2f2; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="manager-container">
+    <div class="tabs-nav">
+        <a href="#videos" class="tab-link active" onclick="switchTab('videos')">Videos & Recordings</a>
+        <a href="#meetings" class="tab-link" onclick="switchTab('meetings')">Meetings</a>
+    </div>
+
+    <!-- Videos Section -->
+    <div id="videosSection">
+        <table class="content-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Video Name</th>
+                    <th>Uploader</th>
+                    <th>Date</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rec in recordings %}
+                <tr id="rec-{{ rec.id }}">
+                    <td>#{{ rec.id }}</td>
+                    <td>
+                        <div style="font-weight: 700;">{{ rec.title }}</div>
+                        <div style="font-size: 0.75rem; color: #94a3b8;">{{ rec.camera.name|default:"Manual Upload" }}</div>
+                    </td>
+                    <td>{{ rec.teacher.username }}</td>
+                    <td>{{ rec.created_at|date:"M d, Y" }}</td>
+                    <td>{{ rec.duration|default:"--" }}</td>
+                    <td>
+                        <span class="badge {% if rec.is_published %}bg-success text-white{% else %}bg-warning{% endif %}">
+                            {{ rec.is_published|yesno:"Published,Hidden" }}
+                        </span>
+                    </td>
+                    <td class="actions-cell">
+                        <a href="{% url 'watch_recording' rec.id %}" class="btn-icon" title="View Video" target="_blank">
+                            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                        </a>
+                        <div class="dropdown">
+                            <button class="btn-icon">
+                                <i data-lucide="more-vertical" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <div class="dropdown-content">
+                                <a href="{% url 'toggle_publish' rec.id %}" class="dropdown-item">
+                                    <i data-lucide="refresh-cw" style="width: 14px;"></i> Toggle Publish
+                                </a>
+                                <a href="javascript:void(0)" onclick="deleteItem('recording', {{ rec.id }})" class="dropdown-item danger">
+                                    <i data-lucide="trash-2" style="width: 14px;"></i> Delete Video
+                                </a>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" style="text-align: center; padding: 3rem; color: #94a3b8;">No videos found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Meetings Section -->
+    <div id="meetingsSection" style="display: none;">
+        <table class="content-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Meeting Name</th>
+                    <th>Host</th>
+                    <th>Date</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in meetings %}
+                <tr id="meet-{{ m.id }}">
+                    <td>#{{ m.id }}</td>
+                    <td>
+                        <div style="font-weight: 700;">{{ m.title }}</div>
+                        <div style="font-size: 0.75rem; color: #94a3b8;">{{ m.classroom.title|default:"Personal Meeting" }}</div>
+                    </td>
+                    <td>{{ m.teacher.username }}</td>
+                    <td>{{ m.scheduled_time|date:"M d, Y" }}</td>
+                    <td>{{ m.duration_minutes }}m</td>
+                    <td>
+                        <span class="badge status-{{ m.status }}">
+                            {{ m.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="actions-cell">
+                        <a href="{% url 'join_meeting' m.meeting_code %}" class="btn-icon" title="View Meeting" target="_blank">
+                            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                        </a>
+                        <div class="dropdown">
+                            <button class="btn-icon">
+                                <i data-lucide="more-vertical" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <div class="dropdown-content">
+                                <a href="{% url 'meeting_attendance' m.meeting_code %}" class="dropdown-item">
+                                    <i data-lucide="users" style="width: 14px;"></i> Attendance
+                                </a>
+                                <a href="javascript:void(0)" onclick="deleteItem('meeting', {{ m.id }})" class="dropdown-item danger">
+                                    <i data-lucide="trash-2" style="width: 14px;"></i> Delete Meeting
+                                </a>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" style="text-align: center; padding: 3rem; color: #94a3b8;">No meetings found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+        document.querySelector(`.tab-link[href="#${tab}"]`).classList.add('active');
+        
+        if (tab === 'videos') {
+            document.getElementById('videosSection').style.display = 'block';
+            document.getElementById('meetingsSection').style.display = 'none';
+        } else {
+            document.getElementById('videosSection').style.display = 'none';
+            document.getElementById('meetingsSection').style.display = 'block';
+        }
+    }
+
+    function deleteItem(type, id) {
+        if (!confirm(`Are you sure you want to delete this ${type}? This action cannot be undone.`)) return;
+        
+        const url = type === 'recording' ? `/cameras/delete-recording-admin/${id}/` : `/cameras/delete-meeting-admin/${id}/`;
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const rowId = type === 'recording' ? `rec-${id}` : `meet-${id}`;
+                document.getElementById(rowId).remove();
+                if (window.showToast) showToast('Deleted', data.message, 'success');
+            } else {
+                alert(data.message);
+            }
+        });
+    }
+</script>
+{% endblock %}

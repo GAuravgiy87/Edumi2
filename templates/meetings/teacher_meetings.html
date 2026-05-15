@@ -1,7 +1,7 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}My Meetings{% endblock %}
+{% block page_title %}{% if is_admin %}All Meetings{% else %}My Meetings{% endif %}{% endblock %}
 
 {% block extra_css %}
 <style>

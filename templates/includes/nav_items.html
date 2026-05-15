@@ -30,6 +30,10 @@
                     <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
                     <span class="sidebar-nav-text">Camera Fleet</span>
                 </a>
+                <a href="{% url 'admin_content_manager' %}" class="sidebar-nav-item {% if '/content-manager/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="folder-kanban"></i></span>
+                    <span class="sidebar-nav-text">Content Manager</span>
+                </a>
                 <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
                     <span class="sidebar-nav-text">Live Monitor</span>
@@ -55,15 +59,26 @@
                 </a>
                 <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
-                    <span class="sidebar-nav-text">Live Sessions</span>
+                    <span class="sidebar-nav-text">Meetings</span>
                 </a>
                 <a href="{% url 'teacher_camera_dashboard' %}" class="sidebar-nav-item {% if '/control-room/' in request.path or '/teacher-dashboard/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
-                    <span class="sidebar-nav-text">Camera Control</span>
+                    <span class="sidebar-nav-text">Live / Videos</span>
                 </a>
                 <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
                     <span class="sidebar-nav-text">AI Monitoring</span>
+                </a>
+            </div>
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Content</div>
+                <a href="{% url 'manage_recordings' %}" class="sidebar-nav-item {% if '/manage-recordings/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
+                    <span class="sidebar-nav-text">Manage Recordings</span>
+                </a>
+                <a href="{% url 'upload_video' %}" class="sidebar-nav-item {% if '/upload-video/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="upload"></i></span>
+                    <span class="sidebar-nav-text">Upload Video</span>
                 </a>
             </div>
         {% endif %}
@@ -86,11 +101,11 @@
                 </a>
                 <a href="{% url 'student_meetings' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
-                    <span class="sidebar-nav-text">Live Classes</span>
+                    <span class="sidebar-nav-text">Meetings</span>
                 </a>
                 <a href="{% url 'student_lecture_list' %}" class="sidebar-nav-item {% if '/lectures/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="play-circle"></i></span>
-                    <span class="sidebar-nav-text">Lectures</span>
+                    <span class="sidebar-nav-text">Live / Videos</span>
                 </a>
                 <a href="{% url 'face_setup' %}" class="sidebar-nav-item">
                     <span class="sidebar-nav-icon"><i data-lucide="user-check"></i></span>

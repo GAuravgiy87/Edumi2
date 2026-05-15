@@ -1,0 +1,85 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-0 font-weight-bold">Manage My Recordings</h4>
+            <p class="text-muted small mb-0">Publish, hide, or manage your video lectures and recordings.</p>
+        </div>
+        <a href="{% url 'upload_video' %}" class="btn btn-primary">
+            <i data-lucide="plus" class="me-2" style="width: 18px; height: 18px;"></i>
+            Upload New Video
+        </a>
+    </div>
+
+    <div class="row">
+        {% if recordings %}
+            {% for rec in recordings %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 shadow-sm border-0 overflow-hidden">
+                    <div class="position-relative">
+                        {% if rec.thumbnail %}
+                        <img src="{{ rec.thumbnail.url }}" class="card-img-top" alt="{{ rec.title }}" style="height: 200px; object-fit: cover;">
+                        {% else %}
+                        <div class="bg-dark d-flex align-items-center justify-content-center" style="height: 200px;">
+                            <i data-lucide="video" class="text-white opacity-25" style="width: 64px; height: 64px;"></i>
+                        </div>
+                        {% endif %}
+                        <div class="position-absolute top-0 end-0 m-2">
+                            <span class="badge {% if rec.is_published %}bg-success{% else %}bg-warning{% endif %} shadow-sm">
+                                {{ rec.is_published|yesno:"Published,Hidden" }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="card-title font-weight-bold mb-1">{{ rec.title }}</h6>
+                        <p class="text-muted small mb-3">{{ rec.created_at|date:"M d, Y" }} • {{ rec.file_size|filesizeformat }}</p>
+                        
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'watch_recording' rec.id %}" class="btn btn-sm btn-outline-primary flex-grow-1" target="_blank">
+                                <i data-lucide="eye" class="me-1" style="width: 14px; height: 14px;"></i>
+                                Preview
+                            </a>
+                            <button onclick="togglePublish({{ rec.id }}, this)" class="btn btn-sm {% if rec.is_published %}btn-outline-warning{% else %}btn-outline-success{% endif %} flex-grow-1">
+                                <i data-lucide="{% if rec.is_published %}eye-off{% else %}check-circle{% endif %}" class="me-1" style="width: 14px; height: 14px;"></i>
+                                {{ rec.is_published|yesno:"Hide,Publish" }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12 text-center py-5">
+                <div class="bg-light p-5 rounded-4 d-inline-block">
+                    <i data-lucide="video-off" class="text-muted mb-3" style="width: 64px; height: 64px;"></i>
+                    <h5>No recordings found</h5>
+                    <p class="text-muted">You haven't uploaded or recorded any lectures yet.</p>
+                    <a href="{% url 'upload_video' %}" class="btn btn-primary mt-2">Upload your first video</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function togglePublish(recId, btn) {
+        fetch(`/cameras/toggle-publish/${recId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload(); // Simple refresh to update state
+            } else {
+                alert(data.message);
+            }
+        });
+    }
+</script>
+{% endblock %}

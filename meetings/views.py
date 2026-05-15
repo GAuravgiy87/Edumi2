@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password, check_password
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -378,9 +379,9 @@ def create_meeting(request):
 def teacher_meetings(request):
     # Allow admin to view all non-classroom meetings
     if request.user.is_superuser:
-        meetings = Meeting.objects.filter(classroom__isnull=True)
+        meetings = Meeting.objects.filter(classroom__isnull=True).exclude(meeting_code__startswith='CAM_')
     elif hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher':
-        meetings = Meeting.objects.filter(teacher=request.user, classroom__isnull=True)
+        meetings = Meeting.objects.filter(teacher=request.user, classroom__isnull=True).exclude(meeting_code__startswith='CAM_')
     else:
         return redirect('login')
     
@@ -406,10 +407,11 @@ def student_meetings(request):
     ).values_list('classroom_id', flat=True)
     
     # Get all scheduled and live meetings (standalone OR in user's classrooms)
+    # Exclude meetings that are actually live camera sessions (those starting with CAM_)
     meetings = Meeting.objects.filter(
         Q(classroom__isnull=True) | Q(classroom_id__in=my_classroom_ids),
         status__in=['scheduled', 'live']
-    )
+    ).exclude(meeting_code__startswith='CAM_')
     return render(request, 'meetings/student_meetings.html', {'meetings': meetings})
 
 @login_required

@@ -14,6 +14,13 @@ urlpatterns = [
     path('start-recording/<int:camera_id>/', views.start_camera_recording, name='start_camera_recording'),
     path('stop-recording/<int:camera_id>/', views.stop_camera_recording, name='stop_camera_recording'),
     path('publish-recording/', views.publish_recording, name='publish_recording'),
+    path('toggle-publish/<int:recording_id>/', views.toggle_recording_publish, name='toggle_recording_publish'),
+    path('manage-recordings/', views.manage_recordings, name='manage_recordings'),
+    path('upload-video/', views.upload_video, name='upload_video'),
+    path('stream-video/<int:recording_id>/', views.stream_video, name='stream_video'),
+    path('content-manager/', views.admin_content_manager, name='admin_content_manager'),
+    path('delete-recording-admin/<int:recording_id>/', views.delete_recording_admin, name='delete_recording_admin'),
+    path('delete-meeting-admin/<int:meeting_id>/', views.delete_meeting_admin, name='delete_meeting_admin'),
     path('live-participants/<int:camera_id>/', views.live_participants, name='live_participants'),
     
     # Student Side
