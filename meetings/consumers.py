@@ -4,6 +4,10 @@ from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
 from django.utils import timezone
 from .models import Meeting, MeetingParticipant, MeetingAttendanceLog, MeetingChat
+from cameras.models import Camera
+
+# Global tracking for CAM_* rooms (non-persistent)
+cam_room_participants = {}
 
 class MeetingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -24,6 +28,12 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             
             # Record join and get user meta in one go
             user_data = await self.get_user_meta()
+
+            # Track for CAM_* rooms
+            if self.meeting_code.startswith('CAM_'):
+                if self.meeting_code not in cam_room_participants:
+                    cam_room_participants[self.meeting_code] = {}
+                cam_room_participants[self.meeting_code][self.user.id] = self.user.username
             
             # Get other active participants BEFORE accepting to ensure we have them
             active_participants = await self.get_active_participants()
@@ -54,27 +64,46 @@ class MeetingConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_meta(self):
-        meeting = Meeting.objects.get(meeting_code=self.meeting_code)
-        # Record join while we are here
-        participant, _ = MeetingParticipant.objects.get_or_create(
-            meeting=meeting,
-            user=self.user
-        )
-        participant.joined_at = timezone.now()
-        participant.is_active = True
-        participant.save()
-        
-        MeetingAttendanceLog.objects.create(
-            participant=participant,
-            event_type='join'
-        )
-        
-        return {
-            'id': self.user.id,
-            'username': self.user.username,
-            'is_host': meeting.teacher == self.user or self.user.is_superuser,
-            'is_admin': self.user.is_superuser
-        }
+        try:
+            meeting = Meeting.objects.get(meeting_code=self.meeting_code)
+            # Record join while we are here
+            participant, _ = MeetingParticipant.objects.get_or_create(
+                meeting=meeting,
+                user=self.user
+            )
+            participant.joined_at = timezone.now()
+            participant.is_active = True
+            participant.save()
+            
+            MeetingAttendanceLog.objects.create(
+                participant=participant,
+                event_type='join'
+            )
+            
+            return {
+                'id': self.user.id,
+                'username': self.user.username,
+                'is_host': meeting.teacher == self.user or self.user.is_superuser,
+                'is_admin': self.user.is_superuser
+            }
+        except Meeting.DoesNotExist:
+             # Handle CAM_* rooms for live lectures
+             if self.meeting_code.startswith('CAM_'):
+                 camera_id = self.meeting_code.split('_')[1]
+                 is_host = False
+                 try:
+                     camera = Camera.objects.get(id=camera_id)
+                     is_host = (camera.live_teacher == self.user) or self.user.is_superuser
+                 except:
+                     pass
+                     
+                 return {
+                     'id': self.user.id,
+                     'username': self.user.username,
+                     'is_host': is_host,
+                     'is_admin': self.user.is_superuser
+                 }
+             raise
 
     @database_sync_to_async
     def get_active_participants(self):
@@ -94,11 +123,26 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                     'is_admin': p.user.is_superuser
                 } for p in active
             ]
+        except Meeting.DoesNotExist:
+            if self.meeting_code.startswith('CAM_'):
+                # Return from in-memory tracking
+                participants = cam_room_participants.get(self.meeting_code, {})
+                return [
+                    {'user_id': uid, 'username': uname, 'is_host': False, 'is_admin': False}
+                    for uid, uname in participants.items()
+                    if uid != self.user.id
+                ]
+            return []
         except Exception as e:
             print(f"Error fetching active participants: {e}")
             return []
     
     async def disconnect(self, close_code):
+        # Remove from tracking for CAM_* rooms
+        if self.meeting_code.startswith('CAM_'):
+            if self.meeting_code in cam_room_participants:
+                cam_room_participants[self.meeting_code].pop(self.user.id, None)
+
         # Notify others that user left
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -320,7 +364,10 @@ class MeetingConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def get_meeting(self):
-        return Meeting.objects.get(meeting_code=self.meeting_code)
+        try:
+            return Meeting.objects.get(meeting_code=self.meeting_code)
+        except Meeting.DoesNotExist:
+            return None
 
     @database_sync_to_async
     def record_join(self):
@@ -338,6 +385,8 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 participant=participant,
                 event_type='join'
             )
+        except Meeting.DoesNotExist:
+            pass # No persistence for CAM_* rooms
         except Exception as e:
             print(f"Error recording join: {e}")
 
@@ -365,8 +414,11 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 participant=participant,
                 event_type='leave'
             )
+        except Meeting.DoesNotExist:
+            pass # No persistence for CAM_* rooms
         except Exception as e:
             print(f"Error recording leave: {e}")
+
     @database_sync_to_async
     def save_chat_message(self, message):
         try:
@@ -376,5 +428,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 user=self.user,
                 message=message
             )
+        except Meeting.DoesNotExist:
+            pass # No persistence for CAM_* rooms
         except Exception as e:
             print(f"Error saving chat message: {e}")

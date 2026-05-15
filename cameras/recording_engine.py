@@ -121,6 +121,15 @@ class RecordingEngine:
             del cls._instances[key]
             return success, instance.recording_id
 
+    @classmethod
+    def is_recording(cls, camera_id, teacher_id):
+        with cls._lock:
+            key = f"{camera_id}_{teacher_id}"
+            if key in cls._instances:
+                instance = cls._instances[key]
+                return True, instance.start_time
+            return False, None
+
     def _stop(self):
         if self.process:
             try:

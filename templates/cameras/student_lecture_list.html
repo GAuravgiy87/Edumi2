@@ -199,4 +199,18 @@
         {% endfor %}
     </div>
 </div>
+
+<script>
+    // Handle real-time updates for live lectures
+    window.addEventListener('live_status_change', function(e) {
+        console.log('Live status change detected:', e.detail);
+        // Automatically reload the page content using Turbo for a smooth experience
+        if (typeof Turbo !== 'undefined') {
+            Turbo.visit(window.location.href, { action: 'replace' });
+        } else {
+            // Fallback if Turbo is not available
+            window.location.reload();
+        }
+    });
+</script>
 {% endblock %}

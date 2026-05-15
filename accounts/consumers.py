@@ -10,10 +10,18 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.user_id = self.scope["user"].id
             self.group_name = f"user_{self.user_id}"
             
+            # Join user-specific group
             await self.channel_layer.group_add(
                 self.group_name,
                 self.channel_name
             )
+            
+            # Join global notifications group
+            await self.channel_layer.group_add(
+                "public_notifications",
+                self.channel_name
+            )
+            
             await self.accept()
 
     async def disconnect(self, close_code):
@@ -22,6 +30,10 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 self.group_name,
                 self.channel_name
             )
+        await self.channel_layer.group_discard(
+            "public_notifications",
+            self.channel_name
+        )
 
     # Receive message from room group
     async def send_notification(self, event):

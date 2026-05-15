@@ -179,11 +179,17 @@
 
 <script>
 (function() {
-    // Initialize Direct Feed from Camera Microservice
+    // ── Global Variables ──
+    const cameraId = "{{ camera.id }}";
+    const username = "{{ user.username }}";
+    const currentUserId = "{{ user.id }}";
+    const meetingCode = "CAM_" + cameraId; // Unique code for this camera's chat room
+    let chatWs = null;
+
+    // ── Initialize Direct Feed ──
     (function initFeed() {
         const cameraServicePort = 8001;
         const host = window.location.hostname;
-        const cameraId = "{{ camera.id }}";
         const feedUrl = `http://${host}:${cameraServicePort}/cameras/${cameraId}/feed/`;
         
         const img = document.getElementById('mainFeed');
@@ -193,7 +199,7 @@
             
             img.onerror = function() {
                 console.error("Feed connection failed. Retrying in 3 seconds...");
-                showToast('Camera connection failed. Retrying...', 'warning');
+                if (typeof showToast === 'function') showToast('Camera connection failed. Retrying...', 'warning');
                 setTimeout(() => {
                     this.src = feedUrl + '?t=' + new Date().getTime();
                 }, 3000);
@@ -201,7 +207,7 @@
 
             img.onload = function() {
                 console.log("Feed successfully connected and streaming.");
-                showToast('Camera connected!', 'success');
+                if (typeof showToast === 'function') showToast('Camera connected!', 'success');
             };
         }
         
@@ -212,27 +218,81 @@
         }
     })();
 
-    function sendMessage(e) {
-        e.preventDefault();
-        const input = document.getElementById('chatInput');
-        if(!input.value.trim()) return;
+    // ── WebSocket Chat Implementation ──
+    function connectChat() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${meetingCode}/`;
+        
+        console.log("Connecting to Chat WebSocket:", wsUrl);
+        chatWs = new WebSocket(wsUrl);
 
+        chatWs.onopen = () => {
+            console.log("Chat connected!");
+            document.getElementById('viewerCount').textContent = "Live Chat Connected";
+        };
+
+        chatWs.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'chat') {
+                appendMessage(data.username, data.message, data.user_id == currentUserId);
+            }
+        };
+
+        chatWs.onclose = () => {
+            console.log("Chat disconnected. Retrying in 5s...");
+            setTimeout(connectChat, 5000);
+        };
+
+        chatWs.onerror = (err) => {
+            console.error("WebSocket Error:", err);
+        };
+    }
+
+    function appendMessage(user, text, isSelf) {
         const chatBox = document.getElementById('chatBox');
+        if (!chatBox) return;
+
         const msg = document.createElement('div');
         msg.className = 'chat-msg';
+        
+        const avatarColor = isSelf ? '#6366f1' : '#64748b';
+        const initial = user.charAt(0).toUpperCase();
+
         msg.innerHTML = `
-            <div style="width:32px; height:32px; background:#6366f1; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:white; font-size:0.75rem; font-weight:700;">${"{{ user.username }}".charAt(0).toUpperCase()}</div>
+            <div style="width:32px; height:32px; background:${avatarColor}; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:white; font-size:0.75rem; font-weight:700;">${initial}</div>
             <div class="msg-content">
-                <div class="msg-user">{{ user.username }}</div>
-                <div class="msg-text">${input.value}</div>
+                <div class="msg-user">${user} ${isSelf ? '(You)' : ''}</div>
+                <div class="msg-text">${text}</div>
             </div>
         `;
+        
         chatBox.appendChild(msg);
         chatBox.scrollTop = chatBox.scrollHeight;
-        input.value = '';
-        lucide.createIcons();
+        
+        // Refresh icons if lucide is present
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function sendMessage(e) {
+        if (e) e.preventDefault();
+        const input = document.getElementById('chatInput');
+        if(!input || !input.value.trim()) return;
+
+        if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+            chatWs.send(JSON.stringify({
+                'type': 'chat',
+                'message': input.value.trim(),
+                'timestamp': new Date().toISOString()
+            }));
+            input.value = '';
+        } else {
+            if (typeof showToast === 'function') showToast('Chat not connected. Please wait...', 'error');
+        }
     }
     
+    // Start chat connection
+    connectChat();
+
     // Export function to window
     window.sendMessage = sendMessage;
 })();

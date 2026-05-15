@@ -199,45 +199,11 @@
         </div>
 
         <div class="panel-card" style="flex: 1; display:flex; flex-direction:column;">
-            <div class="panel-title"><i data-lucide="bar-chart-2"></i> Engagement Analytics</div>
-            <div id="analytics" style="padding-top: 1rem;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
-                    <span style="color:#64748b; font-size:0.875rem;">Head Count:</span>
-                    <span id="liveHeadCount" style="font-weight:800; color:#6366f1; font-size:1.25rem;">--</span>
-                </div>
-                <div style="margin-bottom:1.5rem;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
-                        <span style="color:#64748b; font-size:0.75rem;">Attention Level:</span>
-                        <span id="attentionPercent" style="font-weight:700; color:#10b981; font-size:0.75rem;">--%</span>
-                    </div>
-                    <div style="width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                        <div id="attentionBar" style="width:0%; height:100%; background:#10b981; transition:width 0.5s;"></div>
-                    </div>
-                </div>
-                <div id="emotionLabels" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
-                    <span id="noAnalyticsMsg" style="color:#94a3b8; font-size:0.75rem;">Start streaming to see analytics</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="panel-card" style="flex: 1; display:flex; flex-direction:column;">
-            <div class="panel-title"><i data-lucide="users"></i> Live Students (<span id="studentCount">{{ student_count }}</span>)</div>
+            <div class="panel-title"><i data-lucide="users"></i> Live Students (<span id="studentCount">0</span>)</div>
             <div id="studentList" style="flex:1; overflow-y:auto; color:#94a3b8; font-size:0.875rem; padding-top:1rem;">
-                {% if active_participants %}
-                    {% for username in active_participants %}
-                    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; background:#f8fafc; border-radius:0.5rem; margin-bottom:0.5rem;">
-                        <span style="width:8px; height:8px; background:#4ade80; border-radius:50%;"></span>
-                        <span style="font-weight:600;">{{ username }}</span>
-                    </div>
-                    {% endfor %}
-                    {% if student_count > 10 %}
-                    <div style="text-align:center; color:#64748b; font-size:0.75rem; margin-top:0.5rem;">+{{ student_count|add:"-10" }} more</div>
-                    {% endif %}
-                {% else %}
                 <div style="text-align:center; color:#94a3b8; font-size:0.875rem; padding-top:2rem;">
                     Waiting for students to join...
                 </div>
-                {% endif %}
             </div>
         </div>
 
@@ -245,6 +211,14 @@
             <div class="panel-title"><i data-lucide="message-square"></i> Live Chat</div>
             <div class="chat-messages" id="chatMessages">
                 <div style="text-align:center; color:#94a3b8; font-size:0.75rem;">Session chat will appear here</div>
+            </div>
+            <div style="padding-top:1rem; border-top:1px solid #f1f5f9; margin-top:auto;">
+                <form onsubmit="sendChatMessage(event)" style="display:flex; gap:0.5rem;">
+                    <input type="text" id="chatInput" placeholder="Reply to students..." style="flex:1; padding:0.5rem; border:1px solid #e2e8f0; border-radius:0.5rem; font-size:0.875rem; outline:none;">
+                    <button type="submit" style="padding:0.5rem; background:#6366f1; color:white; border:none; border-radius:0.5rem; cursor:pointer;">
+                        <i data-lucide="send" style="width:16px; height:16px;"></i>
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -273,10 +247,31 @@
 </div>
 
 <script>
-    let isStreaming = false;
-    let isRecording = false;
-    let recStartTime = null;
+    let isStreaming = {{ is_live|yesno:"true,false" }};
+    let isRecording = {{ is_recording|yesno:"true,false" }};
+    let recStartTime = {% if recording_start_time %}new Date("{{ recording_start_time }}"){% else %}null{% endif %};
     let recTimerInterval = null;
+
+    // Initialize UI from server state
+    window.addEventListener('DOMContentLoaded', () => {
+        const streamBtn = document.getElementById('streamBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const recIndicator = document.getElementById('recIndicator');
+
+        if (isStreaming) {
+            streamBtn.innerHTML = '<i data-lucide="square"></i> Stop Live Stream';
+            streamBtn.style.background = '#475569';
+        }
+
+        if (isRecording) {
+            recordBtn.classList.add('recording');
+            recordBtn.innerHTML = '<i data-lucide="square"></i> Stop Recording';
+            recIndicator.classList.add('active');
+            recTimerInterval = setInterval(updateRecTimer, 1000);
+        }
+        
+        if (window.lucide) lucide.createIcons();
+    });
 
     function updateRecTimer() {
         if (!recStartTime) return;
@@ -325,11 +320,6 @@
         }
         lucide.createIcons();
     }
-
-    // Call stop streaming when window closes
-    window.addEventListener('beforeunload', () => {
-        if(isStreaming) fetch(`/cameras/stop-streaming/{{ camera.id }}/`);
-    });
 
     function toggleRecording() {
         if (!isRecording) {
@@ -419,57 +409,144 @@
         showNotification('Snapshot saved!', 'success');
     }
 
-    // Real-time updates via polling or WebSocket
-    // Head count and analytics come from the camera service when streaming
-    let analyticsInterval = null;
-    
-    async function fetchAnalytics() {
-        if (!isStreaming) return;
-        try {
-            const res = await fetch(`/cameras/head-count/api/rtsp/{{ camera.id }}/`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data.head_count !== undefined) {
-                    document.getElementById('liveHeadCount').innerText = data.head_count;
-                }
-                if (data.attention_score !== undefined) {
-                    document.getElementById('attentionPercent').innerText = data.attention_score + '%';
-                    document.getElementById('attentionBar').style.width = data.attention_score + '%';
-                }
+    // ── WebSocket Chat & Presence Implementation ──
+    const cameraId = "{{ camera.id }}";
+    const meetingCode = "CAM_" + cameraId;
+    const currentUserId = "{{ user.id }}";
+    let chatWs = null;
+    let activeParticipants = new Map();
+
+    function connectChat() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${meetingCode}/`;
+        
+        console.log("Connecting to Teacher Chat WebSocket:", wsUrl);
+        chatWs = new WebSocket(wsUrl);
+
+        chatWs.onopen = () => {
+            console.log("Teacher Chat connected!");
+            showNotification('Chat connected!', 'success');
+        };
+
+        chatWs.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'chat') {
+                appendChatMessage(data.username, data.message, data.user_id == currentUserId);
+            } else if (data.type === 'user_joined') {
+                handleUserJoined(data);
+            } else if (data.type === 'user_left') {
+                handleUserLeft(data);
+            } else if (data.type === 'participant_list') {
+                handleParticipantList(data.participants);
             }
-        } catch(e) {
-            // Silently fail - analytics are optional
+        };
+
+        chatWs.onclose = () => {
+            console.log("Chat disconnected. Retrying...");
+            setTimeout(connectChat, 5000);
+        };
+    }
+
+    function handleUserJoined(data) {
+        if (data.user_id == currentUserId) return;
+        activeParticipants.set(data.user_id, data.username);
+        updateStudentListUI();
+    }
+
+    function handleUserLeft(data) {
+        activeParticipants.delete(data.user_id);
+        updateStudentListUI();
+    }
+
+    function handleParticipantList(participants) {
+        activeParticipants.clear();
+        participants.forEach(p => {
+            if (p.user_id != currentUserId) {
+                activeParticipants.set(p.user_id, p.username);
+            }
+        });
+        updateStudentListUI();
+    }
+
+    function updateStudentListUI() {
+        const studentCount = document.getElementById('studentCount');
+        const studentList = document.getElementById('studentList');
+        
+        if (studentCount) studentCount.textContent = activeParticipants.size;
+        
+        if (studentList) {
+            if (activeParticipants.size === 0) {
+                studentList.innerHTML = `
+                    <div style="text-align:center; color:#94a3b8; font-size:0.875rem; padding-top:2rem;">
+                        Waiting for students to join...
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            activeParticipants.forEach((username, id) => {
+                html += `
+                    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; background:#f8fafc; border-radius:0.5rem; margin-bottom:0.5rem;">
+                        <span style="width:8px; height:8px; background:#4ade80; border-radius:50%;"></span>
+                        <span style="font-weight:600;">${username}</span>
+                    </div>`;
+            });
+            studentList.innerHTML = html;
         }
     }
-    
-    async function fetchLiveParticipants() {
-        if (!isStreaming) return;
-        try {
-            const res = await fetch(`/cameras/live-participants/{{ camera.id }}/`);
-            if (res.ok) {
-                const data = await res.json();
-                document.getElementById('studentCount').innerText = data.count || 0;
-                const list = document.getElementById('studentList');
-                if (data.participants && data.participants.length > 0) {
-                    list.innerHTML = data.participants.map(p =>
-                        `<div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; background:#f8fafc; border-radius:0.5rem; margin-bottom:0.5rem;">
-                            <span style="width:8px; height:8px; background:#4ade80; border-radius:50%;"></span>
-                            <span style="font-weight:600;">${p.username}</span>
-                        </div>`
-                    ).join('');
-                }
-            }
-        } catch(e) {
-            // Silently fail
+
+    function appendChatMessage(user, text, isSelf) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+
+        // Remove placeholder if it exists
+        if (chatMessages.innerText.includes("Session chat will appear here")) {
+            chatMessages.innerHTML = '';
+        }
+
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = '0.75rem';
+        msgDiv.style.display = 'flex';
+        msgDiv.style.flexDirection = 'column';
+        msgDiv.style.alignItems = isSelf ? 'flex-end' : 'flex-start';
+
+        msgDiv.innerHTML = `
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem; font-weight: 700;">
+                ${user} ${isSelf ? '(You)' : ''}
+            </div>
+            <div style="background: ${isSelf ? '#6366f1' : '#f1f5f9'}; 
+                        color: ${isSelf ? 'white' : '#1e293b'}; 
+                        padding: 0.5rem 0.75rem; 
+                        border-radius: 0.75rem; 
+                        font-size: 0.875rem; 
+                        max-width: 85%;
+                        box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                ${text}
+            </div>
+        `;
+
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function sendChatMessage(e) {
+        if (e) e.preventDefault();
+        const input = document.getElementById('chatInput');
+        if (!input || !input.value.trim()) return;
+
+        if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+            chatWs.send(JSON.stringify({
+                'type': 'chat',
+                'message': input.value.trim(),
+                'timestamp': new Date().toISOString()
+            }));
+            input.value = '';
+        } else {
+            showNotification('Chat not connected!', 'error');
         }
     }
-    
-    // Fetch analytics every 5 seconds when streaming
-    setInterval(() => {
-        if (isStreaming) {
-            fetchAnalytics();
-            fetchLiveParticipants();
-        }
-    }, 5000);
+
+    // Start chat connection
+    connectChat();
 </script>
 {% endblock %}

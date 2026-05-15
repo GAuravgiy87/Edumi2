@@ -254,7 +254,7 @@ EMOTION_LOGGING_ENABLED = True
 
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>
-FACE_ENCRYPTION_KEY = os.environ.get('FACE_ENCRYPTION_KEY', '')
+FACE_ENCRYPTION_KEY = os.environ.get('FACE_ENCRYPTION_KEY', 'zl-c_61OHA9zX1LiIJ9cinnXJOXQhRkBEIs2JvJRh6Y=')
 # L2 distance threshold: 0 = identical, 1 = completely different
 # 0.50 is stricter than the face_recognition default of 0.60
 FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.50'))

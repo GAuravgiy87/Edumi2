@@ -321,19 +321,63 @@
                 console.log('Notification received:', data);
 
                 if (data.type === 'new_message') {
-                    // Show a toast
-                    showToast(`Message from ${data.data.sender}`, data.data.message, 'info');
+                    showToast(`Message from ${data.sender}`, data.message, 'info');
                     updateNotificationCount();
-                    
-                    // Dispatch event for specialized pages (like Chat)
-                    window.dispatchEvent(new CustomEvent('new_message', { detail: data.data }));
+                    // Refresh if on inbox or conversation page
+                    if (window.location.pathname.includes('/inbox/') || window.location.pathname.includes('/conversation/')) {
+                        refreshCurrentPage();
+                    }
+                    window.dispatchEvent(new CustomEvent('new_message', { detail: data }));
                 } else if (data.type === 'meeting_started') {
-                    showToast(`Class Started!`, `${data.data.title} is now LIVE.`, 'success');
+                    showToast(`Class Started!`, `${data.title} is now LIVE.`, 'success');
                     updateNotificationCount();
-                    // Update dashboards if needed
-                    window.dispatchEvent(new CustomEvent('meeting_state_change', { detail: data.data }));
+                    refreshCurrentPage();
+                    window.dispatchEvent(new CustomEvent('meeting_state_change', { detail: data }));
+                } else if (data.type === 'live_status_change') {
+                    if (data.status === 'started') {
+                        showToast(`Live Lecture!`, `${data.teacher_name} is now live in ${data.camera_name}`, 'success');
+                    }
+                    refreshCurrentPage();
+                    window.dispatchEvent(new CustomEvent('live_status_change', { detail: data }));
+                } else if (data.type === 'classroom_request') {
+                    showToast(`New Join Request`, `${data.student_name} wants to join ${data.classroom_title}`, 'info');
+                    updateNotificationCount();
+                    refreshCurrentPage();
+                } else if (data.type === 'classroom_approved') {
+                    showToast(`Request Approved!`, `You have been added to ${data.classroom_title}`, 'success');
+                    updateNotificationCount();
+                    refreshCurrentPage();
+                } else if (data.type === 'meeting_scheduled') {
+                    showToast(`New Meeting`, `A new meeting "${data.title}" has been scheduled.`, 'info');
+                    updateNotificationCount();
+                    refreshCurrentPage();
+                } else if (data.type === 'meeting_cancelled') {
+                    showToast(`Meeting Cancelled`, `"${data.title}" has been cancelled.`, 'warning');
+                    updateNotificationCount();
+                    refreshCurrentPage();
+                } else if (data.type === 'classroom_denied') {
+                    showToast(`Join Request Denied`, `Your request for ${data.classroom_title} was denied.`, 'error');
+                    updateNotificationCount();
+                    refreshCurrentPage();
+                } else if (data.type === 'classroom_removed') {
+                    showToast(`Removed from Class`, `You were removed from ${data.classroom_title}.`, 'warning');
+                    updateNotificationCount();
+                    refreshCurrentPage();
+                } else if (data.type === 'student_joined') {
+                    showToast(`Student Joined`, `${data.student_name} joined ${data.classroom_title}`, 'success');
+                    updateNotificationCount();
+                    refreshCurrentPage();
                 }
             };
+
+            function refreshCurrentPage() {
+                console.log('Smoothing refreshing page due to real-time update...');
+                if (typeof Turbo !== 'undefined') {
+                    Turbo.visit(window.location.href, { action: 'replace' });
+                } else {
+                    window.location.reload();
+                }
+            }
 
             socket.onclose = function(e) {
                 console.log('Notification socket closed. Reconnecting in 3 seconds...');

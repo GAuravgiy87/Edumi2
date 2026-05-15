@@ -12,6 +12,8 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession, CameraRecording
 from .recording_engine import recording_engine
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from mobile_cameras.models import MobileCamera, MobileCameraPermission
 from .head_count_service import head_count_manager
 
@@ -397,6 +399,23 @@ def live_monitor(request):
     }
     return render(request, 'cameras/live_monitor.html', context)
 
+def broadcast_live_status(camera, status):
+    """Helper to broadcast live status changes to all connected users"""
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "public_notifications",
+        {
+            "type": "send_notification",
+            "data": {
+                "type": "live_status_change",
+                "camera_id": camera.id,
+                "camera_name": camera.name,
+                "teacher_name": camera.live_teacher.username if camera.live_teacher else "",
+                "status": status, # 'started' or 'stopped'
+            }
+        }
+    )
+
 @login_required
 def teacher_camera_dashboard(request):
     """Dashboard for teachers to see assigned cameras (RTSP and Mobile)"""
@@ -451,6 +470,9 @@ def teacher_control_room(request, camera_id):
                 active_participants = list(linked_meeting.participants.filter(is_active=True).values_list('user__username', flat=True)[:10])
         except Exception:
             pass
+
+    # Check if recording is in progress
+    is_recording, recording_start_time = recording_engine.is_recording(camera.id, request.user.id)
         
     context = {
         'camera': camera,
@@ -459,6 +481,9 @@ def teacher_control_room(request, camera_id):
         'linked_meeting': linked_meeting,
         'student_count': student_count,
         'active_participants': active_participants,
+        'is_live': camera.is_live,
+        'is_recording': is_recording,
+        'recording_start_time': recording_start_time.isoformat() if recording_start_time else None,
     }
     return render(request, 'cameras/teacher_control_room.html', context)
 
@@ -472,6 +497,10 @@ def start_streaming(request, camera_id):
     camera.is_live = True
     camera.live_teacher = request.user
     camera.save()
+    
+    # Broadcast status change
+    broadcast_live_status(camera, 'started')
+    
     return JsonResponse({'status': 'success', 'message': 'Live stream started'})
 
 @login_required
@@ -482,6 +511,10 @@ def stop_streaming(request, camera_id):
         camera.is_live = False
         camera.live_teacher = None
         camera.save()
+        
+        # Broadcast status change
+        broadcast_live_status(camera, 'stopped')
+        
         return JsonResponse({'status': 'success', 'message': 'Live stream stopped'})
     return JsonResponse({'status': 'error', 'message': 'Not the live teacher'})
 
