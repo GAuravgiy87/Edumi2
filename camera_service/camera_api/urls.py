@@ -6,6 +6,7 @@ urlpatterns = [
     # RTSP Cameras
     path('cameras/', views.list_cameras, name='list_cameras'),
     path('cameras/<int:camera_id>/feed/', views.camera_feed, name='camera_feed'),
+    path('cameras/<int:camera_id>/zoom/', views.update_camera_zoom, name='update_camera_zoom'),
     path('cameras/<int:camera_id>/test/', views.test_camera, name='test_camera'),
     
     # Mobile Cameras

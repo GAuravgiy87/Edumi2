@@ -125,8 +125,11 @@ class HeadDetector:
     def _finalize(self, count, detections, frame, inv_scale):
         """Annotate and return frame with professional HUD."""
         
-        # 1. Solid Top Bar for HUD - Fixed height 80px
-        cv2.rectangle(frame, (0, 0), (frame.shape[1], 80), (0, 0, 0), -1)
+        # 1. Semi-Transparent Top Bar for HUD
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, 0), (frame.shape[1], 80), (0, 0, 0), -1)
+        # Apply the overlay with 0.4 alpha (60% transparent)
+        cv2.addWeighted(overlay, 0.4, frame, 0.6, 0, frame)
         
         # 2. Status Text
         status_text = f"Heads: {count}"
@@ -136,10 +139,8 @@ class HeadDetector:
         ts = time.strftime("%H:%M:%S")
         cv2.putText(frame, ts, (frame.shape[1]-150, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 1)
         
-        # Resize once to common display size
-        if frame.shape[1] > 1280:
-            frame = cv2.resize(frame, (1280, 720))
-            
+        # Use high quality HUD without downscaling
+        # Removing the 720p bottleneck to support 4K delivery
         return count, detections, frame, 0.0, {}
 
     def _calculate_iou(self, b1, b2):
@@ -395,10 +396,10 @@ class HeadCountManager:
                 recorded_by=session.started_by,
             )
             
-            # Save annotated frame as snapshot
+            # Save annotated frame as snapshot with high quality
             if annotated_frame is not None:
                 ret, buffer = cv2.imencode('.jpg', annotated_frame, 
-                                          [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                          [cv2.IMWRITE_JPEG_QUALITY, 90])
                 if ret:
                     log_entry.snapshot.save(
                         f"headcount_{session.id}_{int(time.time())}.jpg",

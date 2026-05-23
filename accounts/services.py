@@ -44,10 +44,11 @@ def get_student_stats(user):
         status='approved'
     ).values_list('classroom_id', flat=True)
     
-    # Meetings are available if they are standalone OR in student's classrooms
+    # Meetings are available if they are in student's classrooms
     available_meetings = Meeting.objects.filter(
-        Q(classroom__isnull=True) | Q(classroom_id__in=my_classroom_ids),
-        status__in=['scheduled', 'live']
+        classroom_id__in=my_classroom_ids,
+        status__in=['scheduled', 'live'],
+        meeting_type='classroom'
     ).count()
     
     return {

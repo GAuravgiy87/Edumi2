@@ -1,42 +1,42 @@
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const _d          = document.getElementById('meeting-data').dataset;
-const meetingCode = _d.meetingCode;
-const currentUserId   = _d.userId;
-const currentUsername = _d.username;
-const isHost      = _d.isHost === 'true';
-const initialCanSpeak = _d.canSpeak === 'true';
-const initialCanVideo = _d.canVideo === 'true';
-const initialCanShare = _d.canShare === 'true';
-const TOKEN_URL   = _d.tokenUrl;
-const LEAVE_URL    = _d.leaveUrl;
-const SLEEP_URL    = _d.sleepUrl;
-const UNFREEZE_URL = _d.unfreezeUrl;
-const AFTER_LEAVE  = _d.afterLeaveUrl;
-const CSRF         = _d.csrf;
+var _d          = document.getElementById('meeting-data').dataset;
+var meetingCode = _d.meetingCode;
+var currentUserId   = _d.userId;
+var currentUsername = _d.username;
+var isHost      = _d.isHost === 'true';
+var initialCanSpeak = _d.canSpeak === 'true';
+var initialCanVideo = _d.canVideo === 'true';
+var initialCanShare = _d.canShare === 'true';
+var TOKEN_URL   = _d.tokenUrl;
+var LEAVE_URL    = _d.leaveUrl;
+var SLEEP_URL    = _d.sleepUrl;
+var UNFREEZE_URL = _d.unfreezeUrl;
+var AFTER_LEAVE  = _d.afterLeaveUrl;
+var CSRF         = _d.csrf;
 
 // LiveKit SDK globals (from UMD bundle)
 var LiveKitBundle = window.LiveKitBundle || window.LiveKit || window.LiveKitClient || window.livekit;
 
 var { Room, RoomEvent, Track, TrackEvent, LocalTrack,
-        createLocalScreenTracks, VideoPresets, ConnectionState } = LiveKitBundle || {};
+        createLocalScreenTracks, VideoPresets, ScreenSharePresets, ConnectionState } = LiveKitBundle || {};
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let room = null;
-let isMicOn    = true;
-let isCameraOn = true;
-let isScreenSharing = false;
-let screenTrackPub  = null;
-let isSleeping = false;
-let unreadMessages = 0;
-let timerInterval  = null;
-let timerSeconds   = 0;
-let signalingWs    = null;
+var room = null;
+var isMicOn    = true;
+var isCameraOn = true;
+var isScreenSharing = false;
+var screenTrackPub  = null;
+var isSleeping = false;
+var unreadMessages = 0;
+var timerInterval  = null;
+var timerSeconds   = 0;
+var signalingWs    = null;
 
 // Permission State (Enforced locally for students)
-let canSpeak = initialCanSpeak;
-let canVideo = initialCanVideo;
-let canShare = initialCanShare;
+var canSpeak = initialCanSpeak;
+var canVideo = initialCanVideo;
+var canShare = initialCanShare;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -44,7 +44,7 @@ async function init() {
         LiveKitBundle = window.LiveKitBundle || window.LiveKit || window.LiveKitClient || window.livekit;
         if (LiveKitBundle && LiveKitBundle.Room) {
             ({ Room, RoomEvent, Track, TrackEvent, LocalTrack,
-               createLocalScreenTracks, VideoPresets, ConnectionState } = LiveKitBundle);
+               createLocalScreenTracks, VideoPresets, ScreenSharePresets, ConnectionState } = LiveKitBundle);
         } else {
             console.error("LiveKit SDK missing in test_script.js");
             return;
@@ -507,9 +507,18 @@ async function toggleScreenShare() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
                 throw new Error("Screen sharing is not supported on this browser (or you are not on HTTPS).");
             }
-            const [screenTrack] = await createLocalScreenTracks({ audio: false });
+            const [screenTrack] = await createLocalScreenTracks({ 
+                audio: false,
+                resolution: ScreenSharePresets.h1080fps15.resolution
+            });
+
+            if (screenTrack.mediaStreamTrack) {
+                screenTrack.mediaStreamTrack.contentHint = 'text';
+            }
+
             screenTrackPub = await room.localParticipant.publishTrack(screenTrack, {
-                screenShareEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 },
+                videoEncoding: ScreenSharePresets.h1080fps15.encoding,
+                simulcast: false,
             });
             isScreenSharing = true;
             document.getElementById('screenBtn').classList.add('active');

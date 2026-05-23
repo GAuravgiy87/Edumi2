@@ -38,12 +38,12 @@
         display: none;
         align-items: center;
         gap: 0.5rem;
-        background: rgba(0,0,0,0.5);
+        background: transparent; /* Made transparent as requested */
         padding: 0.5rem 1rem;
         border-radius: 9999px;
         color: white;
         font-weight: 700;
-        backdrop-filter: blur(4px);
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5); /* Added shadow for readability on transparent bg */
     }
     .rec-indicator.active { display: flex; animation: pulse 2s infinite; }
     @keyframes pulse {
@@ -56,6 +56,44 @@
         height: 100%;
         object-fit: contain;
     }
+    
+    /* Fullscreen HUD Controls */
+    .fullscreen-controls {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(8px);
+        padding: 0.75rem 1.5rem;
+        border-radius: 1rem;
+        display: none; /* Only visible in fullscreen */
+        align-items: center;
+        gap: 1rem;
+        z-index: 100;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    }
+    .video-monitor:fullscreen .fullscreen-controls {
+        display: flex;
+    }
+    .fs-btn {
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .fs-btn:hover { background: rgba(255,255,255,0.1); }
+    .fs-btn.active { color: #ef4444; }
+    .fs-btn-primary { background: #6366f1; }
+    .fs-btn-primary:hover { background: #4f46e5; }
     
     .controls-bar {
         background: white;
@@ -157,7 +195,25 @@
                     REC <span id="recTimer">00:00</span>
                 </div>
             </div>
-            <img id="mainFeed" src="{% url 'camera_feed' camera.id %}" class="video-feed" alt="Camera Feed">
+            <img id="mainFeed" src="{% url 'camera_feed' camera.id %}" class="video-feed" alt="Camera Feed" style="cursor: crosshair;" onclick="setZoomTarget(event)" oncontextmenu="captureAreaImage(event)">
+            <audio id="monitorAudio" autoplay muted></audio>
+            
+            <!-- Fullscreen HUD -->
+            <div class="fullscreen-controls">
+                <button class="fs-btn fs-btn-primary" id="fsStreamBtn" onclick="toggleStreaming()">
+                    <i data-lucide="radio"></i> <span>Live</span>
+                </button>
+                <button class="fs-btn" id="fsRecordBtn" onclick="toggleRecording()">
+                    <i data-lucide="circle"></i> <span>Record</span>
+                </button>
+                <div style="width:1px; height:24px; background:rgba(255,255,255,0.2); margin:0 0.5rem;"></div>
+                <button class="fs-btn" onclick="adjustZoom(-0.5)"><i data-lucide="minus-circle"></i></button>
+                <span id="fsZoomDisplay" style="color:white; font-weight:700; font-size:0.875rem; min-width:40px; text-align:center;">1.0x</span>
+                <button class="fs-btn" onclick="adjustZoom(0.5)"><i data-lucide="plus-circle"></i></button>
+                <button class="fs-btn" onclick="resetZoom()"><i data-lucide="refresh-cw"></i></button>
+                <div style="width:1px; height:24px; background:rgba(255,255,255,0.2); margin:0 0.5rem;"></div>
+                <button class="fs-btn" onclick="toggleFullScreen()"><i data-lucide="minimize"></i></button>
+            </div>
         </div>
 
         <div class="controls-bar">
@@ -170,6 +226,42 @@
                 </button>
             </div>
             <div style="display:flex; align-items:center; gap:1rem;">
+                <!-- Audio Input Selection -->
+                <div style="display:flex; align-items:center; background:#f1f5f9; padding:0.25rem 0.5rem; border-radius:0.75rem; gap:0.5rem;">
+                    <i data-lucide="mic" style="width:16px; color:#64748b;"></i>
+                    <select id="micSelect" class="form-select form-select-sm" style="width:140px; border:none; background:transparent; font-size:0.75rem; font-weight:600;">
+                        <option value="camera" id="cameraMicOption" selected>IP Camera (Built-in)</option>
+                        <option value="">No Audio</option>
+                        <option value="remote" id="remoteMicOption" disabled>Remote Mic (Not Connected)</option>
+                    </select>
+                    <div id="micLevel" style="width:40px; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">
+                        <div id="micLevelBar" style="width:0%; height:100%; background:#10b981; transition:width 0.1s;"></div>
+                    </div>
+                    <button id="monitorBtn" class="btn-action" title="Monitor Classroom Audio" onclick="toggleMonitorAudio()" style="padding:0.25rem; background:white; border-radius:0.5rem; color:#64748b;">
+                        <i data-lucide="volume-x" id="monitorIcon" style="width:14px;"></i>
+                    </button>
+                    <button id="selfListenBtn" class="btn-action" title="Hear Your Own Voice (Sidetone)" onclick="toggleSelfListen()" style="padding:0.25rem; background:white; border-radius:0.5rem; color:#64748b;">
+                        <i data-lucide="headphones" style="width:14px;"></i>
+                    </button>
+                    <button class="btn-action" title="Open Mobile Mic QR" onclick="showMobileMicQR()" style="padding:0.25rem; background:white; border-radius:0.5rem;">
+                        <i data-lucide="smartphone" style="width:14px;"></i>
+                    </button>
+                </div>
+
+                <!-- Zoom Controls -->
+                <div style="display:flex; align-items:center; background:#f1f5f9; padding:0.25rem; border-radius:0.75rem; gap:0.5rem;">
+                    <button class="action-btn" title="Zoom Out" onclick="adjustZoom(-0.5)" style="background:white; border-radius:0.5rem;">
+                        <i data-lucide="minus-circle"></i>
+                    </button>
+                    <span id="zoomDisplay" style="font-weight:700; font-size:0.75rem; min-width:35px; text-align:center;">1.0x</span>
+                    <button class="action-btn" title="Zoom In" onclick="adjustZoom(0.5)" style="background:white; border-radius:0.5rem;">
+                        <i data-lucide="plus-circle"></i>
+                    </button>
+                    <button class="action-btn" title="Reset Zoom" onclick="resetZoom()" style="background:white; border-radius:0.5rem;">
+                        <i data-lucide="refresh-cw"></i>
+                    </button>
+                </div>
+
                 <label style="font-weight:600; font-size:0.875rem;">Quality:</label>
                 <select class="quality-select" id="qualitySelect">
                     {% for q in qualities %}
@@ -178,6 +270,9 @@
                 </select>
                 <button class="action-btn" title="Snapshot" onclick="takeSnapshot()">
                     <i data-lucide="camera"></i>
+                </button>
+                <button class="action-btn" title="Full Screen" onclick="toggleFullScreen()" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                    <i data-lucide="maximize"></i>
                 </button>
             </div>
         </div>
@@ -229,6 +324,23 @@
     <div class="modal-content">
         <h2 style="font-weight:800; margin-bottom:1rem;">Publish Recording</h2>
         <p style="color:#64748b; font-size:0.875rem; margin-bottom:1.5rem;">Your recording is ready. Add a title and description to share it with your students.</p>
+        
+        <!-- Download Option -->
+        <div style="background: #f8fafc; padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; border: 1px solid #e2e8f0;">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <div style="background:#dcfce7; color:#166534; padding:0.5rem; border-radius:0.5rem;">
+                    <i data-lucide="video"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700; font-size:0.875rem;">Recording Ready</div>
+                    <div style="font-size:0.75rem; color:#64748b;">High-quality 4K/1080p MP4</div>
+                </div>
+            </div>
+            <a id="downloadLink" href="#" download class="btn-action" style="background:#10b981; color:white; padding:0.5rem 1rem; font-size:0.875rem; text-decoration:none;">
+                <i data-lucide="download"></i> Download
+            </a>
+        </div>
+
         <form onsubmit="finishPublish(event)">
             <div style="margin-bottom:1.25rem;">
                 <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Lecture Title</label>
@@ -255,17 +367,78 @@
     // Initialize UI from server state
     window.addEventListener('DOMContentLoaded', () => {
         const streamBtn = document.getElementById('streamBtn');
+        const fsStreamBtn = document.getElementById('fsStreamBtn');
         const recordBtn = document.getElementById('recordBtn');
+        const fsRecordBtn = document.getElementById('fsRecordBtn');
         const recIndicator = document.getElementById('recIndicator');
+        const qualitySelect = document.getElementById('qualitySelect');
+
+        // Restore quality from localStorage
+        const savedQuality = localStorage.getItem(`cam_quality_${window.cameraId}`);
+        if (savedQuality) {
+            qualitySelect.value = savedQuality;
+        }
+
+        // Handle quality change for live feed
+        const updateFeedQuality = () => {
+            const quality = qualitySelect.value;
+            localStorage.setItem(`cam_quality_${window.cameraId}`, quality);
+            
+            let qParam = 'med';
+            if (quality === '4K') qParam = '4k';
+            else if (quality === '1080p') qParam = 'high';
+            else if (quality === '720p') qParam = 'med';
+            else qParam = 'low';
+            
+            const mainFeed = document.getElementById('mainFeed');
+            const baseUrl = "{% url 'camera_feed' camera.id %}";
+            mainFeed.src = `${baseUrl}?q=${qParam}&t=${new Date().getTime()}`;
+        };
+
+        qualitySelect.addEventListener('change', () => {
+            updateFeedQuality();
+            showNotification(`Quality switched to ${qualitySelect.value}`, 'info');
+        });
+
+        // Apply initial quality
+        updateFeedQuality();
+
+        // Initialize Audio
+        initAudio();
+        initRemoteMicStatus();
+        
+        // Auto-start monitoring if IP Camera is selected
+        setTimeout(() => {
+            const micSelect = document.getElementById('micSelect');
+            if (micSelect && micSelect.value === 'camera') {
+                toggleMonitorAudio();
+            }
+        }, 1000);
+
+        // Sync zoom display and server state on load
+        const zDisp = document.getElementById('zoomDisplay');
+        const fzDisp = document.getElementById('fsZoomDisplay');
+        if (zDisp) zDisp.innerText = `${currentZoom.toFixed(1)}x`;
+        if (fzDisp) fzDisp.innerText = `${currentZoom.toFixed(1)}x`;
+
+        if (currentZoom > 1.0 || zoomX !== 0.5 || zoomY !== 0.5) {
+            updateZoomOnServer(currentZoom, zoomX, zoomY);
+        }
 
         if (isStreaming) {
-            streamBtn.innerHTML = '<i data-lucide="square"></i> Stop Live Stream';
+            const txt = '<i data-lucide="square"></i> Stop Live Stream';
+            const fsTxt = '<i data-lucide="square"></i> Stop';
+            streamBtn.innerHTML = txt;
+            fsStreamBtn.innerHTML = fsTxt;
             streamBtn.style.background = '#475569';
+            fsStreamBtn.style.background = '#475569';
         }
 
         if (isRecording) {
             recordBtn.classList.add('recording');
+            fsRecordBtn.classList.add('active');
             recordBtn.innerHTML = '<i data-lucide="square"></i> Stop Recording';
+            fsRecordBtn.innerHTML = '<i data-lucide="square"></i> Stop';
             recIndicator.classList.add('active');
             recTimerInterval = setInterval(updateRecTimer, 1000);
         }
@@ -295,14 +468,25 @@
 
     async function toggleStreaming() {
         const btn = document.getElementById('streamBtn');
+        const fsBtn = document.getElementById('fsStreamBtn');
         if (!isStreaming) {
             // Start Streaming
             const res = await fetch(`/cameras/start-streaming/{{ camera.id }}/`);
             const data = await res.json();
             if (data.status === 'success') {
                 isStreaming = true;
-                btn.innerHTML = '<i data-lucide="square"></i> Stop Live Stream';
+                
+                // Also start audio if a mic is selected
+                if (document.getElementById('micSelect').value) {
+                    initAudioSocket();
+                }
+
+                const txt = '<i data-lucide="square"></i> Stop Live Stream';
+                const fsTxt = '<i data-lucide="square"></i> Stop';
+                btn.innerHTML = txt;
+                fsBtn.innerHTML = fsTxt;
                 btn.style.background = '#475569';
+                fsBtn.style.background = '#475569';
                 showNotification(data.message, 'success');
             } else {
                 showNotification(data.message, 'error');
@@ -313,8 +497,19 @@
             const data = await res.json();
             if (data.status === 'success') {
                 isStreaming = false;
-                btn.innerHTML = '<i data-lucide="radio"></i> Start Live Stream';
+                
+                // Stop audio
+                if (audioSocket) {
+                    audioSocket.close();
+                    audioSocket = null;
+                }
+
+                const txt = '<i data-lucide="radio"></i> Start Live Stream';
+                const fsTxt = '<i data-lucide="radio"></i> Live';
+                btn.innerHTML = txt;
+                fsBtn.innerHTML = fsTxt;
                 btn.style.background = '#6366f1';
+                fsBtn.style.background = '#6366f1';
                 showNotification(data.message, 'info');
             }
         }
@@ -330,57 +525,518 @@
     }
 
     let currentRecordingId = null;
+    let currentZoom = 1.0;
+    let zoomX = 0.5;
+    let zoomY = 0.5;
 
+    // Audio Variables
+    let audioStream = null;
+    let audioContext = null;
+    let audioWorklet = null;
+    let micLevelInterval = null;
+    let audioSocket = null;
+    let remoteMicStatusSocket = null;
+    let monitorSocket = null;
+    let monitorMediaSource = null;
+    let isSelfMonitoring = false;
+    let localLoopbackNode = null;
+
+    function toggleSelfListen() {
+        const btn = document.getElementById('selfListenBtn');
+        isSelfMonitoring = !isSelfMonitoring;
+        
+        if (isSelfMonitoring) {
+            btn.style.color = '#6366f1';
+            btn.style.background = '#e0e7ff';
+            if (audioContext && audioStream) {
+                connectLoopback();
+            } else {
+                showNotification('Select a microphone first to hear yourself', 'info');
+            }
+        } else {
+            btn.style.color = '#64748b';
+            btn.style.background = 'white';
+            disconnectLoopback();
+        }
+    }
+
+    function connectLoopback() {
+        if (!audioContext || !audioStream || localLoopbackNode) return;
+        try {
+            const source = audioContext.createMediaStreamSource(audioStream);
+            localLoopbackNode = audioContext.createGain();
+            localLoopbackNode.gain.value = 1.0;
+            source.connect(localLoopbackNode);
+            localLoopbackNode.connect(audioContext.destination);
+            console.log("Local loopback connected");
+        } catch (e) {
+            console.error("Failed to connect loopback:", e);
+        }
+    }
+
+    function disconnectLoopback() {
+        if (localLoopbackNode) {
+            try {
+                localLoopbackNode.disconnect();
+            } catch (e) {}
+            localLoopbackNode = null;
+        }
+    }
+
+    function toggleMonitorAudio() {
+        const audio = document.getElementById('monitorAudio');
+        const btn = document.getElementById('monitorBtn');
+        const icon = document.getElementById('monitorIcon');
+        
+        if (audio.muted) {
+            // Start monitoring if not already connected
+            if (!monitorSocket || monitorSocket.readyState !== WebSocket.OPEN) {
+                initMonitorSocket();
+            }
+            audio.muted = false;
+            audio.play().catch(console.warn);
+            icon.setAttribute('data-lucide', 'volume-2');
+            btn.style.color = '#10b981';
+            btn.style.background = '#dcfce7';
+            showNotification('Monitoring camera audio...', 'info');
+        } else {
+            audio.muted = true;
+            icon.setAttribute('data-lucide', 'volume-x');
+            btn.style.color = '#64748b';
+            btn.style.background = 'white';
+        }
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function initMonitorSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/audio/{{ camera.id }}/?source=pc_monitor`;
+        
+        monitorSocket = new WebSocket(wsUrl);
+        monitorSocket.binaryType = 'arraybuffer';
+        
+        const audio = document.getElementById('monitorAudio');
+        monitorMediaSource = new MediaSource();
+        audio.src = URL.createObjectURL(monitorMediaSource);
+        
+        let sourceBuffer = null;
+        let queue = [];
+
+        monitorMediaSource.addEventListener('sourceopen', () => {
+            sourceBuffer = monitorMediaSource.addSourceBuffer('audio/webm; codecs="opus"');
+            sourceBuffer.addEventListener('updateend', () => {
+                if (queue.length > 0 && !sourceBuffer.updating) {
+                    sourceBuffer.appendBuffer(queue.shift());
+                }
+            });
+        });
+
+        monitorSocket.onmessage = (e) => {
+            if (typeof e.data === 'string') {
+                // Handle status messages
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'mic_status') {
+                        const opt = document.getElementById('remoteMicOption');
+                        if (data.source === 'mobile' && data.status === 'connected') {
+                            opt.disabled = false;
+                            opt.text = "Remote Mic (iPhone 15 Connected)";
+                            opt.style.color = "#10b981";
+                            showNotification('iPhone 15 Remote Mic is now available!', 'success');
+                        }
+                    }
+                } catch(err) {}
+            } else if (sourceBuffer && !sourceBuffer.updating && monitorMediaSource.readyState === 'open') {
+                sourceBuffer.appendBuffer(e.data);
+            } else if (sourceBuffer) {
+                queue.push(e.data);
+            }
+        };
+
+        monitorSocket.onclose = () => {
+            if (!audio.muted) setTimeout(initMonitorSocket, 3000);
+        };
+    }
+
+    function initRemoteMicStatus() {
+        // Now merged into initMonitorSocket if monitoring is enabled, 
+        // but we'll call initMonitorSocket in background silently for status
+        if (!monitorSocket) initMonitorSocket();
+    }
+
+    function showMobileMicQR() {
+        const url = `${window.location.origin}/cameras/mobile-mic/{{ camera.id }}/`;
+        // In a real app, we'd show a QR code modal. For now, just show the link.
+        const win = window.open(url, '_blank');
+        if (win) win.focus();
+        showNotification('Mobile Mic page opened. Open this URL on your iPhone Safari.', 'info');
+    }
+
+    async function initAudio() {
+        const micSelect = document.getElementById('micSelect');
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioDevices = devices.filter(device => device.kind === 'audioinput');
+            
+            // Keep the initial "IP Camera" and "Remote Mic" options
+            const cameraOpt = document.getElementById('cameraMicOption');
+            const remoteOpt = document.getElementById('remoteMicOption');
+            
+            micSelect.innerHTML = '<option value="">No Audio</option>';
+            if (cameraOpt) micSelect.appendChild(cameraOpt);
+            if (remoteOpt) micSelect.appendChild(remoteOpt);
+            
+            // Filter and clean up labels for Bluetooth/System devices
+            const seenLabels = new Set();
+            audioDevices.forEach(device => {
+                let label = device.label || `Mic: ${device.deviceId.substring(0,5)}...`;
+                
+                // Skip generic "Default" and "Communications" to avoid confusion
+                if (label.toLowerCase().includes('default') || label.toLowerCase().includes('communications')) {
+                    if (audioDevices.length > 2) return; // Only skip if we have better specific options
+                }
+
+                // Clean up Bluetooth labels
+                label = label.replace(/Hands-Free AG Audio/i, '(Hands-Free Mic)');
+                label = label.replace(/Bluetooth/i, 'BT');
+                
+                // Avoid duplicate entries for the same physical device
+                const baseLabel = label.split('(')[0].trim();
+                if (seenLabels.has(baseLabel) && label.includes('Default')) return;
+                seenLabels.add(baseLabel);
+
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                
+                // Recommend "Hands-Free" or specific device over generic ones
+                if (label.includes('Hands-Free') || (!label.includes('Default') && audioDevices.length > 1)) {
+                    option.text = "⭐ " + label;
+                } else {
+                    option.text = label;
+                }
+                
+                micSelect.appendChild(option);
+            });
+            
+            micSelect.onchange = startAudioCapture;
+        } catch (err) {
+            console.error('Error listing audio devices:', err);
+        }
+    }
+
+    async function startAudioCapture() {
+        const val = document.getElementById('micSelect').value;
+        if (!val || val === 'camera' || val === 'remote') {
+            stopAudioCapture();
+            // If it's a server-side audio source, we don't need browser capture
+            return;
+        }
+
+        try {
+            if (audioStream) stopAudioCapture();
+            
+            // Enhanced constraints for Bluetooth/External mics
+            const constraints = {
+                audio: { 
+                    deviceId: { exact: val },
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000,
+                    channelCount: 1 // Voice is usually mono, better for processing
+                }
+            };
+            
+            audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // Setup audio visualization
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(audioStream);
+            const analyzer = audioContext.createAnalyser();
+            source.connect(analyzer);
+            
+            const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+            const levelBar = document.getElementById('micLevelBar');
+            
+            micLevelInterval = setInterval(() => {
+                analyzer.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for(let i=0; i<dataArray.length; i++) sum += dataArray[i];
+                const average = sum / dataArray.length;
+                levelBar.style.width = Math.min(100, average * 2) + '%';
+                
+                // Visual confirmation of sending
+                if (audioSocket && audioSocket.readyState === WebSocket.OPEN && average > 5) {
+                    levelBar.style.background = '#10b981'; // Green when active
+                } else if (audioSocket && audioSocket.readyState === WebSocket.OPEN) {
+                    levelBar.style.background = '#6366f1'; // Indigo when connected but quiet
+                } else {
+                    levelBar.style.background = '#94a3b8'; // Gray when not sending
+                }
+            }, 100);
+
+            // If self-monitoring is enabled, connect to destination
+            if (isSelfMonitoring) {
+                connectLoopback();
+            }
+
+            // Connect to Audio WebSocket if streaming
+            if (isStreaming) initAudioSocket();
+            
+            showNotification('Microphone connected', 'success');
+        } catch (err) {
+            console.error('Error capturing audio:', err);
+            showNotification('Failed to access microphone', 'error');
+        }
+    }
+
+    function stopAudioCapture() {
+        disconnectLoopback();
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+        if (audioContext) {
+            audioContext.close();
+            audioContext = null;
+        }
+        if (micLevelInterval) {
+            clearInterval(micLevelInterval);
+            micLevelInterval = null;
+            document.getElementById('micLevelBar').style.width = '0%';
+        }
+        if (audioSocket) {
+            audioSocket.close();
+            audioSocket = null;
+        }
+    }
+
+    function initAudioSocket() {
+        if (audioSocket) return;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        audioSocket = new WebSocket(`${protocol}//${window.location.host}/ws/audio/{{ camera.id }}/`);
+        
+        audioSocket.onopen = () => {
+            console.log('Audio WebSocket connected');
+            // We'll send audio chunks here
+            startAudioStreaming();
+        };
+    }
+
+    async function startAudioStreaming() {
+        if (!audioStream || !audioSocket) return;
+        
+        // Use a higher bitrate and larger chunks for better stability on Bluetooth
+        const options = { 
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 128000 
+        };
+        
+        const mediaRecorder = new MediaRecorder(audioStream, options);
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0 && audioSocket.readyState === WebSocket.OPEN) {
+                audioSocket.send(e.data);
+            }
+        };
+        // Increased chunk size to 500ms to prevent stream fragmentation/noise
+        mediaRecorder.start(500); 
+        window.audioRecorder = mediaRecorder;
+    }
+
+    // Load saved zoom state
+    const savedZoom = localStorage.getItem(`cam_zoom_${window.cameraId}`);
+    if (savedZoom) {
+        try {
+            const state = JSON.parse(savedZoom);
+            currentZoom = state.level || 1.0;
+            zoomX = state.x || 0.5;
+            zoomY = state.y || 0.5;
+            // We'll sync this to the server after DOM loads
+        } catch(e) {}
+    }
+
+    async function adjustZoom(delta) {
+        const newZoom = Math.max(1.0, Math.min(5.0, currentZoom + delta));
+        if (newZoom === currentZoom) return;
+        await updateZoomOnServer(newZoom, zoomX, zoomY);
+    }
+
+    async function setZoomTarget(event) {
+        const rect = event.target.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        
+        // If currently at 1.0x, automatically zoom in to 2.0x at the clicked spot
+        const newZoom = currentZoom <= 1.0 ? 2.0 : currentZoom;
+        
+        await updateZoomOnServer(newZoom, x, y);
+    }
+
+    async function resetZoom() {
+        await updateZoomOnServer(1.0, 0.5, 0.5);
+    }
+
+    async function updateZoomOnServer(level, x, y) {
+        try {
+            const res = await fetch(`/cameras/update-zoom/{{ camera.id }}/?level=${level}&x=${x}&y=${y}`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                currentZoom = data.zoom;
+                zoomX = data.x;
+                zoomY = data.y;
+                
+                const zDisp = document.getElementById('zoomDisplay');
+                const fzDisp = document.getElementById('fsZoomDisplay');
+                if (zDisp) zDisp.innerText = `${currentZoom.toFixed(1)}x`;
+                if (fzDisp) fzDisp.innerText = `${currentZoom.toFixed(1)}x`;
+                
+                // Save state
+                localStorage.setItem(`cam_zoom_${window.cameraId}`, JSON.stringify({
+                    level: currentZoom,
+                    x: zoomX,
+                    y: zoomY
+                }));
+
+                if (currentZoom > 1.0) {
+                    showNotification(`Zoom: ${currentZoom.toFixed(1)}x at ${Math.round(zoomX*100)}%, ${Math.round(zoomY*100)}%`, 'info');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to update zoom:', err);
+        }
+    }
+
+    function captureAreaImage(event) {
+        event.preventDefault();
+        const mainFeed = document.getElementById('mainFeed');
+        
+        // Create a canvas to capture the current frame
+        const canvas = document.createElement('canvas');
+        canvas.width = mainFeed.naturalWidth || mainFeed.width;
+        canvas.height = mainFeed.naturalHeight || mainFeed.height;
+        const ctx = canvas.getContext('2d');
+        
+        try {
+            // Draw the current image/frame to the canvas
+            ctx.drawImage(mainFeed, 0, 0, canvas.width, canvas.height);
+            
+            // Convert to data URL and download
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            link.download = `camera-capture-${timestamp}.jpg`;
+            link.href = dataUrl;
+            link.click();
+            
+            showNotification('Image captured successfully!', 'success');
+        } catch (err) {
+            console.error('Failed to capture image:', err);
+            showNotification('Failed to capture image. MJPEG stream may be protected.', 'error');
+        }
+    }
+
+    // Initialize UI and sync state
+    // Handled in the merged DOMContentLoaded listener above
+    
     async function startRecording() {
+        const btn = document.getElementById('recordBtn');
+        const fsBtn = document.getElementById('fsRecordBtn');
+        
+        if (btn.disabled) return;
+        btn.disabled = true;
+        fsBtn.disabled = true;
+
         const quality = document.getElementById('qualitySelect').value;
+        const audioSource = document.getElementById('micSelect').value;
         
         const formData = new FormData();
         formData.append('quality', quality);
+        formData.append('audio_source', audioSource);
         
-        const res = await fetch(`/cameras/start-recording/{{ camera.id }}/`, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        });
-        
-        const data = await res.json();
-        if (data.status === 'success') {
-            isRecording = true;
-            recStartTime = new Date();
+        try {
+            const res = await fetch(`/cameras/start-recording/{{ camera.id }}/`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
             
-            document.getElementById('recordBtn').classList.add('recording');
-            document.getElementById('recordBtn').innerHTML = '<i data-lucide="square"></i> Stop Recording';
-            document.getElementById('recIndicator').classList.add('active');
-            
-            recTimerInterval = setInterval(updateRecTimer, 1000);
-            showNotification(data.message, 'success');
-        } else {
-            showNotification(data.message, 'error');
+            const data = await res.json();
+            if (data.status === 'success') {
+                isRecording = true;
+                recStartTime = new Date();
+                
+                btn.classList.add('recording');
+                fsBtn.classList.add('active');
+                
+                btn.innerHTML = '<i data-lucide="square"></i> Stop Recording';
+                fsBtn.innerHTML = '<i data-lucide="square"></i> Stop';
+                
+                document.getElementById('recIndicator').classList.add('active');
+                
+                recTimerInterval = setInterval(updateRecTimer, 1000);
+                showNotification(data.message, 'success');
+            } else {
+                showNotification(data.message, 'error');
+            }
+        } catch (err) {
+            console.error('Recording start error:', err);
+            showNotification('Failed to start recording. Server error.', 'error');
+        } finally {
+            btn.disabled = false;
+            fsBtn.disabled = false;
+            lucide.createIcons();
         }
-        lucide.createIcons();
     }
 
     async function stopRecording() {
-        const res = await fetch(`/cameras/stop-recording/{{ camera.id }}/`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        });
+        const btn = document.getElementById('recordBtn');
+        const fsBtn = document.getElementById('fsRecordBtn');
         
-        const data = await res.json();
-        if (data.status === 'success') {
-            isRecording = false;
-            clearInterval(recTimerInterval);
-            currentRecordingId = data.recording_id;
+        if (btn.disabled) return;
+        btn.disabled = true;
+        fsBtn.disabled = true;
+
+        try {
+            const res = await fetch(`/cameras/stop-recording/{{ camera.id }}/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
             
-            document.getElementById('recordBtn').classList.remove('recording');
-            document.getElementById('recordBtn').innerHTML = '<i data-lucide="circle"></i> Start Recording';
-            document.getElementById('recIndicator').classList.remove('active');
-            
-            document.getElementById('publishModal').style.display = 'flex';
-        } else {
-            showNotification(data.message, 'error');
+            const data = await res.json();
+            if (data.status === 'success') {
+                isRecording = false;
+                clearInterval(recTimerInterval);
+                currentRecordingId = data.recording_id;
+                
+                // Set download link
+                const downloadLink = document.getElementById('downloadLink');
+                if (data.video_url) {
+                    downloadLink.href = data.video_url;
+                    downloadLink.style.display = 'flex';
+                } else {
+                    downloadLink.style.display = 'none';
+                }
+                
+                btn.classList.remove('recording');
+                fsBtn.classList.remove('active');
+                
+                btn.innerHTML = '<i data-lucide="circle"></i> Start Recording';
+                fsBtn.innerHTML = '<i data-lucide="circle"></i> Record';
+                
+                document.getElementById('recIndicator').classList.remove('active');
+                
+                document.getElementById('publishModal').style.display = 'flex';
+            } else {
+                showNotification(data.message, 'error');
+            }
+        } catch (err) {
+            console.error('Recording stop error:', err);
+            showNotification('Failed to stop recording cleanly.', 'error');
+        } finally {
+            btn.disabled = false;
+            fsBtn.disabled = false;
+            lucide.createIcons();
         }
-        lucide.createIcons();
     }
 
     async function finishPublish(e) {
@@ -409,16 +1065,33 @@
         showNotification('Snapshot saved!', 'success');
     }
 
+    function toggleFullScreen() {
+        const monitor = document.querySelector('.video-monitor');
+        if (!document.fullscreenElement) {
+            if (monitor.requestFullscreen) {
+                monitor.requestFullscreen();
+            } else if (monitor.webkitRequestFullscreen) { /* Safari */
+                monitor.webkitRequestFullscreen();
+            } else if (monitor.msRequestFullscreen) { /* IE11 */
+                monitor.msRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+
     // ── WebSocket Chat & Presence Implementation ──
-    const cameraId = "{{ camera.id }}";
-    const meetingCode = "CAM_" + cameraId;
-    const currentUserId = "{{ user.id }}";
-    let chatWs = null;
-    let activeParticipants = new Map();
+    window.cameraId = "{{ camera.id }}";
+    window.meetingCode = "CAM_" + window.cameraId;
+    window.currentUserId = "{{ user.id }}";
+    var chatWs = null;
+    var activeParticipants = new Map();
 
     function connectChat() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${meetingCode}/`;
+        const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${window.meetingCode}/`;
         
         console.log("Connecting to Teacher Chat WebSocket:", wsUrl);
         chatWs = new WebSocket(wsUrl);

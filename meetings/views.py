@@ -316,6 +316,7 @@ def start_classroom_meeting(request, classroom_id):
             classroom=classroom,
             title=title,
             teacher=request.user,
+            meeting_type='classroom',
             meeting_code=meeting_code,
             scheduled_time=timezone.now(),
             duration_minutes=duration_minutes,
@@ -364,6 +365,7 @@ def create_meeting(request):
             title=title,
             description=description,
             teacher=request.user,
+            meeting_type='temporary',
             meeting_code=meeting_code,
             scheduled_time=scheduled_time,
             duration_minutes=duration_minutes,
@@ -406,11 +408,13 @@ def student_meetings(request):
         status='approved'
     ).values_list('classroom_id', flat=True)
     
-    # Get all scheduled and live meetings (standalone OR in user's classrooms)
-    # Exclude meetings that are actually live camera sessions (those starting with CAM_)
+    # Get all scheduled and live meetings (classroom meetings in user's classrooms)
+    # Standalone meetings are only visible to the teacher who created them in their dashboard
+    # Students join standalone meetings via direct link
     meetings = Meeting.objects.filter(
-        Q(classroom__isnull=True) | Q(classroom_id__in=my_classroom_ids),
-        status__in=['scheduled', 'live']
+        classroom_id__in=my_classroom_ids,
+        status__in=['scheduled', 'live'],
+        meeting_type='classroom'
     ).exclude(meeting_code__startswith='CAM_')
     return render(request, 'meetings/student_meetings.html', {'meetings': meetings})
 
@@ -501,6 +505,16 @@ def join_meeting(request, meeting_code):
         if not request.session.get(f'verified_meeting_{meeting.meeting_code}'):
             return redirect('pre_join', meeting_code=meeting.meeting_code)
 
+    # Fetch available IP cameras for teachers
+    teacher_cameras = []
+    if is_host:
+        from cameras.models import Camera, CameraPermission
+        if request.user.is_superuser:
+            teacher_cameras = Camera.objects.all()
+        else:
+            camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
+            teacher_cameras = Camera.objects.filter(id__in=camera_ids)
+
     return render(request, 'meetings/meeting_room.html', {
         'meeting': meeting,
         'participant': participant,
@@ -509,6 +523,7 @@ def join_meeting(request, meeting_code):
         'user_type': request.user.userprofile.user_type if hasattr(request.user, 'userprofile') else 'student',
         'livekit_url': settings.LIVEKIT_URL,
         'face_not_registered': face_not_registered,
+        'teacher_cameras': teacher_cameras,
     })
 
 @login_required
@@ -764,6 +779,18 @@ def leave_meeting(request, meeting_id):
         participant.is_active = False
         participant.left_at = leave_time
         participant.save(update_fields=['is_active', 'left_at', 'total_duration_seconds'])
+
+        # --- AUTO-CLEANUP FOR TEMPORARY MEETINGS ---
+        if meeting.meeting_type == 'temporary':
+            active_exists = MeetingParticipant.objects.filter(
+                meeting=meeting, 
+                is_active=True
+            ).exists()
+            if not active_exists:
+                meeting_code = meeting.meeting_code
+                meeting.delete()
+                print(f"Temporary meeting {meeting_code} deleted via leave_meeting (last participant left).")
+
         return JsonResponse({'status': 'success'})
     except MeetingParticipant.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Not a participant'})

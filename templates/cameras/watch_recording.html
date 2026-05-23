@@ -88,7 +88,7 @@
 <div class="video-page-container">
     <div class="video-main">
         <div class="player-container">
-            <video controls poster="{% if recording.thumbnail %}{{ recording.thumbnail.url }}{% endif %}">
+            <video id="videoPlayer" controls preload="metadata" poster="{% if recording.thumbnail %}{{ recording.thumbnail.url }}{% endif %}">
                 <source src="{% url 'stream_video' recording.id %}" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
@@ -143,4 +143,28 @@
         {% endfor %}
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const video = document.getElementById('videoPlayer');
+        
+        // Optimize for long videos: prevent aggressive pre-fetching
+        // The 'metadata' preload already helps, but we can also monitor buffering
+        video.addEventListener('progress', () => {
+            if (video.buffered.length > 0) {
+                const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                const duration = video.duration;
+                if (duration > 0) {
+                    // console.log(`Buffered: ${(bufferedEnd / duration * 100).toFixed(2)}%`);
+                }
+            }
+        });
+
+        // Error handling
+        video.addEventListener('error', (e) => {
+            console.error('Video error:', video.error);
+            alert('Error loading video. The file might be processing or unavailable.');
+        });
+    });
+</script>
 {% endblock %}

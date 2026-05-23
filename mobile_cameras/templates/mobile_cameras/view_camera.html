@@ -318,7 +318,7 @@
         if (!picker) return;
         const quality = picker.value;
         const img = document.querySelector('.camera-feed');
-        const baseUrl = 'http://localhost:8001/api/mobile-cameras/{{ mobile_camera.id }}/feed/';
+        const baseUrl = 'http://localhost:8001/mobile-cameras/{{ mobile_camera.id }}/feed/';
         if (img) img.src = `${baseUrl}?q=${quality}&t=${new Date().getTime()}`;
     };
 

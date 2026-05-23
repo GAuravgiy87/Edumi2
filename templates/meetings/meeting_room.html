@@ -137,7 +137,75 @@
         background: rgba(255, 255, 255, 0.1) !important;
         color: #fff !important;
     }
-    .participants-count {
+
+    /* Camera Switch Modal Styles */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2000;
+    }
+    .modal-card {
+        background: #fff; width: 90%; max-width: 450px;
+        border-radius: 16px; overflow: hidden;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    }
+    .modal-header {
+        padding: 20px; border-bottom: 1px solid #f1f5f9;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-header h3 { margin: 0; font-size: 1.25rem; color: #1e293b; }
+    .close-modal { 
+        background: none; border: none; font-size: 1.5rem; color: #64748b; 
+        cursor: pointer; padding: 4px; line-height: 1;
+    }
+    .modal-body { padding: 12px; max-height: 400px; overflow-y: auto; }
+    .camera-option {
+        display: flex; align-items: center; gap: 16px; padding: 16px;
+        border-radius: 12px; cursor: pointer; transition: all 0.2s;
+        border: 2px solid transparent; margin-bottom: 8px;
+    }
+    .camera-option:hover { background: #f8fafc; }
+    .camera-option.active { 
+        background: #eff6ff; border-color: #3b82f6; 
+    }
+    .camera-icon {
+        width: 40px; height: 40px; border-radius: 10px;
+        background: #f1f5f9; display: flex; align-items: center;
+        justify-content: center; color: #64748b;
+    }
+    .active .camera-icon { background: #3b82f6; color: #fff; }
+    .camera-info { flex: 1; }
+    .camera-name { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+    .camera-type { font-size: 0.75rem; color: #64748b; }
+    .camera-check { color: #3b82f6; font-weight: bold; opacity: 0; }
+    .active .camera-check { opacity: 1; }
+
+    /* Monitoring View Styles */
+    #monitoringOverlay {
+        position: fixed; bottom: 100px; right: 20px;
+        width: 320px; height: 180px;
+        background: #000; border-radius: 12px;
+        overflow: hidden; border: 2px solid #3b82f6;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        z-index: 1000; display: none;
+        transition: all 0.3s ease;
+    }
+    #monitoringOverlay video { width: 100%; height: 100%; object-fit: cover; }
+    .monitoring-label {
+        position: absolute; top: 8px; left: 8px;
+        background: rgba(0,0,0,0.6); color: #fff;
+        padding: 2px 8px; border-radius: 4px; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .monitoring-close {
+        position: absolute; top: 8px; right: 8px;
+        background: rgba(0,0,0,0.6); color: #fff;
+        width: 20px; height: 20px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; border: none; font-size: 12px;
+    }
+</style>    .participants-count {
         background: #1e293b !important;
         color: #cbd5e1 !important;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
@@ -313,6 +381,12 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     <span>Share Screen</span>
                 </button>
+                {% if is_host %}
+                <button class="menu-item" id="switchCamBtn" onclick="toggleCameraModal(); toggleMoreOptions();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <span>Switch Camera</span>
+                </button>
+                {% endif %}
                 <button class="menu-item" id="peopleBtn" onclick="openSidebar('people'); toggleMoreOptions();">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>Participants</span>
@@ -351,86 +425,156 @@
     data-csrf="{{ csrf_token }}"
     data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
     data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
-    data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}">
+    data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}"
+    data-global-control-url="{% url 'meeting_global_control' meeting.id %}">
 </script>
+
+{% if is_host %}
+<!-- Camera Selection Modal -->
+<div id="cameraModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Switch Camera Source</h3>
+            <button class="close-modal" onclick="toggleCameraModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="camera-option active" id="webcamOption" onclick="switchCameraSource('webcam')">
+                <div class="camera-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></div>
+                <div class="camera-info">
+                    <div class="camera-name">Default Webcam</div>
+                    <div class="camera-type">Built-in or USB Camera</div>
+                </div>
+                <div class="camera-check">✓</div>
+            </div>
+            
+            {% for cam in teacher_cameras %}
+            <div class="camera-option" id="ipOption-{{ cam.id }}" onclick="switchCameraSource('ip', '{{ cam.id }}', '{{ cam.name }}')">
+                <div class="camera-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+                <div class="camera-info">
+                    <div class="camera-name">{{ cam.name }}</div>
+                    <div class="camera-type">{{ cam.get_camera_type_display }}</div>
+                </div>
+                <div class="camera-check">✓</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Hidden elements for IP camera streaming -->
+<canvas id="ipCamCanvas" style="visibility:hidden; position:absolute; left:-9999px;" width="1280" height="720"></canvas>
+<img id="ipCamImg" style="visibility:hidden; position:absolute; left:-9999px;" crossorigin="anonymous">
+
+<!-- Monitoring Overlay (Teacher ONLY) -->
+<div id="monitoringOverlay">
+    <div class="monitoring-label">IP Camera Monitoring</div>
+    <button class="monitoring-close" onclick="stopIpCameraStream()">✕</button>
+    <div id="monitoringVideoContainer"></div>
+</div>
+{% endif %}
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const _d          = document.getElementById('meeting-data').dataset;
-const meetingCode = _d.meetingCode;
-const currentUserId   = _d.userId;
-const currentUsername = _d.username;
-const isHost      = _d.isHost === 'true';
-const userType    = _d.userType;
-const hostId      = _d.hostId;
-const TOKEN_URL   = _d.tokenUrl;
-const LEAVE_URL    = _d.leaveUrl;
-const SLEEP_URL    = _d.sleepUrl;
-const UNFREEZE_URL = _d.unfreezeUrl;
-const AFTER_LEAVE  = _d.afterLeaveUrl;
-const CSRF         = _d.csrf;
+// Global scope variables for access across functions
+var _d = document.getElementById('meeting-data').dataset;
 
-// LiveKit SDK globals (from UMD bundle)
-// LiveKit SDK globals (from UMD bundle)
-var LiveKitBundle = window.LiveKitBundle || window.LiveKit || window.LiveKitClient;
+// Assign to window for Turbo Drive compatibility
+window.meetingConfig = {
+    meetingCode: _d.meetingCode,
+    currentUserId: _d.userId,
+    currentUsername: _d.username,
+    isHost: _d.isHost === 'true',
+    userType: _d.userType,
+    hostId: _d.hostId,
+    TOKEN_URL: _d.tokenUrl,
+    LEAVE_URL: _d.leaveUrl,
+    SLEEP_URL: _d.sleepUrl,
+    UNFREEZE_URL: _d.unfreezeUrl,
+    AFTER_LEAVE: _d.afterLeaveUrl,
+    CSRF: _d.csrf,
+    kickUrl: _d.kickUrl,
+    bannedUsersUrl: _d.bannedUsersUrl,
+    revokeBanUrl: _d.revokeBanUrl,
+    globalControlUrl: _d.globalControlUrl
+};
 
-// Destructure with fallbacks
-var { Room, RoomEvent, Track, TrackEvent, LocalTrack,
-        createLocalScreenTracks, VideoPresets, ConnectionState } = LiveKitBundle || {};
+// Global shortcuts using window properties to prevent Turbo redeclaration errors
+window.meetingCode     = window.meetingConfig.meetingCode;
+window.currentUserId   = window.meetingConfig.currentUserId;
+window.currentUsername = window.meetingConfig.currentUsername;
+window.isHost          = window.meetingConfig.isHost;
+window.userType        = window.meetingConfig.userType;
+window.hostId          = window.meetingConfig.hostId;
+window.TOKEN_URL       = window.meetingConfig.TOKEN_URL;
+window.LEAVE_URL       = window.meetingConfig.LEAVE_URL;
+window.SLEEP_URL       = window.meetingConfig.SLEEP_URL;
+window.UNFREEZE_URL    = window.meetingConfig.UNFREEZE_URL;
+window.AFTER_LEAVE     = window.meetingConfig.AFTER_LEAVE;
+window.CSRF            = window.meetingConfig.CSRF;
+
+// ── LiveKit SDK Initialization ────────────────────────────────────────────────
+var Room, RoomEvent, Track, TrackEvent, LocalTrack,
+    createLocalScreenTracks, VideoPresets, ScreenSharePresets, ConnectionState;
+
+function extractLiveKitSymbols() {
+    if (!window.LiveKitBundle) return false;
+    try {
+        const bundle = window.LiveKitBundle;
+        Room = bundle.Room;
+        RoomEvent = bundle.RoomEvent;
+        Track = bundle.Track;
+        TrackEvent = bundle.TrackEvent;
+        LocalTrack = bundle.LocalTrack;
+        createLocalScreenTracks = bundle.createLocalScreenTracks;
+        VideoPresets = bundle.VideoPresets;
+        ScreenSharePresets = bundle.ScreenSharePresets;
+        ConnectionState = bundle.ConnectionState;
+        return !!Room;
+    } catch (e) {
+        console.error("SDK symbol extraction failed:", e);
+        return false;
+    }
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
-var room = null;
-var isMicOn    = true;
-var isCameraOn = true;
-var isScreenSharing = false;
-var screenTrackPub  = null;
-var isSleeping = false;
-var unreadMessages = 0;
-var timerInterval  = null;
-var timerSeconds   = 0;
-var signalingWs    = null;
+window.room = null;
+window.isMicOn    = true;
+window.isCameraOn = true;
+window.isScreenSharing = false;
+window.screenTrackPub  = null;
+window.isSleeping = false;
+window.unreadMessages = 0;
+window.timerInterval  = null;
+window.timerSeconds   = 0;
+window.signalingWs    = null;
+
+// IP Camera State
+window.currentVideoSource = 'webcam'; // 'webcam' or 'ip'
+window.currentIpCamId = null;
+window.ipCamImg = null;
+window.ipCamAnimationId = null;
+window.ipCamTrackPub = null;
+window.ipCamCanvas = null;
+window.ipCamCtx = null;
 
 // Permission State (Always allowed as per teacher request)
-var canSpeak = true;
-var canVideo = true;
-var canShare = true;
+window.canSpeak = true;
+window.canVideo = true;
+window.canShare = true;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-    // If SDK is still not found, try one last mapping attempt
-    if (!window.LiveKitBundle) {
-        mapLiveKitSDK();
-    }
-    
-    if (window.LiveKitBundle) {
-        console.log("LiveKitBundle symbols:", Object.keys(window.LiveKitBundle).filter(k => k[0] === k[0].toUpperCase()).slice(0, 15));
-        // Extract symbols from the mapped bundle
-        try {
-            Room = window.LiveKitBundle.Room;
-            RoomEvent = window.LiveKitBundle.RoomEvent;
-            Track = window.LiveKitBundle.Track;
-            TrackEvent = window.LiveKitBundle.TrackEvent;
-            LocalTrack = window.LiveKitBundle.LocalTrack;
-            createLocalScreenTracks = window.LiveKitBundle.createLocalScreenTracks;
-            VideoPresets = window.LiveKitBundle.VideoPresets;
-            ConnectionState = window.LiveKitBundle.ConnectionState;
-            
-            if (!Room) throw new Error("Room constructor missing from bundle");
-        } catch (err) {
-            console.error("Extraction failed:", err);
-            window.LiveKitBundle = null; // Reset to force retry
-            return;
-        }
-    } else {
-        console.error('LiveKit SDK missing! Retrying init in 1.5 seconds...');
-        setTimeout(init, 1500);
+    if (!extractLiveKitSymbols()) {
+        console.warn('LiveKit SDK missing or incomplete! Retrying init in 1s...');
+        setTimeout(init, 1000);
         return;
     }
+
     // ── Signaling WebSocket ──────────────────────────────────────────────────
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${meetingCode}/`);
+    window.signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${window.meetingCode}/`);
     
-    signalingWs.onmessage = (e) => {
+    window.signalingWs.onmessage = (e) => {
         try {
             const data = JSON.parse(e.data);
             handleSignalingMessage(data);
@@ -440,93 +584,94 @@ async function init() {
     };
 
     // Fetch token from Django
-    const res   = await fetch(TOKEN_URL);
-    const data  = await res.json();
-    if (data.error) { showNotification('Access denied: ' + data.error, 'error'); return; }
-
-    const { token, url } = data;
-
-    // Show registration warning for students if not registered
-    {% if not is_host and not user.is_superuser %}
-    if (data.face_not_registered || "{{ face_not_registered }}" === "True") {
-        showNotification('Face not registered! Please register in Attendance Settings for automatic attendance.', 'warning');
-    }
-    {% endif %}
-
-    room = new Room({
-        adaptiveStream: true,          // auto-adjust quality per subscriber bandwidth
-        dynacast: true,                // only encode layers actually needed
-        videoCaptureDefaults: {
-            resolution: VideoPresets.h1080.resolution,
-        },
-        publishDefaults: {
-            simulcast: true,           // send 3 quality layers — SFU picks the right one per viewer
-            videoCodec: 'h264',
-            videoEncoding: VideoPresets.h1080.encoding,
-            screenShareEncoding: {
-                maxBitrate: 4_000_000,
-                maxFramerate: 30,
-            }
-        },
-    });
-
-    // ── Room events ───────────────────────────────────────────────────────────
-    room
-        .on(RoomEvent.ParticipantConnected,    onParticipantConnected)
-        .on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected)
-        .on(RoomEvent.TrackSubscribed,         onTrackSubscribed)
-        .on(RoomEvent.TrackUnsubscribed,       onTrackUnsubscribed)
-        .on(RoomEvent.TrackMuted,              onTrackMuted)
-        .on(RoomEvent.TrackUnmuted,            onTrackUnmuted)
-        .on(RoomEvent.ActiveSpeakersChanged,   onActiveSpeakersChanged)
-        .on(RoomEvent.DataReceived,            onDataReceived)
-        .on(RoomEvent.Disconnected,            onDisconnected)
-        .on(RoomEvent.ConnectionStateChanged,  onConnectionStateChanged);
-
-    await room.connect(url, token);
-    console.log('Connected to LiveKit room:', room.name);
-
-    // Initial state based on permissions
-    isMicOn = isHost ? true : canSpeak;
-    isCameraOn = isHost ? true : canVideo;
-
-    // Publish local camera + mic if permitted
     try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            showNotification('Security Block: Camera/Mic requires HTTPS or localhost.', 'error');
-        } else {
-            if (isMicOn) await room.localParticipant.setMicrophoneEnabled(true);
-            if (isCameraOn) await room.localParticipant.setCameraEnabled(true);
+        const res   = await fetch(window.TOKEN_URL);
+        const data  = await res.json();
+        if (data.error) { 
+            showNotification('Access denied: ' + data.error, 'error'); 
+            return; 
         }
-    } catch (e) {
-        console.error('Initial Camera/Mic error:', e);
-        if (e.name === 'NotFoundError') {
-            showNotification('No Camera/Mic found! Please plug in a device.', 'warning');
-        } else if (e.name === 'NotAllowedError') {
-            showNotification('Permission Denied! Please allow camera access in browser.', 'error');
-        } else {
-            showNotification('Media Error: ' + e.message, 'warning');
-        }
-    }
 
-    // Update UI buttons to reflect actual initial state
-    document.getElementById('micBtn').classList.toggle('off', !isMicOn);
-    document.getElementById('camBtn').classList.toggle('off', !isCameraOn);
+        const { token, url } = data;
+
+        // Show registration warning for students if not registered
+        {% if not is_host and not user.is_superuser %}
+        if (data.face_not_registered || "{{ face_not_registered }}" === "True") {
+            showNotification('Face not registered! Please register in Attendance Settings.', 'warning');
+        }
+        {% endif %}
+
+        window.room = new Room({
+            adaptiveStream: true,
+            dynacast: true,
+            videoCaptureDefaults: { resolution: VideoPresets.h1080.resolution },
+            publishDefaults: {
+                simulcast: true,
+                videoCodec: 'h264',
+                videoEncoding: VideoPresets.h1080.encoding,
+                screenShareEncoding: {
+                    maxBitrate: 6_000_000,
+                    maxFramerate: 30,
+                }
+            },
+        });
+
+        // ── Room events ───────────────────────────────────────────────────────────
+        window.room
+            .on(RoomEvent.ParticipantConnected,    onParticipantConnected)
+            .on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected)
+            .on(RoomEvent.TrackSubscribed,         onTrackSubscribed)
+            .on(RoomEvent.TrackUnsubscribed,       onTrackUnsubscribed)
+            .on(RoomEvent.TrackMuted,              onTrackMuted)
+            .on(RoomEvent.TrackUnmuted,            onTrackUnmuted)
+            .on(RoomEvent.ActiveSpeakersChanged,   onActiveSpeakersChanged)
+            .on(RoomEvent.DataReceived,            onDataReceived)
+            .on(RoomEvent.Disconnected,            onDisconnected)
+            .on(RoomEvent.ConnectionStateChanged,  onConnectionStateChanged);
+
+        await window.room.connect(url, token);
+        console.log('Connected to LiveKit room:', window.room.name);
+
+        // Initial state
+        window.isMicOn = window.isHost ? true : window.canSpeak;
+        window.isCameraOn = window.isHost ? true : window.canVideo;
+
+        // Publish local camera + mic
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            if (window.isMicOn) await window.room.localParticipant.setMicrophoneEnabled(true);
+            if (window.isCameraOn) await window.room.localParticipant.setCameraEnabled(true);
+        }
+
+        // Update UI buttons
+        updateControlButtons();
+        renderLocalParticipant();
+
+        if (window.room.remoteParticipants) {
+            window.room.remoteParticipants.forEach(p => onParticipantConnected(p));
+        }
+
+        updateParticipantCount();
+        startTimer();
+    } catch (err) {
+        console.error('Init failed:', err);
+        showNotification('Failed to initialize meeting: ' + err.message, 'error');
+    }
+}
+
+function updateControlButtons() {
+    const micBtn = document.getElementById('micBtn');
+    const camBtn = document.getElementById('camBtn');
+    
+    micBtn.classList.toggle('off', !isMicOn);
+    camBtn.classList.toggle('off', !isCameraOn);
+    
+    const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
     const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+    const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
     const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
-    if (!isMicOn) document.getElementById('micBtn').innerHTML = micOffIcon;
-    if (!isCameraOn) document.getElementById('camBtn').innerHTML = camOffIcon;
-
-    // Render local participant
-    renderLocalParticipant();
-
-    // Render any participants already in the room
-    if (room.remoteParticipants) {
-        room.remoteParticipants.forEach(p => onParticipantConnected(p));
-    }
-
-    updateParticipantCount();
-    startTimer();
+    
+    micBtn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
+    camBtn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
@@ -584,18 +729,31 @@ function renderLocalParticipant() {
         });
     }
 
-    // Also listen for future local track publications (e.g. screen share)
+    // Also listen for future local track publications (e.g. screen share or IP camera)
     lp.on(window.LiveKitBundle.ParticipantEvent.LocalTrackPublished || 'localTrackPublished', pub => {
         console.log('Local track published:', pub.source, pub.trackSid);
+        
         if (pub.source === Track.Source.ScreenShare) {
-            // Wait for track to be available
+            // Handle screen share
             if (pub.track) {
                 showLocalScreenShare(pub.track);
             } else {
-                // If not ready, use publication.onTrackSubscribed if v1.x or just poll
                 const checkTrack = setInterval(() => {
                     if (pub.track) {
                         showLocalScreenShare(pub.track);
+                        clearInterval(checkTrack);
+                    }
+                }, 100);
+                setTimeout(() => clearInterval(checkTrack), 5000);
+            }
+        } else if (pub.source === Track.Source.Camera) {
+            // Handle camera (including IP camera)
+            if (pub.track) {
+                attachTrackToBox(pub.track, box, true);
+            } else {
+                const checkTrack = setInterval(() => {
+                    if (pub.track) {
+                        attachTrackToBox(pub.track, box, true);
                         clearInterval(checkTrack);
                     }
                 }, 100);
@@ -679,25 +837,53 @@ function updateParticipantCount() {
 }
 
 function attachTrackToBox(track, box, isLocal) {
+    if (!track || !box) return;
+    console.log(`Attaching ${track.kind} track to ${box.id} (Local: ${isLocal}, Source: ${track.source})`);
+    
     // Remove existing element for this track kind
     const existing = box.querySelector(`[data-kind="${track.kind}"]`);
-    if (existing) existing.remove();
+    if (existing) {
+        track.detach(existing);
+        existing.remove();
+    }
 
     const el = track.attach();
     el.dataset.kind = track.kind;
+    el.dataset.source = track.source;
+    
     if (track.kind === Track.Kind.Video) {
         el.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-        if (isLocal) el.style.transform = 'scaleX(-1)';
+        
+        // Mirror only for webcam, not for IP camera or screen share
+        const isIpCam = track.name === 'camera' && currentVideoSource === 'ip';
+        if (isLocal && !isIpCam && track.source !== Track.Source.ScreenShare) {
+            el.style.transform = 'scaleX(-1)';
+        }
+        
         el.muted = true;
         el.autoplay = true;
         el.playsInline = true;
+        
         if (isLocal) {
             el.id = 'localVideo';
             el.dataset.local = 'true';
         }
+        
+        // Ensure srcObject is set (redundant but safe)
+        if (track.mediaStreamTrack && !el.srcObject) {
+            el.srcObject = new MediaStream([track.mediaStreamTrack]);
+        }
+        
         box.insertBefore(el, box.querySelector('.video-nametag'));
+        
+        // Explicitly play and handle potential play errors
+        const playPromise = el.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(e => {
+                console.warn(`Autoplay blocked or failed for ${track.kind} on ${box.id}:`, e);
+            });
+        }
     }
-    // Audio elements are invisible — LiveKit attaches them to document automatically
 }
 
 function detachTrackFromBox(track, box) {
@@ -1006,21 +1192,37 @@ async function toggleScreenShare() {
                 throw new Error("Screen share function not found in SDK.");
             }
 
+            // Use ScreenSharePresets for better text clarity if available, else fallback to VideoPresets
+            const ssPreset = ScreenSharePresets.h1080fps15 || VideoPresets.h1080;
+
             const tracks = await createScreen({ 
                 audio: false,
-                resolution: VideoPresets.h1080.resolution
+                resolution: ssPreset.resolution
             });
             const screenTrack = Array.isArray(tracks) ? tracks[0] : tracks;
             
             if (!screenTrack) throw new Error("No screen track created.");
 
+            // Set content hint to 'text' for sharper screenshare
+            if (screenTrack.mediaStreamTrack) {
+                screenTrack.mediaStreamTrack.contentHint = 'text';
+            }
+
             screenTrackPub = await room.localParticipant.publishTrack(screenTrack, {
                 name: 'screen_share',
                 source: Track.Source.ScreenShare,
-                videoEncoding: VideoPresets.h1080.encoding,
+                videoEncoding: ssPreset.encoding,
+                simulcast: false, // Usually screenshare doesn't need simulcast and it can degrade quality
             });
             isScreenSharing = true;
             document.getElementById('screenBtn').classList.add('active');
+
+            // --- AUTO-HIDE CAMERA ON SCREENSHARE ---
+            if (isHost && isCameraOn) {
+                await room.localParticipant.setCameraEnabled(false);
+                // Keep isCameraOn=true internally so we know to restore it later
+                document.getElementById('camBtn').classList.add('off');
+            }
             
             // Handle manual stop from browser UI
             const mediaTrack = screenTrack.mediaStreamTrack || screenTrack;
@@ -1043,12 +1245,168 @@ async function stopScreenShare() {
     isScreenSharing = false;
     document.getElementById('screenBtn').classList.remove('active');
     if (screenTrackPub) {
-        await room.localParticipant.unpublishTrack(screenTrackPub.track);
-        screenTrackPub.track.stop();
+        try {
+            const track = screenTrackPub.track;
+            await room.localParticipant.unpublishTrack(track);
+            if (track) track.stop();
+        } catch (err) {
+            console.warn('Error stopping screen share track:', err);
+        }
         screenTrackPub = null;
     }
+
+    // --- RESTORE CAMERA AFTER SCREENSHARE ---
+    if (isHost && isCameraOn) {
+        try {
+            await room.localParticipant.setCameraEnabled(true);
+            document.getElementById('camBtn').classList.remove('off');
+        } catch (err) {
+            console.warn('Failed to restore camera after screenshare:', err);
+        }
+    }
+
     // Layout cleanup handled by localTrackUnpublished → hideLocalScreenShare()
     showNotification('Screen sharing stopped', 'info');
+}
+
+// ── Teacher Camera Switching ──────────────────────────────────────────────────
+function toggleCameraModal() {
+    const modal = document.getElementById('cameraModal');
+    if (!modal) return;
+    modal.style.display = modal.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function switchCameraSource(type, id, name) {
+    if (type === currentVideoSource && (type === 'webcam' || id === currentIpCamId)) {
+        toggleCameraModal();
+        return;
+    }
+
+    // Set source state BEFORE starting stream so listeners know which source it is
+    currentVideoSource = type;
+
+    try {
+        if (type === 'ip') {
+            await startIpCameraStream(id, name);
+            currentIpCamId = id;
+        } else {
+            await stopIpCameraStream();
+            currentIpCamId = null;
+        }
+        
+        // Update UI
+        document.querySelectorAll('.camera-option').forEach(opt => opt.classList.remove('active'));
+        if (type === 'webcam') {
+            document.getElementById('webcamOption').classList.add('active');
+        } else {
+            const opt = document.getElementById(`ipOption-${id}`);
+            if (opt) opt.classList.add('active');
+        }
+        
+        toggleCameraModal();
+    } catch (err) {
+        console.error('Failed to switch camera:', err);
+        showNotification('Failed to switch camera: ' + err.message, 'error');
+        // Revert state on failure
+        currentVideoSource = (type === 'ip') ? 'webcam' : 'ip';
+    }
+}
+
+async function startIpCameraStream(id, name) {
+    showNotification(`Starting monitoring for ${name}...`, 'info');
+    
+    const overlay = document.getElementById('monitoringOverlay');
+    const container = document.getElementById('monitoringVideoContainer');
+    if (!overlay || !container) return;
+
+    // 1. Setup Canvas and Image
+    if (!ipCamCanvas) {
+        ipCamCanvas = document.getElementById('ipCamCanvas');
+        ipCamCtx = ipCamCanvas.getContext('2d');
+    }
+    if (!ipCamImg) ipCamImg = document.getElementById('ipCamImg');
+    
+    ipCamImg.src = "";
+    const feedUrl = `/cameras/camera-feed/${id}/?q=high`;
+    ipCamImg.src = feedUrl;
+
+    // 2. Start Animation loop
+    const drawFrame = () => {
+        if (currentVideoSource !== 'ip') return;
+        
+        if (ipCamImg.naturalWidth > 0) {
+            const canvasAspect = ipCamCanvas.width / ipCamCanvas.height;
+            const imgAspect = ipCamImg.naturalWidth / ipCamImg.naturalHeight;
+            
+            let drawWidth, drawHeight, offsetX, offsetY;
+            if (imgAspect > canvasAspect) {
+                drawWidth = ipCamCanvas.width;
+                drawHeight = ipCamCanvas.width / imgAspect;
+                offsetX = 0;
+                offsetY = (ipCamCanvas.height - drawHeight) / 2;
+            } else {
+                drawHeight = ipCamCanvas.height;
+                drawWidth = ipCamCanvas.height * imgAspect;
+                offsetY = 0;
+                offsetX = (ipCamCanvas.width - drawWidth) / 2;
+            }
+            
+            ipCamCtx.fillStyle = '#000';
+            ipCamCtx.fillRect(0, 0, ipCamCanvas.width, ipCamCanvas.height);
+            ipCamCtx.drawImage(ipCamImg, offsetX, offsetY, drawWidth, drawHeight);
+        } else {
+            ipCamCtx.fillStyle = '#0f172a';
+            ipCamCtx.fillRect(0, 0, ipCamCanvas.width, ipCamCanvas.height);
+            ipCamCtx.fillStyle = '#ffffff';
+            ipCamCtx.font = 'bold 30px Inter, sans-serif';
+            ipCamCtx.textAlign = 'center';
+            ipCamCtx.fillText(`Connecting to ${name}...`, ipCamCanvas.width/2, ipCamCanvas.height/2);
+        }
+        ipCamAnimationId = requestAnimationFrame(drawFrame);
+    };
+
+    if (ipCamAnimationId) cancelAnimationFrame(ipCamAnimationId);
+    ipCamAnimationId = requestAnimationFrame(drawFrame);
+
+    // 3. Show Overlay and Attach Video
+    overlay.style.display = 'block';
+    container.innerHTML = '';
+    
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = ipCamCanvas.captureStream(15);
+    container.appendChild(video);
+
+    showNotification(`${name} monitoring active`, 'success');
+}
+
+async function stopIpCameraStream() {
+    const overlay = document.getElementById('monitoringOverlay');
+    const container = document.getElementById('monitoringVideoContainer');
+    
+    if (overlay) overlay.style.display = 'none';
+    if (container) container.innerHTML = '';
+
+    if (ipCamAnimationId) {
+        cancelAnimationFrame(ipCamAnimationId);
+        ipCamAnimationId = null;
+    }
+    
+    if (ipCamImg) {
+        ipCamImg.onload = null;
+        ipCamImg.onerror = null;
+        ipCamImg.src = "";
+    }
+
+    currentVideoSource = 'webcam';
+    currentIpCamId = null;
+    
+    document.querySelectorAll('.camera-option').forEach(opt => opt.classList.remove('active'));
+    document.getElementById('webcamOption').classList.add('active');
+    
+    showNotification('Monitoring stopped', 'info');
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -1118,7 +1476,7 @@ async function toggleGlobalControl(type) {
     const currentState = btn.classList.contains('active');
     const newState = !currentState;
     
-    const res = await fetch(_d.globalControlUrl, {
+    const res = await fetch(window.meetingConfig.globalControlUrl, {
         method: 'POST',
         headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, value: newState })
@@ -1133,7 +1491,7 @@ async function toggleGlobalControl(type) {
 async function kickUser(userId) {
     if (!confirm('Are you sure you want to kick this student for 1 hour?')) return;
     
-    const url = _d.kickUrl.replace('0', userId);
+    const url = window.meetingConfig.kickUrl.replace('0', userId);
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'X-CSRFToken': CSRF }
@@ -1143,7 +1501,7 @@ async function kickUser(userId) {
 }
 
 async function unbanUser(userId) {
-    const url = _d.revokeBanUrl.replace('0', userId);
+    const url = window.meetingConfig.revokeBanUrl.replace('0', userId);
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'X-CSRFToken': CSRF }
@@ -1157,7 +1515,7 @@ async function unbanUser(userId) {
 
 async function fetchBannedUsers() {
     if (!isHost) return;
-    const res = await fetch(_d.bannedUsersUrl);
+    const res = await fetch(window.meetingConfig.bannedUsersUrl);
     const data = await res.json();
     const list = document.getElementById('bannedList');
     if (!list) return;
@@ -1174,7 +1532,7 @@ async function fetchBannedUsers() {
                     <div style="font-size:10px; color:#ef4444;">Banned until ${new Date(u.banned_until).toLocaleTimeString()}</div>
                 </div>
                 <div class="participant-actions">
-                    <button class="action-btn" onclick="unbanUser('${u.id}')" title="Unban Student">✅</button>
+                    <button class="action-btn" onclick="window.unbanUser('${u.id}')" title="Unban Student">✅</button>
                 </div>`;
             list.appendChild(item);
         });
@@ -1182,6 +1540,26 @@ async function fetchBannedUsers() {
         list.innerHTML = '<p style="text-align:center; color:#999; font-size:12px; padding:10px;">No banned students</p>';
     }
 }
+
+// Attach to window for Turbo/Inline events
+window.toggleMic = toggleMic;
+window.toggleCamera = toggleCamera;
+window.toggleScreenShare = toggleScreenShare;
+window.stopScreenShare = stopScreenShare;
+window.toggleCameraModal = toggleCameraModal;
+window.switchCameraSource = switchCameraSource;
+window.stopIpCameraStream = stopIpCameraStream;
+window.sendChatMessage = sendChatMessage;
+window.toggleSleepMode = toggleSleepMode;
+window.toggleGlobalControl = toggleGlobalControl;
+window.kickUser = kickUser;
+window.unbanUser = unbanUser;
+window.fetchBannedUsers = fetchBannedUsers;
+window.leaveMeeting = leaveMeeting;
+window.openSidebar = openSidebar;
+window.toggleSidebar = toggleSidebar;
+window.toggleMoreOptions = toggleMoreOptions;
+window.switchSidebarTab = switchSidebarTab;
 
 // ── Leave ─────────────────────────────────────────────────────────────────────
 async function leaveMeeting() {

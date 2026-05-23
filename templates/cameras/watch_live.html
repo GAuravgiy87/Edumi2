@@ -133,6 +133,22 @@
                 <div class="pulse-dot"></div> LIVE
             </div>
             <img id="mainFeed" src="" class="live-feed" alt="Live Stream">
+            <audio id="liveAudio" autoplay></audio>
+            
+            <!-- Mobile Audio Overlay -->
+            <div id="audioOverlay" style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; cursor:pointer;" onclick="startAudioExplicitly()">
+                <div style="background:white; color:#1e293b; padding:1rem 2rem; border-radius:1rem; font-weight:700; display:flex; align-items:center; gap:0.75rem; box-shadow:0 10px 15px -3px rgba(0,0,0,0.3);">
+                    <i data-lucide="volume-2" style="width:24px; height:24px;"></i>
+                    Tap to Join with Audio
+                </div>
+            </div>
+            
+            <!-- Audio Controls -->
+            <div style="position:absolute; bottom:1rem; right:1rem; display:flex; gap:0.5rem; z-index:10;">
+                <button onclick="toggleAudio()" class="btn-action" id="audioToggleBtn" style="background:rgba(15,23,42,0.8); color:white; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+                    <i data-lucide="volume-2" id="audioIcon"></i>
+                </button>
+            </div>
         </div>
         
         <div class="video-info">
@@ -180,17 +196,126 @@
 <script>
 (function() {
     // ── Global Variables ──
-    const cameraId = "{{ camera.id }}";
-    const username = "{{ user.username }}";
-    const currentUserId = "{{ user.id }}";
-    const meetingCode = "CAM_" + cameraId; // Unique code for this camera's chat room
-    let chatWs = null;
+    window.cameraId = "{{ camera.id }}";
+    window.username = "{{ user.username }}";
+    window.currentUserId = "{{ user.id }}";
+    window.meetingCode = "CAM_" + window.cameraId; // Unique code for this camera's chat room
+    var chatWs = null;
+    var audioWs = null;
+    var audioBuffer = [];
+    var isAudioPlaying = false;
+    var audioSource = null;
+    var mediaSource = null;
+
+    // ── Audio Implementation ──
+    function connectAudio() {
+        if (audioWs) audioWs.close();
+        
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/audio/${window.cameraId}/`;
+        
+        console.log("Connecting to Audio WebSocket:", wsUrl);
+        audioWs = new WebSocket(wsUrl);
+        audioWs.binaryType = 'arraybuffer';
+
+        const audio = document.getElementById('liveAudio');
+        mediaSource = new MediaSource();
+        audio.src = URL.createObjectURL(mediaSource);
+        
+        let sourceBuffer = null;
+        let queue = [];
+        let isFirstChunk = true;
+
+        mediaSource.addEventListener('sourceopen', () => {
+            try {
+                // Using webm/opus which is what MediaRecorder sends
+                sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
+                
+                sourceBuffer.addEventListener('error', (e) => {
+                    console.error("SourceBuffer error:", e);
+                    // If buffer errors, it's usually a container mismatch, restart
+                    setTimeout(connectAudio, 2000);
+                });
+
+                sourceBuffer.addEventListener('updateend', () => {
+                    if (queue.length > 0 && !sourceBuffer.updating) {
+                        try {
+                            sourceBuffer.appendBuffer(queue.shift());
+                        } catch (err) {
+                            console.error("Queue append error:", err);
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error("MediaSource addSourceBuffer error:", err);
+            }
+        });
+
+        audioWs.onmessage = (e) => {
+            if (sourceBuffer && !sourceBuffer.updating && mediaSource.readyState === 'open') {
+                try {
+                    sourceBuffer.appendBuffer(e.data);
+                    // Auto-play on first data if possible
+                    if (isFirstChunk) {
+                        audio.play().catch(() => {
+                            console.log("Autoplay blocked, waiting for user interaction");
+                        });
+                        isFirstChunk = false;
+                    }
+                } catch (err) {
+                    console.warn("Direct append failed, queuing:", err);
+                    queue.push(e.data);
+                }
+            } else if (sourceBuffer) {
+                queue.push(e.data);
+            }
+        };
+
+        audioWs.onclose = () => {
+            console.log("Audio disconnected. Retrying in 5s...");
+            setTimeout(connectAudio, 5000);
+        };
+
+        audioWs.onerror = (err) => {
+            console.error("Audio WebSocket error:", err);
+        };
+    }
+
+    window.toggleAudio = function() {
+        const audio = document.getElementById('liveAudio');
+        const icon = document.getElementById('audioIcon');
+        if (audio.muted) {
+            audio.muted = false;
+            icon.setAttribute('data-lucide', 'volume-2');
+            if (typeof showToast === 'function') showToast('Audio unmuted', 'info');
+        } else {
+            audio.muted = true;
+            icon.setAttribute('data-lucide', 'volume-x');
+            if (typeof showToast === 'function') showToast('Audio muted', 'info');
+        }
+        if (window.lucide) lucide.createIcons();
+    };
+
+    window.startAudioExplicitly = function() {
+        const audio = document.getElementById('liveAudio');
+        const overlay = document.getElementById('audioOverlay');
+        
+        audio.play().then(() => {
+            console.log("Audio started explicitly");
+            overlay.style.display = 'none';
+        }).catch(err => {
+            console.error("Audio start failed:", err);
+            // Even if it fails, hide overlay and let user use the toggle btn
+            overlay.style.display = 'none';
+        });
+    };
 
     // ── Initialize Direct Feed ──
     (function initFeed() {
         const cameraServicePort = 8001;
         const host = window.location.hostname;
-        const feedUrl = `http://${host}:${cameraServicePort}/cameras/${cameraId}/feed/`;
+        // Request 4K by default for students if they have bandwidth, otherwise adaptive
+        const feedUrl = `http://${host}:${cameraServicePort}/cameras/${window.cameraId}/feed/?q=4k`;
         
         const img = document.getElementById('mainFeed');
         if (img) {
@@ -216,6 +341,9 @@
         if (viewerCount) {
             viewerCount.textContent = (Math.floor(Math.random() * 5) + 1) + " watching";
         }
+        
+        // Connect Audio
+        connectAudio();
     })();
 
     // ── WebSocket Chat Implementation ──

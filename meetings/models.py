@@ -89,6 +89,7 @@ class Meeting(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hosted_meetings')
+    meeting_type = models.CharField(max_length=20, choices=[('classroom', 'Classroom'), ('temporary', 'Temporary')], default='temporary')
     meeting_code = models.CharField(max_length=20, unique=True)
     scheduled_time = models.DateTimeField()
     duration_minutes = models.IntegerField(default=60)

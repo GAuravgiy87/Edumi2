@@ -414,6 +414,18 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 participant=participant,
                 event_type='leave'
             )
+
+            # --- AUTO-CLEANUP FOR TEMPORARY MEETINGS ---
+            if meeting.meeting_type == 'temporary':
+                active_exists = MeetingParticipant.objects.filter(
+                    meeting=meeting, 
+                    is_active=True
+                ).exists()
+                
+                if not active_exists:
+                    meeting_code = meeting.meeting_code
+                    meeting.delete()
+                    print(f"Temporary meeting {meeting_code} deleted via Consumer (last participant left).")
         except Meeting.DoesNotExist:
             pass # No persistence for CAM_* rooms
         except Exception as e:

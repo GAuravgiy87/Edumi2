@@ -104,8 +104,8 @@
     <div class="camera-grid">
         {% for camera in cameras %}
         <div class="camera-card">
-            <div class="camera-preview">
-                <img src="{% static 'images/camera-placeholder.jpg' %}" alt="Preview">
+            <div class="camera-preview" style="background: #f1f5f9; display: flex; align-items: center; justify-content: center; min-height: 180px;">
+                <i data-lucide="camera" style="width: 48px; height: 48px; color: #94a3b8;"></i>
                 <div class="camera-badge">
                     {% if camera.is_active %}
                         <span style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%;"></span>

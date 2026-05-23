@@ -22,21 +22,10 @@ import logging
 
 logger = logging.getLogger('cameras')
 
-def get_video_stream(file_path, range_header):
+def get_video_stream(file_path, start, end):
     """Generator to stream video in chunks with support for Range requests"""
-    size = os.path.getsize(file_path)
-    byte_range = re.match(r'bytes=(\d+)-(\d*)', range_header)
+    chunk_size = 1024 * 1024 # 1MB chunks for responsiveness
     
-    start, end = 0, size - 1
-    if byte_range:
-        start = int(byte_range.group(1))
-        if byte_range.group(2):
-            end = int(byte_range.group(2))
-    
-    chunk_size = 1024 * 1024 # 1MB
-    if end - start + 1 < chunk_size:
-        chunk_size = end - start + 1
-        
     with open(file_path, 'rb') as f:
         f.seek(start)
         remaining = end - start + 1
@@ -50,10 +39,10 @@ def get_video_stream(file_path, range_header):
 
 @login_required
 def stream_video(request, recording_id):
-    """View to serve video files in chunks (YouTube style)"""
+    """View to serve video files in chunks (YouTube style) - Optimized for 4hr+ videos"""
     recording = get_object_or_404(CameraRecording, id=recording_id)
     
-    # Check permissions (teachers can view their own, students can view published)
+    # Check permissions
     if not (request.user.is_superuser or 
             recording.teacher == request.user or 
             (recording.is_published and hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'student')):
@@ -63,29 +52,36 @@ def stream_video(request, recording_id):
     if not os.path.exists(file_path):
         return HttpResponse("Video file not found", status=404)
         
-    range_header = request.META.get('HTTP_RANGE', None)
     size = os.path.getsize(file_path)
+    range_header = request.META.get('HTTP_RANGE', None)
     
     if range_header:
-        # Partial content response
-        byte_range = re.match(r'bytes=(\d+)-(\d*)', range_header)
-        start = int(byte_range.group(1))
-        end = int(byte_range.group(2)) if byte_range.group(2) else size - 1
-        
-        response = StreamingHttpResponse(
-            get_video_stream(file_path, range_header),
-            status=206,
-            content_type='video/mp4'
-        )
-        response['Content-Range'] = f'bytes {start}-{end}/{size}'
-        response['Accept-Ranges'] = 'bytes'
-        response['Content-Length'] = str(end - start + 1)
-    else:
-        # Full content response
-        response = FileResponse(open(file_path, 'rb'), content_type='video/mp4')
-        response['Content-Length'] = str(size)
-        response['Accept-Ranges'] = 'bytes'
-        
+        # Standard Range request parsing
+        match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else size - 1
+            
+            # Ensure boundaries
+            start = max(0, min(start, size - 1))
+            end = max(start, min(end, size - 1))
+            
+            content_length = end - start + 1
+            
+            response = StreamingHttpResponse(
+                get_video_stream(file_path, start, end),
+                status=206,
+                content_type='video/mp4'
+            )
+            response['Content-Range'] = f'bytes {start}-{end}/{size}'
+            response['Accept-Ranges'] = 'bytes'
+            response['Content-Length'] = str(content_length)
+            return response
+            
+    # Default to full file streaming if no range or invalid range
+    response = StreamingHttpResponse(get_video_stream(file_path, 0, size - 1), content_type='video/mp4')
+    response['Accept-Ranges'] = 'bytes'
+    response['Content-Length'] = str(size)
     return response
 
 @login_required
@@ -121,6 +117,51 @@ def upload_video(request):
         
     cameras = Camera.objects.all() if request.user.is_superuser else Camera.objects.filter(camerapermission__teacher=request.user)
     return render(request, 'cameras/upload_video.html', {'cameras': cameras})
+
+@login_required
+def mobile_mic(request, camera_id):
+    """Dedicated page for using a mobile phone as a wireless microphone"""
+    camera = get_object_or_404(Camera, id=camera_id)
+    return render(request, 'cameras/mobile_mic.html', {
+        'camera': camera,
+        'user': request.user
+    })
+
+@login_required
+def recordings_folder(request):
+    """View to show recordings organized in a folder-like structure with date subfolders"""
+    from django.utils.text import slugify
+    
+    if request.user.is_superuser:
+        # Only show recordings that actually have a file
+        recordings = CameraRecording.objects.exclude(video_file='').order_by('-created_at')
+    else:
+        recordings = CameraRecording.objects.filter(teacher=request.user).exclude(video_file='').order_by('-created_at')
+    
+    # Group by camera, then by date
+    from collections import defaultdict
+    folders = defaultdict(lambda: defaultdict(list))
+    
+    for rec in recordings:
+        camera_name = rec.camera.name if rec.camera else "Uploaded Videos"
+        date_str = rec.created_at.strftime('%Y-%m-%d')
+        folders[camera_name][date_str].append(rec)
+    
+    # Convert to a regular dict with slugified IDs for the template
+    processed_folders = []
+    for cam_name, dates in folders.items():
+        processed_folders.append({
+            'name': cam_name,
+            'id': slugify(cam_name),
+            'dates': dict(dates),
+            'count': sum(len(v) for v in dates.values())
+        })
+    
+    context = {
+        'folders': processed_folders,
+        'total_count': recordings.count(),
+    }
+    return render(request, 'cameras/recordings_folder.html', context)
 
 @login_required
 def manage_recordings(request):
@@ -563,7 +604,7 @@ def live_monitor(request):
     import requests
     camera_service_running = False
     try:
-        response = requests.get('http://localhost:8001/api/cameras/', timeout=2)
+        response = requests.get('http://localhost:8001/cameras/', timeout=2)
         camera_service_running = response.status_code == 200
     except:
         pass
@@ -652,8 +693,8 @@ def teacher_control_room(request, camera_id):
         
     context = {
         'camera': camera,
-        'qualities': ['360p', '480p', '720p', '1080p'],
-        'default_quality': '720p',
+        'qualities': ['360p', '480p', '720p', '1080p', '4K'],
+        'default_quality': '1080p',
         'linked_meeting': linked_meeting,
         'student_count': student_count,
         'active_participants': active_participants,
@@ -662,6 +703,29 @@ def teacher_control_room(request, camera_id):
         'recording_start_time': recording_start_time.isoformat() if recording_start_time else None,
     }
     return render(request, 'cameras/teacher_control_room.html', context)
+
+@login_required
+def update_zoom(request, camera_id):
+    """Proxy view to update camera zoom in the microservice"""
+    camera = get_object_or_404(Camera, id=camera_id)
+    if not camera.has_permission(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+    
+    zoom_level = request.GET.get('level', 1.0)
+    x = request.GET.get('x', '')
+    y = request.GET.get('y', '')
+    
+    import requests
+    try:
+        # Forward request to camera microservice
+        url = f'http://localhost:8001/cameras/{camera_id}/zoom/?level={zoom_level}'
+        if x: url += f'&x={x}'
+        if y: url += f'&y={y}'
+        
+        response = requests.get(url, timeout=5)
+        return JsonResponse(response.json())
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @login_required
 def start_streaming(request, camera_id):
@@ -854,7 +918,8 @@ def start_camera_recording(request, camera_id):
         return JsonResponse({'status': 'error', 'message': 'Permission denied'})
         
     quality = request.POST.get('quality', '720p')
-    success, message = recording_engine.start_recording(camera, request.user, quality)
+    audio_source = request.POST.get('audio_source', 'pc') # 'pc', 'remote', or 'camera'
+    success, message = recording_engine.start_recording(camera, request.user, quality, audio_source)
     
     if success:
         return JsonResponse({'status': 'success', 'message': f'Recording started in {quality}'})
@@ -868,9 +933,11 @@ def stop_camera_recording(request, camera_id):
     success, recording_id = recording_engine.stop_recording(camera.id, request.user.id)
     
     if success:
+        rec = get_object_or_404(CameraRecording, id=recording_id)
         return JsonResponse({
             'status': 'success', 
             'recording_id': recording_id,
+            'video_url': rec.video_file.url if rec.video_file else None,
             'message': 'Recording stopped and being processed'
         })
     else:
@@ -904,7 +971,7 @@ def test_camera(request, camera_id):
     
     try:
         # Use camera service for testing (it has better RTSP handling)
-        camera_service_url = f'http://localhost:8001/api/cameras/{camera_id}/test/'
+        camera_service_url = f'http://localhost:8001/cameras/{camera_id}/test/'
         response = requests.get(camera_service_url, timeout=30)
         
         if response.status_code == 200:

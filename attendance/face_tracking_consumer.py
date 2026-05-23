@@ -201,13 +201,32 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
                 encodings = face_recognition.face_encodings(
                     np_img, face_locations, num_jitters=1, model='large'
                 )
-            except Exception:
-                # Fallback to pseudo-embeddings for each face
+            except (ImportError, Exception):
+                # Robust Fallback for each face
+                gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
                 for (top, right, bottom, left) in face_locations:
-                    face_crop = np_img[top:bottom, left:right]
-                    resized_face = cv2.resize(face_crop, (8, 16))
-                    pseudo_enc = (resized_face.mean(axis=2).flatten() / 255.0).tolist()
-                    encodings.append(pseudo_enc)
+                    try:
+                        face_crop = gray[max(0,top):min(h,bottom), max(0,left):min(w,right)]
+                        if face_crop.size == 0:
+                            encodings.append([0.0]*128)
+                            continue
+                            
+                        # Normalize lighting
+                        face_norm = cv2.equalizeHist(face_crop)
+                        
+                        # Grayscale features
+                        g_feat = cv2.resize(face_norm, (8, 8)).flatten() / 255.0
+                        
+                        # Edge features
+                        sobelx = cv2.Sobel(face_norm, cv2.CV_64F, 1, 0, ksize=3)
+                        sobely = cv2.Sobel(face_norm, cv2.CV_64F, 0, 1, ksize=3)
+                        mag = cv2.magnitude(sobelx, sobely)
+                        e_feat = cv2.resize(mag, (8, 8)).flatten()
+                        e_feat = e_feat / (np.max(e_feat) + 1e-6)
+                        
+                        encodings.append(np.concatenate([g_feat, e_feat]).tolist())
+                    except:
+                        encodings.append([0.0]*128)
 
             faces_out = []
             best_match_uid  = None
@@ -236,9 +255,11 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
                     try:
                         import face_recognition
                         distances = face_recognition.face_distance(stored_vecs, enc_vec)
-                    except Exception:
-                        # Fallback Euclidean distance
-                        distances = np.linalg.norm(stored_vecs - enc_vec, axis=1)
+                    except (ImportError, Exception):
+                        # Fallback Euclidean distance with normalization
+                        raw_dists = np.linalg.norm(stored_vecs - enc_vec, axis=1)
+                        # Normalize to 0-1 range compatible with threshold
+                        distances = np.clip(raw_dists / 7.5, 0, 1)
 
                     best_idx    = int(np.argmin(distances))
                     best_dist   = float(distances[best_idx])
