@@ -88,13 +88,22 @@
         align-items: center;
         gap: 0.5rem;
         font-weight: 600;
-        transition: all 0.2s;
     }
-    .fs-btn:hover { background: rgba(255,255,255,0.1); }
     .fs-btn.active { color: #ef4444; }
     .fs-btn-primary { background: #6366f1; }
-    .fs-btn-primary:hover { background: #4f46e5; }
     
+    .action-btn {
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        background: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+    }
+
     .controls-bar {
         background: white;
         padding: 1.25rem;
@@ -113,7 +122,6 @@
         gap: 0.5rem;
         border: none;
         cursor: pointer;
-        transition: all 0.2s;
     }
     .btn-stream { background: #6366f1; color: white; }
     .btn-record { background: #ef4444; color: white; }
@@ -200,14 +208,6 @@
         border-radius: 50%;
         color: #64748b;
         cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .icon-btn-round:hover {
-        background: #f8fafc;
-        color: #6366f1;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
     .icon-btn-style {
@@ -221,21 +221,10 @@
     .dropdown-icon-group {
         display: flex;
         align-items: center;
-        gap: 0;
         background: white;
         padding: 0.25rem 0.5rem;
         border-radius: 0.75rem;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        max-width: 32px;
-        overflow: hidden;
-        border: 1px solid transparent;
-    }
-
-    .dropdown-icon-group:hover, .dropdown-icon-group:focus-within {
-        max-width: 180px;
-        gap: 0.25rem;
-        border-color: #e2e8f0;
-        padding-right: 0.5rem;
+        border: 1px solid #e2e8f0;
     }
 
     .clean-select {
@@ -247,16 +236,7 @@
         outline: none;
         cursor: pointer;
         padding-right: 0.5rem;
-        opacity: 0;
-        width: 0;
-        transition: all 0.3s ease;
-        pointer-events: none;
-    }
-
-    .dropdown-icon-group:hover .clean-select, .dropdown-icon-group:focus-within .clean-select {
-        opacity: 1;
-        width: 110px;
-        pointer-events: auto;
+        width: 100px;
     }
 
     #zoomSlider {
@@ -274,11 +254,6 @@
         background: #6366f1;
         border-radius: 50%;
         cursor: pointer;
-        transition: transform 0.1s;
-    }
-
-    #zoomSlider::-webkit-slider-thumb:hover {
-        transform: scale(1.2);
     }
 </style>
 {% endblock %}
@@ -327,37 +302,16 @@
             <div style="display:flex; align-items:center; gap:0.75rem; flex:1; justify-content:center;">
                 <!-- Audio Controls Group -->
                 <div style="display:flex; align-items:center; background:#f1f5f9; padding:0.25rem 0.4rem; border-radius:1rem; gap:0.35rem;">
-                    <!-- Mic Selection -->
-                    <div class="dropdown-icon-group" title="Select Microphone">
-                        <i data-lucide="mic" class="icon-btn-style"></i>
-                        <select id="micSelect" class="form-select-sm clean-select">
-                            <option value="camera" id="cameraMicOption" selected>IP Camera</option>
-                            <option value="">Mute</option>
-                            <option value="remote" id="remoteMicOption" disabled>Remote</option>
-                        </select>
-                    </div>
+                    <!-- Combined Mic/Audio Button -->
+                    <button id="monitorBtn" class="icon-btn-round" title="Toggle IP Camera Audio" onclick="toggleMonitorAudio()" style="width:32px; height:32px; background:white;">
+                        <i data-lucide="volume-x" id="monitorIcon" style="width:16px;"></i>
+                    </button>
 
                     <!-- Voice Graph -->
-                    <div style="width:60px; height:22px; background:#e2e8f0; border-radius:0.4rem; position:relative; overflow:hidden;" title="Voice Level">
-                        <canvas id="visualizerCanvas" width="60" height="22" style="display:block;"></canvas>
+                    <div style="width:80px; height:24px; background:#e2e8f0; border-radius:0.4rem; position:relative; overflow:hidden;" title="Live Audio Sync">
+                        <canvas id="visualizerCanvas" width="80" height="24" style="display:block;"></canvas>
                         <div id="micLevel" style="display:none;"><div id="micLevelBar"></div></div>
                     </div>
-
-                    <button id="monitorBtn" class="icon-btn-round" title="Monitor Classroom" onclick="toggleMonitorAudio()" style="width:28px; height:28px;">
-                        <i data-lucide="volume-x" id="monitorIcon" style="width:14px;"></i>
-                    </button>
-                    
-                    <!-- Output Selection -->
-                    <div class="dropdown-icon-group" title="Select Output">
-                        <i data-lucide="headphones" class="icon-btn-style"></i>
-                        <select id="speakerSelect" class="form-select-sm clean-select" style="width:90px;">
-                            <option value="">Default</option>
-                        </select>
-                    </div>
-
-                    <button id="selfListenBtn" class="icon-btn-round" title="Sidetone" onclick="toggleSelfListen()" style="width:28px; height:28px;">
-                        <i data-lucide="user-round-voice" style="width:14px;"></i>
-                    </button>
                 </div>
 
                 <!-- Zoom Slider Group -->
@@ -373,9 +327,6 @@
                     <option value="{{ q }}" {% if q == default_quality %}selected{% endif %}>{{ q }}</option>
                     {% endfor %}
                 </select>
-                <button class="action-btn" title="Snapshot" onclick="takeSnapshot()" style="width:32px; height:32px;">
-                    <i data-lucide="camera" style="width:16px;"></i>
-                </button>
                 <button class="action-btn" title="Full Screen" onclick="toggleFullScreen()" style="width:32px; height:32px; background:#f8fafc;">
                     <i data-lucide="maximize" style="width:16px;"></i>
                 </button>
@@ -711,12 +662,12 @@
             audio.muted = false;
             audio.play().catch(e => {
                 console.warn("Autoplay blocked. User interaction required.", e);
-                showNotification('Click the monitor button again to start audio', 'warning');
+                showNotification('Click the speaker button again to start audio', 'warning');
             });
             icon.setAttribute('data-lucide', 'volume-2');
             btn.style.color = '#10b981';
             btn.style.background = '#dcfce7';
-            showNotification('Monitoring classroom audio...', 'info');
+            showNotification('Live IP Camera Audio Active', 'success');
         } else {
             audio.muted = true;
             if (monitorSocket) {
@@ -737,9 +688,30 @@
         }
     }
 
+    // Auto-init audio on load if camera is live
+    document.addEventListener('DOMContentLoaded', () => {
+        if (isStreaming) {
+            setTimeout(() => {
+                const audio = document.getElementById('monitorAudio');
+                if (audio && audio.muted) {
+                    // We don't auto-unmute because browsers block it, 
+                    // but we ensure the socket is ready.
+                    initMonitorSocket();
+                }
+            }, 1500);
+        }
+    });
+
+    let monitorAudioContext = null;
+    let monitorSourceNode = null;
+    let monitorAnalyzer = null;
+    let isConnectingMonitor = false;
+
     function initMonitorSocket() {
+        if (isConnectingMonitor) return;
         if (monitorSocket && monitorSocket.readyState === WebSocket.OPEN) return;
         
+        isConnectingMonitor = true;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/audio/{{ camera.id }}/?source=pc_monitor`;
         
@@ -749,22 +721,61 @@
         
         const audio = document.getElementById('monitorAudio');
         
-        // Always create a new MediaSource to handle new headers correctly
-        if (monitorMediaSource) {
-            try { URL.revokeObjectURL(audio.src); } catch(e) {}
+        // Only set up MediaSource and AudioContext ONCE
+        if (!audio.src || !audio.src.startsWith('blob:')) {
+            monitorMediaSource = new MediaSource();
+            audio.src = URL.createObjectURL(monitorMediaSource);
         }
-        
-        monitorMediaSource = new MediaSource();
-        audio.src = URL.createObjectURL(monitorMediaSource);
         
         let sourceBuffer = null;
         let queue = [];
 
         monitorMediaSource.addEventListener('sourceopen', () => {
+            if (sourceBuffer) return; // Already initialized
             try {
                 sourceBuffer = monitorMediaSource.addSourceBuffer('audio/webm; codecs="opus"');
-                sourceBuffer.mode = 'sequence'; // Better for streaming chunks
+                sourceBuffer.mode = 'sequence'; 
                 
+                // Initialize visualizer for monitor audio ONCE
+                if (!monitorAudioContext) {
+                    monitorAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    monitorSourceNode = monitorAudioContext.createMediaElementSource(audio);
+                    monitorAnalyzer = monitorAudioContext.createAnalyser();
+                    monitorAnalyzer.fftSize = 256;
+                    monitorSourceNode.connect(monitorAnalyzer);
+                    monitorAnalyzer.connect(monitorAudioContext.destination);
+                }
+                
+                const bufferLength = monitorAnalyzer.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                const canvas = document.getElementById('visualizerCanvas');
+                const canvasCtx = canvas.getContext('2d');
+
+                function drawMonitorVisualizer() {
+                    if (audio.muted || !monitorSocket || monitorSocket.readyState !== WebSocket.OPEN) {
+                        canvasCtx.fillStyle = '#f1f5f9';
+                        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                        if (audio.muted) return; // Stop loop if muted
+                    }
+                    visualizerAnimationFrame = requestAnimationFrame(drawMonitorVisualizer);
+                    monitorAnalyzer.getByteFrequencyData(dataArray);
+                    
+                    canvasCtx.fillStyle = '#f1f5f9';
+                    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    const barWidth = (canvas.width / bufferLength) * 2.5;
+                    let barHeight;
+                    let x = 0;
+                    
+                    for(let i = 0; i < bufferLength; i++) {
+                        barHeight = dataArray[i] / 3;
+                        canvasCtx.fillStyle = '#10b981'; // Green for IP Cam Mic
+                        canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                        x += barWidth + 1;
+                    }
+                }
+                drawMonitorVisualizer();
+
                 sourceBuffer.addEventListener('updateend', () => {
                     if (queue.length > 0 && !sourceBuffer.updating && monitorMediaSource.readyState === 'open') {
                         try {
@@ -774,28 +785,21 @@
                         }
                     }
                 });
-                
-                sourceBuffer.addEventListener('error', (e) => {
-                    console.error("SourceBuffer error:", e);
-                    // On error, we might need to restart the stream
-                });
             } catch (e) {
-                console.error("Failed to create SourceBuffer:", e);
+                console.error("Failed to initialize monitor source buffer:", e);
             }
         });
+
+        monitorSocket.onopen = () => {
+            isConnectingMonitor = false;
+        };
 
         monitorSocket.onmessage = (e) => {
             if (typeof e.data === 'string') {
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'mic_status') {
-                        const opt = document.getElementById('remoteMicOption');
-                        if (data.source === 'mobile' && data.status === 'connected') {
-                            opt.disabled = false;
-                            opt.text = "Remote Mic (iPhone 15 Connected)";
-                            opt.style.color = "#10b981";
-                            showNotification('iPhone 15 Remote Mic is available!', 'success');
-                        }
+                        // Handle mobile mic status if needed
                     }
                 } catch(err) {}
             } else {
@@ -804,7 +808,6 @@
                     try {
                         sourceBuffer.appendBuffer(e.data);
                     } catch(err) {
-                        console.warn("Buffer append failed, queuing:", err.message);
                         queue.push(e.data);
                     }
                 } else if (sourceBuffer) {
@@ -816,11 +819,12 @@
 
         monitorSocket.onerror = (err) => {
             console.error("Monitor WebSocket error:", err);
+            isConnectingMonitor = false;
         };
 
         monitorSocket.onclose = () => {
             console.log("Monitor WebSocket closed");
-            const audio = document.getElementById('monitorAudio');
+            isConnectingMonitor = false;
             if (!audio.muted) {
                 console.log("Reconnecting monitor...");
                 setTimeout(initMonitorSocket, 2000);
@@ -843,88 +847,13 @@
     }
 
     async function initAudio() {
-        const micSelect = document.getElementById('micSelect');
-        const speakerSelect = document.getElementById('speakerSelect');
-        
-        try {
-            // Request permission early to get device labels
-            await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            
-            // 1. Initialize Microphones
-            const audioInputs = devices.filter(device => device.kind === 'audioinput');
-            const cameraOpt = document.getElementById('cameraMicOption');
-            const remoteOpt = document.getElementById('remoteMicOption');
-            
-            micSelect.innerHTML = '<option value="">No Audio</option>';
-            if (cameraOpt) micSelect.appendChild(cameraOpt);
-            if (remoteOpt) micSelect.appendChild(remoteOpt);
-            
-            const seenMicLabels = new Set();
-            audioInputs.forEach(device => {
-                let label = device.label || `Mic: ${device.deviceId.substring(0,5)}...`;
-                if (label.toLowerCase().includes('default') || label.toLowerCase().includes('communications')) {
-                    if (audioInputs.length > 2) return;
-                }
-                label = label.replace(/Hands-Free AG Audio/i, '(Hands-Free Mic)');
-                label = label.replace(/Bluetooth/i, 'BT');
-                const baseLabel = label.split('(')[0].trim();
-                if (seenMicLabels.has(baseLabel) && label.includes('Default')) return;
-                seenMicLabels.add(baseLabel);
-
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.text = (label.includes('Hands-Free') || label.includes('BT')) ? "⭐ " + label : label;
-                micSelect.appendChild(option);
-            });
-            
-            micSelect.onchange = startAudioCapture;
-
-            // 2. Initialize Speakers (Output)
-            if ('setSinkId' in HTMLMediaElement.prototype) {
-                const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-                speakerSelect.innerHTML = '<option value="">Default Output</option>';
-                
-                audioOutputs.forEach(device => {
-                    let label = device.label || `Speaker: ${device.deviceId.substring(0,5)}...`;
-                    
-                    // Prioritize Bluetooth/Headphones for monitoring
-                    if (label.toLowerCase().includes('bluetooth') || label.toLowerCase().includes('bt') || 
-                        label.toLowerCase().includes('headphone') || label.toLowerCase().includes('hands-free')) {
-                        label = "🎧 " + label.replace(/Bluetooth/i, 'BT');
-                    }
-
-                    const option = document.createElement('option');
-                    option.value = device.deviceId;
-                    option.text = label;
-                    speakerSelect.appendChild(option);
-                });
-                
-                speakerSelect.onchange = changeAudioOutput;
-            } else {
-                speakerSelect.style.display = 'none';
-                console.warn('Browser does not support output device selection (setSinkId)');
-            }
-        } catch (err) {
-            console.error('Error listing audio devices:', err);
-        }
+        // Dropdowns removed for UI simplicity. IP Camera audio is now automated.
+        return;
     }
 
     async function changeAudioOutput() {
-        const deviceId = document.getElementById('speakerSelect').value;
-        const monitorAudio = document.getElementById('monitorAudio');
-        
-        try {
-            if (monitorAudio.setSinkId) {
-                await monitorAudio.setSinkId(deviceId);
-                console.log(`Audio output changed to ${deviceId || 'default'}`);
-                showNotification('Audio output changed successfully', 'success');
-            }
-        } catch (err) {
-            console.error('Failed to change audio output:', err);
-            showNotification('Could not switch Bluetooth/Speaker output. Check browser permissions.', 'error');
-        }
+        // Output selection removed for UI simplicity.
+        return;
     }
 
     let visualizerAnimationFrame = null;
@@ -1187,10 +1116,10 @@
         
         if (btn.disabled) return;
         btn.disabled = true;
-        fsBtn.disabled = true;
+        if (fsBtn) fsBtn.disabled = true;
 
-        const quality = document.getElementById('qualitySelect').value;
-        const audioSource = document.getElementById('micSelect').value;
+        const quality = document.getElementById('qualitySelect') ? document.getElementById('qualitySelect').value : '1080p';
+        const audioSource = 'camera'; // Default to IP Camera mic since selector was removed for simplicity
         
         const formData = new FormData();
         formData.append('quality', quality);

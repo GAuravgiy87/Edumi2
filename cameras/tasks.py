@@ -16,36 +16,55 @@ def process_recording_task(recording_id):
         
         # 1. Remux MKV to MP4 if needed (for VLC/Web compatibility)
         if current_path.endswith('.mkv'):
-            mp4_path = current_path.replace('.mkv', '.mp4')
-            logger.info(f"Background remuxing {current_path} to {mp4_path}...")
-            
-            remux_cmd = [
-                'ffmpeg', '-y', '-i', current_path,
-                '-c', 'copy', # Copy streams without re-encoding
-                '-movflags', '+faststart', # Move MOOV atom for web playback
-                mp4_path
-            ]
-            
             try:
-                # No timeout here as it's a background task
-                subprocess.run(remux_cmd, check=True, capture_output=True)
+                # 1. Wait for file to be released (if FFmpeg is still closing it)
+                # On Windows, we check if we can open the file for writing
+                import time
+                max_retries = 10
+                for i in range(max_retries):
+                    try:
+                        with open(current_path, 'rb+') as f:
+                            break
+                    except IOError:
+                        logger.info(f"File {current_path} is locked, waiting... ({i+1}/{max_retries})")
+                        time.sleep(2)
                 
-                # Update record with new path
-                old_mkv_path = current_path
-                relative_path = os.path.relpath(mp4_path, settings.MEDIA_ROOT)
-                rec.video_file.name = relative_path.replace('\\', '/')
-                rec.file_size = os.path.getsize(mp4_path)
-                rec.save()
+                # 2. Remux MKV to MP4 for browser compatibility
+                # We use -movflags +faststart to make it playable before full download
+                # We also ensure AAC audio and H264 video for maximum browser support
+                output_path = current_path.replace('.mkv', '.mp4')
+                cmd = [
+                    'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+                    '-i', current_path,
+                    '-c:v', 'copy',
+                    '-c:a', 'aac', '-b:a', '128k', # Ensure audio is AAC for browser playback
+                    '-movflags', '+faststart',
+                    output_path
+                ]
                 
-                # Now use the new path for thumbnail generation
-                video_path = mp4_path
+                logger.info(f"Remuxing {current_path} to {output_path}...")
+                subprocess.run(cmd, check=True)
                 
-                # Delete old MKV to save space
-                try: os.remove(old_mkv_path)
-                except: pass
+                # If successful, update path and delete original MKV
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    # Update record with new path
+                    relative_path = os.path.relpath(output_path, settings.MEDIA_ROOT)
+                    rec.video_file.name = relative_path.replace('\\', '/')
+                    rec.file_size = os.path.getsize(output_path)
+                    rec.save()
+                    
+                    # Remove original MKV
+                    try: os.remove(current_path)
+                    except: pass
+                    
+                    video_path = output_path
+                    logger.info(f"Remuxing successful: {video_path}")
+                else:
+                    logger.error("Remuxing failed: Output file is empty or missing")
+                    video_path = current_path
             except Exception as e:
                 logger.error(f"Background remuxing failed for {recording_id}: {e}")
-                video_path = current_path # Fallback to original
+                video_path = current_path # Fallback to original MKV (might not play in browser)
         else:
             video_path = current_path
         

@@ -286,8 +286,10 @@
 
         // Notification count update
         function updateNotificationCount(count = null) {
+            const badge = document.getElementById('notificationBadge');
+            if (!badge) return; // Silent return if badge doesn't exist in current layout
+
             if (count !== null) {
-                const badge = document.getElementById('notificationBadge');
                 if (count > 0) {
                     badge.textContent = count > 99 ? '99+' : count;
                     badge.style.display = 'flex';
@@ -299,7 +301,6 @@
             fetch('/notifications/unread-count/')
                 .then(response => response.json())
                 .then(data => {
-                    const badge = document.getElementById('notificationBadge');
                     if (data.count > 0) {
                         badge.textContent = data.count > 99 ? '99+' : data.count;
                         badge.style.display = 'flex';
@@ -307,7 +308,7 @@
                         badge.style.display = 'none';
                     }
                 })
-                .catch(error => console.error('Error fetching notification count:', error));
+                .catch(error => console.warn('Error fetching notification count:', error));
         }
 
         // Real-time WebSocket connection
@@ -337,12 +338,18 @@
                     if (data.status === 'started') {
                         showToast(`Live Lecture!`, `${data.teacher_name} is now live in ${data.camera_name}`, 'success');
                     }
-                    refreshCurrentPage();
+                    // Only refresh if not in a meeting or camera control room to avoid disruption
+                    if (!window.location.pathname.includes('/meetings/join/') && !window.location.pathname.includes('/cameras/teacher/')) {
+                        refreshCurrentPage();
+                    }
                     window.dispatchEvent(new CustomEvent('live_status_change', { detail: data }));
                 } else if (data.type === 'classroom_request') {
                     showToast(`New Join Request`, `${data.student_name} wants to join ${data.classroom_title}`, 'info');
                     updateNotificationCount();
-                    refreshCurrentPage();
+                    // Only refresh if on classroom management pages
+                    if (window.location.pathname.includes('/classrooms/') || window.location.pathname.includes('/manage/')) {
+                        refreshCurrentPage();
+                    }
                 } else if (data.type === 'classroom_approved') {
                     showToast(`Request Approved!`, `You have been added to ${data.classroom_title}`, 'success');
                     updateNotificationCount();
@@ -350,7 +357,9 @@
                 } else if (data.type === 'meeting_scheduled') {
                     showToast(`New Meeting`, `A new meeting "${data.title}" has been scheduled.`, 'info');
                     updateNotificationCount();
-                    refreshCurrentPage();
+                    if (window.location.pathname.includes('/dashboard/') || window.location.pathname === '/') {
+                        refreshCurrentPage();
+                    }
                 } else if (data.type === 'meeting_cancelled') {
                     showToast(`Meeting Cancelled`, `"${data.title}" has been cancelled.`, 'warning');
                     updateNotificationCount();
@@ -366,11 +375,24 @@
                 } else if (data.type === 'student_joined') {
                     showToast(`Student Joined`, `${data.student_name} joined ${data.classroom_title}`, 'success');
                     updateNotificationCount();
-                    refreshCurrentPage();
+                    // Don't refresh for every student join unless on the specific class view
+                    if (window.location.pathname.includes('/classrooms/view/')) {
+                        refreshCurrentPage();
+                    }
                 }
             };
 
             function refreshCurrentPage() {
+                // Avoid refreshing if user is in an active media session
+                if (window.room && window.room.state === 'connected') {
+                    console.log('Skipping auto-refresh: Active meeting session detected.');
+                    return;
+                }
+                if (window.isStreaming || window.isRecording) {
+                    console.log('Skipping auto-refresh: Active camera session detected.');
+                    return;
+                }
+
                 console.log('Smoothing refreshing page due to real-time update...');
                 if (typeof Turbo !== 'undefined') {
                     Turbo.visit(window.location.href, { action: 'replace' });

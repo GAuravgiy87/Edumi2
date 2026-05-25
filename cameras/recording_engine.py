@@ -122,7 +122,7 @@ class RecordingEngine:
             'ffmpeg', '-y',
             '-hide_banner',
             '-loglevel', 'warning', 
-            '-probesize', '5M', '-analyzeduration', '5M', # Increased for better stream detection
+            '-probesize', '15M', '-analyzeduration', '15M', # Increased for better stream detection
             '-hwaccel', 'd3d11va' if encoder == 'h264_amf' else 'auto', 
             '-thread_queue_size', '8192', # Increased buffer for better sync
             '-use_wallclock_as_timestamps', '1',
@@ -170,17 +170,17 @@ class RecordingEngine:
         # 4. speechnorm: Enhance human voice
         # 5. agate: Noise gate
         # 6. adelay: Fine-tune sync for external mics (delaying audio to match RTSP lag)
-        # 7. volume: Apply 4x gain for low-sensitivity IP camera mics
+        # 7. volume: Apply 20x gain for low-sensitivity IP camera mics
         sync_delay = '1200' if self.audio_path else '0'
         audio_filters = (
             f'aresample=async=1000:min_hard_comp=0.05:first_pts=0,'
             f'adelay={sync_delay}|{sync_delay},' # Delay audio to match RTSP latency
-            'highpass=f=80,lowpass=f=16000,' # Slightly wider frequency range
-            'volume=4.0,' # 4x gain boost
-            'afftdn=nf=-30,' # Less aggressive noise reduction
+            'highpass=f=150,lowpass=f=14000,' # Optimized for human speech
+            'volume=20.0,' # 20x gain boost
+            'afftdn=nf=-35,' # Noise reduction
             'speechnorm=e=4:p=0.5,'
-            'agate=threshold=0.01:range=0:attack=50:release=200,' # Lower gate threshold
-            'dynaudnorm=p=0.9:m=12.0:s=5,'
+            'agate=threshold=0.01:range=0:attack=50:release=200,'
+            'dynaudnorm=p=0.9:m=60.0:s=5,' # Maximum normalization
             'aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo'
         )
 
@@ -363,21 +363,25 @@ class RecordingEngine:
                     
                     # If manual stop, terminate the process gracefully
                     if not auto_save and self.process.poll() is None:
-                        # Move process termination to a background thread to prevent ASGI hang
-                        def force_terminate(proc):
+                        logger.info(f"Sending termination signal to FFmpeg (PID: {self.process.pid})")
+                        try:
+                            if os.name == 'nt':
+                                import signal
+                                os.kill(self.process.pid, signal.CTRL_BREAK_EVENT)
+                            else:
+                                self.process.terminate()
+                            
+                            # Wait for process to exit and flush headers (blocking for up to 5s)
                             try:
-                                if os.name == 'nt':
-                                    import signal
-                                    os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
-                                    proc.wait(timeout=3)
-                                else:
-                                    proc.terminate()
-                                    proc.wait(timeout=3)
-                            except:
-                                try: proc.kill()
-                                except: pass
-                        
-                        threading.Thread(target=force_terminate, args=(self.process,), daemon=True).start()
+                                self.process.wait(timeout=5)
+                                logger.info("FFmpeg process terminated gracefully and flushed headers.")
+                            except subprocess.TimeoutExpired:
+                                logger.warning("FFmpeg did not exit in time, forcing kill...")
+                                self.process.kill()
+                        except Exception as e:
+                            logger.error(f"Error terminating FFmpeg: {e}")
+                            try: self.process.kill()
+                            except: pass
                     
                     # Update database logic stays the same but without waiting for process
                     try:

@@ -55,6 +55,12 @@ def stream_video(request, recording_id):
     size = os.path.getsize(file_path)
     range_header = request.META.get('HTTP_RANGE', None)
     
+    content_type = 'video/mp4'
+    if file_path.endswith('.mkv'):
+        content_type = 'video/x-matroska'
+    elif file_path.endswith('.webm'):
+        content_type = 'video/webm'
+        
     if range_header:
         # Standard Range request parsing
         match = re.match(r'bytes=(\d+)-(\d*)', range_header)
@@ -71,7 +77,7 @@ def stream_video(request, recording_id):
             response = StreamingHttpResponse(
                 get_video_stream(file_path, start, end),
                 status=206,
-                content_type='video/mp4'
+                content_type=content_type
             )
             response['Content-Range'] = f'bytes {start}-{end}/{size}'
             response['Accept-Ranges'] = 'bytes'
@@ -79,7 +85,7 @@ def stream_video(request, recording_id):
             return response
             
     # Default to full file streaming if no range or invalid range
-    response = StreamingHttpResponse(get_video_stream(file_path, 0, size - 1), content_type='video/mp4')
+    response = StreamingHttpResponse(get_video_stream(file_path, 0, size - 1), content_type=content_type)
     response['Accept-Ranges'] = 'bytes'
     response['Content-Length'] = str(size)
     return response

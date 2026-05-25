@@ -159,20 +159,22 @@ class AudioConsumer(AsyncWebsocketConsumer):
             camera = await database_sync_to_async(Camera.objects.get)(id=self.camera_id)
             rtsp_url = camera.get_full_rtsp_url()
             
-            # Simplified FFmpeg command for maximum compatibility
-            # Using standard opus parameters for broad compatibility
+            # THE "ULTIMATE" AUDIO FIX - Attempt 4: High-Sensitivity discovery
+            # 1. Increase probe to 40MB - some cameras have huge GOP sizes that hide audio
+            # 2. Use -map 0:a? to capture ALL possible audio tracks
+            # 3. Apply a massive 20x gain and high-intensity normalization
             cmd = [
-                'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+                'ffmpeg', '-y', '-hide_banner', '-loglevel', 'info',
                 '-nostdin',
                 '-rtsp_transport', 'tcp', 
-                '-probesize', '5M', '-analyzeduration', '5M',
+                '-probesize', '40M', '-analyzeduration', '40M',
                 '-i', rtsp_url,
-                '-vn',
-                '-map', '0:a?',
-                '-acodec', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2',
-                '-af', 'volume=4.0,dynaudnorm=p=0.9:m=10.0:s=5,aresample=async=1:min_hard_comp=0.1:first_pts=0',
+                '-vn', 
+                '-map', '0:a?', 
+                '-acodec', 'libopus', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+                '-af', 'volume=20.0,highpass=f=150,lowpass=f=14000,dynaudnorm=p=0.9:m=60.0:s=5,aresample=async=1:min_hard_comp=0.1:first_pts=0',
+                '-fflags', '+genpts+discardcorrupt+igndts+nobuffer+flush_packets',
                 '-f', 'webm',
-                '-flush_packets', '1',
                 'pipe:1'
             ]
             

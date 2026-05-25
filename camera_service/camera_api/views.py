@@ -50,6 +50,7 @@ class CameraStreamer:
         self.lock = threading.Lock()
         self.last_access = time.time()
         self.last_frame: Optional[np.ndarray] = None  # Store raw frame for adaptive encoding
+        self.last_frame_time = 0 # Timestamp of last successful frame
         self.connection_attempts = 0
         self.max_reconnect_attempts = 5
         self.reconnect_delay = 2
@@ -139,12 +140,13 @@ class CameraStreamer:
                 
                 # Set environment variable for this attempt with hardware decoding support
                 # Using d3d11va for RX 550 and increasing buffer for stability
-                os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = f'{transport_opt};hwaccel;d3d11va'
+                # stimeout is in microseconds (4s = 4000000)
+                os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = f'{transport_opt};hwaccel;d3d11va;stimeout;4000000'
                 
                 cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
                 cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT)
                 cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT)
-                cap.set(cv2.CAP_PROP_BUFFERSIZE, 3) # Increased buffer to prevent frame drops
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1) # Small buffer for lowest latency and freeze prevention
                 cap.set(cv2.CAP_PROP_FPS, 30)
                 
                 if cap.isOpened():
@@ -225,10 +227,8 @@ class CameraStreamer:
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
                     self.connection_attempts = 0  # Reset on successful frame
+                    self.last_frame_time = time.time() # Track freshness
 
-                    # Process in a separate thread to keep the capture loop tight? 
-                    # No, for MJPEG we need to be efficient here.
-                    
                     # Apply digital zoom BEFORE AI processing
                     frame = self._apply_zoom(frame)
 
@@ -334,19 +334,25 @@ class CameraManager:
     _streamers = {}
 
     @classmethod
-    def get_streamer(cls, camera_id, rtsp_url):
+    def get_streamer(cls, camera_id, rtsp_url, force_restart=False):
         with cls._lock:
-            # Create new streamer if not exists or if existing one stopped
+            # Create new streamer if not exists or if existing one stopped/stale
+            should_create = False
             if camera_id not in cls._streamers:
-                logger.info(f"Creating new streamer for camera {camera_id}")
-                streamer = CameraStreamer(camera_id, rtsp_url)
-                streamer.start()
-                cls._streamers[camera_id] = streamer
+                should_create = True
+            elif force_restart:
+                logger.info(f"Forcing restart for camera {camera_id}")
+                cls._streamers[camera_id].stop()
+                should_create = True
             elif not cls._streamers[camera_id].running:
-                logger.info(f"Restarting stopped streamer for camera {camera_id}")
+                should_create = True
+            
+            if should_create:
+                logger.info(f"Creating/Restarting streamer for camera {camera_id}")
                 streamer = CameraStreamer(camera_id, rtsp_url)
                 streamer.start()
                 cls._streamers[camera_id] = streamer
+                
             return cls._streamers[camera_id]
     
     @classmethod
@@ -383,29 +389,39 @@ def camera_feed(request, camera_id):
             throttles = {'4k': 0.033, 'high': 0.033, 'med': 0.05, 'low': 0.1}
             delay = throttles.get(quality, 0.05)
             
-            # Wait for first frame (up to 30 seconds)
+            # Wait for first frame (up to 15 seconds)
             wait_count = 0
-            max_wait = 300  # 30 seconds at 0.1s intervals
+            max_wait = 150  # 15 seconds at 0.1s intervals
             while streamer.get_frame() is None and wait_count < max_wait:
                 time.sleep(0.1)
                 wait_count += 1
                 if wait_count % 10 == 0:
                     logger.info(f"Waiting for first frame from camera {camera_id}... ({wait_count/10:.0f}s)")
             
-            first_frame = streamer.get_frame()
-            if first_frame is None:
-                logger.error(f"No frame received from camera {camera_id} after 30 seconds")
-                yield (b'--frame\r\n'
-                       b'Content-Type: text/plain\r\n\r\n'
-                       b'ERROR: Could not get video frame from camera.\r\n'
-                       b'Check RTSP URL and credentials.\r\n')
-                return
+            if streamer.get_frame() is None:
+                logger.error(f"No frame received from camera {camera_id} after 15 seconds")
+                # Force restart for next attempt
+                camera_manager.get_streamer(camera.id, full_url, force_restart=True)
+                return # This will trigger img.onerror in the browser
             
             logger.info(f"=== STREAMING STARTED for camera {camera_id} ===")
             frame_count = 0
             
             try:
                 while True:
+                    # Check for streamer health
+                    stale_time = time.time() - streamer.last_frame_time
+                    if stale_time > 10.0: # If no frame for 10 seconds, it's frozen
+                        logger.warning(f"Camera {camera_id} stream is frozen ({stale_time:.1f}s). Terminating response.")
+                        # Force restart for next client
+                        camera_manager.get_streamer(camera.id, full_url, force_restart=True)
+                        break # Terminate current response to trigger browser retry
+
+                    if stale_time > 4.0:
+                        # Stream is lagging, wait briefly and retry
+                        time.sleep(0.5)
+                        continue
+
                     frame = streamer.get_adaptive_frame(quality)
                     if frame:
                         frame_count += 1
