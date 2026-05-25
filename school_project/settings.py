@@ -12,7 +12,19 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+import sys
+import asyncio
 from dotenv import load_dotenv
+
+# Set the event loop policy for Windows to support subprocesses in asyncio
+# In Python 3.14+, this might be the default, but we ensure it's applied
+# to avoid NotImplementedError in Daphne/Channels
+if sys.platform == 'win32':
+    try:
+        if hasattr(asyncio, 'WindowsProactorEventLoopPolicy'):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

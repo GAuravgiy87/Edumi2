@@ -1,3 +1,15 @@
+import sys
+import asyncio
+
+# CRITICAL: Set the event loop policy for Windows to support subprocesses in asyncio
+# This must be done at the earliest possible moment for Daphne/Channels
+if sys.platform == 'win32':
+    try:
+        if hasattr(asyncio, 'WindowsProactorEventLoopPolicy'):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
+
 # This will make sure the app is always imported when
 # Django starts so that shared_task will use this app.
 from .celery import app as celery_app

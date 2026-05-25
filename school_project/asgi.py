@@ -3,6 +3,17 @@ ASGI config for school_project project.
 """
 
 import os
+import sys
+import asyncio
+
+# Set the event loop policy for Windows to support subprocesses in asyncio
+if sys.platform == 'win32':
+    try:
+        if hasattr(asyncio, 'WindowsProactorEventLoopPolicy'):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'school_project.settings')
 
 from django.core.asgi import get_asgi_application

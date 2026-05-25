@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import subprocess
 import asyncio
 import threading
@@ -155,6 +156,12 @@ class AudioConsumer(AsyncWebsocketConsumer):
         if self.camera_id in rtsp_relays:
             return
 
+        # Diagnostic: Log the event loop type
+        loop = asyncio.get_running_loop()
+        logger.info(f"RTSP Audio Relay starting on loop: {type(loop).__name__}")
+        if sys.platform == 'win32' and 'Proactor' not in type(loop).__name__:
+            logger.error("WARNING: Not using ProactorEventLoop on Windows! Subprocesses will fail.")
+
         try:
             camera = await database_sync_to_async(Camera.objects.get)(id=self.camera_id)
             rtsp_url = camera.get_full_rtsp_url()
@@ -179,11 +186,25 @@ class AudioConsumer(AsyncWebsocketConsumer):
             ]
             
             logger.info(f"Starting FFmpeg Audio Relay for camera {self.camera_id}")
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
+            
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                is_async_process = True
+            except NotImplementedError:
+                logger.warning("asyncio.create_subprocess_exec not supported on this loop. Falling back to synchronous Popen + Thread.")
+                # Fallback: Start process using standard subprocess and a thread to feed the queue
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    bufsize=0 # Unbuffered
+                )
+                is_async_process = False
+
             rtsp_relays[self.camera_id] = process
             header_key = f'relay_{self.camera_id}'
             monitor_group = f'camera_monitor_{self.camera_id}'
@@ -195,10 +216,21 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 try:
                     # Read larger chunks for header and stability
                     chunk_size = 65536 if first_chunk else 4096
-                    chunk = await asyncio.wait_for(process.stdout.read(chunk_size), timeout=15.0)
+                    
+                    if is_async_process:
+                        chunk = await asyncio.wait_for(process.stdout.read(chunk_size), timeout=15.0)
+                    else:
+                        # For synchronous process, we use run_in_executor to avoid blocking the event loop
+                        chunk = await asyncio.get_event_loop().run_in_executor(
+                            None, process.stdout.read, chunk_size
+                        )
                     
                     if not chunk:
-                        err_data = await process.stderr.read()
+                        if is_async_process:
+                            err_data = await process.stderr.read()
+                        else:
+                            err_data = process.stderr.read()
+                            
                         if err_data:
                             logger.error(f"FFmpeg Relay Error (Cam {self.camera_id}): {err_data.decode()}")
                         break
@@ -218,6 +250,9 @@ class AudioConsumer(AsyncWebsocketConsumer):
                     )
                 except asyncio.TimeoutError:
                     logger.warning(f"RTSP Audio Relay Timeout (Cam {self.camera_id})")
+                    break
+                except Exception as e:
+                    logger.error(f"Error reading from relay pipe: {e}")
                     break
         except Exception as e:
             logger.error(f"RTSP Audio Relay Critical Error (Cam {self.camera_id}): {str(e)}")
