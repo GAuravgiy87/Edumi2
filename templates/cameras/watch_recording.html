@@ -85,11 +85,14 @@
 {% endblock %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <div class="video-page-container">
     <div class="video-main">
         <div class="player-container">
             <video id="videoPlayer" controls preload="metadata" poster="{% if recording.thumbnail %}{{ recording.thumbnail.url }}{% endif %}">
+                {% if not playlist_url %}
                 <source src="{% url 'stream_video' recording.id %}" type="video/mp4">
+                {% endif %}
                 Your browser does not support the video tag.
             </video>
         </div>
@@ -147,9 +150,26 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const video = document.getElementById('videoPlayer');
+        const playlistUrl = "{{ playlist_url|default:'' }}";
         
+        if (playlistUrl && Hls.isSupported()) {
+            const hls = new Hls({
+                maxBufferLength: 30, // 30 seconds buffer
+                maxMaxBufferLength: 60,
+                startLevel: -1, // Auto quality
+                capLevelToPlayerSize: true
+            });
+            hls.loadSource(playlistUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                console.log('HLS manifest loaded, ready to play');
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Native HLS support (Safari)
+            video.src = playlistUrl;
+        }
+
         // Optimize for long videos: prevent aggressive pre-fetching
-        // The 'metadata' preload already helps, but we can also monitor buffering
         video.addEventListener('progress', () => {
             if (video.buffered.length > 0) {
                 const bufferedEnd = video.buffered.end(video.buffered.length - 1);

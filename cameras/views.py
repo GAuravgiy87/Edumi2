@@ -897,10 +897,56 @@ def watch_recording(request, recording_id):
         Q(teacher=recording.teacher) | Q(camera=recording.camera)
     ).order_by('-created_at')[:5]
     
-    return render(request, 'cameras/watch_recording.html', {
+    context = {
         'recording': recording,
         'recommended': recommended
-    })
+    }
+    
+    if recording.is_chunked:
+        context['playlist_url'] = reverse('recording_playlist', args=[recording.id])
+    
+    return render(request, 'cameras/watch_recording.html', context)
+
+@login_required
+def stream_recording_chunk(request, recording_id, sequence):
+    """Serve a specific video chunk from the database"""
+    from .models import RecordingChunk
+    chunk = get_object_or_404(RecordingChunk, recording_id=recording_id, sequence=sequence)
+    
+    # Check permission for the recording
+    recording = chunk.recording
+    if not (recording.is_published or recording.teacher == request.user or request.user.is_superuser):
+        return HttpResponse("Unauthorized", status=403)
+        
+    return HttpResponse(chunk.data, content_type='video/mp2t')
+
+@login_required
+def recording_playlist(request, recording_id):
+    """Generate HLS playlist for a chunked recording"""
+    from .models import CameraRecording, RecordingChunk
+    recording = get_object_or_404(CameraRecording, id=recording_id)
+    
+    if not (recording.is_published or recording.teacher == request.user or request.user.is_superuser):
+        return HttpResponse("Unauthorized", status=403)
+        
+    chunks = RecordingChunk.objects.filter(recording=recording).order_by('sequence')
+    
+    playlist = [
+        "#EXTM3U",
+        "#EXT-X-VERSION:3",
+        "#EXT-X-TARGETDURATION:10",
+        "#EXT-X-MEDIA-SEQUENCE:0",
+        "#EXT-X-PLAYLIST-TYPE:VOD"
+    ]
+    
+    for chunk in chunks:
+        playlist.append(f"#EXTINF:{chunk.duration},")
+        chunk_url = reverse('stream_chunk', args=[recording.id, chunk.sequence])
+        playlist.append(chunk_url)
+        
+    playlist.append("#EXT-X-ENDLIST")
+    
+    return HttpResponse("\n".join(playlist), content_type='application/vnd.apple.mpegurl')
 
 @login_required
 def teacher_profile(request, teacher_id):
@@ -940,10 +986,16 @@ def stop_camera_recording(request, camera_id):
     
     if success:
         rec = get_object_or_404(CameraRecording, id=recording_id)
+        video_url = None
+        if rec.is_chunked:
+            video_url = reverse('watch_recording', args=[rec.id])
+        elif rec.video_file:
+            video_url = rec.video_file.url
+
         return JsonResponse({
             'status': 'success', 
             'recording_id': recording_id,
-            'video_url': rec.video_file.url if rec.video_file else None,
+            'video_url': video_url,
             'message': 'Recording stopped and being processed'
         })
     else:

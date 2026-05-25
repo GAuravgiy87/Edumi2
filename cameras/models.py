@@ -81,6 +81,7 @@ class CameraRecording(models.Model):
     duration = models.DurationField(null=True, blank=True)
     file_size = models.BigIntegerField(null=True, blank=True) # In bytes
     is_published = models.BooleanField(default=False)
+    is_chunked = models.BooleanField(default=False) # New: indicate if stored in chunks
     recording_status = models.CharField(max_length=20, choices=(
         ('recording', 'Recording'),
         ('processing', 'Processing'),
@@ -91,6 +92,20 @@ class CameraRecording(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.teacher.username}"
+
+class RecordingChunk(models.Model):
+    recording = models.ForeignKey(CameraRecording, on_delete=models.CASCADE, related_name='chunks')
+    sequence = models.IntegerField()
+    data = models.BinaryField() # The actual video data for this chunk
+    duration = models.FloatField(default=10.0) # Chunk duration in seconds
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['sequence']
+        unique_together = ('recording', 'sequence')
+
+    def __str__(self):
+        return f"Chunk {self.sequence} for {self.recording.title}"
 
 
 class HeadCountLog(models.Model):
