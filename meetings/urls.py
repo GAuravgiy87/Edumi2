@@ -40,4 +40,5 @@ urlpatterns = [
     path('kick/<int:meeting_id>/<int:user_id>/', views.kick_participant, name='kick_participant'),
     path('revoke-ban/<int:meeting_id>/<int:user_id>/', views.revoke_ban, name='revoke_ban'),
     path('banned-users/<int:meeting_id>/', views.get_banned_users, name='get_banned_users'),
+    path('global-control/<int:meeting_id>/', views.meeting_global_control, name='meeting_global_control'),
 ]

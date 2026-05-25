@@ -63,27 +63,45 @@ def register(request):
         return redirect('home')
     
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password1 = request.POST.get('password1')
-        password2 = request.POST.get('password2')
+        username = request.POST.get('username', '').strip()
+        password1 = request.POST.get('password1', '')
+        password2 = request.POST.get('password2', '')
         user_type = request.POST.get('user_type')
+        
+        if not username:
+            return render(request, 'accounts/register.html', {'error': 'Username is required'}, status=422)
+        if not password1:
+            return render(request, 'accounts/register.html', {'error': 'Password is required'}, status=422)
+        if not user_type:
+            return render(request, 'accounts/register.html', {'error': 'Please select your role'}, status=422)
         
         if password1 == password2:
             from django.contrib.auth.models import User
+            from django.db import IntegrityError, transaction
+            
             try:
-                user = User.objects.create_user(username=username, password=password1)
-                UserProfile.objects.create(user=user, user_type=user_type)
+                with transaction.atomic():
+                    if User.objects.filter(username=username).exists():
+                        return render(request, 'accounts/register.html', {'error': f'Username "{username}" is already taken'}, status=422)
+                    
+                    user = User.objects.create_user(username=username, password=password1)
+                    UserProfile.objects.create(user=user, user_type=user_type)
+                    
+                # Login after successful creation (outside atomic block is safer for some backends)
                 login(request, user)
                 request.session['show_welcome'] = True
+                
                 if user_type == 'teacher':
                     return redirect('teacher_dashboard')
                 elif user_type == 'student':
                     return redirect('student_dashboard')
                 return redirect('home')
-            except:
-                return render(request, 'accounts/register.html', {'error': 'Username already exists'})
+            except IntegrityError:
+                return render(request, 'accounts/register.html', {'error': 'Database error during registration'}, status=422)
+            except Exception as e:
+                return render(request, 'accounts/register.html', {'error': f'Registration failed: {str(e)}'}, status=422)
         else:
-            return render(request, 'accounts/register.html', {'error': 'Passwords do not match'})
+            return render(request, 'accounts/register.html', {'error': 'Passwords do not match'}, status=422)
     
     return render(request, 'accounts/register.html')
 

@@ -35,7 +35,7 @@
                     <span class="sidebar-nav-text">Content Manager</span>
                 </a>
                 <a href="{% url 'recordings_folder' %}" class="sidebar-nav-item {% if '/recordings-folder/' in request.path %}active{% endif %}">
-                    <span class="sidebar-nav-icon"><i data-lucide="folder-video"></i></span>
+                    <span class="sidebar-nav-icon"><i data-lucide="library"></i></span>
                     <span class="sidebar-nav-text">Recordings Library</span>
                 </a>
                 <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
@@ -77,7 +77,7 @@
             <div class="sidebar-nav-section">
                 <div class="sidebar-nav-title">Content</div>
                 <a href="{% url 'recordings_folder' %}" class="sidebar-nav-item {% if '/recordings-folder/' in request.path %}active{% endif %}">
-                    <span class="sidebar-nav-icon"><i data-lucide="folder-video"></i></span>
+                    <span class="sidebar-nav-icon"><i data-lucide="library"></i></span>
                     <span class="sidebar-nav-text">Recordings Library</span>
                 </a>
                 <a href="{% url 'manage_recordings' %}" class="sidebar-nav-item {% if '/manage-recordings/' in request.path %}active{% endif %}">

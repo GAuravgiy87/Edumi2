@@ -14,7 +14,7 @@ class RecordingEngine:
     """FFmpeg-based recording engine for high-quality AV synchronization"""
     
     _instances = {}
-    _lock = threading.Lock()
+    _lock = threading.RLock()
 
     def __init__(self, camera_id, teacher_id, audio_path=None):
         self.camera_id = camera_id
@@ -25,7 +25,7 @@ class RecordingEngine:
         self.recording_id = None
         self.start_time = None
         self.finalized = False
-        self.lock = threading.Lock() # Local lock for finalization state
+        self.lock = threading.RLock() # Use RLock to prevent re-entrant deadlocks during monitor callback
 
     @classmethod
     def start_recording(cls, camera, teacher, quality='1080p', audio_source='pc'):
@@ -117,11 +117,12 @@ class RecordingEngine:
             encoder = 'libx264'
             logger.warning("Failed to check for h264_amf, using libx264")
 
-        # Base command
+        # Base command with global sync settings
         cmd = [
             'ffmpeg', '-y',
             '-hide_banner',
             '-loglevel', 'warning', 
+            '-probesize', '5M', '-analyzeduration', '5M', # Increased for better stream detection
             '-hwaccel', 'd3d11va' if encoder == 'h264_amf' else 'auto', 
             '-thread_queue_size', '8192', # Increased buffer for better sync
             '-use_wallclock_as_timestamps', '1',
@@ -169,15 +170,17 @@ class RecordingEngine:
         # 4. speechnorm: Enhance human voice
         # 5. agate: Noise gate
         # 6. adelay: Fine-tune sync for external mics (delaying audio to match RTSP lag)
+        # 7. volume: Apply 4x gain for low-sensitivity IP camera mics
         sync_delay = '1200' if self.audio_path else '0'
         audio_filters = (
             f'aresample=async=1000:min_hard_comp=0.05:first_pts=0,'
             f'adelay={sync_delay}|{sync_delay},' # Delay audio to match RTSP latency
-            'highpass=f=100,lowpass=f=15000,' 
-            'afftdn=nf=-25,'
+            'highpass=f=80,lowpass=f=16000,' # Slightly wider frequency range
+            'volume=4.0,' # 4x gain boost
+            'afftdn=nf=-30,' # Less aggressive noise reduction
             'speechnorm=e=4:p=0.5,'
-            'agate=threshold=0.02:range=0:attack=50:release=200,'
-            'dynaudnorm=p=0.9:m=10.0:s=5,'
+            'agate=threshold=0.01:range=0:attack=50:release=200,' # Lower gate threshold
+            'dynaudnorm=p=0.9:m=12.0:s=5,'
             'aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo'
         )
 
@@ -189,10 +192,10 @@ class RecordingEngine:
                 '-af', audio_filters,
             ])
         else:
-            # Map the first audio stream from the camera if it exists
+            # Map all audio streams from the camera if they exist
             cmd.extend([
                 '-map', '0:v:0',
-                '-map', '0:a:0?',
+                '-map', '0:a?',
                 '-c:a', 'aac', '-b:a', '192k', '-ar', '44100',
                 '-af', audio_filters,
             ])
@@ -249,24 +252,26 @@ class RecordingEngine:
         
         # If the process exited and we haven't finalized yet, it's a crash or disconnect
         # IMPORTANT: Only cleanup if it's NOT a deliberate manual stop
+        
+        # We use a slight delay to ensure file handles are released before finalization
+        time.sleep(1)
+        
+        should_cleanup = False
         with self.lock:
             if not self.finalized:
                 logger.warning(f"FFmpeg process for camera {self.camera_id} stopped unexpectedly. Auto-saving...")
-                # We use a slight delay to ensure file handles are released
-                time.sleep(2)
                 self._stop(auto_save=True)
-                
-                # Remove from active instances
-                key = f"{self.camera_id}_{self.teacher_id}"
-                with RecordingEngine._lock:
-                    if RecordingEngine._instances.get(key) == self:
-                        del RecordingEngine._instances[key]
+                should_cleanup = True
             else:
-                # Deliberate stop handled it, just ensure key is removed
-                key = f"{self.camera_id}_{self.teacher_id}"
-                with RecordingEngine._lock:
-                    if RecordingEngine._instances.get(key) == self:
-                        del RecordingEngine._instances[key]
+                # Deliberate stop handled it, but we still need to ensure cleanup
+                should_cleanup = True
+        
+        if should_cleanup:
+            # Remove from active instances OUTSIDE the instance lock to prevent AB-BA deadlock
+            key = f"{self.camera_id}_{self.teacher_id}"
+            with RecordingEngine._lock:
+                if RecordingEngine._instances.get(key) == self:
+                    del RecordingEngine._instances[key]
 
     @classmethod
     def stop_recording(cls, camera_id, teacher_id):
@@ -290,21 +295,26 @@ class RecordingEngine:
                         key = k
                         break
             
-            # If we have an instance, stop it
-            if instance:
-                try:
-                    logger.info(f"Stop requested for memory instance {key}")
-                    instance._stop(auto_save=False)
+        # If we have an instance, stop it OUTSIDE the class lock to avoid deadlocks with monitor thread
+        if instance:
+            try:
+                logger.info(f"Stop requested for memory instance {key}")
+                instance._stop(auto_save=False)
+                
+                # Re-acquire class lock briefly for cleanup
+                with cls._lock:
                     if key in cls._instances:
                         del cls._instances[key]
-                    return True, instance.recording_id
-                except Exception as e:
-                    logger.error(f"Error stopping memory instance: {e}")
+                return True, instance.recording_id
+            except Exception as e:
+                logger.error(f"Error stopping memory instance: {e}")
+                with cls._lock:
                     if key in cls._instances:
                         del cls._instances[key]
-                    # Don't return yet, try DB fallback below
-            
-            # 4. If no instance in memory but DB record exists, finalize it
+                # Don't return yet, try DB fallback below
+        
+        # 4. If no instance in memory but DB record exists, finalize it
+        with cls._lock:
             if active_rec:
                 logger.warning(f"Stop requested: Found DB record {active_rec.id} for camera {camera_id} without memory instance. Finalizing.")
                 active_rec.recording_status = 'processing'

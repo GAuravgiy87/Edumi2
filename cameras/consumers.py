@@ -3,22 +3,27 @@ import os
 import subprocess
 import asyncio
 import threading
+import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from .models import Camera
 from channels.db import database_sync_to_async
 
+import traceback
+
+logger = logging.getLogger('cameras')
+
 # Dictionary to store the first chunk (header) for each active camera audio stream
+# Keys: "mic_{camera_id}" or "relay_{camera_id}"
 audio_headers = {}
 # Active RTSP audio relay processes {camera_id: subprocess}
 rtsp_relays = {}
-# Number of listeners per camera {camera_id: count}
-camera_listeners = {}
+# Number of listeners per camera relay {camera_id: count}
+relay_listeners = {}
 
 class AudioConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.camera_id = self.scope['url_route']['kwargs']['camera_id']
-        self.room_group_name = f'camera_audio_{self.camera_id}'
         self.user = self.scope['user']
         
         # Get source from query string
@@ -29,6 +34,16 @@ class AudioConsumer(AsyncWebsocketConsumer):
         elif 'source=pc_monitor' in query_params:
             self.source = 'pc_monitor'
         
+        # Group Names:
+        # - camera_audio_{id}: For teacher's mic audio (sent to students)
+        # - camera_monitor_{id}: For IP camera's internal mic audio (sent to teacher)
+        if self.source == 'pc_monitor':
+            self.room_group_name = f'camera_monitor_{self.camera_id}'
+            self.header_key = f'relay_{self.camera_id}'
+        else:
+            self.room_group_name = f'camera_audio_{self.camera_id}'
+            self.header_key = f'mic_{self.camera_id}'
+            
         self.is_teacher = await self.check_is_teacher()
         
         await self.channel_layer.group_add(
@@ -38,23 +53,18 @@ class AudioConsumer(AsyncWebsocketConsumer):
         
         await self.accept()
 
-        # Track listeners for IP Camera audio
-        if self.camera_id not in camera_listeners:
-            camera_listeners[self.camera_id] = 0
-        camera_listeners[self.camera_id] += 1
+        # Handle IP Camera Audio Relay for monitoring
+        if self.source == 'pc_monitor':
+            if self.camera_id not in relay_listeners:
+                relay_listeners[self.camera_id] = 0
+            relay_listeners[self.camera_id] += 1
 
-        # Start IP Camera Audio Relay if it's the first listener
-        # Teachers can also start the relay if they are in 'pc_monitor' mode
-        should_start_relay = (camera_listeners[self.camera_id] == 1 and 
-                             (not self.is_teacher or self.source == 'pc_monitor'))
+            if relay_listeners[self.camera_id] == 1:
+                asyncio.create_task(self.start_rtsp_audio_relay())
         
-        if should_start_relay:
-            asyncio.create_task(self.start_rtsp_audio_relay())
-        
-        # If a header exists for this camera, send it to the new joiner immediately
-        if self.source == 'pc_monitor' or not self.is_teacher:
-            if self.camera_id in audio_headers:
-                await self.send(bytes_data=audio_headers[self.camera_id])
+        # Send appropriate header immediately
+        if self.header_key in audio_headers:
+            await self.send(bytes_data=audio_headers[self.header_key])
         
         if self.is_teacher and self.source != 'pc_monitor':
             await self.channel_layer.group_send(
@@ -79,16 +89,17 @@ class AudioConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        
         if self.audio_file:
             self.audio_file.close()
-            # Clear header if teacher disconnects
-            if self.camera_id in audio_headers:
-                del audio_headers[self.camera_id]
+            # If teacher stops mic, clear mic header
+            if self.source != 'pc_monitor' and self.header_key in audio_headers:
+                del audio_headers[self.header_key]
         
-        # Update listener count and stop relay if last one
-        if self.camera_id in camera_listeners:
-            camera_listeners[self.camera_id] -= 1
-            if camera_listeners[self.camera_id] <= 0:
+        # Update relay listener count and stop relay if last one
+        if self.source == 'pc_monitor' and self.camera_id in relay_listeners:
+            relay_listeners[self.camera_id] -= 1
+            if relay_listeners[self.camera_id] <= 0:
                 self.stop_rtsp_audio_relay()
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -96,8 +107,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
             # Teachers can only send audio if they are NOT in monitor mode
             if self.is_teacher and self.source != 'pc_monitor':
                 # Store the first chunk as the header for new students
-                if self.camera_id not in audio_headers:
-                    audio_headers[self.camera_id] = bytes_data
+                if self.header_key not in audio_headers:
+                    audio_headers[self.header_key] = bytes_data
                 
                 if self.audio_file:
                     self.audio_file.write(bytes_data)
@@ -118,6 +129,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
 
     async def mic_status(self, event):
         """Handle mic status updates (connected/disconnected)"""
+        # Broadcast status to BOTH audio and monitor groups
         await self.send(text_data=json.dumps({
             'type': 'mic_status',
             'source': event['source'],
@@ -147,42 +159,55 @@ class AudioConsumer(AsyncWebsocketConsumer):
             camera = await database_sync_to_async(Camera.objects.get)(id=self.camera_id)
             rtsp_url = camera.get_full_rtsp_url()
             
-            # Optimized FFmpeg command for ultra-low latency and perfect sync
-            # Added -nostdin and -probesize to prevent hangs/errors
+            # Simplified FFmpeg command for maximum compatibility
+            # Using standard opus parameters for broad compatibility
             cmd = [
                 'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
                 '-nostdin',
-                '-probesize', '32k',
-                '-rtsp_transport', 'tcp', '-i', rtsp_url,
-                '-vn', # No video
-                '-acodec', 'libopus', '-b:a', '64k', '-vbr', 'on',
-                '-af', 'aresample=async=1:min_hard_comp=0.100000:first_pts=0',
+                '-rtsp_transport', 'tcp', 
+                '-probesize', '5M', '-analyzeduration', '5M',
+                '-i', rtsp_url,
+                '-vn',
+                '-map', '0:a?',
+                '-acodec', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2',
+                '-af', 'volume=4.0,dynaudnorm=p=0.9:m=10.0:s=5,aresample=async=1:min_hard_comp=0.1:first_pts=0',
                 '-f', 'webm',
+                '-flush_packets', '1',
                 'pipe:1'
             ]
             
+            logger.info(f"Starting FFmpeg Audio Relay for camera {self.camera_id}")
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE # Capture stderr for better error reporting
+                stderr=asyncio.subprocess.PIPE
             )
             rtsp_relays[self.camera_id] = process
+            header_key = f'relay_{self.camera_id}'
+            monitor_group = f'camera_monitor_{self.camera_id}'
             
             # Read from pipe and broadcast
+            first_chunk = True
+            
             while self.camera_id in rtsp_relays:
                 try:
-                    chunk = await asyncio.wait_for(process.stdout.read(4096), timeout=5.0)
+                    # Read larger chunks for header and stability
+                    chunk_size = 65536 if first_chunk else 4096
+                    chunk = await asyncio.wait_for(process.stdout.read(chunk_size), timeout=15.0)
+                    
                     if not chunk:
-                        # Check stderr if stdout is empty
-                        err = await process.stderr.read()
-                        if err: print(f"FFmpeg Relay Error: {err.decode()}")
+                        err_data = await process.stderr.read()
+                        if err_data:
+                            logger.error(f"FFmpeg Relay Error (Cam {self.camera_id}): {err_data.decode()}")
                         break
                     
-                    if self.camera_id not in audio_headers:
-                        audio_headers[self.camera_id] = chunk
+                    if first_chunk:
+                        logger.info(f"Captured Audio Header for Cam {self.camera_id} ({len(chunk)} bytes)")
+                        audio_headers[header_key] = chunk
+                        first_chunk = False
 
                     await self.channel_layer.group_send(
-                        self.room_group_name,
+                        monitor_group,
                         {
                             'type': 'audio_chunk',
                             'data': chunk,
@@ -190,10 +215,11 @@ class AudioConsumer(AsyncWebsocketConsumer):
                         }
                     )
                 except asyncio.TimeoutError:
-                    print(f"RTSP Audio Relay Timeout for camera {self.camera_id}")
+                    logger.warning(f"RTSP Audio Relay Timeout (Cam {self.camera_id})")
                     break
         except Exception as e:
-            print(f"RTSP Audio Relay Critical Error: {str(e)}")
+            logger.error(f"RTSP Audio Relay Critical Error (Cam {self.camera_id}): {str(e)}")
+            logger.error(traceback.format_exc())
         finally:
             self.stop_rtsp_audio_relay()
 
@@ -201,13 +227,11 @@ class AudioConsumer(AsyncWebsocketConsumer):
         if self.camera_id in rtsp_relays:
             process = rtsp_relays.pop(self.camera_id)
             try:
-                # Use standard termination
                 process.terminate()
-                # We can't await in a sync def, but the process will be reaped by OS
             except:
                 pass
-            # Don't clear headers here as other listeners might still need them 
-            # unless this was the absolute last one
-            if self.camera_id not in camera_listeners or camera_listeners[self.camera_id] <= 0:
-                if self.camera_id in audio_headers:
-                    del audio_headers[self.camera_id]
+            
+            header_key = f'relay_{self.camera_id}'
+            if self.camera_id not in relay_listeners or relay_listeners[self.camera_id] <= 0:
+                if header_key in audio_headers:
+                    del audio_headers[header_key]

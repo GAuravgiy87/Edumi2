@@ -978,3 +978,37 @@ def get_banned_users(request, meeting_id):
     } for b in banned if b.is_banned()]
     
     return JsonResponse({'banned': data})
+
+@login_required
+@require_http_methods(["POST"])
+def meeting_global_control(request, meeting_id):
+    """Host controls everyone's mic/camera/chat at once"""
+    meeting = get_object_or_404(Meeting, id=meeting_id)
+    
+    # Only host or admin can use global controls
+    if meeting.teacher != request.user and not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+    
+    import json
+    try:
+        data = json.loads(request.body)
+        control_type = data.get('type') # 'mute_all' or 'cam_off_all'
+        value = data.get('value') # boolean
+        
+        # Broadcast to all participants via WebSocket
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'meeting_{meeting.meeting_code}',
+            {
+                'type': 'global_control_update',
+                'control_type': control_type,
+                'value': value,
+                'message': f'Teacher has {"enabled" if value else "disabled"} global {control_type.replace("_", " ")}'
+            }
+        )
+        return JsonResponse({'status': 'success'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

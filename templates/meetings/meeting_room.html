@@ -638,8 +638,35 @@ async function init() {
 
         // Publish local camera + mic
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            if (window.isMicOn) await window.room.localParticipant.setMicrophoneEnabled(true);
-            if (window.isCameraOn) await window.room.localParticipant.setCameraEnabled(true);
+            // Attempt Microphone
+            if (window.isMicOn) {
+                try {
+                    await window.room.localParticipant.setMicrophoneEnabled(true);
+                } catch (micErr) {
+                    console.warn('Microphone initialization failed:', micErr);
+                    window.isMicOn = false;
+                    if (micErr.name === 'NotFoundError' || micErr.name === 'DevicesNotFoundError') {
+                        showNotification('No microphone found on this device.', 'warning');
+                    } else if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+                        showNotification('Microphone access denied.', 'error');
+                    }
+                }
+            }
+
+            // Attempt Camera
+            if (window.isCameraOn) {
+                try {
+                    await window.room.localParticipant.setCameraEnabled(true);
+                } catch (camErr) {
+                    console.warn('Camera initialization failed:', camErr);
+                    window.isCameraOn = false;
+                    if (camErr.name === 'NotFoundError' || camErr.name === 'DevicesNotFoundError') {
+                        showNotification('No camera found on this device.', 'warning');
+                    } else if (camErr.name === 'NotAllowedError' || camErr.name === 'PermissionDeniedError') {
+                        showNotification('Camera access denied.', 'error');
+                    }
+                }
+            }
         }
 
         // Update UI buttons
@@ -1146,8 +1173,10 @@ async function toggleMic() {
     } catch (e) {
         console.error('Mic toggle error:', e);
         isMicOn = !isMicOn; // Revert state
-        if (e.name === 'NotFoundError') {
+        if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
             showNotification('No microphone found on this device.', 'warning');
+        } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            showNotification('Microphone access denied.', 'error');
         } else {
             showNotification('Could not access microphone.', 'error');
         }
@@ -1157,7 +1186,14 @@ async function toggleMic() {
 async function toggleCamera() {
     try {
         isCameraOn = !isCameraOn;
-        await room.localParticipant.setCameraEnabled(isCameraOn);
+        
+        // Handle IP camera source
+        if (currentVideoSource === 'ip' && !isCameraOn) {
+            await stopIpCameraStream();
+        } else {
+            await room.localParticipant.setCameraEnabled(isCameraOn);
+        }
+
         const btn = document.getElementById('camBtn');
         btn.classList.toggle('off', !isCameraOn);
         const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
@@ -1170,8 +1206,10 @@ async function toggleCamera() {
     } catch (e) {
         console.error('Camera toggle error:', e);
         isCameraOn = !isCameraOn; // Revert state
-        if (e.name === 'NotFoundError') {
+        if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
             showNotification('No camera found on this device.', 'warning');
+        } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            showNotification('Camera access denied.', 'error');
         } else {
             showNotification('Could not access camera.', 'error');
         }
@@ -1376,8 +1414,36 @@ async function startIpCameraStream(id, name) {
     video.autoplay = true;
     video.muted = true;
     video.playsInline = true;
-    video.srcObject = ipCamCanvas.captureStream(15);
+    const stream = ipCamCanvas.captureStream(15);
+    video.srcObject = stream;
     container.appendChild(video);
+
+    // --- PUBLISH TO LIVEKIT ---
+    if (window.room && window.room.localParticipant && isCameraOn) {
+        try {
+            // Clean up existing IP track if switching between IP cameras
+            if (ipCamTrackPub) {
+                await window.room.localParticipant.unpublishTrack(ipCamTrackPub.track);
+                if (ipCamTrackPub.track) ipCamTrackPub.track.stop();
+                ipCamTrackPub = null;
+            }
+
+            // Unpublish existing webcam track
+            await window.room.localParticipant.setCameraEnabled(false);
+
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                ipCamTrackPub = await window.room.localParticipant.publishTrack(videoTrack, {
+                    name: 'camera',
+                    source: Track.Source.Camera,
+                    simulcast: true,
+                });
+                console.log('IP Camera track published to LiveKit');
+            }
+        } catch (err) {
+            console.error('Failed to publish IP camera track:', err);
+        }
+    }
 
     showNotification(`${name} monitoring active`, 'success');
 }
@@ -1394,6 +1460,18 @@ async function stopIpCameraStream() {
         ipCamAnimationId = null;
     }
     
+    // --- UNPUBLISH FROM LIVEKIT ---
+    if (ipCamTrackPub && window.room && window.room.localParticipant) {
+        try {
+            await window.room.localParticipant.unpublishTrack(ipCamTrackPub.track);
+            if (ipCamTrackPub.track) ipCamTrackPub.track.stop();
+            ipCamTrackPub = null;
+            console.log('IP Camera track unpublished');
+        } catch (err) {
+            console.warn('Error unpublishing IP camera track:', err);
+        }
+    }
+
     if (ipCamImg) {
         ipCamImg.onload = null;
         ipCamImg.onerror = null;
@@ -1403,6 +1481,15 @@ async function stopIpCameraStream() {
     currentVideoSource = 'webcam';
     currentIpCamId = null;
     
+    // Restore webcam if global camera state is still ON
+    if (isCameraOn && window.room && window.room.localParticipant) {
+        try {
+            await window.room.localParticipant.setCameraEnabled(true);
+        } catch (err) {
+            console.warn('Failed to restore webcam:', err);
+        }
+    }
+
     document.querySelectorAll('.camera-option').forEach(opt => opt.classList.remove('active'));
     document.getElementById('webcamOption').classList.add('active');
     
