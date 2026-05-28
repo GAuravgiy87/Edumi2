@@ -16,4 +16,5 @@ urlpatterns = [
     # Head Counting (Microservice)
     path('head-count/start/<str:camera_type>/<int:camera_id>/', views.start_head_count, name='start_head_count'),
     path('head-count/stop/<str:camera_type>/<int:camera_id>/', views.stop_head_count, name='stop_head_count'),
+    path('head-count/active-sessions/', views.active_head_count_sessions, name='active_head_count_sessions'),
 ]

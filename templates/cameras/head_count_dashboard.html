@@ -87,7 +87,7 @@
                             ▶ Start Counting
                         </button>
                     {% endif %}
-                    <a href="{% url 'camera_live_view' camera.id %}" class="btn btn-secondary">👁 View</a>
+                    <a href="{% url 'teacher_control_room' camera.id %}" class="btn btn-secondary">👁 View</a>
                 </div>
             </div>
             {% endfor %}
@@ -132,7 +132,7 @@
                             ▶ Start Counting
                         </button>
                     {% endif %}
-                    <a href="{% url 'camera_live_view' camera.id %}" class="btn btn-secondary">👁 View</a>
+                    <a href="{% url 'watch_live' camera.id %}" class="btn btn-secondary">👁 View</a>
                 </div>
             </div>
             {% endfor %}

@@ -71,14 +71,18 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 meeting=meeting,
                 user=self.user
             )
+            
+            # Only log 'join' if the user was not already active or last log was 'leave'
+            last_log = MeetingAttendanceLog.objects.filter(participant=participant).order_by('timestamp').last()
+            if not participant.is_active or (last_log and last_log.event_type == 'leave'):
+                MeetingAttendanceLog.objects.create(
+                    participant=participant,
+                    event_type='join'
+                )
+                
             participant.joined_at = timezone.now()
             participant.is_active = True
             participant.save()
-            
-            MeetingAttendanceLog.objects.create(
-                participant=participant,
-                event_type='join'
-            )
             
             return {
                 'id': self.user.id,
@@ -377,14 +381,18 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 meeting=meeting,
                 user=self.user
             )
+            
+            # Only log 'join' if the user was not already active or last log was 'leave'
+            last_log = MeetingAttendanceLog.objects.filter(participant=participant).order_by('timestamp').last()
+            if not participant.is_active or (last_log and last_log.event_type == 'leave'):
+                MeetingAttendanceLog.objects.create(
+                    participant=participant,
+                    event_type='join'
+                )
+
             participant.joined_at = timezone.now()
             participant.is_active = True
             participant.save()
-            
-            MeetingAttendanceLog.objects.create(
-                participant=participant,
-                event_type='join'
-            )
         except Meeting.DoesNotExist:
             pass # No persistence for CAM_* rooms
         except Exception as e:
@@ -398,12 +406,16 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 meeting=meeting,
                 user=self.user
             )
+            
+            if not participant.is_active:
+                return # Already left
+
             now = timezone.now()
             
             # Calculate duration since last join
             last_join = participant.attendance_logs.filter(event_type='join').last()
             if last_join:
-                duration = (now - last_join.timestamp).total_seconds()
+                duration = max(0, (now - last_join.timestamp).total_seconds())
                 participant.total_duration_seconds += int(duration)
             
             participant.left_at = now

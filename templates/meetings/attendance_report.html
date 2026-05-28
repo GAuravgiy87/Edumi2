@@ -183,6 +183,12 @@
                 {% else %}
                     <span class="badge badge-offline">Offline</span>
                 {% endif %}
+                
+                {% if pd.session_count > 1 %}
+                    <span class="badge badge-amber" style="background: #fff7ed; color: #9a3412; border: 1px solid #ffedd5; margin-left: 0.5rem;">
+                        ⚠️ Multiple Entries
+                    </span>
+                {% endif %}
             </div>
 
             <!-- First Joined -->

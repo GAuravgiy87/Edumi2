@@ -79,7 +79,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'channels',
     'accounts',
-    'pages',
     'cameras',  # RTSP Camera management
     'mobile_cameras',  # Mobile Camera management (IP Webcam, DroidCam)
     'meetings',
@@ -124,28 +123,48 @@ WSGI_APPLICATION = 'school_project.wsgi.application'
 ASGI_APPLICATION = 'school_project.asgi.application'
 
 # Channels Configuration
-# We use InMemoryChannelLayer for local development to avoid issues with 
-# outdated Redis versions (e.g. Redis 3.x on Windows).
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+# We use RedisChannelLayer when running in Docker/Linux (where Redis 5+ is available)
+# On Windows, we force InMemoryChannelLayer to avoid "unknown command 'BZPOPMIN'" 
+# which occurs with older Windows Redis versions (3.x).
+REDIS_URL = os.environ.get('REDIS_URL')
+
+if REDIS_URL and sys.platform != 'win32':
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [REDIS_URL],
+            },
+        }
     }
-}
+else:
+    # Default to InMemory for Windows or when REDIS_URL is missing
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
 
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            'timeout': 30,  # Wait up to 30 seconds for database lock
-            'check_same_thread': False,  # Allow multi-threaded access
-        },
+if os.environ.get('DATABASE_URL'):
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                'timeout': 30,  # Wait up to 30 seconds for database lock
+                'check_same_thread': False,  # Allow multi-threaded access
+            },
+        }
+    }
 
 
 # Password validation

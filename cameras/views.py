@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
-from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, FileResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.contrib.auth.models import User
 from django.db.models import Avg, Max, Min, Count, Q
 from django.utils import timezone
@@ -251,11 +251,6 @@ def is_admin(user):
     return False
 
 
-def can_manage_camera(user, camera):
-    """Check if user can manage a camera (admin only)"""
-    return is_admin(user)
-
-
 def can_view_camera(user, camera):
     """Check if user can view a camera"""
     if is_admin(user):
@@ -324,58 +319,6 @@ def test_rtsp_paths(ip, port, username, password):
     
     return None, None
 
-
-def parse_rtsp_url(url):
-    """
-    Robustly parse an RTSP URL to extract components.
-    Handles complex passwords with multiple '@' symbols.
-    """
-    if not url.startswith('rtsp://'):
-        raise ValueError("URL must start with rtsp://")
-    
-    # Remove prefix
-    temp = url[7:]
-    
-    # Standard format: [user[:pass]@]host[:port][/path]
-    # Split at the LAST '@' to separate userinfo from host/path
-    if '@' in temp:
-        userinfo, rest = temp.rsplit('@', 1)
-        # Split userinfo at the FIRST ':' to handle '@' in password
-        if ':' in userinfo:
-            username, password = userinfo.split(':', 1)
-        else:
-            username = userinfo
-            password = ''
-    else:
-        username = ''
-        password = ''
-        rest = temp
-    
-    # Now 'rest' is host[:port][/path]
-    if '/' in rest:
-        hostport, stream_path = rest.split('/', 1)
-        stream_path = '/' + stream_path
-    else:
-        hostport = rest
-        stream_path = '/'
-    
-    if ':' in hostport:
-        ip_address, port = hostport.split(':', 1)
-        try:
-            port = int(port)
-        except ValueError:
-            port = 554
-    else:
-        ip_address = hostport
-        port = 554
-    
-    return {
-        'ip_address': ip_address,
-        'port': port,
-        'username': username,
-        'password': password,
-        'stream_path': stream_path
-    }
 
 @login_required
 def admin_dashboard(request):
@@ -496,31 +439,6 @@ def edit_camera(request, camera_id):
         'password': camera.password,
         'assigned_teachers': assigned_teachers
     })
-
-@login_required
-def camera_live_view(request, camera_id):
-    if not is_admin(request.user):
-        return redirect('login')
-    
-    camera = get_object_or_404(Camera, id=camera_id)
-    
-    # Get active session if any
-    active_session = HeadCountSession.objects.filter(
-        camera_id=camera.id, 
-        camera_type='rtsp' if camera.camera_type == 'rtsp' else 'mobile',
-        status='active'
-    ).first()
-    
-    # In a real app, you'd track who is watching. 
-    # For now we'll pass some mock/calculated data.
-    context = {
-        'camera': camera,
-        'active_session': active_session,
-        'watching_teachers': [camera.get_authorized_teachers().first()], # Mock
-        'start_time': active_session.started_at if active_session else timezone.now(),
-        'total_students': 0, # Placeholder
-    }
-    return render(request, 'cameras/camera_live_view.html', context)
 
 
 @login_required
@@ -1134,12 +1052,13 @@ def manage_permissions(request, camera_id):
 @login_required
 def head_count_dashboard(request):
     """Dashboard for head counting - shows all cameras with head count capability"""
+    import requests
+    
     # Get cameras based on user role
     if is_admin(request.user):
         rtsp_cameras = Camera.objects.filter(is_active=True)
         mobile_cameras = MobileCamera.objects.filter(is_active=True)
     elif hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher':
-        # Teachers see cameras they have permission for
         camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
         rtsp_cameras = Camera.objects.filter(id__in=camera_ids, is_active=True)
         
@@ -1149,20 +1068,29 @@ def head_count_dashboard(request):
         rtsp_cameras = Camera.objects.none()
         mobile_cameras = MobileCamera.objects.none()
     
-    # Check active sessions
-    active_sessions = head_count_manager.get_active_sessions()
+    # PROXIED: Get active sessions from the dedicated camera service
+    active_sessions = {}
+    try:
+        service_url = 'http://localhost:8001/head-count/active-sessions/'
+        response = requests.get(service_url, timeout=2)
+        if response.status_code == 200:
+            active_sessions = response.json().get('active_sessions', {})
+    except Exception as e:
+        logger.error(f"Failed to fetch active headcount sessions from service: {e}")
     
-    # Add session status to cameras
+    # Add session status to cameras based on proxied data
     for camera in rtsp_cameras:
-        camera.has_active_session = head_count_manager.is_session_active('rtsp', camera.id)
+        session_key = f"rtsp_{camera.id}"
+        camera.has_active_session = session_key in active_sessions
         camera.camera_type = 'rtsp'
     
     for camera in mobile_cameras:
-        camera.has_active_session = head_count_manager.is_session_active('mobile', camera.id)
+        session_key = f"mobile_{camera.id}"
+        camera.has_active_session = session_key in active_sessions
         camera.camera_type = 'mobile'
     
-    # Get recent head count logs
-    recent_logs = HeadCountLog.objects.all()[:10]
+    # Get recent head count logs (Database is shared, so this is fine)
+    recent_logs = HeadCountLog.objects.all().order_by('-timestamp')[:10]
     
     context = {
         'rtsp_cameras': rtsp_cameras,

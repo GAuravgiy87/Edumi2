@@ -8,7 +8,8 @@ import asyncio
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 import websockets
-from websockets.http11 import Request
+from django.conf import settings
+from .models import Meeting
 
 logger = logging.getLogger(__name__)
 

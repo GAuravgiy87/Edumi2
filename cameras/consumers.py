@@ -194,8 +194,14 @@ class AudioConsumer(AsyncWebsocketConsumer):
                     stderr=asyncio.subprocess.PIPE
                 )
                 is_async_process = True
-            except NotImplementedError:
-                logger.warning("asyncio.create_subprocess_exec not supported on this loop. Falling back to synchronous Popen + Thread.")
+            except (NotImplementedError, Exception) as e:
+                # Catching Exception too because some loop implementations might raise different errors
+                # or Python 3.14+ might have changed the error type
+                if isinstance(e, NotImplementedError) or "NotImplementedError" in str(type(e)):
+                    logger.warning(f"asyncio subprocess not supported on loop {type(loop).__name__}. Falling back to synchronous Popen.")
+                else:
+                    logger.error(f"Unexpected error starting async subprocess: {e}")
+                
                 # Fallback: Start process using standard subprocess and a thread to feed the queue
                 process = subprocess.Popen(
                     cmd,

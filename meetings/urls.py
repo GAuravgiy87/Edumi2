@@ -28,6 +28,8 @@ urlpatterns = [
     path('cancel/<int:meeting_id>/', views.cancel_meeting, name='cancel_meeting'),
     path('attendance/<str:meeting_code>/', views.meeting_attendance, name='meeting_attendance'),
     path('summary/<str:meeting_code>/', views.meeting_summary, name='meeting_summary'),
+    path('classroom/attendance/history/', views.classroom_attendance_history, name='classroom_attendance_history'),
+    path('classroom/<int:classroom_id>/attendance/', views.classroom_attendance_detail, name='classroom_attendance_detail'),
     
     # Meeting Sleep Mode
     path('sleep/<str:meeting_code>/', views.sleep_meeting, name='sleep_meeting'),

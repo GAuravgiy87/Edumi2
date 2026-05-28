@@ -374,18 +374,50 @@ def user_management(request):
     
     return render(request, 'accounts/user_management.html', {'users': users})
 
+from django.db import transaction
+import logging
+
+logger = logging.getLogger(__name__)
+
 @login_required
 def delete_user(request, user_id):
-    # Check if user is admin
+    """Delete a user account and clean up related objects to avoid IntegrityError"""
     if not request.user.is_superuser:
-        return redirect('login')
+        return redirect('admin_panel')
+        
+    user = get_object_or_404(User, id=user_id)
     
-    if request.method == 'POST':
-        user = get_object_or_404(User, id=user_id)
-        if not user.is_superuser:  # Prevent deleting admin users
+    if user == request.user:
+        return redirect('admin_panel')
+    
+    try:
+        with transaction.atomic():
+            # Manual cleanup for models that might cause IntegrityErrors in SQLite
+            # especially those with SET_NULL but complex dependencies
+            from meetings.models import ClassroomMembership, Meeting, Classroom
+            from cameras.models import CameraPermission, CameraRecording, HeadCountSession
+            
+            # Delete memberships first
+            ClassroomMembership.objects.filter(student=user).delete()
+            ClassroomMembership.objects.filter(approved_by=user).update(approved_by=None)
+            
+            # Delete recordings (this will also delete RecordingChunks via CASCADE)
+            CameraRecording.objects.filter(teacher=user).delete()
+            
+            # Delete permissions
+            CameraPermission.objects.filter(teacher=user).delete()
+            
+            # Delete meetings and classrooms (cascades)
+            Meeting.objects.filter(teacher=user).delete()
+            Classroom.objects.filter(teacher=user).delete()
+            
+            # Finally delete the user
             user.delete()
-    
-    return redirect('user_management')
+            
+        return JsonResponse({'status': 'success', 'message': 'User deleted successfully'})
+    except Exception as e:
+        logger.error(f"Failed to delete user {user_id}: {e}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 @login_required

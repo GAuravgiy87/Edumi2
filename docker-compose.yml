@@ -1,8 +1,25 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=edumi
+      - POSTGRES_USER=edumi
+      - POSTGRES_PASSWORD=edumi
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edumi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
     expose:
       - "6379"
 
@@ -23,18 +40,49 @@ services:
     volumes:
       - .:/app
     environment:
-      - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-docker-secret-key-12345
+      - ALLOWED_HOSTS=*
+      - DATABASE_URL=postgres://edumi:edumi@db:5432/edumi
       - REDIS_URL=redis://redis:6379/0
-      - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit:7880}
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-devsecret}
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=devsecret
     depends_on:
-      - redis
-      - livekit
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "8000:8000"
+
+  worker:
+    build: .
+    command: celery -A school_project worker -l info
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-docker-secret-key-12345
+      - DATABASE_URL=postgres://edumi:edumi@db:5432/edumi
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  camera_service:
+    build: ./camera_service
+    command: python manage.py runserver 0.0.0.0:8001
+    volumes:
+      - ./camera_service:/app
+    ports:
+      - "8001:8001"
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgres://edumi:edumi@db:5432/edumi
+    depends_on:
+      db:
+        condition: service_healthy
 
   nginx:
     image: nginx:latest
@@ -46,3 +94,8 @@ services:
       - ./media:/app/media
     depends_on:
       - web
+      - camera_service
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -91,6 +91,8 @@
         <div class="player-container">
             <video id="videoPlayer" controls preload="metadata" poster="{% if recording.thumbnail %}{{ recording.thumbnail.url }}{% endif %}">
                 {% if not playlist_url %}
+                <source src="{% url 'stream_video' recording.id %}" type="video/x-matroska">
+                <source src="{% url 'stream_video' recording.id %}" type="video/webm">
                 <source src="{% url 'stream_video' recording.id %}" type="video/mp4">
                 {% endif %}
                 Your browser does not support the video tag.

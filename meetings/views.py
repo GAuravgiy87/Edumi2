@@ -650,18 +650,24 @@ def meeting_attendance(request, meeting_code):
 
         for log in logs_list:
             if log.event_type == 'join':
-                pending_join = log.timestamp
-            elif log.event_type == 'leave' and pending_join:
-                secs = max(0, int((log.timestamp - pending_join).total_seconds()))
-                sessions.append({
-                    'joined': pending_join,
-                    'left': log.timestamp,
-                    'duration_secs': secs,
-                    'duration_fmt': f"{secs // 60}m {secs % 60}s",
-                    'active': False,
-                })
-                accumulated_secs += secs
-                pending_join = None
+                # If there's already a pending join, we treat the time until this new join 
+                # as a session that "ended" when the new one started (approximate)
+                # but better to just keep the first join as the start of the session
+                # and ignore subsequent joins until a leave is found.
+                if pending_join is None:
+                    pending_join = log.timestamp
+            elif log.event_type == 'leave':
+                if pending_join:
+                    secs = max(0, int((log.timestamp - pending_join).total_seconds()))
+                    sessions.append({
+                        'joined': pending_join,
+                        'left': log.timestamp,
+                        'duration_secs': secs,
+                        'duration_fmt': f"{secs // 60}m {secs % 60}s",
+                        'active': False,
+                    })
+                    accumulated_secs += secs
+                    pending_join = None
 
         # Still active — join without a matching leave
         if pending_join:
@@ -729,10 +735,12 @@ def end_meeting(request, meeting_id):
     for p in active_participants:
         # Log the leave event
         MeetingAttendanceLog.objects.create(participant=p, event_type='leave')
+        
         # Accumulate session time
         if p.joined_at:
             session_secs = max(0, int((end_time - p.joined_at).total_seconds()))
             p.total_duration_seconds = (p.total_duration_seconds or 0) + session_secs
+        
         p.is_active = False
         p.left_at = end_time
         p.save(update_fields=['is_active', 'left_at', 'total_duration_seconds'])
@@ -763,6 +771,10 @@ def leave_meeting(request, meeting_id):
     
     try:
         participant = MeetingParticipant.objects.get(meeting=meeting, user=request.user)
+        
+        if not participant.is_active:
+            return JsonResponse({'status': 'success', 'message': 'Already left'})
+
         leave_time = timezone.now()
 
         # --- Log every LEAVE event for detailed attendance tracking ---
@@ -772,7 +784,7 @@ def leave_meeting(request, meeting_id):
         )
 
         # Accumulate session duration into total
-        if participant.joined_at and participant.is_active:
+        if participant.joined_at:
             session_secs = max(0, int((leave_time - participant.joined_at).total_seconds()))
             participant.total_duration_seconds = (participant.total_duration_seconds or 0) + session_secs
 
@@ -978,6 +990,62 @@ def get_banned_users(request, meeting_id):
     } for b in banned if b.is_banned()]
     
     return JsonResponse({'banned': data})
+
+from django.db.models import Sum
+
+@login_required
+def classroom_attendance_history(request):
+    """Day-wise and class-wise list of all meetings held"""
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.user_type != 'teacher':
+        return redirect('dashboard')
+    
+    # Get meetings for classrooms managed by this teacher
+    classrooms = Classroom.objects.filter(teacher=request.user)
+    meetings = Meeting.objects.filter(classroom__in=classrooms).order_by('-scheduled_time')
+    
+    # Group by date
+    from collections import defaultdict
+    history = defaultdict(list)
+    for meeting in meetings:
+        date_str = meeting.scheduled_time.strftime('%Y-%m-%d')
+        history[date_str].append(meeting)
+    
+    context = {
+        'history': dict(history),
+        'classrooms': classrooms,
+    }
+    return render(request, 'meetings/attendance_history.html', context)
+
+@login_required
+def classroom_attendance_detail(request, classroom_id):
+    """Attendance summary for a specific classroom grouped by day"""
+    classroom = get_object_or_404(Classroom, id=classroom_id)
+    if classroom.teacher != request.user and not request.user.is_superuser:
+        return redirect('dashboard')
+    
+    meetings = Meeting.objects.filter(classroom=classroom).order_by('-scheduled_time')
+    
+    # Group meetings by date
+    from collections import defaultdict
+    meetings_by_day = defaultdict(list)
+    for meeting in meetings:
+        day = meeting.scheduled_time.date()
+        meetings_by_day[day].append(meeting)
+    
+    # Convert to sorted list of tuples (date, [meetings])
+    grouped_meetings = []
+    for day in sorted(meetings_by_day.keys(), reverse=True):
+        grouped_meetings.append({
+            'date': day,
+            'meetings': meetings_by_day[day]
+        })
+    
+    context = {
+        'classroom': classroom,
+        'grouped_meetings': grouped_meetings,
+        'page_title': f'Meeting History — {classroom.title}',
+    }
+    return render(request, 'meetings/classroom_attendance_detail.html', context)
 
 @login_required
 @require_http_methods(["POST"])

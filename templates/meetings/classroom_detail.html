@@ -127,10 +127,22 @@
                 </div>
             </div>
             {% if is_teacher %}
-            <a href="{% url 'start_classroom_meeting' classroom.id %}" class="btn-hero-action">
-                <i data-lucide="video"></i>
-                <span>Start Session</span>
-            </a>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <a href="{% url 'classroom_attendance_overview' classroom.id %}"
+                   style="padding: 12px 22px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; border: 1px solid rgba(255,255,255,0.4); display:inline-flex; align-items:center; gap:7px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Attendance
+                </a>
+                <a href="{% url 'classroom_attendance_detail' classroom.id %}"
+                   style="padding: 12px 22px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; border: 1px solid rgba(255,255,255,0.4); display:inline-flex; align-items:center; gap:7px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+                    Meeting Logs
+                </a>
+                <a href="{% url 'start_classroom_meeting' classroom.id %}" class="btn-hero-action">
+                    <i data-lucide="video"></i>
+                    <span>Start Session</span>
+                </a>
+            </div>
             {% endif %}
         </div>
     </div>

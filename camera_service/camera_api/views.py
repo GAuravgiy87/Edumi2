@@ -125,81 +125,71 @@ class CameraStreamer:
         logger.info(f"Stopped streamer for camera {self.camera_id}")
 
     def _connect_camera(self):
-        """Connect to RTSP camera with multiple transport protocols"""
-        # Try different RTSP transport protocols
+        """Connect to RTSP camera with multiple transport protocols and hardware acceleration fallbacks"""
+        # Try different combinations of transport and hardware acceleration
         transport_options = [
             ('tcp', 'rtsp_transport;tcp'),      # TCP - most reliable
             ('udp', 'rtsp_transport;udp'),      # UDP - faster but less reliable
-            ('http', 'rtsp_transport;http'),    # HTTP tunneling
         ]
         
-        for transport_name, transport_opt in transport_options:
-            cap = None  # Initialize cap for this iteration
-            try:
-                logger.info(f"Trying {transport_name.upper()} transport for camera {self.camera_id}")
-                
-                # Set environment variable for this attempt with hardware decoding support
-                # Using d3d11va for RX 550 and increasing buffer for stability
-                # stimeout is in microseconds (4s = 4000000)
-                os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = f'{transport_opt};hwaccel;d3d11va;stimeout;4000000'
-                
-                cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
-                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT)
-                cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT)
-                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1) # Small buffer for lowest latency and freeze prevention
-                cap.set(cv2.CAP_PROP_FPS, 30)
-                
-                if cap.isOpened():
-                    logger.info(f"Connection opened with {transport_name.upper()}, attempting to read frame...")
-                    
-                    # Try to read multiple frames (some cameras need a few frames to start)
-                    for attempt in range(5):
-                        ret, frame = cap.read()
-                        if ret and frame is not None:
-                            self.connection_attempts = 0
-                            logger.info(f"Successfully connected to camera {self.camera_id} via {transport_name.upper()} (attempt {attempt + 1})")
-                            logger.info(f"Frame size: {frame.shape[1]}x{frame.shape[0]}")
-                            return cap
-                        time.sleep(0.2)
-                    
-                    logger.warning(f"{transport_name.upper()}: Opened but could not read frames")
-                    cap.release()
-                else:
-                    logger.warning(f"{transport_name.upper()}: Failed to open connection")
-                    
-            except Exception as e:
-                logger.error(f"{transport_name.upper()} transport error for camera {self.camera_id}: {e}")
-                if cap is not None:
-                    try:
-                        cap.release()
-                    except:
-                        pass
+        # Try with and without hardware acceleration
+        hw_accels = [
+            ('d3d11va', 'hwaccel;d3d11va'),     # Windows DX11
+            ('none', ''),                       # Software decoding
+        ]
         
-        # If all transports fail, try without specific transport (default)
-        cap = None
-        try:
-            logger.info(f"Trying default connection for camera {self.camera_id}")
-            cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT)
-            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT)
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            
-            if cap.isOpened():
-                for attempt in range(5):
-                    ret, frame = cap.read()
-                    if ret and frame is not None:
-                        self.connection_attempts = 0
-                        logger.info(f"Connected to camera {self.camera_id} via default (attempt {attempt + 1})")
-                        return cap
-                    time.sleep(0.2)
-                cap.release()
-        except Exception as e:
-            logger.error(f"Default connection error: {e}")
-            if cap is not None:
+        for hw_name, hw_opt in hw_accels:
+            for transport_name, transport_opt in transport_options:
+                cap = None
                 try:
-                    cap.release()
-                except:
-                    pass
+                    logger.info(f"Attempting {transport_name.upper()} transport with HW {hw_name} for camera {self.camera_id}")
+                    
+                    # Build options string
+                    opts = f'{transport_opt};stimeout;4000000'
+                    if hw_opt:
+                        opts += f';{hw_opt}'
+                    
+                    os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = opts
+                    
+                    cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+                    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT)
+                    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT)
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    
+                    if cap.isOpened():
+                        # Verify we can actually read non-black frames
+                        for attempt in range(5):
+                            ret, frame = cap.read()
+                            if ret and frame is not None:
+                                # Check if frame is entirely black (all zeros)
+                                if np.mean(frame) > 0.1:
+                                    self.connection_attempts = 0
+                                    logger.info(f"Successfully connected! Transport: {transport_name}, HW: {hw_name}")
+                                    return cap
+                                else:
+                                    logger.warning(f"Attempt {attempt+1}: Received black frame, retrying...")
+                            time.sleep(0.3)
+                        
+                        logger.warning(f"Transport {transport_name} with HW {hw_name} produced only black frames")
+                        cap.release()
+                    else:
+                        logger.warning(f"Failed to open {transport_name} with HW {hw_name}")
+                        
+                except Exception as e:
+                    logger.error(f"Error with {transport_name}/HW {hw_name}: {e}")
+                    if cap is not None:
+                        try: cap.release()
+                        except: pass
+        
+        # Final fallback: simplest possible connection
+        try:
+            logger.info(f"Final fallback for camera {self.camera_id}...")
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+            cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+            if cap.isOpened():
+                return cap
+        except:
+            pass
             
         return None
 
@@ -861,3 +851,8 @@ def stop_head_count(request, camera_type, camera_id):
         return JsonResponse({'success': True, 'message': message})
     else:
         return JsonResponse({'error': message}, status=400)
+
+def active_head_count_sessions(request):
+    """Get all active headcount sessions from the manager"""
+    sessions = head_count_manager.get_active_sessions()
+    return JsonResponse({'active_sessions': sessions})

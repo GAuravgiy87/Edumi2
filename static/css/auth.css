@@ -150,7 +150,7 @@ body:has(.auth-split-container) {
     position: absolute;
     width: min(500px, 90vw);
     height: min(350px, 50vh);
-    bottom: clamp(400px, 55vh, 650px);
+    bottom: clamp(100px, 15vh, 200px); /* Shifted down from 400px+ */
     left: 50%;
     transform: translateX(-50%);
     z-index: 5;
@@ -165,7 +165,7 @@ body:has(.auth-split-container) {
     background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
     border-radius: 240px 240px 0 0;
     bottom: 40px;
-    left: 20px;
+    left: 75px; /* Centered: Shifted from 20px */
     box-shadow: 0 10px 30px rgba(255, 107, 53, 0.4);
     z-index: 4;
 }
@@ -178,7 +178,7 @@ body:has(.auth-split-container) {
     background: linear-gradient(135deg, #7C3AED 0%, #6366F1 100%);
     border-radius: clamp(16px, 2vw, 20px);
     bottom: 40px;
-    left: 90px;
+    left: 145px; /* Centered: Shifted from 90px */
     box-shadow: 0 10px 30px rgba(124, 58, 237, 0.4);
     z-index: 2;
 }
@@ -191,7 +191,7 @@ body:has(.auth-split-container) {
     background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
     border-radius: clamp(16px, 2vw, 20px);
     bottom: 40px;
-    left: 190px;
+    left: 245px; /* Centered: Shifted from 190px */
     box-shadow: 0 10px 30px rgba(31, 41, 55, 0.5);
     z-index: 3;
 }
@@ -204,7 +204,7 @@ body:has(.auth-split-container) {
     background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
     border-radius: clamp(30px, 4vw, 50px);
     bottom: 40px;
-    left: 280px;
+    left: 335px; /* Centered: Shifted from 280px */
     box-shadow: 0 10px 30px rgba(251, 191, 36, 0.4);
     z-index: 1;
 }

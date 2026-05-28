@@ -10,8 +10,6 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    gcc \
     libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/lists/*
@@ -19,17 +17,13 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies
 COPY requirements.txt /app/
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install psycopg2-binary django-redis channels-redis dj-database-url
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the current directory contents into the container at /app
 COPY . /app/
 
-# Run collectstatic
-RUN python manage.py collectstatic --noinput
+# Expose port 8001
+EXPOSE 8001
 
-# Expose port 8000
-EXPOSE 8000
-
-# Start the application using daphne
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "school_project.asgi:application"]
+# Start the application
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8001"]

@@ -21,9 +21,6 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 logger = logging.getLogger('cameras')
 
 
-# Tracking logic removed to focus exclusively on accurate headcount and performance
-
-
 class HeadDetector:
     """
     Optimized Head Detection with Frame Skipping & Resolution Control.
@@ -31,117 +28,136 @@ class HeadDetector:
     """
     
     def __init__(self):
-        # Initialize HOG descriptor
+        # Initialize HOG descriptor for person detection
         self.hog = cv2.HOGDescriptor()
         self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
         
-        # Load Haar Cascades
+        # Load Haar Cascades with fallback
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         self.profile_face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_profileface.xml')
         self.upper_body_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_upperbody.xml')
         
+        # Try to load a specialized head cascade if it exists, otherwise use upper body as proxy
+        # Note: We'll rely on upper body and faces as primary head proxies in classroom settings
+        
         # Parameters
-        self.confidence_threshold = 0.35
+        self.confidence_threshold = 0.3
         self.tracking_lock = threading.Lock()
         
-        # Motion detection (DISABLED)
-        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=True)
-        
-        # Performance/Stabilization State
+        # Stabilization State
         self.frame_counter = 0
         self.last_full_detections = []
-        self.head_count_history = deque(maxlen=15)
+        self.head_count_history = deque(maxlen=20) # Increased history for better stability
         self.stable_head_count = 0
 
-    def detect_heads(self, frame, track_movement=False):
-        """Main entry point for detection. Optimized for headcount accuracy."""
+    def detect_heads(self, frame):
+        """
+        Detects heads/people in a frame.
+        Optimized for classroom environments where students are often seated.
+        """
         if frame is None: return 0, [], None, 0.0, {}
         
         orig_h, orig_w = frame.shape[:2]
         
-        # Resize for performance
-        max_p_w = 400
-        scale = 1.0
-        if orig_w > max_p_w:
-            scale = max_p_w / orig_w
-            p_frame = cv2.resize(frame, (max_p_w, int(orig_h * scale)))
-        else:
-            p_frame = frame
+        # 1. Processing Scale: Use a fixed width for consistent detection performance
+        target_w = 640
+        scale = target_w / orig_w
+        p_frame = cv2.resize(frame, (target_w, int(orig_h * scale)))
+        gray = cv2.cvtColor(p_frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray) # Improve contrast for better detection
             
         inv_scale = 1.0 / scale
         annotated_raw = frame.copy()
 
         with self.tracking_lock:
             self.frame_counter += 1
-            # SKIP LOGIC: Run heavy models every 5 frames
-            should_run_heavy = (self.frame_counter % 5 == 0)
+            # Run heavy detection every 4 frames (increased frequency for responsiveness)
+            should_run_heavy = (self.frame_counter % 4 == 0)
             
-            if not should_run_heavy and hasattr(self, 'last_full_detections') and self.last_full_detections:
+            if not should_run_heavy and self.last_full_detections:
                 return self._finalize(self.stable_head_count, self.last_full_detections, 
                                      annotated_raw, inv_scale)
 
-        # START DETECTION
+        # 2. Multi-Model Fusion Detection
         all_detections = []
-        gray = cv2.cvtColor(p_frame, cv2.COLOR_BGR2GRAY)
         
-        # 1. HOG
+        # --- A. HOG Person Detection (Full body/Half body) ---
         try:
-            boxes, weights = self.hog.detectMultiScale(p_frame, winStride=(8,8), padding=(8,8), scale=1.05)
+            boxes, weights = self.hog.detectMultiScale(p_frame, winStride=(8,8), padding=(4,4), scale=1.05)
             for (x, y, w, h), weight in zip(boxes, weights):
                 if weight > self.confidence_threshold:
-                    all_detections.append({'bbox': (x, y, w, h), 'confidence': float(weight), 'type': 'hog_person'})
+                    all_detections.append({'bbox': (x, y, w, h), 'confidence': float(weight), 'type': 'person'})
         except Exception: pass
         
-        # 2. Haar Face (Frontal and Profile)
+        # --- B. Haar Cascades (Face & Upper Body) ---
+        # Face detection is a high-confidence indicator of a head
         try:
-            faces = self.face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(20, 20))
+            # Frontal Faces
+            faces = self.face_cascade.detectMultiScale(gray, 1.1, 4, minSize=(30, 30))
             for box in faces:
-                if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
-                    all_detections.append({'bbox': tuple(box), 'confidence': 0.7, 'type': 'haar_face'})
+                if not any(self._boxes_overlap(box, d['bbox'], 0.5) for d in all_detections):
+                    all_detections.append({'bbox': tuple(box), 'confidence': 0.8, 'type': 'head'})
             
-            profiles = self.profile_face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(20, 20))
+            # Profile Faces (Side view)
+            profiles = self.profile_face_cascade.detectMultiScale(gray, 1.1, 4, minSize=(30, 30))
             for box in profiles:
-                if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
-                    all_detections.append({'bbox': tuple(box), 'confidence': 0.65, 'type': 'profile_face'})
-        except Exception: pass
-        
-        # 3. Upper Body
-        try:
-            bodies = self.upper_body_cascade.detectMultiScale(gray, 1.1, 3, minSize=(30, 30))
+                if not any(self._boxes_overlap(box, d['bbox'], 0.5) for d in all_detections):
+                    all_detections.append({'bbox': tuple(box), 'confidence': 0.7, 'type': 'head'})
+                    
+            # Upper Body (Crucial for seated students)
+            bodies = self.upper_body_cascade.detectMultiScale(gray, 1.1, 3, minSize=(50, 50))
             for box in bodies:
-                if not any(self._boxes_overlap(box, d['bbox']) for d in all_detections):
-                    all_detections.append({'bbox': tuple(box), 'confidence': 0.6, 'type': 'upper_body'})
+                # Upper body box is larger, check if it already contains a face
+                if not any(self._boxes_overlap(box, d['bbox'], 0.3) for d in all_detections):
+                    all_detections.append({'bbox': tuple(box), 'confidence': 0.6, 'type': 'head'})
         except Exception: pass
 
+        # 3. Stabilization & Counting
         with self.tracking_lock:
-            # Stabilize and Cache
+            # We use a moving average of the raw counts to filter out flickering
             current_count = len(all_detections)
             self.head_count_history.append(current_count)
-            self.stable_head_count = int(np.median(list(self.head_count_history))) if self.head_count_history else current_count
+            
+            # Calculate stable count using median (robust to outliers)
+            self.stable_head_count = int(np.median(list(self.head_count_history)))
             self.last_full_detections = all_detections
             
-            return self._finalize(self.stable_head_count, all_detections, annotated_raw, inv_scale)
+            # Calculate average confidence
+            avg_conf = 0.0
+            if all_detections:
+                avg_conf = sum(d['confidence'] for d in all_detections) / len(all_detections)
+            
+            return self._finalize(self.stable_head_count, all_detections, annotated_raw, inv_scale, avg_conf)
 
-    def _finalize(self, count, detections, frame, inv_scale):
-        """Annotate and return frame with professional HUD."""
+    def _finalize(self, count, detections, frame, inv_scale, avg_conf=0.0):
+        """Annotate the frame and return data"""
+        h, w = frame.shape[:2]
         
-        # 1. Semi-Transparent Top Bar for HUD
+        # 1. Draw Detections
+        for d in detections:
+            x, y, bw, bh = [int(v * inv_scale) for v in d['bbox']]
+            # Draw green bounding box
+            color = (0, 255, 0) # Green
+            cv2.rectangle(frame, (x, y), (x + bw, y + bh), color, 2)
+            
+            # Label
+            label = f"{d['type']} {int(d['confidence']*100)}%"
+            cv2.putText(frame, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # 2. Semi-Transparent HUD Bar
         overlay = frame.copy()
-        cv2.rectangle(overlay, (0, 0), (frame.shape[1], 80), (0, 0, 0), -1)
-        # Apply the overlay with 0.4 alpha (60% transparent)
-        cv2.addWeighted(overlay, 0.4, frame, 0.6, 0, frame)
+        cv2.rectangle(overlay, (0, 0), (w, 70), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
         
-        # 2. Status Text
-        status_text = f"Heads: {count}"
-        cv2.putText(frame, status_text, (20, 55), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 0), 3)
+        # 3. HUD Content
+        cv2.putText(frame, f"EDU-MI AI HEADCOUNT: {count}", (20, 45), 
+                    cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 0), 2)
         
-        # 3. Current Time on the right
-        ts = time.strftime("%H:%M:%S")
-        cv2.putText(frame, ts, (frame.shape[1]-150, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 1)
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        cv2.putText(frame, ts, (w - 280, 40), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         
-        # Use high quality HUD without downscaling
-        # Removing the 720p bottleneck to support 4K delivery
-        return count, detections, frame, 0.0, {}
+        return count, detections, frame, avg_conf, {}
 
     def _calculate_iou(self, b1, b2):
         x1, y1, w1, h1 = b1
@@ -149,18 +165,26 @@ class HeadDetector:
         xi1, yi1, xi2, yi2 = max(x1, x2), max(y1, y2), min(x1+w1, x2+w2), min(y1+h1, y2+h2)
         if xi2 <= xi1 or yi2 <= yi1: return 0.0
         inter = (xi2-xi1) * (yi2-yi1)
-        return inter / (w1*h1 + w2*h2 - inter)
+        union = (w1*h1 + w2*h2 - inter)
+        return inter / union if union > 0 else 0.0
 
     def _calculate_inclusion(self, s, l):
+        """Check if box 's' is mostly inside box 'l'"""
         sx, sy, sw, sh = s
         lx, ly, lw, lh = l
         xi1, yi1, xi2, yi2 = max(sx, lx), max(sy, ly), min(sx+sw, lx+lw), min(sy+sh, ly+lh)
         if xi2 <= xi1 or yi2 <= yi1: return 0.0
-        return (xi2-xi1)*(yi2-yi1) / (sw*sh)
+        inter_area = (xi2-xi1)*(yi2-yi1)
+        s_area = sw*sh
+        return inter_area / s_area if s_area > 0 else 0.0
 
-    def _boxes_overlap(self, b1, b2, threshold=0.3):
+    def _boxes_overlap(self, b1, b2, threshold=0.4):
+        """Determines if two bounding boxes are likely detecting the same object"""
         if self._calculate_iou(b1, b2) > threshold: return True
-        return self._calculate_inclusion(b1, b2) > 0.8 or self._calculate_inclusion(b2, b1) > 0.8
+        # Also check if one box is completely inside another (e.g. face inside body)
+        if self._calculate_inclusion(b1, b2) > 0.8 or self._calculate_inclusion(b2, b1) > 0.8:
+            return True
+        return False
 
 
 class HeadCountManager:
@@ -286,100 +310,96 @@ class HeadCountManager:
         return camera_key in self._sessions
     
     def _run_session(self, camera_key, session_data):
-        """Background thread for head counting"""
+        """Background thread to process camera feed for a session"""
         from .models import HeadCountLog, HeadCountSession
         
         session = session_data['session']
+        camera_id = session.camera_id
+        camera_type = session.camera_type
         stream_url = session_data['stream_url']
         interval = session.capture_interval
         
-        # Initialize video capture
-        cap = None
-        reconnect_attempts = 0
-        max_reconnect = 5
+        logger.info(f"Starting background headcount thread for {camera_type} camera {camera_id}")
         
-        while session_data['running']:
+        # Robust connection logic
+        def connect():
+            transport_options = [('tcp', 'rtsp_transport;tcp'), ('udp', 'rtsp_transport;udp')]
+            for t_name, t_opt in transport_options:
+                try:
+                    os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = f'{t_opt};stimeout;4000000'
+                    cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+                    if cap.isOpened():
+                        # Verify we can read a frame
+                        ret, _ = cap.read()
+                        if ret: return cap
+                        cap.release()
+                except: pass
+            return None
+
+        cap = connect()
+        if not cap:
+            logger.error(f"Headcount failed to connect to {camera_type} camera {camera_id}")
             try:
-                # Connect to stream
-                if cap is None or not cap.isOpened():
-                    if reconnect_attempts >= 3: # Reduced from 5 for faster "Stop"
-                        logger.error(f"Camera {camera_key} is OFFLINE. Stopping session.")
-                        # Stop the session properly
-                        self.stop_session(session.camera_type, session.camera_id)
-                        # Mark as errored in DB if possible
+                s = HeadCountSession.objects.get(id=session.id)
+                s.status = 'failed'
+                s.save()
+            except: pass
+            return
+
+        last_log_time = 0
+        
+        try:
+            while session_data.get('running', False):
+                now = time.time()
+                
+                # Check if it's time to log based on the user-defined interval
+                if now - last_log_time >= interval:
+                    try:
+                        ret, frame = cap.read()
+                        if not ret or frame is None:
+                            # Try one quick reconnect
+                            cap.release()
+                            cap = connect()
+                            if not cap: break
+                            ret, frame = cap.read()
+                            if not ret: break
+                        
+                        # Process frame
+                        count, detections, annotated, avg_conf, tracked = self.detector.detect_heads(frame)
+                        
+                        # Update session live stats
                         try:
                             s = HeadCountSession.objects.get(id=session.id)
-                            s.status = 'error'
+                            s.total_captures += 1
+                            if s.total_captures == 1:
+                                s.max_head_count = count
+                                s.min_head_count = count
+                                s.average_head_count = count
+                            else:
+                                s.max_head_count = max(s.max_head_count, count)
+                                s.min_head_count = min(s.min_head_count, count)
+                                s.average_head_count = (
+                                    (s.average_head_count * (s.total_captures - 1) + count) / 
+                                    s.total_captures
+                                )
                             s.save()
-                        except: pass
-                        break
-                    
-                    cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
-                    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
-                    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
-                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                    
-                    if not cap.isOpened():
-                        reconnect_attempts += 1
-                        time.sleep(2) # Faster check
-                        continue
-                    
-                    reconnect_attempts = 0
+                            session = s
+                        except HeadCountSession.DoesNotExist: pass
+                        
+                        # Save log to database
+                        self._save_log(session, count, avg_conf, annotated)
+                        last_log_time = now
+                        
+                    except Exception as e:
+                        logger.error(f"Error in headcount processing loop: {e}")
+                        time.sleep(2)
                 
-                # Read frame
-                ret, frame = cap.read()
+                # Sleep briefly to avoid CPU pegging
+                time.sleep(1.0)
                 
-                if not ret or frame is None:
-                    logger.warning(f"Failed to read frame from {camera_key}")
-                    cap.release()
-                    cap = None
-                    time.sleep(2)
-                    continue
-                
-                # Detect heads
-                head_count, detections, annotated_frame, avg_confidence, tracked_persons = \
-                    self.detector.detect_heads(frame)
-                
-                # Save log entry
-                self._save_log(session, head_count, avg_confidence, annotated_frame)
-                
-                # Update session stats
-                try:
-                    session = HeadCountSession.objects.get(id=session.id)
-                    session.total_captures += 1
-                    
-                    if session.total_captures == 1:
-                        session.max_head_count = head_count
-                        session.min_head_count = head_count
-                        session.average_head_count = head_count
-                    else:
-                        session.max_head_count = max(session.max_head_count, head_count)
-                        session.min_head_count = min(session.min_head_count, head_count)
-                        # Running average
-                        session.average_head_count = (
-                            (session.average_head_count * (session.total_captures - 1) + head_count) 
-                            / session.total_captures
-                        )
-                    session.save()
-                except HeadCountSession.DoesNotExist:
-                    pass
-                
-                # Wait for next interval (checked in small increments for faster shutdown)
-                for _ in range(int(interval * 2)):
-                    if not session_data['running']: break
-                    time.sleep(0.5)
-                
-            except Exception as e:
-                logger.error(f"Error in head count session {camera_key}: {e}")
-                if cap:
-                    cap.release()
-                    cap = None
-                time.sleep(5)
-        
-        # Cleanup
-        if cap:
-            cap.release()
-        logger.info(f"Head count thread ended for {camera_key}")
+        finally:
+            if cap: cap.release()
+            logger.info(f"Background headcount thread for {camera_type} camera {camera_id} stopped")
     
     def _save_log(self, session, head_count, avg_confidence, annotated_frame):
         """Save a head count log entry"""

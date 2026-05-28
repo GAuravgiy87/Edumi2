@@ -69,12 +69,18 @@ CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for development
 ROOT_URLCONF = 'camera_service.urls'
 
 # Use the same database as main project
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': MAIN_PROJECT_DIR / 'db.sqlite3',
+if os.environ.get('DATABASE_URL'):
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': MAIN_PROJECT_DIR / 'db.sqlite3',
+        }
+    }
 
 # Logging
 LOGGING = {
