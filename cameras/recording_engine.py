@@ -509,8 +509,20 @@ recording_engine = RecordingEngine
 
 def cleanup_orphaned_recordings():
     """Find recordings stuck in 'recording' state and mark as failed or recover if file exists"""
-    from .models import CameraRecording
-    orphaned = CameraRecording.objects.filter(recording_status='recording')
+    try:
+        from .models import CameraRecording
+        from django.db import connection
+        
+        # Comprehensive check for table existence
+        all_tables = connection.introspection.table_names()
+        if "cameras_camerarecording" not in all_tables:
+            return
+
+        orphaned = CameraRecording.objects.filter(recording_status='recording')
+    except Exception as e:
+        # Silently fail if DB or table is not ready
+        return
+
     for rec in orphaned:
         # If it's more than 5 minutes old and not in our active instances, it's orphaned
         rec_time = rec.created_at

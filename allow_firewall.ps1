@@ -15,7 +15,9 @@ Write-Host "=== Edumi Firewall Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
 $rules = @(
+    @{ Name="Edumi-Nginx-80";      Port=80;              Proto="TCP"; Desc="Nginx web server" },
     @{ Name="Edumi-Django-8000";   Port=8000;            Proto="TCP"; Desc="Django web server" },
+    @{ Name="Edumi-Camera-8001";   Port=8001;            Proto="TCP"; Desc="Camera service" },
     @{ Name="Edumi-LiveKit-7880";  Port=7880;            Proto="TCP"; Desc="LiveKit HTTP/WS signaling" },
     @{ Name="Edumi-LiveKit-7881";  Port=7881;            Proto="TCP"; Desc="LiveKit RTC TCP" },
     @{ Name="Edumi-LiveKit-7882";  Port=7882;            Proto="UDP"; Desc="LiveKit RTC UDP" },

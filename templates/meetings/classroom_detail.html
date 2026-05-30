@@ -213,7 +213,12 @@
                         {% if meeting.status == 'live' %}
                         <a href="{% url 'join_meeting' meeting.meeting_code %}" class="btn-sm" style="background: #ef4444; color: white; padding: 0.5rem 1rem;">Enter Room</a>
                         {% elif meeting.status == 'ended' %}
-                        <a href="{% url 'meeting_summary' meeting.meeting_code %}" class="btn-sm" style="background: #4f46e5; color: white; padding: 0.5rem 1rem;">View Summary</a>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <a href="{% url 'meeting_summary' meeting.meeting_code %}" class="btn-sm" style="background: #4f46e5; color: white; padding: 0.5rem 1rem;">Summary</a>
+                            {% if is_teacher %}
+                            <a href="{% url 'meeting_attendance' meeting.meeting_code %}" class="btn-sm" style="background: #10b981; color: white; padding: 0.5rem 1rem;">Attendance</a>
+                            {% endif %}
+                        </div>
                         {% endif %}
                     </div>
                 </div>

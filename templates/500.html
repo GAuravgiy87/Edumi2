@@ -4,17 +4,159 @@
 {% block page_title %}500 - Server Error{% endblock %}
 
 {% block content %}
-<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; text-align: center; padding: 20px;">
-    <div style="font-size: 120px; font-weight: 800; color: var(--danger); line-height: 1; margin-bottom: 20px; opacity: 0.2;">500</div>
-    <div style="background: white; padding: 40px; border-radius: 20px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-width: 500px; width: 100%; position: relative; margin-top: -60px;">
-        <div style="width: 80px; height: 80px; background: #fff7ed; color: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+<style>
+    .error-container {
+        min-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background: radial-gradient(circle at center, rgba(239, 68, 68, 0.05) 0%, transparent 70%);
+    }
+
+    .error-code {
+        font-size: clamp(8rem, 20vw, 15rem);
+        font-weight: 900;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1;
+        margin-bottom: -2rem;
+        opacity: 0.15;
+        user-select: none;
+    }
+
+    .error-card {
+        background: white;
+        border-radius: 2rem;
+        padding: 3rem 2rem;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+        border: 1px solid #f1f5f9;
+        max-width: 550px;
+        width: 100%;
+        text-align: center;
+        position: relative;
+        z-index: 10;
+        backdrop-filter: blur(10px);
+    }
+
+    .error-icon {
+        width: 100px;
+        height: 100px;
+        background: #fff5f5;
+        border-radius: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 2rem;
+        transform: rotate(5deg);
+        transition: transform 0.3s ease;
+    }
+
+    .error-card:hover .error-icon {
+        transform: rotate(0deg) scale(1.05);
+    }
+
+    .error-icon svg {
+        width: 48px;
+        height: 48px;
+        color: #ef4444;
+    }
+
+    .error-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 1rem;
+    }
+
+    .error-message {
+        color: #64748b;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2.5rem;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .btn-error {
+        padding: 0.875rem 2rem;
+        border-radius: 1rem;
+        font-weight: 700;
+        font-size: 1rem;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .btn-refresh {
+        background: #ef4444;
+        color: white;
+        box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3);
+        border: none;
+    }
+
+    .btn-refresh:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+        box-shadow: 0 20px 25px -5px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-home {
+        background: white;
+        color: #1e293b;
+        border: 2px solid #e2e8f0;
+    }
+
+    .btn-home:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        transform: translateY(-2px);
+    }
+
+    @media (max-width: 640px) {
+        .error-card {
+            padding: 2rem 1.5rem;
+        }
+        .error-title {
+            font-size: 1.5rem;
+        }
+        .error-message {
+            font-size: 1rem;
+        }
+    }
+</style>
+
+<div class="error-container">
+    <div class="error-code">500</div>
+    <div class="error-card">
+        <div class="error-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
         </div>
-        <h1 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin-bottom: 10px;">Internal Server Error</h1>
-        <p style="color: var(--text-muted); margin-bottom: 30px; font-size: 15px;">We're experiencing some technical difficulties on our end. Please try refreshing the page or contact support if the issue persists.</p>
-        <div style="display: flex; gap: 15px; justify-content: center;">
-            <button onclick="location.reload()" class="btn-primary" style="padding: 12px 25px;">Refresh Page</button>
-            <a href="{% url 'home' %}" class="btn-secondary" style="padding: 12px 25px; background: var(--gray-100); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; font-weight: 600; text-decoration: none;">Back to Home</a>
+        <h1 class="error-title">System Error</h1>
+        <p class="error-message">
+            We're experiencing some technical difficulties on our end. Our team has been notified and we're working to fix it. Please try refreshing the page.
+        </p>
+        <div class="error-actions">
+            <button onclick="location.reload()" class="btn-error btn-refresh">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                Refresh Page
+            </button>
+            <a href="{% url 'home' %}" class="btn-error btn-home">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Return Home
+            </a>
         </div>
     </div>
 </div>

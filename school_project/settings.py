@@ -40,28 +40,44 @@ load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-@j!l-9t=qs!b&lkynb=zq$-h3f9d(_nm!hvctk$9ij()0kaja%')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split(',')
+# Allow any host in production/docker to make IP-based access easier
+ALLOWED_HOSTS = ['*']
 
-# Disable SSL redirect for development (enable in production)
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost',
-    'http://localhost:8000',
-    'http://127.0.0.1',
-    'http://127.0.0.1:8000',
-]
+# Security Settings for Production
 if not DEBUG:
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = False # Set to True only if you have SSL/HTTPS configured
+    SESSION_COOKIE_SECURE = False # Set to True only if using HTTPS
+    CSRF_COOKIE_SECURE = False # Set to True only if using HTTPS
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = 0 # Only enable if using HTTPS
+    X_FRAME_OPTIONS = 'SAMEORIGIN' # Changed from DENY to allow some camera features if needed
 else:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
     SECURE_HSTS_SECONDS = 0
+    X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# Read CSRF trusted origins from environment variable
+CSRF_TRUSTED_ORIGINS = []
+csrf_origins_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if csrf_origins_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
+
+# Always add these defaults for local development
+DEFAULT_CSRF_ORIGINS = [
+    'http://localhost',
+    'http://127.0.0.1',
+]
+for origin in DEFAULT_CSRF_ORIGINS:
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
+# For extra flexibility, allow wildcard host
+CSRF_ALLOW_WILDCARD_HOST = True
 
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -90,6 +106,15 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+]
+
+try:
+    import whitenoise
+    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
+except ImportError:
+    pass
+
+MIDDLEWARE.extend([
     'school_project.middleware.DatabaseErrorMiddleware',  # Handle database locked errors
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -98,7 +123,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_browser_reload.middleware.BrowserReloadMiddleware',
-]
+])
 
 ROOT_URLCONF = 'school_project.urls'
 
@@ -150,10 +175,22 @@ else:
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 if os.environ.get('DATABASE_URL'):
-    import dj_database_url
-    DATABASES = {
-        'default': dj_database_url.config(conn_max_age=600)
-    }
+    try:
+        import dj_database_url
+        DATABASES = {
+            'default': dj_database_url.config(conn_max_age=600)
+        }
+    except ImportError:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+                'OPTIONS': {
+                    'timeout': 30,  # Wait up to 30 seconds for database lock
+                    'check_same_thread': False,  # Allow multi-threaded access
+                },
+            }
+        }
 else:
     DATABASES = {
         'default': {
@@ -199,11 +236,9 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
@@ -211,7 +246,13 @@ STATICFILES_FINDERS = [
     'compressor.finders.CompressorFinder',
 ]
 
-COMPRESS_ENABLED = False
+# Use WhiteNoise to serve static files with compression and caching
+try:
+    import whitenoise
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+except ImportError:
+    pass
+COMPRESS_ENABLED = True
 COMPRESS_URL = '/static/'
 COMPRESS_STORAGE = 'compressor.storage.CompressorFileStorage'
 COMPRESS_ROOT = STATIC_ROOT
@@ -275,6 +316,8 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # LiveKit Settings
 LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:8000/livekit-proxy')
+LIVEKIT_INTERNAL_URL = os.environ.get('LIVEKIT_INTERNAL_URL', 'ws://localhost:7880')
+LIVEKIT_INTERNAL_HTTP_URL = os.environ.get('LIVEKIT_INTERNAL_HTTP_URL', 'http://localhost:7880')
 LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey')
 LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_characters_long_1234')
 

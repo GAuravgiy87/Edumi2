@@ -1,0 +1,8 @@
+**/__pycache__/
+*.py[cod]
+.env
+venv/
+env/
+.vscode/
+.git/
+camera_db.sqlite3

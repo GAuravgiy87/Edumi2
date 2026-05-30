@@ -4,6 +4,7 @@ HTTP proxy for LiveKit REST endpoints (e.g. /rtc/validate)
 The LiveKit JS SDK makes HTTP GET requests to validate tokens before connecting.
 This view proxies those requests to the local LiveKit server.
 """
+from django.conf import settings
 import requests
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -11,7 +12,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-LIVEKIT_INTERNAL = "http://localhost:7880"
+LIVEKIT_INTERNAL = getattr(settings, 'LIVEKIT_INTERNAL_HTTP_URL', "http://localhost:7880")
 
 
 @csrf_exempt

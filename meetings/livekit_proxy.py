@@ -13,7 +13,7 @@ from .models import Meeting
 
 logger = logging.getLogger(__name__)
 
-LIVEKIT_INTERNAL = "ws://localhost:7880"
+LIVEKIT_INTERNAL = getattr(settings, 'LIVEKIT_INTERNAL_URL', "ws://localhost:7880")
 
 
 class LiveKitProxyConsumer(AsyncWebsocketConsumer):
