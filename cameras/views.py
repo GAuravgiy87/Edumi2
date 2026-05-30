@@ -1,1381 +1,241 @@
-import threading
-import time
-import logging
-from typing import Optional
-from urllib.parse import urlparse
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
+
 from django.contrib.auth.decorators import login_required
-from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
-from django.contrib.auth.models import User
-from django.db.models import Avg, Max, Min, Count, Q
-from django.utils import timezone
-from datetime import datetime, timedelta
-from .models import Camera, CameraPermission, HeadCountLog, HeadCountSession, CameraRecording
-from .recording_engine import recording_engine
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from mobile_cameras.models import MobileCamera, MobileCameraPermission
-from .head_count_service import head_count_manager
-import os
-import re
-import logging
+from .views_logic import (
+    get_video_stream,
+    is_admin,
+    can_view_camera,
+    test_rtsp_paths,
+    broadcast_live_status,
+    stream_video as stream_video_impl,
+    upload_video as upload_video_impl,
+    mobile_mic as mobile_mic_impl,
+    recordings_folder as recordings_folder_impl,
+    manage_recordings as manage_recordings_impl,
+    toggle_recording_publish as toggle_recording_publish_impl,
+    admin_content_manager as admin_content_manager_impl,
+    delete_recording_admin as delete_recording_admin_impl,
+    delete_meeting_admin as delete_meeting_admin_impl,
+    admin_dashboard as admin_dashboard_impl,
+    add_camera as add_camera_impl,
+    edit_camera as edit_camera_impl,
+    delete_camera as delete_camera_impl,
+    camera_feed as camera_feed_impl,
+    test_camera as test_camera_impl,
+    live_monitor as live_monitor_impl,
+    test_feed_page as test_feed_page_impl,
+    teacher_camera_dashboard as teacher_camera_dashboard_impl,
+    teacher_control_room as teacher_control_room_impl,
+    update_zoom as update_zoom_impl,
+    start_streaming as start_streaming_impl,
+    stop_streaming as stop_streaming_impl,
+    live_participants as live_participants_impl,
+    student_lecture_list as student_lecture_list_impl,
+    watch_live as watch_live_impl,
+    watch_recording as watch_recording_impl,
+    stream_recording_chunk as stream_recording_chunk_impl,
+    recording_playlist as recording_playlist_impl,
+    teacher_profile as teacher_profile_impl,
+    start_camera_recording as start_camera_recording_impl,
+    stop_camera_recording as stop_camera_recording_impl,
+    publish_recording as publish_recording_impl,
+    grant_permission as grant_permission_impl,
+    revoke_permission as revoke_permission_impl,
+    manage_permissions as manage_permissions_impl,
+    head_count_dashboard as head_count_dashboard_impl,
+    start_head_count as start_head_count_impl,
+    stop_head_count as stop_head_count_impl,
+    head_count_logs as head_count_logs_impl,
+    head_count_log_detail as head_count_log_detail_impl,
+    head_count_session_history as head_count_session_history_impl,
+    head_count_api as head_count_api_impl,
+    head_count_report as head_count_report_impl,
+    export_head_count_csv as export_head_count_csv_impl,
+)
 
-logger = logging.getLogger('cameras')
 
-def get_video_stream(file_path, start, end):
-    """Generator to stream video in chunks with support for Range requests"""
-    chunk_size = 1024 * 1024 # 1MB chunks for responsiveness
-    
-    with open(file_path, 'rb') as f:
-        f.seek(start)
-        remaining = end - start + 1
-        while remaining > 0:
-            read_size = min(chunk_size, remaining)
-            data = f.read(read_size)
-            if not data:
-                break
-            yield data
-            remaining -= read_size
-
+# Video views
 @login_required
 def stream_video(request, recording_id):
-    """View to serve video files in chunks (YouTube style) - Optimized for 4hr+ videos"""
-    recording = get_object_or_404(CameraRecording, id=recording_id)
-    
-    # Check permissions
-    if not (request.user.is_superuser or 
-            recording.teacher == request.user or 
-            (recording.is_published and hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'student')):
-        return HttpResponse("Unauthorized", status=403)
-        
-    file_path = recording.video_file.path
-    if not os.path.exists(file_path):
-        return HttpResponse("Video file not found", status=404)
-        
-    size = os.path.getsize(file_path)
-    range_header = request.META.get('HTTP_RANGE', None)
-    
-    content_type = 'video/mp4'
-    if file_path.endswith('.mkv'):
-        content_type = 'video/x-matroska'
-    elif file_path.endswith('.webm'):
-        content_type = 'video/webm'
-        
-    if range_header:
-        # Standard Range request parsing
-        match = re.match(r'bytes=(\d+)-(\d*)', range_header)
-        if match:
-            start = int(match.group(1))
-            end = int(match.group(2)) if match.group(2) else size - 1
-            
-            # Ensure boundaries
-            start = max(0, min(start, size - 1))
-            end = max(start, min(end, size - 1))
-            
-            content_length = end - start + 1
-            
-            response = StreamingHttpResponse(
-                get_video_stream(file_path, start, end),
-                status=206,
-                content_type=content_type
-            )
-            response['Content-Range'] = f'bytes {start}-{end}/{size}'
-            response['Accept-Ranges'] = 'bytes'
-            response['Content-Length'] = str(content_length)
-            return response
-            
-    # Default to full file streaming if no range or invalid range
-    response = StreamingHttpResponse(get_video_stream(file_path, 0, size - 1), content_type=content_type)
-    response['Accept-Ranges'] = 'bytes'
-    response['Content-Length'] = str(size)
-    return response
+    return stream_video_impl(request, recording_id)
 
 @login_required
 def upload_video(request):
-    """View for teachers to upload video lectures"""
-    if not (request.user.is_superuser or (hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher')):
-        return redirect('dashboard')
-        
-    if request.method == 'POST':
-        title = request.POST.get('title')
-        description = request.POST.get('description')
-        video_file = request.FILES.get('video_file')
-        camera_id = request.POST.get('camera')
-        
-        if not video_file:
-            return render(request, 'cameras/upload_video.html', {'error': 'Please select a video file.'})
-            
-        camera = None
-        if camera_id:
-            camera = Camera.objects.filter(id=camera_id).first()
-            
-        recording = CameraRecording.objects.create(
-            teacher=request.user,
-            camera=camera,
-            title=title,
-            description=description,
-            video_file=video_file,
-            recording_status='completed',
-            is_published=False # Teacher must manually publish
-        )
-        
-        return redirect('manage_recordings')
-        
-    cameras = Camera.objects.all() if request.user.is_superuser else Camera.objects.filter(camerapermission__teacher=request.user)
-    return render(request, 'cameras/upload_video.html', {'cameras': cameras})
+    return upload_video_impl(request)
 
 @login_required
 def mobile_mic(request, camera_id):
-    """Dedicated page for using a mobile phone as a wireless microphone"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    return render(request, 'cameras/mobile_mic.html', {
-        'camera': camera,
-        'user': request.user
-    })
+    return mobile_mic_impl(request, camera_id)
 
 @login_required
 def recordings_folder(request):
-    """View to show recordings organized in a folder-like structure with date subfolders"""
-    from django.utils.text import slugify
-    
-    if request.user.is_superuser:
-        # Only show recordings that actually have a file
-        recordings = CameraRecording.objects.exclude(video_file='').order_by('-created_at')
-    else:
-        recordings = CameraRecording.objects.filter(teacher=request.user).exclude(video_file='').order_by('-created_at')
-    
-    # Group by camera, then by date
-    from collections import defaultdict
-    folders = defaultdict(lambda: defaultdict(list))
-    
-    for rec in recordings:
-        camera_name = rec.camera.name if rec.camera else "Uploaded Videos"
-        date_str = rec.created_at.strftime('%Y-%m-%d')
-        folders[camera_name][date_str].append(rec)
-    
-    # Convert to a regular dict with slugified IDs for the template
-    processed_folders = []
-    for cam_name, dates in folders.items():
-        processed_folders.append({
-            'name': cam_name,
-            'id': slugify(cam_name),
-            'dates': dict(dates),
-            'count': sum(len(v) for v in dates.values())
-        })
-    
-    context = {
-        'folders': processed_folders,
-        'total_count': recordings.count(),
-    }
-    return render(request, 'cameras/recordings_folder.html', context)
+    return recordings_folder_impl(request)
 
 @login_required
 def manage_recordings(request):
-    """View for teachers to manage their recordings and uploads"""
-    if not (request.user.is_superuser or (hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher')):
-        return redirect('dashboard')
-        
-    recordings = CameraRecording.objects.filter(teacher=request.user).order_by('-created_at')
-    return render(request, 'cameras/manage_recordings.html', {'recordings': recordings})
+    return manage_recordings_impl(request)
 
 @login_required
 def toggle_recording_publish(request, recording_id):
-    """Toggle the published status of a recording"""
-    recording = get_object_or_404(CameraRecording, id=recording_id)
-    
-    if not (request.user.is_superuser or recording.teacher == request.user):
-        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
-        
-    recording.is_published = not recording.is_published
-    recording.save()
-    
-    return JsonResponse({
-        'status': 'success', 
-        'is_published': recording.is_published,
-        'message': f'Recording {"published" if recording.is_published else "hidden"}'
-    })
-
-@login_required
-def admin_content_manager(request):
-    """Admin view to manage all videos and meetings"""
-    if not request.user.is_superuser:
-        return redirect('dashboard')
-        
-    from meetings.models import Meeting
-    
-    # Get all recordings
-    recordings = CameraRecording.objects.all().select_related('teacher', 'camera').order_by('-created_at')
-    
-    # Get all meetings
-    meetings = Meeting.objects.all().select_related('teacher', 'classroom').order_by('-scheduled_time')
-    
-    return render(request, 'cameras/admin_content_manager.html', {
-        'recordings': recordings,
-        'meetings': meetings
-    })
-
-@login_required
-def delete_recording_admin(request, recording_id):
-    """Admin deletes a recording"""
-    if not request.user.is_superuser:
-        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
-        
-    recording = get_object_or_404(CameraRecording, id=recording_id)
-    
-    # Delete file from storage
-    if recording.video_file and os.path.exists(recording.video_file.path):
-        os.remove(recording.video_file.path)
-    if recording.thumbnail and os.path.exists(recording.thumbnail.path):
-        os.remove(recording.thumbnail.path)
-        
-    recording.delete()
-    return JsonResponse({'status': 'success', 'message': 'Recording deleted successfully'})
-
-@login_required
-def delete_meeting_admin(request, meeting_id):
-    """Admin deletes a meeting"""
-    if not request.user.is_superuser:
-        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
-        
-    from meetings.models import Meeting
-    meeting = get_object_or_404(Meeting, id=meeting_id)
-    meeting.delete()
-    return JsonResponse({'status': 'success', 'message': 'Meeting deleted successfully'})
-
-def is_admin(user):
-    """Check if user is admin"""
-    if user.is_authenticated:
-        if user.is_superuser:
-            return True
-    return False
-
-
-def can_view_camera(user, camera):
-    """Check if user can view a camera"""
-    if is_admin(user):
-        return True
-    
-    # If the camera is live, any authenticated user can view it (for student lectures)
-    if camera.is_live:
-        return True
-        
-    # If not live, teachers can only view cameras they have explicit permission for (control room access)
-    if hasattr(user, 'userprofile') and user.userprofile.user_type == 'teacher':
-        return camera.has_permission(user)
-    
-    # Students can ONLY view live cameras
-    if hasattr(user, 'userprofile') and user.userprofile.user_type == 'student':
-        return camera.is_live and camera.is_active
-        
-    return False
-
-
-def test_rtsp_paths(ip, port, username, password):
-    """Test common RTSP paths to find the working one"""
-    import cv2
-    common_paths = [
-        '/live',
-        '/stream',
-        '/h264',
-        '/video',
-        '/cam/realmonitor',
-        '/Streaming/Channels/101',
-        '/1',
-        '/11',
-        '/av0_0',
-        '/mpeg4',
-        '/media/video1',
-        '/onvif1',
-        '/ch0',
-        '/ch01.264',
-        '/',
-    ]
-    
-    from urllib.parse import quote
-    for path in common_paths:
-        if username and password:
-            safe_user = quote(username)
-            safe_pass = quote(password)
-            rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip}:{port}{path}"
-        else:
-            rtsp_url = f"rtsp://{ip}:{port}{path}"
-        
-        try:
-            cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
-            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
-            
-            if cap.isOpened():
-                ret, frame = cap.read()
-                cap.release()
-                
-                if ret and frame is not None:
-                    return path, rtsp_url
-            else:
-                cap.release()
-        except Exception as e:
-            continue
-    
-    return None, None
-
-
-@login_required
-def admin_dashboard(request):
-    if not is_admin(request.user):
-        return redirect('login')
-    
-    cameras = Camera.objects.all().order_by('-created_at')
-    teachers = User.objects.filter(userprofile__user_type='teacher')
-    
-    context = {
-        'cameras': cameras,
-        'teachers': teachers,
-    }
-    return render(request, 'cameras/admin_dashboard.html', context)
-
-@login_required
-def add_camera(request):
-    if not is_admin(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-    
-    if request.method == 'POST':
-        name = request.POST.get('name')
-        camera_type = request.POST.get('camera_type')
-        ip_address = request.POST.get('ip_address')
-        port = int(request.POST.get('port', 554))
-        username = request.POST.get('username', '')
-        password = request.POST.get('password', '')
-        
-        if camera_type == 'rtsp':
-            # Auto-detect path
-            detected_path, _ = test_rtsp_paths(ip_address, port, username, password)
-            stream_path = detected_path if detected_path else '/stream'
-            is_active = True if detected_path else False
-        else:
-            # Mobile cameras have fixed paths
-            stream_path = '/video' if camera_type == 'ip_webcam' else '/mjpegfeed'
-            is_active = True
-            
-        camera = Camera.objects.create(
-            name=name,
-            camera_type=camera_type,
-            ip_address=ip_address,
-            port=port,
-            username=username,
-            password=password,
-            stream_path=stream_path,
-            is_active=is_active
-        )
-        
-        return JsonResponse({
-            'status': 'success', 
-            'message': 'Camera added successfully',
-            'is_active': is_active
-        })
-    
-    return redirect('admin_dashboard')
-
-@login_required
-def edit_camera(request, camera_id):
-    if not is_admin(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-    
-    camera = get_object_or_404(Camera, id=camera_id)
-    
-    if request.method == 'POST':
-        # Check if we are updating camera details or just permissions
-        # If 'name' is in POST, we are updating details
-        if 'name' in request.POST:
-            camera.name = request.POST.get('name')
-            camera.camera_type = request.POST.get('camera_type')
-            camera.ip_address = request.POST.get('ip_address')
-            port_val = request.POST.get('port')
-            if port_val:
-                camera.port = int(port_val)
-            camera.username = request.POST.get('username', '')
-            camera.password = request.POST.get('password', '')
-            
-            # If RTSP and details changed, re-detect path
-            if camera.camera_type == 'rtsp':
-                detected_path, _ = test_rtsp_paths(camera.ip_address, camera.port, camera.username, camera.password)
-                if detected_path:
-                    camera.stream_path = detected_path
-                    camera.is_active = True
-            
-            camera.save()
-        
-        # Always handle teacher assignments if 'teachers' is in POST or if it's the assignment form
-        # The assignment form has a hidden input 'camera_id' and a list of 'teachers'
-        if 'teachers' in request.POST or ('name' not in request.POST and 'camera_id' in request.POST):
-            teacher_ids = request.POST.getlist('teachers')
-            logger.info(f"Updating permissions for camera {camera_id}. Teachers: {teacher_ids}")
-            # Clear old permissions
-            CameraPermission.objects.filter(camera=camera).delete()
-            # Add new permissions
-            for t_id in teacher_ids:
-                try:
-                    teacher = User.objects.get(id=t_id)
-                    CameraPermission.objects.create(camera=camera, teacher=teacher, granted_by=request.user)
-                    logger.info(f"Granted permission to teacher {teacher.username} for camera {camera.name}")
-                except User.DoesNotExist:
-                    logger.warning(f"Teacher with ID {t_id} does not exist")
-                    continue
-                except Exception as e:
-                    logger.error(f"Error granting permission: {e}")
-                    continue
-                    
-        return JsonResponse({'status': 'success', 'message': 'Camera updated successfully'})
-    
-    # Return camera data for modal
-    assigned_teachers = list(camera.get_authorized_teachers().values_list('id', flat=True))
-    return JsonResponse({
-        'id': camera.id,
-        'name': camera.name,
-        'camera_type': camera.camera_type,
-        'ip_address': camera.ip_address,
-        'port': camera.port,
-        'username': camera.username,
-        'password': camera.password,
-        'assigned_teachers': assigned_teachers
-    })
-
-
-@login_required
-def delete_camera(request, camera_id):
-    if not is_admin(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-    
-    if request.method == 'POST':
-        camera = get_object_or_404(Camera, id=camera_id)
-        try:
-            camera.delete()
-            return JsonResponse({'status': 'success'})
-        except Exception as e:
-            logger.error(f"Error deleting camera {camera_id}: {e}")
-            # Fallback for SQLite ghost constraints
-            from django.db import connection
-            try:
-                with connection.cursor() as cursor:
-                    cursor.execute('PRAGMA foreign_keys = OFF;')
-                    camera.delete()
-                    cursor.execute('PRAGMA foreign_keys = ON;')
-                return JsonResponse({'status': 'success'})
-            except Exception as e2:
-                return JsonResponse({'status': 'error', 'message': str(e2)}, status=500)
-    return redirect('admin_dashboard')
-
-
-@login_required
-def camera_feed(request, camera_id):
-    """
-    Gateway to the dedicated Camera Service.
-    Checks permissions before redirecting to the streaming microservice.
-    """
-    camera = get_object_or_404(Camera, id=camera_id)
-    
-    # Check permission
-    if not can_view_camera(request.user, camera):
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
-    # Redirect to dedicated camera service (port 8001)
-    # We pass the same quality parameter if present
-    quality = request.GET.get('q', 'med')
-    camera_service_url = f"http://{request.get_host().split(':')[0]}:8001/cameras/{camera_id}/feed/?q={quality}"
-    
-    return redirect(camera_service_url)
-
-@login_required
-def test_camera(request, camera_id):
-    """Redirect camera testing to the dedicated service"""
-    if not is_admin(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-    
-    camera = get_object_or_404(Camera, id=camera_id)
-    camera_service_url = f"http://{request.get_host().split(':')[0]}:8001/cameras/{camera_id}/test/"
-    
-    return redirect(camera_service_url)
-
-@login_required
-def live_monitor(request):
-    """View to see all live camera feeds in a grid"""
-    if not request.user.is_authenticated:
-        return redirect('login')
-    
-    # Filter RTSP cameras based on user permissions
-    if is_admin(request.user):
-        cameras = Camera.objects.all()
-        mobile_cameras = MobileCamera.objects.all()
-    elif hasattr(request.user, 'userprofile'):
-        if request.user.userprofile.user_type == 'teacher':
-            # Teachers see all cameras they have permission for, even if offline
-            camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
-            cameras = Camera.objects.filter(id__in=camera_ids)
-            
-            mobile_camera_ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
-            mobile_cameras = MobileCamera.objects.filter(id__in=mobile_camera_ids)
-        elif request.user.userprofile.user_type == 'student':
-            # Students see all active cameras
-            cameras = Camera.objects.filter(is_active=True)
-            mobile_cameras = MobileCamera.objects.filter(is_active=True)
-        else:
-            cameras = Camera.objects.none()
-            mobile_cameras = MobileCamera.objects.none()
-    else:
-        cameras = Camera.objects.none()
-        mobile_cameras = MobileCamera.objects.none()
-    
-    # Check if camera service is running
-    import requests
-    camera_service_running = False
-    try:
-        response = requests.get('http://localhost:8001/cameras/', timeout=2)
-        camera_service_running = response.status_code == 200
-    except:
-        pass
-    
-    context = {
-        'cameras': cameras,
-        'mobile_cameras': mobile_cameras,
-        'camera_service_running': camera_service_running,
-    }
-    return render(request, 'cameras/live_monitor.html', context)
-
-def broadcast_live_status(camera, status):
-    """Helper to broadcast live status changes to all connected users"""
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "public_notifications",
-        {
-            "type": "send_notification",
-            "data": {
-                "type": "live_status_change",
-                "camera_id": camera.id,
-                "camera_name": camera.name,
-                "teacher_name": camera.live_teacher.username if camera.live_teacher else "",
-                "status": status, # 'started' or 'stopped'
-            }
-        }
-    )
-
-@login_required
-def teacher_camera_dashboard(request):
-    """Dashboard for teachers to see assigned cameras (RTSP and Mobile)"""
-    if not hasattr(request.user, 'userprofile') or request.user.userprofile.user_type != 'teacher':
-        return redirect('dashboard')
-        
-    # Get RTSP cameras
-    camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
-    rtsp_cameras = list(Camera.objects.filter(id__in=camera_ids))
-    for cam in rtsp_cameras:
-        cam.is_mobile = False
-        
-    # Get Mobile cameras
-    mobile_camera_ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
-    mobile_cameras = list(MobileCamera.objects.filter(id__in=mobile_camera_ids))
-    for cam in mobile_cameras:
-        cam.is_mobile = True
-        
-    # Combine lists
-    all_cameras = rtsp_cameras + mobile_cameras
-    
-    # Get recent recordings by this teacher
-    recent_recordings = CameraRecording.objects.filter(teacher=request.user).order_by('-created_at')[:5]
-    
-    return render(request, 'cameras/teacher_dashboard.html', {
-        'cameras': all_cameras,
-        'recent_recordings': recent_recordings
-    })
-
-@login_required
-def teacher_control_room(request, camera_id):
-    """Teacher control room for live streaming and recording"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    
-    # Check permission
-    if not camera.has_permission(request.user):
-        return redirect('dashboard')
-    
-    # We NO LONGER mark camera as live here.
-    # It will be marked live only when the teacher explicitly clicks "Start Live Stream"
-        
-    # Get linked meeting if any (camera can be linked to a meeting for student tracking)
-    linked_meeting = None
-    student_count = 0
-    active_participants = []
-    if camera.livekit_room:
-        try:
-            from meetings.models import Meeting, MeetingParticipant
-            linked_meeting = Meeting.objects.filter(meeting_code=camera.livekit_room).first()
-            if linked_meeting:
-                student_count = MeetingParticipant.objects.filter(meeting=linked_meeting, is_active=True).count()
-                active_participants = list(linked_meeting.participants.filter(is_active=True).values_list('user__username', flat=True)[:10])
-        except Exception:
-            pass
-
-    # Check if recording is in progress
-    is_recording, recording_start_time = recording_engine.is_recording(camera.id, request.user.id)
-        
-    context = {
-        'camera': camera,
-        'qualities': ['360p', '480p', '720p', '1080p', '4K'],
-        'default_quality': '1080p',
-        'linked_meeting': linked_meeting,
-        'student_count': student_count,
-        'active_participants': active_participants,
-        'is_live': camera.is_live,
-        'is_recording': is_recording,
-        'recording_start_time': recording_start_time.isoformat() if recording_start_time else None,
-    }
-    return render(request, 'cameras/teacher_control_room.html', context)
-
-@login_required
-def update_zoom(request, camera_id):
-    """Proxy view to update camera zoom in the microservice"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    if not camera.has_permission(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
-    
-    zoom_level = request.GET.get('level', 1.0)
-    x = request.GET.get('x', '')
-    y = request.GET.get('y', '')
-    
-    import requests
-    try:
-        # Forward request to camera microservice
-        url = f'http://localhost:8001/cameras/{camera_id}/zoom/?level={zoom_level}'
-        if x: url += f'&x={x}'
-        if y: url += f'&y={y}'
-        
-        response = requests.get(url, timeout=5)
-        return JsonResponse(response.json())
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-@login_required
-def start_streaming(request, camera_id):
-    """Teacher starts the live stream explicitly"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    if not camera.has_permission(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-    
-    camera.is_live = True
-    camera.live_teacher = request.user
-    camera.save()
-    
-    # Broadcast status change
-    broadcast_live_status(camera, 'started')
-    
-    return JsonResponse({'status': 'success', 'message': 'Live stream started'})
-
-@login_required
-def stop_streaming(request, camera_id):
-    """Teacher stops the live stream"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    if camera.live_teacher == request.user:
-        camera.is_live = False
-        camera.live_teacher = None
-        camera.save()
-        
-        # Broadcast status change
-        broadcast_live_status(camera, 'stopped')
-        
-        return JsonResponse({'status': 'success', 'message': 'Live stream stopped'})
-    return JsonResponse({'status': 'error', 'message': 'Not the live teacher'})
-
-@login_required
-def live_participants(request, camera_id):
-    """Get live participants for a camera's linked meeting"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    
-    # Check permission
-    if not camera.has_permission(request.user):
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
-    if camera.livekit_room:
-        try:
-            from meetings.models import Meeting, MeetingParticipant
-            meeting = Meeting.objects.filter(meeting_code=camera.livekit_room).first()
-            if meeting:
-                participants = meeting.participants.filter(is_active=True).select_related('user')
-                participant_list = [
-                    {'username': p.user.username, 'user_id': p.user.id}
-                    for p in participants
-                ]
-                return JsonResponse({
-                    'count': len(participant_list),
-                    'participants': participant_list
-                })
-        except Exception as e:
-            pass
-    
-    return JsonResponse({'count': 0, 'participants': []})
-
-@login_required
-def student_lecture_list(request):
-    """List all available live sessions and recorded lectures for students"""
-    from meetings.models import Meeting, ClassroomMembership
-    
-    query = request.GET.get('q', '')
-    teacher_id = request.GET.get('teacher', '')
-    
-    # Get classrooms where user is an approved member
-    my_classroom_ids = ClassroomMembership.objects.filter(
-        student=request.user, 
-        status='approved'
-    ).values_list('classroom_id', flat=True)
-
-    # 1. Filter Live Cameras
-    # We need to hide cameras that are linked to classrooms the student isn't in
-    live_sessions = Camera.objects.filter(is_live=True).select_related('live_teacher')
-    
-    # Identify rooms that are linked to classrooms
-    classroom_rooms = Meeting.objects.filter(
-        classroom__isnull=False,
-        status='live'
-    ).values('meeting_code', 'classroom_id')
-    
-    room_to_classroom = {r['meeting_code']: r['classroom_id'] for r in classroom_rooms}
-    
-    filtered_live = []
-    for cam in live_sessions:
-        if cam.livekit_room in room_to_classroom:
-            # This camera is in a classroom session
-            if room_to_classroom[cam.livekit_room] in my_classroom_ids:
-                filtered_live.append(cam)
-        else:
-            # Standalone camera or not linked to an active classroom meeting
-            filtered_live.append(cam)
-    
-    # 2. Filter Recordings
-    # recordings = CameraRecording.objects.filter(is_published=True).select_related('teacher', 'camera')
-    # For recordings, if the camera used is traditionally for a classroom, should we hide it?
-    # Usually recordings are published by teachers explicitly, but let's stick to the "meetings" logic.
-    # If a recording's camera has a livekit_room that belongs to a classroom, maybe check?
-    # For now, let's keep recordings as they are unless they have a direct classroom link (which they don't yet).
-    recordings = CameraRecording.objects.filter(is_published=True).select_related('teacher', 'camera')
-    
-    if query:
-        recordings = recordings.filter(
-            Q(title__icontains=query) | 
-            Q(teacher__username__icontains=query) |
-            Q(camera__name__icontains=query)
-        )
-        # Re-filter the filtered_live list for query
-        filtered_live = [
-            cam for cam in filtered_live 
-            if query.lower() in cam.name.lower() or 
-               (cam.live_teacher and query.lower() in cam.live_teacher.username.lower())
-        ]
-        
-    if teacher_id:
-        recordings = recordings.filter(teacher_id=teacher_id)
-        filtered_live = [cam for cam in filtered_live if str(cam.live_teacher_id) == str(teacher_id)]
-
-    # Get list of teachers for filtering
-    teachers = User.objects.filter(userprofile__user_type='teacher')
-
-    return render(request, 'cameras/student_lecture_list.html', {
-        'live_sessions': filtered_live,
-        'recordings': recordings,
-        'teachers': teachers,
-        'query': query,
-        'selected_teacher': teacher_id
-    })
-
-@login_required
-def watch_live(request, camera_id):
-    """Watch a live lecture (Student View)"""
-    # Allow admins to view any camera, even if not marked "live"
-    if is_admin(request.user):
-        camera = get_object_or_404(Camera, id=camera_id)
-    else:
-        camera = get_object_or_404(Camera, id=camera_id, is_live=True)
-    
-    # In a real app, we'd check if the student belongs to the teacher's class
-    
-    context = {
-        'camera': camera,
-        'teacher': camera.live_teacher if hasattr(camera, 'live_teacher') else None,
-    }
-    return render(request, 'cameras/watch_live.html', context)
+    return toggle_recording_publish_impl(request, recording_id)
 
 @login_required
 def watch_recording(request, recording_id):
-    """Watch a recorded lecture"""
-    recording = get_object_or_404(CameraRecording, id=recording_id)
-    
-    # Check permissions: owner or published
-    if not (recording.is_published or recording.teacher == request.user or request.user.is_superuser):
-        return HttpResponse("Unauthorized", status=403)
-    
-    # Recommended videos (same teacher or same camera)
-    recommended = CameraRecording.objects.filter(
-        is_published=True
-    ).exclude(id=recording_id).filter(
-        Q(teacher=recording.teacher) | Q(camera=recording.camera)
-    ).order_by('-created_at')[:5]
-    
-    context = {
-        'recording': recording,
-        'recommended': recommended
-    }
-    
-    if recording.is_chunked:
-        context['playlist_url'] = reverse('recording_playlist', args=[recording.id])
-    
-    return render(request, 'cameras/watch_recording.html', context)
+    return watch_recording_impl(request, recording_id)
 
 @login_required
 def stream_recording_chunk(request, recording_id, sequence):
-    """Serve a specific video chunk from the database"""
-    from .models import RecordingChunk
-    chunk = get_object_or_404(RecordingChunk, recording_id=recording_id, sequence=sequence)
-    
-    # Check permission for the recording
-    recording = chunk.recording
-    if not (recording.is_published or recording.teacher == request.user or request.user.is_superuser):
-        return HttpResponse("Unauthorized", status=403)
-        
-    return HttpResponse(chunk.data, content_type='video/mp2t')
+    return stream_recording_chunk_impl(request, recording_id, sequence)
 
 @login_required
 def recording_playlist(request, recording_id):
-    """Generate HLS playlist for a chunked recording"""
-    from .models import CameraRecording, RecordingChunk
-    recording = get_object_or_404(CameraRecording, id=recording_id)
-    
-    if not (recording.is_published or recording.teacher == request.user or request.user.is_superuser):
-        return HttpResponse("Unauthorized", status=403)
-        
-    chunks = RecordingChunk.objects.filter(recording=recording).order_by('sequence')
-    
-    playlist = [
-        "#EXTM3U",
-        "#EXT-X-VERSION:3",
-        "#EXT-X-TARGETDURATION:10",
-        "#EXT-X-MEDIA-SEQUENCE:0",
-        "#EXT-X-PLAYLIST-TYPE:VOD"
-    ]
-    
-    for chunk in chunks:
-        playlist.append(f"#EXTINF:{chunk.duration},")
-        chunk_url = reverse('stream_chunk', args=[recording.id, chunk.sequence])
-        playlist.append(chunk_url)
-        
-    playlist.append("#EXT-X-ENDLIST")
-    
-    return HttpResponse("\n".join(playlist), content_type='application/vnd.apple.mpegurl')
+    return recording_playlist_impl(request, recording_id)
 
 @login_required
 def teacher_profile(request, teacher_id):
-    """Show all lectures and live status for a specific teacher"""
-    teacher = get_object_or_404(User, id=teacher_id)
-    
-    live_cameras = Camera.objects.filter(live_teacher=teacher, is_live=True)
-    recordings = CameraRecording.objects.filter(teacher=teacher, is_published=True).order_by('-created_at')
-    
-    return render(request, 'cameras/teacher_profile.html', {
-        'target_teacher': teacher,
-        'live_cameras': live_cameras,
-        'recordings': recordings
-    })
+    return teacher_profile_impl(request, teacher_id)
+
+
+# Admin and content management views
+@login_required
+def admin_content_manager(request):
+    return admin_content_manager_impl(request)
 
 @login_required
-def start_camera_recording(request, camera_id):
-    """Start recording a camera feed using FFmpeg engine"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    if not camera.has_permission(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'})
-        
-    quality = request.POST.get('quality', '720p')
-    audio_source = request.POST.get('audio_source', 'pc') # 'pc', 'remote', or 'camera'
-    success, message = recording_engine.start_recording(camera, request.user, quality, audio_source)
-    
-    if success:
-        return JsonResponse({'status': 'success', 'message': f'Recording started in {quality}'})
-    else:
-        return JsonResponse({'status': 'error', 'message': message})
+def delete_recording_admin(request, recording_id):
+    return delete_recording_admin_impl(request, recording_id)
 
 @login_required
-def stop_camera_recording(request, camera_id):
-    """Stop recording and prepare for publishing"""
-    camera = get_object_or_404(Camera, id=camera_id)
-    success, recording_id = recording_engine.stop_recording(camera.id, request.user.id)
-    
-    if success:
-        rec = get_object_or_404(CameraRecording, id=recording_id)
-        video_url = None
-        if rec.is_chunked:
-            video_url = reverse('watch_recording', args=[rec.id])
-        elif rec.video_file:
-            video_url = rec.video_file.url
-
-        return JsonResponse({
-            'status': 'success', 
-            'recording_id': recording_id,
-            'video_url': video_url,
-            'message': 'Recording stopped and being processed'
-        })
-    else:
-        return JsonResponse({'status': 'error', 'message': 'No active recording found'})
+def delete_meeting_admin(request, meeting_id):
+    return delete_meeting_admin_impl(request, meeting_id)
 
 @login_required
-def publish_recording(request):
-    """Publish a finished recording with title and description"""
-    if request.method == 'POST':
-        recording_id = request.POST.get('recording_id')
-        title = request.POST.get('title')
-        description = request.POST.get('description')
-        
-        try:
-            rec = CameraRecording.objects.get(id=recording_id, teacher=request.user)
-            rec.title = title
-            rec.description = description
-            rec.is_published = True
-            rec.save()
-            return JsonResponse({'status': 'success', 'message': 'Lecture published successfully'})
-        except CameraRecording.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Recording not found'})
-            
-    return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+def admin_dashboard(request):
+    return admin_dashboard_impl(request)
+
+
+# Camera management views
+@login_required
+def add_camera(request):
+    return add_camera_impl(request)
+
+@login_required
+def edit_camera(request, camera_id):
+    return edit_camera_impl(request, camera_id)
+
+@login_required
+def delete_camera(request, camera_id):
+    return delete_camera_impl(request, camera_id)
+
+@login_required
+def camera_feed(request, camera_id):
+    return camera_feed_impl(request, camera_id)
 
 @login_required
 def test_camera(request, camera_id):
-    """Test camera connection - uses camera service for diagnostics"""
-    import requests
-    camera = get_object_or_404(Camera, id=camera_id)
-    
-    try:
-        # Use camera service for testing (it has better RTSP handling)
-        camera_service_url = f'http://localhost:8001/cameras/{camera_id}/test/'
-        response = requests.get(camera_service_url, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return JsonResponse(data)
-        else:
-            return JsonResponse({
-                'status': 'error',
-                'message': f'Camera service error: HTTP {response.status_code}',
-                'hint': 'Make sure camera service is running on port 8001'
-            })
-    except requests.exceptions.ConnectionError:
-        return JsonResponse({
-            'status': 'error',
-            'message': 'Camera service not running on port 8001',
-            'hint': 'Start camera service: cd camera_service && python manage.py runserver 8001'
-        })
-    except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': f'Error: {str(e)}'
-        })
+    return test_camera_impl(request, camera_id)
+
+@login_required
+def live_monitor(request):
+    return live_monitor_impl(request)
 
 @login_required
 def test_feed_page(request):
-    """Simple test page for camera feed"""
-    return render(request, 'test_feed.html')
+    return test_feed_page_impl(request)
+
+
+# Streaming and control room views
+@login_required
+def teacher_camera_dashboard(request):
+    return teacher_camera_dashboard_impl(request)
 
 @login_required
+def teacher_control_room(request, camera_id):
+    return teacher_control_room_impl(request, camera_id)
+
+@login_required
+def update_zoom(request, camera_id):
+    return update_zoom_impl(request, camera_id)
+
+@login_required
+def start_streaming(request, camera_id):
+    return start_streaming_impl(request, camera_id)
+
+@login_required
+def stop_streaming(request, camera_id):
+    return stop_streaming_impl(request, camera_id)
+
+@login_required
+def live_participants(request, camera_id):
+    return live_participants_impl(request, camera_id)
+
+@login_required
+def student_lecture_list(request):
+    return student_lecture_list_impl(request)
+
+@login_required
+def watch_live(request, camera_id):
+    return watch_live_impl(request, camera_id)
+
+@login_required
+def start_camera_recording(request, camera_id):
+    return start_camera_recording_impl(request, camera_id)
+
+@login_required
+def stop_camera_recording(request, camera_id):
+    return stop_camera_recording_impl(request, camera_id)
+
+@login_required
+def publish_recording(request):
+    return publish_recording_impl(request)
+
+
+# Permission views
+@login_required
 def grant_permission(request, camera_id):
-    """Grant a teacher permission to view a camera"""
-    if not is_admin(request.user):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-    
-    if request.method == 'POST':
-        camera = get_object_or_404(Camera, id=camera_id)
-        teacher_id = request.POST.get('teacher_id')
-        teacher = get_object_or_404(User, id=teacher_id)
-        
-        CameraPermission.objects.get_or_create(
-            camera=camera,
-            teacher=teacher,
-            defaults={'granted_by': request.user}
-        )
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Access granted to {teacher.get_full_name() or teacher.username}'
-        })
-    
-    return JsonResponse({'error': 'Invalid request'}, status=400)
+    return grant_permission_impl(request, camera_id)
 
 @login_required
 def revoke_permission(request, camera_id, teacher_id):
-    """Revoke a teacher's permission to view a camera"""
-    if not is_admin(request.user):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-    
-    camera = get_object_or_404(Camera, id=camera_id)
-    teacher = get_object_or_404(User, id=teacher_id)
-    
-    deleted_count, _ = CameraPermission.objects.filter(camera=camera, teacher=teacher).delete()
-    
-    if deleted_count > 0:
-        return JsonResponse({
-            'success': True,
-            'message': f'Access revoked from {teacher.get_full_name() or teacher.username}'
-        })
-    return JsonResponse({'success': False, 'message': 'Permission not found'})
+    return revoke_permission_impl(request, camera_id, teacher_id)
 
 @login_required
 def manage_permissions(request, camera_id):
-    """Manage camera permissions"""
-    if not is_admin(request.user):
-        return redirect('login')
-    
-    camera = get_object_or_404(Camera, id=camera_id)
-    # Get all teachers
-    teachers = User.objects.filter(userprofile__user_type='teacher')
-    
-    # Get authorized teachers
-    authorized_teachers = camera.get_authorized_teachers()
-    
-    # Get unauthorized teachers (teachers who don't have permission yet)
-    authorized_teacher_ids = authorized_teachers.values_list('id', flat=True)
-    unauthorized_teachers = teachers.exclude(id__in=authorized_teacher_ids)
-    
-    context = {
-        'camera': camera,
-        'teachers': teachers,
-        'authorized_teachers': authorized_teachers,
-        'unauthorized_teachers': unauthorized_teachers,
-    }
-    return render(request, 'cameras/manage_permissions.html', context)
+    return manage_permissions_impl(request, camera_id)
 
 
-# ─────────────────────────────────────────────────────────────
-# HEAD COUNTING VIEWS
-# ─────────────────────────────────────────────────────────────
-
+# Head counting views
 @login_required
 def head_count_dashboard(request):
-    """Dashboard for head counting - shows all cameras with head count capability"""
-    import requests
-    
-    # Get cameras based on user role
-    if is_admin(request.user):
-        rtsp_cameras = Camera.objects.filter(is_active=True)
-        mobile_cameras = MobileCamera.objects.filter(is_active=True)
-    elif hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher':
-        camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
-        rtsp_cameras = Camera.objects.filter(id__in=camera_ids, is_active=True)
-        
-        mobile_camera_ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
-        mobile_cameras = MobileCamera.objects.filter(id__in=mobile_camera_ids, is_active=True)
-    else:
-        rtsp_cameras = Camera.objects.none()
-        mobile_cameras = MobileCamera.objects.none()
-    
-    # PROXIED: Get active sessions from the dedicated camera service
-    active_sessions = {}
-    try:
-        service_url = 'http://localhost:8001/head-count/active-sessions/'
-        response = requests.get(service_url, timeout=2)
-        if response.status_code == 200:
-            active_sessions = response.json().get('active_sessions', {})
-    except Exception as e:
-        logger.error(f"Failed to fetch active headcount sessions from service: {e}")
-    
-    # Add session status to cameras based on proxied data
-    for camera in rtsp_cameras:
-        session_key = f"rtsp_{camera.id}"
-        camera.has_active_session = session_key in active_sessions
-        camera.camera_type = 'rtsp'
-    
-    for camera in mobile_cameras:
-        session_key = f"mobile_{camera.id}"
-        camera.has_active_session = session_key in active_sessions
-        camera.camera_type = 'mobile'
-    
-    # Get recent head count logs (Database is shared, so this is fine)
-    recent_logs = HeadCountLog.objects.all().order_by('-timestamp')[:10]
-    
-    context = {
-        'rtsp_cameras': rtsp_cameras,
-        'mobile_cameras': mobile_cameras,
-        'active_sessions': active_sessions,
-        'recent_logs': recent_logs,
-    }
-    return render(request, 'cameras/head_count_dashboard.html', context)
-
+    return head_count_dashboard_impl(request)
 
 @login_required
 def start_head_count(request, camera_type, camera_id):
-    """Start head counting session - proxies request to dedicated camera service"""
-    import requests
-    
-    # Check permissions first
-    if camera_type == 'rtsp':
-        camera = get_object_or_404(Camera, id=camera_id)
-    elif camera_type == 'mobile':
-        camera = get_object_or_404(MobileCamera, id=camera_id)
-    else:
-        return JsonResponse({'error': 'Invalid camera type'}, status=400)
-    
-    if not can_view_camera(request.user, camera):
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
-    # Prepare parameters for the microservice
-    classroom_id = request.POST.get('classroom_id') or request.GET.get('classroom_id') or ''
-    interval = request.POST.get('interval') or request.GET.get('interval') or '30'
-    
-    try:
-        service_url = f'http://localhost:8001/head-count/start/{camera_type}/{camera_id}/'
-        params = {
-            'user_id': request.user.id,
-            'classroom_id': classroom_id,
-            'interval': interval
-        }
-        response = requests.get(service_url, params=params, timeout=10)
-        return JsonResponse(response.json(), status=response.status_code)
-    except Exception as e:
-        return JsonResponse({'error': f'Camera service error: {str(e)}'}, status=500)
-
+    return start_head_count_impl(request, camera_type, camera_id)
 
 @login_required
 def stop_head_count(request, camera_type, camera_id):
-    """Stop head counting session - proxies request to dedicated camera service"""
-    import requests
-    try:
-        service_url = f'http://localhost:8001/head-count/stop/{camera_type}/{camera_id}/'
-        response = requests.get(service_url, timeout=10)
-        return JsonResponse(response.json(), status=response.status_code)
-    except Exception as e:
-        return JsonResponse({'error': f'Camera service error: {str(e)}'}, status=500)
-
+    return stop_head_count_impl(request, camera_type, camera_id)
 
 @login_required
 def head_count_logs(request):
-    """View head count logs with filtering"""
-    logs = HeadCountLog.objects.all()
-    
-    # Filter by camera type
-    camera_type = request.GET.get('camera_type')
-    if camera_type:
-        logs = logs.filter(camera_type=camera_type)
-    
-    # Filter by camera
-    camera_id = request.GET.get('camera_id')
-    if camera_id:
-        logs = logs.filter(camera_id=camera_id)
-    
-    # Filter by classroom
-    classroom_id = request.GET.get('classroom')
-    if classroom_id:
-        logs = logs.filter(classroom_id=classroom_id)
-    
-    # Filter by date range
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
-    if date_from:
-        logs = logs.filter(date__gte=date_from)
-    if date_to:
-        logs = logs.filter(date__lte=date_to)
-    
-    # Filter by hour
-    hour = request.GET.get('hour')
-    if hour:
-        logs = logs.filter(hour=int(hour))
-    
-    # Calculate statistics
-    stats = logs.aggregate(
-        total_records=Count('id'),
-        avg_head_count=Avg('head_count'),
-        max_head_count=Max('head_count'),
-        min_head_count=Min('head_count'),
-        avg_confidence=Avg('confidence_score')
-    )
-    
-    # Group by date for chart data
-    date_stats = logs.values('date').annotate(
-        avg_count=Avg('head_count'),
-        max_count=Max('head_count'),
-        total=Count('id')
-    ).order_by('-date')[:30]
-    
-    # Group by hour for time-wise analysis
-    hour_stats = logs.values('hour').annotate(
-        avg_count=Avg('head_count'),
-        total=Count('id')
-    ).order_by('hour')
-    
-    # Get classrooms for filter dropdown
-    from meetings.models import Classroom
-    classrooms = Classroom.objects.all()
-    
-    context = {
-        'logs': logs[:100],  # Limit to 100 records
-        'stats': stats,
-        'date_stats': date_stats,
-        'hour_stats': hour_stats,
-        'classrooms': classrooms,
-        'filter_params': request.GET,
-    }
-    return render(request, 'cameras/head_count_logs.html', context)
-
+    return head_count_logs_impl(request)
 
 @login_required
 def head_count_log_detail(request, log_id):
-    """View details of a specific head count log"""
-    log = get_object_or_404(HeadCountLog, id=log_id)
-    
-    context = {
-        'log': log,
-    }
-    return render(request, 'cameras/head_count_log_detail.html', context)
-
+    return head_count_log_detail_impl(request, log_id)
 
 @login_required
 def head_count_session_history(request):
-    """View history of head counting sessions"""
-    sessions = HeadCountSession.objects.all()
-    
-    # Filter by status
-    status = request.GET.get('status')
-    if status:
-        sessions = sessions.filter(status=status)
-    
-    # Filter by date range
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
-    if date_from:
-        sessions = sessions.filter(started_at__date__gte=date_from)
-    if date_to:
-        sessions = sessions.filter(started_at__date__lte=date_to)
-    
-    context = {
-        'sessions': sessions[:50],
-    }
-    return render(request, 'cameras/head_count_sessions.html', context)
-
+    return head_count_session_history_impl(request)
 
 @login_required
 def head_count_api(request, camera_type, camera_id):
-    """API endpoint to get current head count for a camera"""
-    current_count = head_count_manager.get_current_count(camera_type, camera_id)
-    is_active = head_count_manager.is_session_active(camera_type, camera_id)
-    
-    return JsonResponse({
-        'camera_type': camera_type,
-        'camera_id': camera_id,
-        'is_active': is_active,
-        'current_count': current_count,
-    })
-
+    return head_count_api_impl(request, camera_type, camera_id)
 
 @login_required
 def head_count_report(request):
-    """Generate head count reports - class-wise, day-wise, time-wise"""
-    # Get filter parameters
-    report_type = request.GET.get('report_type', 'daily')
-    classroom_id = request.GET.get('classroom')
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
-    
-    logs = HeadCountLog.objects.all()
-    
-    # Apply filters
-    if classroom_id:
-        logs = logs.filter(classroom_id=classroom_id)
-    if date_from:
-        logs = logs.filter(date__gte=date_from)
-    if date_to:
-        logs = logs.filter(date__lte=date_to)
-    
-    report_data = {}
-    
-    if report_type == 'class_wise':
-        # Group by classroom
-        report_data = logs.values(
-            'classroom__title', 'classroom_id'
-        ).annotate(
-            total_records=Count('id'),
-            avg_head_count=Avg('head_count'),
-            max_head_count=Max('head_count'),
-            min_head_count=Min('head_count'),
-        ).order_by('-total_records')
-        
-    elif report_type == 'day_wise':
-        # Group by date
-        report_data = logs.values('date').annotate(
-            total_records=Count('id'),
-            avg_head_count=Avg('head_count'),
-            max_head_count=Max('head_count'),
-            min_head_count=Min('head_count'),
-        ).order_by('-date')
-        
-    elif report_type == 'time_wise':
-        # Group by hour
-        report_data = logs.values('hour').annotate(
-            total_records=Count('id'),
-            avg_head_count=Avg('head_count'),
-            max_head_count=Max('head_count'),
-        ).order_by('hour')
-        
-    elif report_type == 'camera_wise':
-        # Group by camera
-        report_data = logs.values(
-            'camera_type', 'camera_id', 'camera_name'
-        ).annotate(
-            total_records=Count('id'),
-            avg_head_count=Avg('head_count'),
-            max_head_count=Max('head_count'),
-        ).order_by('-total_records')
-    
-    # Get classrooms for filter
-    from meetings.models import Classroom
-    classrooms = Classroom.objects.all()
-    
-    context = {
-        'report_type': report_type,
-        'report_data': report_data,
-        'classrooms': classrooms,
-        'filter_params': request.GET,
-    }
-    return render(request, 'cameras/head_count_report.html', context)
-
+    return head_count_report_impl(request)
 
 @login_required
 def export_head_count_csv(request):
-    """Export head count logs as CSV"""
-    import csv
-    
-    logs = HeadCountLog.objects.all()
-    
-    # Apply filters
-    camera_type = request.GET.get('camera_type')
-    if camera_type:
-        logs = logs.filter(camera_type=camera_type)
-    
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
-    if date_from:
-        logs = logs.filter(date__gte=date_from)
-    if date_to:
-        logs = logs.filter(date__lte=date_to)
-    
-    # Create CSV response
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="head_count_logs.csv"'
-    
-    writer = csv.writer(response)
-    writer.writerow([
-        'Date', 'Time', 'Camera Type', 'Camera Name', 
-        'Classroom', 'Head Count', 'Confidence', 'Notes'
-    ])
-    
-    for log in logs:
-        writer.writerow([
-            log.date,
-            log.timestamp.strftime('%H:%M:%S'),
-            log.get_camera_type_display(),
-            log.camera_name,
-            log.classroom.title if log.classroom else 'N/A',
-            log.head_count,
-            f"{log.confidence_score:.2f}",
-            log.notes
-        ])
-    
-    return response
+    return export_head_count_csv_impl(request)
