@@ -1,17 +1,44 @@
+# Python cache
 **/__pycache__/
 *.py[cod]
 *$py.class
-.env
-.env.docker
-.venv
+*.pyo
+
+# Virtual environments
+.venv/
 venv/
 ENV/
 env/
-.vscode/
+
+# Local env files (secrets stay off the image)
+.env
+.env.deploy
+.env.local
+
+# Git
 .git/
 .gitignore
+
+# Local DB (Docker uses Postgres)
 db.sqlite3
+
+# Collected static (rebuilt at container startup)
 staticfiles/
+
+# Media uploads (mounted as volume)
 media/
+
+# Logs
 *.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Node (if any)
 node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -154,7 +154,11 @@ ASGI_APPLICATION = 'school_project.asgi.application'
 # which occurs with older Windows Redis versions (3.x).
 REDIS_URL = os.environ.get('REDIS_URL')
 
-if REDIS_URL and sys.platform != 'win32':
+# Use Redis channel layer when REDIS_URL is set.
+# In Docker (Linux) always use Redis. On Windows dev without Redis, fall back to InMemory.
+_use_redis_channels = bool(REDIS_URL) and (sys.platform != 'win32' or os.environ.get('FORCE_REDIS_CHANNELS'))
+
+if _use_redis_channels:
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -164,7 +168,7 @@ if REDIS_URL and sys.platform != 'win32':
         }
     }
 else:
-    # Default to InMemory for Windows or when REDIS_URL is missing
+    # Windows dev without Redis — InMemoryChannelLayer (single process only)
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
@@ -326,6 +330,11 @@ LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'devsecret_must_be_32_
 HEAD_COUNT_INTERVAL = 30
 ATTENTION_THRESHOLD = 0.6
 EMOTION_LOGGING_ENABLED = True
+
+# Camera Service URL (internal, server-side only)
+# In Docker: uses service name via CAMERA_SERVICE_URL env var
+# In dev: falls back to localhost:8001
+CAMERA_SERVICE_URL = os.environ.get('CAMERA_SERVICE_URL', 'http://localhost:8001')
 
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>

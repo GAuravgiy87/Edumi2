@@ -318,7 +318,13 @@
         if (!picker) return;
         const quality = picker.value;
         const img = document.querySelector('.camera-feed');
-        const baseUrl = 'http://localhost:8001/mobile-cameras/{{ mobile_camera.id }}/feed/';
+        // Use same-origin path — nginx proxies /mobile-cameras/ to camera_service in Docker
+        // In dev (port != 80/443), camera service is on port 8001
+        const port = window.location.port;
+        const camBase = (!port || port === '80' || port === '443')
+            ? `${window.location.protocol}//${window.location.hostname}`
+            : `${window.location.protocol}//${window.location.hostname}:8001`;
+        const baseUrl = `${camBase}/mobile-cameras/{{ mobile_camera.id }}/feed/`;
         if (img) img.src = `${baseUrl}?q=${quality}&t=${new Date().getTime()}`;
     };
 

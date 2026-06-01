@@ -61,9 +61,11 @@ def get_student_stats(user):
 def get_admin_stats():
     """Get overall platform statistics for the admin panel."""
     import requests
+    from django.conf import settings
     camera_service_online = False
     try:
-        response = requests.get("http://127.0.0.1:8001/cameras/", timeout=1)
+        internal_url = getattr(settings, 'CAMERA_SERVICE_URL', 'http://localhost:8001')
+        response = requests.get(f"{internal_url}/cameras/", timeout=1)
         camera_service_online = (response.status_code == 200)
     except:
         camera_service_online = False

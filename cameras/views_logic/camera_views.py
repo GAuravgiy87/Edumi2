@@ -163,7 +163,10 @@ def camera_feed(request, camera_id):
     """
     Gateway to the dedicated Camera Service.
     Checks permissions before redirecting to the streaming microservice.
+    In Docker, the camera service is accessed via nginx (same host, no port).
+    In development, falls back to localhost:8001.
     """
+    from django.conf import settings
     from .utils import can_view_camera
     camera = get_object_or_404(Camera, id=camera_id)
 
@@ -171,11 +174,18 @@ def camera_feed(request, camera_id):
     if not can_view_camera(request.user, camera):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
-    # Redirect to dedicated camera service (port 8001)
-    # We pass the same quality parameter if present
     quality = request.GET.get('q', 'med')
-    camera_service_url = f"http://{request.get_host().split(':')[0]}:8001/cameras/{camera_id}/feed/?q={quality}"
 
+    # In Docker, nginx routes /cameras/ directly to camera_service — use same host/port as the browser.
+    # In dev, camera service runs on port 8001.
+    camera_service_base = getattr(settings, 'CAMERA_SERVICE_EXTERNAL_URL', None)
+    if not camera_service_base:
+        # Build from request: same host, but check if we're behind nginx (port 80/443)
+        host = request.get_host()  # includes port if non-standard
+        scheme = request.scheme
+        camera_service_base = f"{scheme}://{host}"
+
+    camera_service_url = f"{camera_service_base}/cameras/{camera_id}/feed/?q={quality}"
     return redirect(camera_service_url)
 
 
@@ -189,8 +199,10 @@ def test_camera(request, camera_id):
     camera = get_object_or_404(Camera, id=camera_id)
 
     try:
+        from django.conf import settings
+        internal_url = getattr(settings, 'CAMERA_SERVICE_URL', 'http://localhost:8001')
         # Use camera service for testing (it has better RTSP handling)
-        camera_service_url = f'http://localhost:8001/cameras/{camera_id}/test/'
+        camera_service_url = f'{internal_url}/cameras/{camera_id}/test/'
         response = requests.get(camera_service_url, timeout=30)
 
         if response.status_code == 200:
@@ -249,7 +261,9 @@ def live_monitor(request):
     # Check if camera service is running
     camera_service_running = False
     try:
-        response = requests.get('http://localhost:8001/cameras/', timeout=2)
+        from django.conf import settings
+        internal_url = getattr(settings, 'CAMERA_SERVICE_URL', 'http://localhost:8001')
+        response = requests.get(f'{internal_url}/cameras/', timeout=2)
         camera_service_running = response.status_code == 200
     except:
         pass

@@ -1,31 +1,31 @@
-# Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_CACHE_DIR=/root/.cache/pip
+ENV PIP_NO_COMPILE=1
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
+# ffmpeg for RTSP audio extraction, libgl1/libglib2.0-0 for OpenCV headless
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libgl1 libglib2.0-0 \
+        ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY camera_service/requirements.txt /app/
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Requirements first for cache efficiency
+COPY camera_service/requirements.txt .
+RUN pip install --upgrade pip --quiet && \
+    pip install --quiet -r requirements.txt
 
-# Copy the entire project context into the container at /app
-# This allows camera_service to access main project apps
-COPY . /app/
+# Copy full project (camera_service imports models from main project)
+COPY . .
 
-# Expose port 8001
+RUN mkdir -p /app/media/temp && \
+    chmod -R 755 /app/media && \
+    chmod +x /app/camera_service/entrypoint.sh
+
 EXPOSE 8001
-
-# Start the application from the camera_service subdirectory
 WORKDIR /app/camera_service
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8001"]
+ENTRYPOINT ["/app/camera_service/entrypoint.sh"]

@@ -212,9 +212,10 @@
         if (audioWs) audioWs.close();
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/audio/${window.cameraId}/`;
+        // Connect as ip_cam source so the server relays the camera's built-in mic via RTSP
+        const wsUrl = `${protocol}//${window.location.host}/ws/audio/${window.cameraId}/?source=ip_cam`;
         
-        console.log("Connecting to Audio WebSocket:", wsUrl);
+        console.log("Connecting to IP-Cam Audio WebSocket:", wsUrl);
         audioWs = new WebSocket(wsUrl);
         audioWs.binaryType = 'arraybuffer';
 
@@ -312,21 +313,34 @@
 
     // ── Initialize Direct Feed ──
     (function initFeed() {
-        const cameraServicePort = 8001;
         const host = window.location.hostname;
-        // Request 4K by default for students if they have bandwidth, otherwise adaptive
-        const feedUrl = `http://${host}:${cameraServicePort}/cameras/${window.cameraId}/feed/?q=4k`;
-        
+        const port = window.location.port;
+        const scheme = window.location.protocol;
+
+        // In Docker (nginx), camera service is on the same host/port via proxy.
+        // In dev, camera service runs on port 8001.
+        // We detect Docker by checking if we're on port 80/443 or no port (default).
+        let feedBase;
+        if (!port || port === '80' || port === '443') {
+            // Behind nginx — camera service is proxied at /cameras/
+            feedBase = `${scheme}//${host}`;
+        } else {
+            // Dev mode — camera service on port 8001
+            feedBase = `${scheme}//${host}:8001`;
+        }
+
+        const feedUrl = `${feedBase}/cameras/${window.cameraId}/feed/?q=4k`;
+
         const img = document.getElementById('mainFeed');
         if (img) {
             img.src = feedUrl;
             console.log("Attempting direct feed connection:", feedUrl);
-            
+
             img.onerror = function() {
                 console.error("Feed connection failed. Retrying in 3 seconds...");
                 if (typeof showToast === 'function') showToast('Camera connection failed. Retrying...', 'warning');
                 setTimeout(() => {
-                    this.src = feedUrl + '?t=' + new Date().getTime();
+                    this.src = feedUrl + '&t=' + new Date().getTime();
                 }, 3000);
             };
 
@@ -335,13 +349,13 @@
                 if (typeof showToast === 'function') showToast('Camera connected!', 'success');
             };
         }
-        
+
         // Set realistic viewer count
         const viewerCount = document.getElementById('viewerCount');
         if (viewerCount) {
             viewerCount.textContent = (Math.floor(Math.random() * 5) + 1) + " watching";
         }
-        
+
         // Connect Audio
         connectAudio();
     })();
