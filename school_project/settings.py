@@ -71,6 +71,7 @@ if csrf_origins_env:
 DEFAULT_CSRF_ORIGINS = [
     'http://localhost',
     'http://127.0.0.1',
+    'http://10.7.11.141',
 ]
 for origin in DEFAULT_CSRF_ORIGINS:
     if origin not in CSRF_TRUSTED_ORIGINS:

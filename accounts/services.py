@@ -63,7 +63,7 @@ def get_admin_stats():
     import requests
     camera_service_online = False
     try:
-        response = requests.get("http://127.0.0.1:8001/api/cameras/", timeout=1)
+        response = requests.get("http://127.0.0.1:8001/cameras/", timeout=1)
         camera_service_online = (response.status_code == 200)
     except:
         camera_service_online = False
