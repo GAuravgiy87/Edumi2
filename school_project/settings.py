@@ -70,8 +70,14 @@ if csrf_origins_env:
 # Always add these defaults for local development
 DEFAULT_CSRF_ORIGINS = [
     'http://localhost',
+    'http://localhost:8000',
+    'http://localhost:8080',
     'http://127.0.0.1',
+    'http://127.0.0.1:8000',
+    'http://127.0.0.1:8080',
     'http://10.7.11.141',
+    'http://192.168.1.100',
+    'http://192.168.1.100:8080',
 ]
 for origin in DEFAULT_CSRF_ORIGINS:
     if origin not in CSRF_TRUSTED_ORIGINS:

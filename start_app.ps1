@@ -35,7 +35,7 @@ try {
 
 # 3. Start LiveKit
 Write-Host "[3/7] Starting LiveKit SFU (localhost:7880)..." -ForegroundColor Yellow
-Start-Process -FilePath $LIVEKIT -ArgumentList "--config","livekit.yaml" -WindowStyle Minimized
+Start-Process -FilePath $LIVEKIT -ArgumentList "--config","config/livekit.yaml" -WindowStyle Minimized
 Start-Sleep -Seconds 3
 
 # 4. Run Migrations

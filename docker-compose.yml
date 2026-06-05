@@ -4,8 +4,8 @@ x-django-env: &django-env
   LIVEKIT_API_KEY: "${LIVEKIT_API_KEY}"
   LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET}"
   FACE_ENCRYPTION_KEY: "${FACE_ENCRYPTION_KEY}"
-  LIVEKIT_URL: "ws://${SERVER_IP}/livekit-proxy"
-  CSRF_TRUSTED_ORIGINS: "http://localhost,http://127.0.0.1,http://${SERVER_IP}"
+  LIVEKIT_URL: "ws://${SERVER_IP}:8080/livekit-proxy"
+  CSRF_TRUSTED_ORIGINS: "http://localhost,http://localhost:8080,http://127.0.0.1,http://127.0.0.1:8080,http://${SERVER_IP},http://${SERVER_IP}:8080"
   DEBUG: "False"
   ALLOWED_HOSTS: "*"
   REDIS_URL: "redis://redis:6379/0"
@@ -56,7 +56,7 @@ services:
     restart: unless-stopped
     command: --config /etc/livekit/config.yaml
     volumes:
-      - ./livekit.yaml:/etc/livekit/config.yaml:ro
+      - ./config/livekit.yaml:/etc/livekit/config.yaml:ro
     networks:
       - edumi_net
 
