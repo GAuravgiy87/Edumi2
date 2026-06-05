@@ -75,3 +75,4 @@ websockets==16.0
 Werkzeug==3.0.1
 wheel==0.46.3
 zope.interface==8.2
+dlib-bin==20.0.1

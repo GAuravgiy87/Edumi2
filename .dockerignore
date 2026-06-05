@@ -15,3 +15,7 @@ staticfiles/
 media/
 *.log
 node_modules/
+*.md
+docs/
+paper_assets/
+architecture/

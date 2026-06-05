@@ -10,11 +10,13 @@ import io
 import hashlib
 import json
 import logging
+import numpy as np
 from typing import Optional
 
 from .encryption_service import FaceEncryptionService
 
 logger = logging.getLogger('attendance.face_service')
+
 
 MATCH_THRESHOLD   = 0.55   # default; overridden per-classroom
 MIN_QUALITY_SCORE = 0.08

@@ -10,6 +10,7 @@ from .forms import RegisterForm
 from .models import UserProfile
 from meetings.models import Meeting
 from cameras.models import Camera
+from attendance.models import StudentFaceProfile
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -129,6 +130,9 @@ def student_dashboard(request):
     context = get_student_stats(request.user)
     context['profile_completion'] = get_profile_completion(request.user)
     context['profile'] = profile
+    context['face_registered'] = StudentFaceProfile.objects.filter(
+        student=request.user, is_active=True
+    ).exists()
     
     return render(request, 'accounts/student_dashboard.html', context)
 
@@ -261,6 +265,9 @@ def profile_view(request, username=None):
         'is_own_profile': is_own_profile,
         'stats': stats,
         'completion': completion,
+        'face_registered': StudentFaceProfile.objects.filter(
+            student=profile_user, is_active=True
+        ).exists() if (profile and profile.user_type == 'student') else False,
     }
     
     return render(request, 'accounts/profile.html', context)

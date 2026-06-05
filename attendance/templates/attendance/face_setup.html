@@ -338,6 +338,7 @@
 </div>
 
 <script>
+(function() {
 // ── Info Modal & Profile Completeness ─────────────────────
 const infoComplete = {{ info_complete|yesno:"true,false" }};
 
@@ -347,7 +348,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-async function saveProfileInfo() {
+window.saveProfileInfo = async function saveProfileInfo() {
     const roll = document.getElementById('modal_roll').value.trim();
     const branch = document.getElementById('modal_branch').value.trim();
     const contact = document.getElementById('modal_contact').value.trim();
@@ -369,8 +370,7 @@ async function saveProfileInfo() {
         
         if (data.status === 'success') {
             document.getElementById('infoModal').classList.remove('active');
-            // Allow registration to proceed
-            window.location.reload(); // Reload to refresh infoComplete status
+            window.location.reload();
         } else {
             errorEl.textContent = data.message;
             errorEl.style.display = "block";
@@ -379,39 +379,41 @@ async function saveProfileInfo() {
         errorEl.textContent = "Failed to update profile. Try again.";
         errorEl.style.display = "block";
     }
-}
+};
 
 // ── Tab switcher ───────────────────────────────────────────
-function switchTab(tab) {
+window.switchTab = function switchTab(tab) {
     document.querySelectorAll('.face-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.face-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
     document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
-}
+};
 
 // ── Upload preview ─────────────────────────────────────────
-function previewImage(input) {
+window.previewImage = function previewImage(input) {
     const file = input.files[0];
     if (!file) return;
     const preview = document.getElementById('previewImg');
     preview.src = URL.createObjectURL(file);
     preview.style.display = 'block';
     document.getElementById('uploadBtn').disabled = false;
-}
+};
 
 // Drag & drop
 const zone = document.getElementById('uploadZone');
-zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-zone.addEventListener('drop', e => {
-    e.preventDefault(); zone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-        const input = document.getElementById('photoInput');
-        const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files;
-        previewImage(input);
-    }
-});
+if (zone) {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const input = document.getElementById('photoInput');
+            const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files;
+            previewImage(input);
+        }
+    });
+}
 
 // ── Camera logic ────────────────────────────────────────────
 let cameraStream = null;
@@ -419,7 +421,7 @@ let detectionInterval = null;
 let stabilityCounter = 0;
 let isCapturing = false;
 
-async function startCamera() {
+window.startCamera = async function startCamera() {
     try {
         cameraStream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: 'user', width: {ideal:1280}, height: {ideal:720} } 
@@ -433,16 +435,15 @@ async function startCamera() {
         document.getElementById('captureBtn').style.display = 'inline-flex';
         document.getElementById('stopCamBtn').style.display = 'inline-flex';
         
-        // Start auto-detection
         stabilityCounter = 0;
         isCapturing = false;
         detectionInterval = setInterval(detectFace, 800);
     } catch(e) {
         showCaptureResult('error', '⚠ Camera access denied. Please allow camera access in your browser settings.');
     }
-}
+};
 
-function stopCamera() {
+window.stopCamera = function stopCamera() {
     if (detectionInterval) { clearInterval(detectionInterval); detectionInterval = null; }
     if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
     document.getElementById('cameraFeed').style.display = 'none';
@@ -452,7 +453,7 @@ function stopCamera() {
     document.getElementById('captureBtn').style.display = 'none';
     document.getElementById('stopCamBtn').style.display = 'none';
     document.getElementById('faceGuide').classList.remove('detected');
-}
+};
 
 async function detectFace() {
     if (isCapturing || !cameraStream) return;
@@ -462,7 +463,6 @@ async function detectFace() {
     const guide = document.getElementById('faceGuide');
     const statusEl = document.getElementById('cameraStatus');
 
-    // Small frame for fast detection
     canvas.width = 240; canvas.height = 180;
     const ctx = canvas.getContext('2d');
     ctx.translate(240, 0); ctx.scale(-1, 1); 
@@ -490,7 +490,7 @@ async function detectFace() {
 
             if (stabilityCounter >= 2) {
                 statusEl.textContent = '📸 Auto-capturing...';
-                capturePhoto(); // Trigger final high-quality capture
+                capturePhoto();
             }
         } else {
             guide.classList.remove('detected');
@@ -502,7 +502,7 @@ async function detectFace() {
     }
 }
 
-async function capturePhoto() {
+window.capturePhoto = async function capturePhoto() {
     if (isCapturing) return;
     isCapturing = true;
     if (detectionInterval) { clearInterval(detectionInterval); detectionInterval = null; }
@@ -514,41 +514,32 @@ async function capturePhoto() {
     const guide = document.getElementById('faceGuide');
     
     guide.classList.add('detected');
-    
-    // Show processing state immediately
     showCaptureResult('processing', 'Processing...');
     statusEl.textContent = '📸 Capturing photo...';
     
-    // Disable button
     captureBtn.disabled = true;
     captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20" style="animation: spin 1s linear infinite;"/></svg> Capturing…';
     
-    // Small delay to show capture animation
     await new Promise(r => setTimeout(r, 300));
     
-    // Capture frame
     canvas.width = 640; canvas.height = 480;
     const ctx = canvas.getContext('2d');
     ctx.translate(640, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, 640, 480);
     
     const frameB64 = canvas.toDataURL('image/jpeg', 0.92);
     
-    // Show processing state
     captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20" style="animation: spin 1s linear infinite;"/></svg> Processing…';
     statusEl.textContent = '🧠 Processing face recognition...';
     showCaptureResult('processing', 'Analyzing face...');
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         
         const resp = await fetch("{% url 'capture_face_photo' %}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-            body: JSON.stringify({ 
-                frame_b64: frameB64
-                // Student info is now pulled from profile on server side
-            }),
+            body: JSON.stringify({ frame_b64: frameB64 }),
             signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -563,6 +554,8 @@ async function capturePhoto() {
         } else {
             statusEl.textContent = '❌ ' + (data.message || 'Registration failed');
             showCaptureResult('error', data.message || 'Face registration failed. Please try again.');
+            isCapturing = false;
+            detectionInterval = setInterval(detectFace, 800);
         }
     } catch(e) {
         if (e.name === 'AbortError') {
@@ -572,11 +565,12 @@ async function capturePhoto() {
             statusEl.textContent = '❌ Network error';
             showCaptureResult('error', 'Network error. Please check your connection and try again.');
         }
+        isCapturing = false;
     } finally {
         captureBtn.disabled = false;
         captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg> Capture & Register';
     }
-}
+};
 
 function showCaptureResult(type, msg) {
     const el = document.getElementById('captureResult');
@@ -589,5 +583,8 @@ function getCsrf() {
     const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
     return c ? c.split('=')[1] : '';
 }
+
+})(); // end IIFE
 </script>
 {% endblock %}
+
