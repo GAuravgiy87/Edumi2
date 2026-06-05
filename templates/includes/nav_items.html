@@ -65,7 +65,7 @@
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
                     <span class="sidebar-nav-text">Meetings</span>
                 </a>
-                <a href="{% url 'teacher_camera_dashboard' %}" class="sidebar-nav-item {% if '/control-room/' in request.path or '/teacher-dashboard/' in request.path %}active{% endif %}">
+                <a href="{% url 'teacher_camera_dashboard' %}" class="sidebar-nav-item {% if '/control-room/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
                     <span class="sidebar-nav-text">Live / Videos</span>
                 </a>

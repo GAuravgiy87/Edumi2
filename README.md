@@ -170,13 +170,16 @@ python -m venv .venv
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# 4. Copy the environment config and fill in your values
+# 4. Install AI Face Recognition Models (Required)
+pip install git+https://github.com/ageitgey/face_recognition_models.git
+
+# 5. Copy the environment config and fill in your values
 copy .env.example .env
 
-# 5. Apply database migrations
+# 6. Apply database migrations
 python manage.py migrate
 
-# 6. Launch all services with the master script
+# 7. Launch all services with the master script
 #    Right-click → "Run with PowerShell" OR:
 powershell -ExecutionPolicy Bypass -File .\start_app.ps1
 ```
@@ -217,6 +220,9 @@ source .venv/bin/activate
 # Main application
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# Install AI Face Recognition Models (Required for attendance & tracking)
+pip install git+https://github.com/ageitgey/face_recognition_models.git
 
 # Camera microservice (separate Django sub-project)
 pip install -r camera_service/requirements.txt

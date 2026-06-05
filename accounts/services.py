@@ -26,11 +26,28 @@ def get_profile_completion(user):
 
 def get_teacher_stats(user):
     """Get statistics for the teacher dashboard."""
+    from django.utils import timezone
+    from meetings.models import Classroom, Meeting
+    
+    total_students = User.objects.filter(
+        classroom_memberships__classroom__teacher=user,
+        classroom_memberships__status='approved'
+    ).distinct().count()
+    
+    today = timezone.localdate()
+    today_meetings = Meeting.objects.filter(
+        teacher=user,
+        status__in=['scheduled', 'live'],
+        scheduled_time__date=today
+    ).order_by('scheduled_time')[:5]
+
     return {
-        'total_meetings': Meeting.objects.filter(teacher=user, classroom__isnull=True).count(),
-        'live_meetings': Meeting.objects.filter(teacher=user, status='live', classroom__isnull=True).count(),
-        'scheduled_meetings': Meeting.objects.filter(teacher=user, status='scheduled', classroom__isnull=True).count(),
-        'completed_meetings': Meeting.objects.filter(teacher=user, status='ended', classroom__isnull=True).count(),
+        'total_meetings': Classroom.objects.filter(teacher=user).count(),
+        'live_meetings': Meeting.objects.filter(teacher=user, status='live').count(),
+        'scheduled_meetings': Meeting.objects.filter(teacher=user, status='scheduled').count(),
+        'completed_meetings': Meeting.objects.filter(teacher=user, status='ended').count(),
+        'total_students': total_students,
+        'today_meetings': today_meetings,
     }
 
 def get_student_stats(user):
