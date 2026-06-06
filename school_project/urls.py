@@ -20,6 +20,8 @@ urlpatterns = [
     path('mobile-cameras/', include('mobile_cameras.urls')),
     path('meetings/', include('meetings.urls')),
     path('attendance/', include('attendance.urls')),
+    path('videos/', include('videos.urls')),  # <-- Video URLs
+    path('video-editing/', include('video_editing.urls')),  # <-- Video editing URLs
 ]
 
 # Error handlers

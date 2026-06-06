@@ -56,12 +56,19 @@ MIDDLEWARE = [
 # CORS settings - allow main app to access camera service
 CORS_ALLOWED_ORIGINS = [
     "https://localhost",
+    "https://localhost:8002",
     "https://localhost:8443",
     "https://127.0.0.1",
+    "https://127.0.0.1:8002",
     "https://127.0.0.1:8443",
     "http://localhost:8000",
+    "http://localhost:8002",
     "http://127.0.0.1:8000",
+    "http://127.0.0.1:8002",
     "http://10.7.11.141:8000",
+    "http://10.7.11.141:8002",
+    "https://10.7.11.141:8000",
+    "https://10.7.11.141:8002",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for development
@@ -69,6 +76,9 @@ CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for development
 ROOT_URLCONF = 'camera_service.urls'
 
 # Use the same database as main project
+DATABASE_DIR = MAIN_PROJECT_DIR / 'database'
+DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+
 if os.environ.get('DATABASE_URL'):
     import dj_database_url
     DATABASES = {
@@ -78,7 +88,11 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': MAIN_PROJECT_DIR / 'db.sqlite3',
+            'NAME': DATABASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                'timeout': 30,
+                'check_same_thread': False,
+            },
         }
     }
 

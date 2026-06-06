@@ -71,13 +71,30 @@ if csrf_origins_env:
 DEFAULT_CSRF_ORIGINS = [
     'http://localhost',
     'http://localhost:8000',
+    'http://localhost:8002',
+    'http://localhost:8003',
     'http://localhost:8080',
+    'https://localhost',
+    'https://localhost:8000',
+    'https://localhost:8002',
+    'https://localhost:8003',
+    'https://localhost:8080',
     'http://127.0.0.1',
     'http://127.0.0.1:8000',
+    'http://127.0.0.1:8002',
+    'http://127.0.0.1:8003',
     'http://127.0.0.1:8080',
+    'https://127.0.0.1',
+    'https://127.0.0.1:8000',
+    'https://127.0.0.1:8002',
+    'https://127.0.0.1:8003',
+    'https://127.0.0.1:8080',
     'http://10.7.11.141',
+    'https://10.7.11.141',
     'http://192.168.1.100',
     'http://192.168.1.100:8080',
+    'https://192.168.1.100',
+    'https://192.168.1.100:8080',
 ]
 for origin in DEFAULT_CSRF_ORIGINS:
     if origin not in CSRF_TRUSTED_ORIGINS:
@@ -101,11 +118,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'channels',
+    'common',  # New: Common utilities, mixins, tags
     'accounts',
     'cameras',  # RTSP Camera management
     'mobile_cameras',  # Mobile Camera management (IP Webcam, DroidCam)
     'meetings',
     'attendance',  # Face Recognition Attendance System
+    'videos',  # New: Video streaming app!
+    'video_editing',  # New: Video editing app!
     'django_extensions',  # For HTTPS development server
     'compressor',
 ]
@@ -183,6 +203,9 @@ else:
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+DATABASE_DIR = BASE_DIR / 'database'
+DATABASE_DIR.mkdir(parents=True, exist_ok=True)  # Create database directory if doesn't exist
+
 if os.environ.get('DATABASE_URL'):
     try:
         import dj_database_url
@@ -193,7 +216,7 @@ if os.environ.get('DATABASE_URL'):
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
+                'NAME': DATABASE_DIR / 'db.sqlite3',
                 'OPTIONS': {
                     'timeout': 30,  # Wait up to 30 seconds for database lock
                     'check_same_thread': False,  # Allow multi-threaded access
@@ -204,7 +227,7 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': DATABASE_DIR / 'db.sqlite3',
             'OPTIONS': {
                 'timeout': 30,  # Wait up to 30 seconds for database lock
                 'check_same_thread': False,  # Allow multi-threaded access
@@ -268,7 +291,8 @@ COMPRESS_ROOT = STATIC_ROOT
 
 # Media files (uploaded by users)
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = DATABASE_DIR / 'media'
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)  # Ensure media directory exists
 
 LOGIN_URL = 'login'
 LOGOUT_REDIRECT_URL = '/'

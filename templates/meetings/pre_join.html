@@ -69,6 +69,17 @@
 </style>
 
 <div class="prejoin-container">
+    <div id="ipWarningBanner" class="warning-banner" style="display:none; border-color: #ef4444; background: #fef2f2;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <p style="color:#991b1b;">
+            <strong>Camera/Microphone not working?</strong><br>
+            Since you're accessing via an IP address, you need to enable insecure origins in Chrome:<br>
+            1. Open <code style="background:#fecaca; padding:0.125rem 0.25rem; border-radius:0.25rem;">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code><br>
+            2. Add <code style="background:#fecaca; padding:0.125rem 0.25rem; border-radius:0.25rem;" id="currentOrigin">http://YOUR-IP:PORT</code> to the list<br>
+            3. Click "Relaunch" to apply changes.
+        </p>
+    </div>
+    
     <div style="margin-bottom: 2rem;">
         <h1 style="font-size: 2rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">Join Meeting: {{ meeting.title }}</h1>
         <p style="color: #64748b;">Prepare your hardware and verify your identity before entering.</p>
@@ -236,7 +247,10 @@ async function performFaceCheck() {
     try {
         const response = await fetch('{% url "verify_face_prejoin" %}', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            headers: { 
+                'Content-Type': 'application/json', 
+                'X-CSRFToken': '{{ csrf_token }}' 
+            },
             body: JSON.stringify({ image: imageData, meeting_code: '{{ meeting.meeting_code }}' })
         });
         const data = await response.json();
@@ -266,10 +280,23 @@ function redirectToMeeting() {
 function skipVerify() {
     window.location.href = "{% url 'join_meeting' meeting.meeting_code %}?skip_verify=1";
 }
-
-document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); initCamera(); });
-{% else %}
-document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
 {% endif %}
+
+document.addEventListener('DOMContentLoaded', () => {
+    lucide.createIcons();
+    
+    // Show IP camera access warning if not on localhost
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' || 
+                        window.location.hostname === '[::1]';
+    if (!isLocalhost) {
+        document.getElementById('ipWarningBanner').style.display = 'flex';
+        document.getElementById('currentOrigin').textContent = window.location.origin;
+    }
+    
+    {% if face_registered %}
+    initCamera();
+    {% endif %}
+});
 </script>
 {% endblock %}

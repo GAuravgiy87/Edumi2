@@ -52,22 +52,41 @@ Write-Host "[6/7] Starting Camera Service (port 8003)..." -ForegroundColor Yello
 Start-Process -FilePath "python" -ArgumentList "camera_service/manage.py runserver 0.0.0.0:8003" -WindowStyle Minimized
 Start-Sleep -Seconds 2
 
-# 7. Start Main App (Daphne)
-Write-Host "[7/7] Starting Main Application (port 8002)..." -ForegroundColor Yellow
+# 7. Start Main App (Django Extensions runserver_plus with HTTPS)
+Write-Host "[7/7] Starting Main Application (HTTPS on port 8002)..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "System is starting up!" -ForegroundColor Green
-Write-Host "Access App: http://localhost:8002" -ForegroundColor Cyan
-Write-Host "Admin Panel: http://localhost:8002/admin/" -ForegroundColor Cyan
+Write-Host "Access App: https://localhost:8002" -ForegroundColor Cyan
+Write-Host "Admin Panel: https://localhost:8002/admin/" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "📝 NOTE: You'll see a 'Your connection is not private' warning in Chrome" -ForegroundColor Yellow
+Write-Host "Click 'Advanced' then 'Proceed to localhost (unsafe)' to continue" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Keep this window open to see server logs." -ForegroundColor Gray
 Write-Host "Press Ctrl+C to stop the web server." -ForegroundColor Gray
 Write-Host ""
-Write-Host "⚠️  IMPORTANT FOR OTHER STUDENTS:" -ForegroundColor Yellow
-Write-Host "If students join via IP (e.g. http://192.168.x.x:8002), they MUST enable" -ForegroundColor Gray
-Write-Host "camera permissions in Chrome by going to:" -ForegroundColor Gray
-Write-Host "chrome://flags/#unsafely-treat-insecure-origin-as-secure" -ForegroundColor Cyan
-Write-Host "And adding your server IP to the list." -ForegroundColor Gray
-Write-Host ""
 
-# Start the Main Application in the foreground
-python manage.py runserver 0.0.0.0:8002
+# Check if certs exist, create if not
+$certDir = ".\certs"
+if (-not (Test-Path $certDir)) {
+    New-Item -ItemType Directory -Path $certDir | Out-Null
+}
+
+# Generate self-signed cert using OpenSSL if available, or let runserver_plus handle it
+try {
+    $hasOpenSSL = $null -ne (Get-Command openssl -ErrorAction SilentlyContinue)
+    if ($hasOpenSSL -and -not (Test-Path "$certDir\server.crt")) {
+        Write-Host "Generating self-signed SSL certificate..." -ForegroundColor Yellow
+        openssl req -x509 -newkey rsa:4096 -keyout "$certDir\server.key" -out "$certDir\server.crt" -days 365 -nodes -subj "/CN=localhost" 2>&1 | Out-Null
+        Write-Host "SSL certificate generated successfully!" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "OpenSSL not found, using built-in certificate generation..." -ForegroundColor Yellow
+}
+
+# Start the Main Application with HTTPS
+if (Test-Path "$certDir\server.crt") {
+    python manage.py runserver_plus 0.0.0.0:8002 --cert-file="$certDir\server.crt" --key-file="$certDir\server.key"
+} else {
+    python manage.py runserver_plus 0.0.0.0:8002
+}

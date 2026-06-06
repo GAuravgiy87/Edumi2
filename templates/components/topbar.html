@@ -1,0 +1,43 @@
+<!-- Top Bar -->
+<div class="topbar">
+    <div class="topbar-left">
+        <button class="mobile-menu-btn" onclick="openMobileSidebar()">
+            <i data-lucide="menu" class="icon" style="width: 24px; height: 24px;"></i>
+        </button>
+        <h1 class="topbar-title">{% block page_title %}Dashboard{% endblock %}</h1>
+    </div>
+    <div class="topbar-right">
+        <div class="topbar-search">
+            <span class="topbar-search-icon">
+                <i data-lucide="search" class="icon" style="width: 16px; height: 16px;"></i>
+            </span>
+            <input type="text" placeholder="Search..." onkeypress="handleSearch(event)">
+        </div>
+        
+        <!-- Theme Toggle -->
+        <button type="button" class="topbar-icon-btn theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+            <i data-lucide="moon" id="moonIcon" style="width: 20px; height: 20px;"></i>
+            <i data-lucide="sun" id="sunIcon" style="display: none; width: 20px; height: 20px;"></i>
+        </button>
+
+        <div class="notification-wrapper">
+            <button type="button" class="topbar-icon-btn notification-btn" id="notificationBtn" onclick="toggleNotifications(event)">
+                <i data-lucide="bell" class="icon" style="width: 20px; height: 20px;"></i>
+                <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+            </button>
+            
+            <div class="notification-dropdown" id="notificationDropdown">
+                <div class="notification-dropdown-header">
+                    <h3>Notifications</h3>
+                    <button onclick="markAllNotificationsRead(event)" class="mark-all-read-btn">Mark all read</button>
+                </div>
+                <div class="notification-dropdown-list" id="notificationList">
+                    <div class="notification-loading">Loading...</div>
+                </div>
+                <div class="notification-dropdown-footer">
+                    <a href="{% url 'notifications_list' %}">View all notifications</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

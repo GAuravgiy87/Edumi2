@@ -25,7 +25,7 @@ from meetings.models import (
 from meetings.tasks import generate_meeting_summary
 from accounts.notification_utils import notify_meeting_started, notify_meeting_cancelled
 from attendance.face_service import get_face_service
-from attendance.models import StudentFaceProfile
+from attendance.models import StudentFaceProfile, AttendanceRecord
 
 
 def generate_meeting_code():
@@ -72,11 +72,13 @@ def create_meeting(request):
 def teacher_meetings(request):
     """Teacher (or admin) views all standalone meetings."""
     if request.user.is_superuser:
-        meetings = Meeting.objects.filter(classroom__isnull=True).exclude(meeting_code__startswith='CAM_')
+        meetings = Meeting.objects.filter(
+            classroom__isnull=True
+        ).exclude(meeting_code__startswith='CAM_').select_related('teacher', 'classroom')
     elif hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher':
         meetings = Meeting.objects.filter(
             teacher=request.user, classroom__isnull=True
-        ).exclude(meeting_code__startswith='CAM_')
+        ).exclude(meeting_code__startswith='CAM_').select_related('teacher', 'classroom')
     else:
         return redirect('login')
 
@@ -103,7 +105,7 @@ def student_meetings(request):
         classroom_id__in=my_classroom_ids,
         status__in=['scheduled', 'live'],
         meeting_type='classroom',
-    ).exclude(meeting_code__startswith='CAM_')
+    ).exclude(meeting_code__startswith='CAM_').select_related('teacher', 'classroom')
     return render(request, 'meetings/student_meetings.html', {'meetings': meetings})
 
 

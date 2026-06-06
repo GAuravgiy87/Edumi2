@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ video.title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <a href="{% url 'video_list' %}" class="btn btn-secondary mb-4">Back to Videos</a>
+    <a href="{% url 'edit_video' video.id %}" class="btn btn-primary mb-4 ms-2">Edit Video</a>
+    
+    <h1 class="mb-4">{{ video.title }}</h1>
+    {% if video.description %}
+    <p class="mb-4">{{ video.description }}</p>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-body">
+            <!-- Video Player -->
+            <video id="videoPlayer" class="w-100" controls style="max-height: 500px;">
+                Your browser does not support the video tag.
+            </video>
+            
+            <!-- Quality Selector -->
+            <div class="mt-3">
+                <label for="qualitySelect" class="form-label">Select Quality:</label>
+                <select id="qualitySelect" class="form-select" style="max-width: 200px;">
+                    {% for quality in video.qualities.all %}
+                    <option value="{{ quality.id }}" {% if forloop.first %}selected{% endif %}>{{ quality.quality }}</option>
+                    {% empty %}
+                    <option value="" disabled>No qualities available</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const videoPlayer = document.getElementById('videoPlayer');
+    const qualitySelect = document.getElementById('qualitySelect');
+    
+    let currentQualityId = qualitySelect.value;
+    let chunks = [];
+    let currentChunkIndex = 0;
+    let isPlaying = false;
+    
+    // Function to load chunks for a quality
+    async function loadChunksForQuality(qualityId) {
+        // For simplicity, let's first use the full quality file as fallback
+        videoPlayer.src = '{% url "stream_quality_video" 0 %}'.replace('0', qualityId);
+    }
+    
+    // Initial load
+    if (currentQualityId) {
+        loadChunksForQuality(currentQualityId);
+    }
+    
+    // Quality change handler
+    qualitySelect.addEventListener('change', function() {
+        currentQualityId = this.value;
+        loadChunksForQuality(currentQualityId);
+    });
+});
+</script>
+{% endblock %}
