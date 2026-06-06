@@ -206,34 +206,44 @@ else:
 DATABASE_DIR = BASE_DIR / 'database'
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)  # Create database directory if doesn't exist
 
-if os.environ.get('DATABASE_URL'):
-    try:
-        import dj_database_url
-        DATABASES = {
-            'default': dj_database_url.config(conn_max_age=600)
-        }
-    except ImportError:
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': DATABASE_DIR / 'db.sqlite3',
-                'OPTIONS': {
-                    'timeout': 30,  # Wait up to 30 seconds for database lock
-                    'check_same_thread': False,  # Allow multi-threaded access
-                },
-            }
-        }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': DATABASE_DIR / 'db.sqlite3',
-            'OPTIONS': {
-                'timeout': 30,  # Wait up to 30 seconds for database lock
-                'check_same_thread': False,  # Allow multi-threaded access
-            },
-        }
+# We use 4 separate SQLite databases to split the load as requested
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_main.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
+    },
+    'camera_db': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_camera.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
+    },
+    'video_db': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_video.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
+    },
+    'meeting_db': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_meeting.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
     }
+}
+
+# Add database router
+DATABASE_ROUTERS = ['school_project.db_router.EdumiRouter']
 
 
 # Password validation

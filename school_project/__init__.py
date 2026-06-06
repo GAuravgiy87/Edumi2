@@ -35,4 +35,12 @@ def patch_context_copy():
 
 patch_context_copy()
 
+# Disable SQLite foreign keys globally so we can split databases without constraint errors
+from django.db.backends.signals import connection_created
+def disable_sqlite_foreign_keys(sender, connection, **kwargs):
+    if connection.vendor == 'sqlite':
+        cursor = connection.cursor()
+        cursor.execute('PRAGMA foreign_keys = OFF;')
+connection_created.connect(disable_sqlite_foreign_keys)
+
 __all__ = ('celery_app',)

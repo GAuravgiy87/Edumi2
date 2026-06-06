@@ -79,22 +79,45 @@ ROOT_URLCONF = 'camera_service.urls'
 DATABASE_DIR = MAIN_PROJECT_DIR / 'database'
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 
-if os.environ.get('DATABASE_URL'):
-    import dj_database_url
-    DATABASES = {
-        'default': dj_database_url.config(conn_max_age=600)
+# We use 4 separate SQLite databases to split the load as requested
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_main.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
+    },
+    'camera_db': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_camera.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
+    },
+    'video_db': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_video.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
+    },
+    'meeting_db': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATABASE_DIR / 'db_meeting.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+            'check_same_thread': False,
+        },
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': DATABASE_DIR / 'db.sqlite3',
-            'OPTIONS': {
-                'timeout': 30,
-                'check_same_thread': False,
-            },
-        }
-    }
+}
+
+# Add database router
+sys.path.insert(0, str(MAIN_PROJECT_DIR))
+DATABASE_ROUTERS = ['school_project.db_router.EdumiRouter']
 
 # Logging
 LOGGING = {
