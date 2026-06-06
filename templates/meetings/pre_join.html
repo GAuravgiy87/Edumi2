@@ -53,6 +53,18 @@
     }
     .warning-banner svg { flex-shrink: 0; color: #d97706; margin-top: 2px; }
     .warning-banner p { font-size: 0.875rem; color: #92400e; margin: 0; line-height: 1.5; }
+    
+    .media-controls {
+        display: flex; gap: 1rem; margin-top: 1.5rem; padding: 1rem; background: #f1f5f9; border-radius: 0.75rem; justify-content: center;
+    }
+    .media-btn {
+        width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+        background: #e2e8f0;
+    }
+    .media-btn:hover { background: #cbd5e1; }
+    .media-btn.active { background: #4f46e5; color: white; }
+    .media-btn.muted { background: #ef4444; color: white; }
+    
     @media (max-width: 900px) { .prejoin-grid { grid-template-columns: 1fr; } }
 </style>
 
@@ -90,13 +102,24 @@
     {% else %}
     <!-- === REGISTERED USER: full face verification === -->
     <div class="prejoin-grid">
-        <div class="camera-preview-wrap">
-            <video id="videoPreview" autoplay playsinline muted></video>
-            <div id="cameraOverlay" class="preview-overlay">
-                <i data-lucide="camera-off" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
-                <p>Camera is starting...</p>
+        <div>
+            <div class="camera-preview-wrap">
+                <video id="videoPreview" autoplay playsinline muted></video>
+                <div id="cameraOverlay" class="preview-overlay">
+                    <i data-lucide="camera-off" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
+                    <p>Camera is starting...</p>
+                </div>
+                <canvas id="identityCanvas" style="display:none;"></canvas>
             </div>
-            <canvas id="identityCanvas" style="display:none;"></canvas>
+            
+            <div class="media-controls">
+                <button id="micBtn" class="media-btn active" onclick="toggleMic()">
+                    <i data-lucide="mic"></i>
+                </button>
+                <button id="camBtn" class="media-btn active" onclick="toggleCam()">
+                    <i data-lucide="video"></i>
+                </button>
+            </div>
         </div>
 
         <div class="status-card">
@@ -144,14 +167,18 @@
 <script>
 {% if face_registered %}
 let stream = null;
+let micEnabled = true;
+let camEnabled = true;
 const video = document.getElementById('videoPreview');
 const canvas = document.getElementById('identityCanvas');
 const overlay = document.getElementById('cameraOverlay');
 const joinBtn = document.getElementById('joinBtn');
+const micBtn = document.getElementById('micBtn');
+const camBtn = document.getElementById('camBtn');
 
 async function initCamera() {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         video.srcObject = stream;
         overlay.style.opacity = '0';
         updateStatus('cam', true, 'Camera active');
@@ -159,6 +186,36 @@ async function initCamera() {
     } catch (err) {
         updateStatus('cam', false, 'Access denied or no camera found');
     }
+}
+
+function toggleMic() {
+    micEnabled = !micEnabled;
+    if (stream) {
+        stream.getAudioTracks().forEach(track => track.enabled = micEnabled);
+    }
+    if (micEnabled) {
+        micBtn.classList.remove('muted');
+        micBtn.innerHTML = '<i data-lucide="mic"></i>';
+    } else {
+        micBtn.classList.add('muted');
+        micBtn.innerHTML = '<i data-lucide="mic-off"></i>';
+    }
+    lucide.createIcons();
+}
+
+function toggleCam() {
+    camEnabled = !camEnabled;
+    if (stream) {
+        stream.getVideoTracks().forEach(track => track.enabled = camEnabled);
+    }
+    if (camEnabled) {
+        camBtn.classList.remove('muted');
+        camBtn.innerHTML = '<i data-lucide="video"></i>';
+    } else {
+        camBtn.classList.add('muted');
+        camBtn.innerHTML = '<i data-lucide="video-off"></i>';
+    }
+    lucide.createIcons();
 }
 
 function updateStatus(type, success, text) {

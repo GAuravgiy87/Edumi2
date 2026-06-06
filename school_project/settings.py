@@ -106,7 +106,6 @@ INSTALLED_APPS = [
     'mobile_cameras',  # Mobile Camera management (IP Webcam, DroidCam)
     'meetings',
     'attendance',  # Face Recognition Attendance System
-    'django_browser_reload',
     'django_extensions',  # For HTTPS development server
     'compressor',
 ]
@@ -129,7 +128,6 @@ MIDDLEWARE.extend([
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_browser_reload.middleware.BrowserReloadMiddleware',
 ])
 
 ROOT_URLCONF = 'school_project.urls'
@@ -340,7 +338,7 @@ EMOTION_LOGGING_ENABLED = True
 # Camera Service URL (internal, server-side only)
 # In Docker: uses service name via CAMERA_SERVICE_URL env var
 # In dev: falls back to localhost:8001
-CAMERA_SERVICE_URL = os.environ.get('CAMERA_SERVICE_URL', 'http://localhost:8001')
+CAMERA_SERVICE_URL = os.environ.get('CAMERA_SERVICE_URL', 'http://localhost:8003')
 
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>

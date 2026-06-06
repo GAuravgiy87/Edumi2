@@ -231,6 +231,34 @@ def verify_face_prejoin(request):
     if result['match']:
         if meeting_code:
             request.session[f'verified_meeting_{meeting_code}'] = True
+            try:
+                meeting = Meeting.objects.get(meeting_code=meeting_code)
+                # Update last verified time
+                profile.last_verified_at = timezone.now()
+                profile.save()
+                
+                # Create or update AttendanceRecord
+                if meeting.classroom:
+                    attendance_record, created = AttendanceRecord.objects.get_or_create(
+                        student=request.user,
+                        meeting=meeting,
+                        defaults={
+                            'classroom': meeting.classroom,
+                            'date': timezone.now().date(),
+                            'status': 'present',
+                            'verification_method': 'face_recognition',
+                            'face_match_confidence': result.get('confidence', 0.0),
+                            'face_verified_at': timezone.now(),
+                            'marked_present_at': timezone.now()
+                        }
+                    )
+                    if not created:
+                        attendance_record.face_verified_at = timezone.now()
+                        attendance_record.face_match_confidence = max(attendance_record.face_match_confidence, result.get('confidence', 0.0))
+                        attendance_record.save()
+            except Exception as e:
+                print(f"Error creating attendance record: {e}")
+        
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'message': result['message']})
 

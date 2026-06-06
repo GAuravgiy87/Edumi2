@@ -421,7 +421,7 @@
     data-leave-url="{% url 'leave_meeting' meeting.id %}"
     data-sleep-url="{% url 'sleep_meeting' meeting.meeting_code %}"
     data-unfreeze-url="{% url 'unfreeze_meeting' meeting.meeting_code %}"
-    data-after-leave-url="{% if meeting.classroom %}{% url 'classroom_detail' meeting.classroom.id %}{% elif is_host %}{% url 'teacher_classrooms' %}{% else %}{% url 'student_classrooms' %}{% endif %}"
+    data-after-leave-url="{% if is_host %}{% url 'teacher_dashboard' %}{% else %}{% url 'student_dashboard' %}{% endif %}"
     data-csrf="{{ csrf_token }}"
     data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
     data-banned-users-url="{% url 'get_banned_users' meeting.id %}"

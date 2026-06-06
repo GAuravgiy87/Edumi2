@@ -20,7 +20,6 @@ urlpatterns = [
     path('mobile-cameras/', include('mobile_cameras.urls')),
     path('meetings/', include('meetings.urls')),
     path('attendance/', include('attendance.urls')),
-    path("__reload__/", include("django_browser_reload.urls")),
 ]
 
 # Error handlers
