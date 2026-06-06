@@ -135,14 +135,6 @@
             <img id="mainFeed" src="" class="live-feed" alt="Live Stream">
             <audio id="liveAudio" autoplay></audio>
             
-            <!-- Mobile Audio Overlay -->
-            <div id="audioOverlay" style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; cursor:pointer;" onclick="startAudioExplicitly()">
-                <div style="background:white; color:#1e293b; padding:1rem 2rem; border-radius:1rem; font-weight:700; display:flex; align-items:center; gap:0.75rem; box-shadow:0 10px 15px -3px rgba(0,0,0,0.3);">
-                    <i data-lucide="volume-2" style="width:24px; height:24px;"></i>
-                    Tap to Join with Audio
-                </div>
-            </div>
-            
             <!-- Audio Controls -->
             <div style="position:absolute; bottom:1rem; right:1rem; display:flex; gap:0.5rem; z-index:10;">
                 <button onclick="toggleAudio()" class="btn-action" id="audioToggleBtn" style="background:rgba(15,23,42,0.8); color:white; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
@@ -208,8 +200,18 @@
     var mediaSource = null;
 
     // ── Audio Implementation ──
+    let audioConnectionAttempts = 0;
+    const MAX_AUDIO_ATTEMPTS = 3;
+    
     function connectAudio() {
-        if (audioWs) audioWs.close();
+        if (audioWs) {
+            audioWs.close();
+            audioWs = null;
+        }
+        if (audioConnectionAttempts >= MAX_AUDIO_ATTEMPTS) {
+            console.log("Max audio connection attempts reached, stopping");
+            return;
+        }
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         // Connect as ip_cam source so the server relays the camera's built-in mic via RTSP
@@ -233,9 +235,7 @@
                 sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
                 
                 sourceBuffer.addEventListener('error', (e) => {
-                    console.error("SourceBuffer error:", e);
-                    // If buffer errors, it's usually a container mismatch, restart
-                    setTimeout(connectAudio, 2000);
+                    console.warn("SourceBuffer error:", e);
                 });
 
                 sourceBuffer.addEventListener('updateend', () => {
@@ -243,12 +243,12 @@
                         try {
                             sourceBuffer.appendBuffer(queue.shift());
                         } catch (err) {
-                            console.error("Queue append error:", err);
+                            // Do nothing, just ignore
                         }
                     }
                 });
             } catch (err) {
-                console.error("MediaSource addSourceBuffer error:", err);
+                // Do nothing, just ignore
             }
         });
 
@@ -259,12 +259,11 @@
                     // Auto-play on first data if possible
                     if (isFirstChunk) {
                         audio.play().catch(() => {
-                            console.log("Autoplay blocked, waiting for user interaction");
+                            // Do nothing, just ignore
                         });
                         isFirstChunk = false;
                     }
                 } catch (err) {
-                    console.warn("Direct append failed, queuing:", err);
                     queue.push(e.data);
                 }
             } else if (sourceBuffer) {
@@ -273,12 +272,15 @@
         };
 
         audioWs.onclose = () => {
-            console.log("Audio disconnected. Retrying in 5s...");
-            setTimeout(connectAudio, 5000);
+            audioConnectionAttempts++;
+            if (audioConnectionAttempts < MAX_AUDIO_ATTEMPTS) {
+                console.log("Audio disconnected. Retrying in 5s...");
+                setTimeout(connectAudio, 5000);
+            }
         };
 
         audioWs.onerror = (err) => {
-            console.error("Audio WebSocket error:", err);
+            // Do nothing, just ignore
         };
     }
 
@@ -297,20 +299,6 @@
         if (window.lucide) lucide.createIcons();
     };
 
-    window.startAudioExplicitly = function() {
-        const audio = document.getElementById('liveAudio');
-        const overlay = document.getElementById('audioOverlay');
-        
-        audio.play().then(() => {
-            console.log("Audio started explicitly");
-            overlay.style.display = 'none';
-        }).catch(err => {
-            console.error("Audio start failed:", err);
-            // Even if it fails, hide overlay and let user use the toggle btn
-            overlay.style.display = 'none';
-        });
-    };
-
     // ── Initialize Direct Feed ──
     (function initFeed() {
         const host = window.location.hostname;
@@ -318,15 +306,15 @@
         const scheme = window.location.protocol;
 
         // In Docker (nginx), camera service is on the same host/port via proxy.
-        // In dev, camera service runs on port 8001.
+        // In dev, camera service runs on port 8003.
         // We detect Docker by checking if we're on port 80/443 or no port (default).
         let feedBase;
         if (!port || port === '80' || port === '443') {
             // Behind nginx — camera service is proxied at /cameras/
             feedBase = `${scheme}//${host}`;
         } else {
-            // Dev mode — camera service on port 8001
-            feedBase = `${scheme}//${host}:8001`;
+            // Dev mode — camera service on port 8003
+            feedBase = `${scheme}//${host}:8003`;
         }
 
         const feedUrl = `${feedBase}/cameras/${window.cameraId}/feed/?q=4k`;

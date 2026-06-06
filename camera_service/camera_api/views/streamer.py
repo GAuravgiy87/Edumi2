@@ -129,19 +129,57 @@ class CameraStreamer:
             pass
         return None
 
+    def _generate_placeholder(self):
+        """Generate a placeholder frame when no real camera is available."""
+        import datetime
+        # Create a black background
+        height, width = 1080, 1920
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+        
+        # Add some color
+        frame[:] = (30, 30, 50)
+        
+        # Add text
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text1 = f"Camera {self.camera_id}: Waiting for Feed"
+        text2 = f"Time: {datetime.datetime.now().strftime('%H:%M:%S')}"
+        
+        # Calculate positions
+        (w1, h1), _ = cv2.getTextSize(text1, font, 2, 3)
+        (w2, h2), _ = cv2.getTextSize(text2, font, 1.5, 2)
+        
+        x1 = (width - w1) // 2
+        y1 = (height + h1) // 2 - 50
+        x2 = (width - w2) // 2
+        y2 = (height + h2) // 2 + 50
+        
+        cv2.putText(frame, text1, (x1, y1), font, 2, (255, 255, 255), 3)
+        cv2.putText(frame, text2, (x2, y2), font, 1.5, (150, 150, 255), 2)
+        
+        return frame
+    
     def _update(self):
         """Background capture loop — reads frames, applies zoom, encodes JPEG."""
         while self.running:
             if time.time() - self.last_access > 90:
                 break
             if self.cap is None:
-                if self.connection_attempts >= RTSP_MAX_RECONNECT:
-                    time.sleep(10)
-                    self.connection_attempts = 0
-                    continue
+                # Try to connect, but if not available, show placeholder
                 self.connection_attempts += 1
                 self.cap = self._connect_camera()
                 if self.cap is None:
+                    # Show placeholder while waiting
+                    placeholder = self._generate_placeholder()
+                    self.last_frame_time = time.time()
+                    if self.lock.acquire(blocking=False):
+                        try:
+                            self.last_frame = placeholder.copy()
+                            med = cv2.resize(placeholder, (1280, 720), interpolation=cv2.INTER_LINEAR)
+                            ret_j, jpeg = cv2.imencode('.jpg', med, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                            if ret_j:
+                                self.frame = jpeg.tobytes()
+                        finally:
+                            self.lock.release()
                     time.sleep(RTSP_RECONNECT_DELAY)
                     continue
             try:

@@ -48,26 +48,26 @@ Start-Process -FilePath "celery" -ArgumentList "-A school_project worker -l info
 Start-Sleep -Seconds 2
 
 # 6. Start Camera Service
-Write-Host "[6/7] Starting Camera Service (port 8001)..." -ForegroundColor Yellow
-Start-Process -FilePath "python" -ArgumentList "camera_service/manage.py runserver 0.0.0.0:8001" -WindowStyle Minimized
+Write-Host "[6/7] Starting Camera Service (port 8003)..." -ForegroundColor Yellow
+Start-Process -FilePath "python" -ArgumentList "camera_service/manage.py runserver 0.0.0.0:8003" -WindowStyle Minimized
 Start-Sleep -Seconds 2
 
 # 7. Start Main App (Daphne)
-Write-Host "[7/7] Starting Main Application (port 8000)..." -ForegroundColor Yellow
+Write-Host "[7/7] Starting Main Application (port 8002)..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "System is starting up!" -ForegroundColor Green
-Write-Host "Access App: http://localhost:8000" -ForegroundColor Cyan
-Write-Host "Admin Panel: http://localhost:8000/admin/" -ForegroundColor Cyan
+Write-Host "Access App: http://localhost:8002" -ForegroundColor Cyan
+Write-Host "Admin Panel: http://localhost:8002/admin/" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Keep this window open to see server logs." -ForegroundColor Gray
 Write-Host "Press Ctrl+C to stop the web server." -ForegroundColor Gray
 Write-Host ""
 Write-Host "⚠️  IMPORTANT FOR OTHER STUDENTS:" -ForegroundColor Yellow
-Write-Host "If students join via IP (e.g. http://192.168.x.x:8000), they MUST enable" -ForegroundColor Gray
+Write-Host "If students join via IP (e.g. http://192.168.x.x:8002), they MUST enable" -ForegroundColor Gray
 Write-Host "camera permissions in Chrome by going to:" -ForegroundColor Gray
 Write-Host "chrome://flags/#unsafely-treat-insecure-origin-as-secure" -ForegroundColor Cyan
 Write-Host "And adding your server IP to the list." -ForegroundColor Gray
 Write-Host ""
 
 # Start the Main Application in the foreground
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 0.0.0.0:8002
