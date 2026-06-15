@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ meeting.title }} - Edumi Meet</title>
+    {% load static %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <!-- mediasoup-client browser bundle served locally -->
+    <script src="{% static 'js/mediasoup-client.min.js' %}"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <!-- SFU URL injected from Django settings -->
+    <script>window.SFU_URL = "{{ sfu_url }}"; window.SFU_AVAILABLE = {{ sfu_available|yesno:"true,false" }};</script>
+</head>
+<body class="meeting-body">
+
+
+<div class="meet-container">
+        <!-- Top Bar -->
+        <div class="meet-topbar">
+            <div class="meet-info">
+                <h3>{{ meeting.title }}</h3>
+                <span class="meet-code">{{ meeting.meeting_code }}</span>
+            </div>
+            <div class="recording-indicator" id="recordingIndicator" style="display: none;">
+                <span class="recording-dot"></span>
+                <span class="recording-text">Recording</span>
+                <span class="recording-timer" id="recordingTimer">00:00</span>
+            </div>
+            <div class="meet-timer" id="meetTimer">00:00</div>
+        </div>
+        
+        <!-- Video Grid -->
+        <div class="meet-main">
+            <div class="video-grid-container" id="videoGridContainer">
+                <div id="mainVideoArea" class="main-video-area"></div>
+                <div id="sidebarVideoArea" class="sidebar-video-area"></div>
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="meet-sidebar" id="meetSidebar" style="display: none;">
+                <div class="sidebar-header">
+                    <div class="sidebar-tabs">
+                        <button class="sidebar-tab active" onclick="switchSidebarTab('people')">
+                            <i data-lucide="users"></i>
+                            <span>People</span>
+                        </button>
+                        <button class="sidebar-tab" onclick="switchSidebarTab('chat')">
+                            <i data-lucide="message-square"></i>
+                            <span>Chat</span>
+                        </button>
+                    </div>
+                    <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+                </div>
+                
+                <div class="sidebar-content">
+                    <!-- People Tab -->
+                    <div class="sidebar-panel active" id="peoplePanel">
+                        <div class="participants-count">
+                            <span id="participantCount">1</span> in call
+                        </div>
+                        <div class="participants-list" id="participantsList">
+                            <div class="participant-item">
+                                <div class="participant-avatar">
+                                    <img src="{{ user.userprofile.get_profile_picture_url }}" alt="{{ user.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff'">
+                                </div>
+                                <div class="participant-info">
+                                    <div class="participant-name">{{ user.username }} (You)</div>
+                                    <div style="display: flex; gap: 4px;">
+                                        {% if user.is_superuser %}<span class="host-label" style="background:#ef4444;">Admin</span>{% endif %}
+                                        {% if is_host %}<span class="host-label">Host</span>{% endif %}
+                                    </div>
+                                </div>
+                                <div class="participant-status" id="localStatus">
+                                    <i data-lucide="mic" id="localMicStatus"></i>
+                                    <i data-lucide="video" id="localCamStatus"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Debug HUD (Ctrl+Shift+D to toggle) -->
+                    <div id="debugHUD" style="display: none; position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: #00ff00; padding: 10px; border-radius: 5px; font-family: monospace; z-index: 10000; font-size: 12px; pointer-events: none;">
+                        <div>Meeting: <span id="debugCode"></span></div>
+                        <div>WS Status: <span id="debugWS">Disconnected</span></div>
+                        <div>User ID: <span id="debugUID"></span></div>
+                        <div>Participants: <span id="debugParts"></span></div>
+                        <div>Last Msg: <span id="debugLast">None</span></div>
+                        <button onclick="syncParticipants()" style="pointer-events: auto; background: #333; color: white; border: 1px solid #555; margin-top: 5px; padding: 2px 5px; cursor: pointer;">Force Sync</button>
+                    </div>
+                    <!-- Chat Tab -->
+                    <div class="sidebar-panel" id="chatPanel">
+                        <div class="chat-messages" id="chatMessages"></div>
+                        <div class="chat-input-box">
+                            <input type="text" id="chatInput" placeholder="Send a message to everyone" />
+                            <button onclick="sendChatMessage()" class="send-btn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Floating Controls -->
+        <div class="meet-controls">
+            <button class="control-button" id="micBtn" onclick="toggleMic()" title="Microphone">
+                <i data-lucide="mic"></i>
+            </button>
+            
+            <button class="control-button" id="camBtn" onclick="toggleCamera()" title="Camera">
+                <i data-lucide="video"></i>
+            </button>
+            
+            <button class="control-button" id="screenBtn" onclick="toggleScreenShare()" title="Share screen">
+                <i data-lucide="monitor"></i>
+            </button>
+            
+            {% if is_host %}
+            <button class="control-button" id="recordBtn" onclick="toggleRecording()" title="Record meeting">
+                <i data-lucide="circle"></i>
+            </button>
+            {% endif %}
+            
+            <div class="control-divider"></div>
+            
+            <button class="control-button" id="peopleBtn" onclick="openSidebar('people')" title="Participants">
+                <i data-lucide="users"></i>
+            </button>
+            
+            <button class="control-button" id="chatBtn" onclick="openSidebar('chat')" title="Chat">
+                <i data-lucide="message-square"></i>
+                <span class="notification-badge" id="chatBadge" style="display: none;">0</span>
+            </button>
+            
+            <button class="control-button" id="themeBtn" onclick="toggleTheme()" title="Toggle dark/light mode">
+                <i data-lucide="sun"></i>
+            </button>
+            
+            {% if is_host %}
+            <button class="control-button" id="sleepBtn" onclick="toggleSleepMode()" title="Put meeting to sleep">
+                <i data-lucide="moon"></i>
+            </button>
+            {% endif %}
+            
+            <div class="control-divider"></div>
+            
+            <button class="control-button danger" onclick="leaveMeeting()" title="Leave call">
+                <i data-lucide="phone-off"></i>
+            </button>
+        </div>
+    </div>
+
+<script id="meeting-data" 
+    data-meeting-id="{{ meeting.id }}"
+    data-meeting-code="{{ meeting.meeting_code }}"
+    data-user-id="{{ user.id }}"
+    data-username="{{ user.username }}"
+    data-is-host="{% if is_host %}true{% else %}false{% endif %}"
+    data-avatar="{{ user.userprofile.get_profile_picture_url }}">
+</script>
+
+<script src="{% static 'js/sfu-client.js' %}"></script>
+
+<script src="{% static 'js/meeting-room.js' %}"></script>
+
+<!-- ── Face Attendance (students only) ──────────────────────────────────── -->
+{% if not is_host and not user.is_superuser %}
+<style>
+#face-att-badge {
+    position:fixed;bottom:90px;right:20px;z-index:1000;
+    display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:24px;
+    font-size:.8rem;font-weight:600;color:#fff;backdrop-filter:blur(12px);
+    box-shadow:0 4px 20px rgba(0,0,0,.3);transition:all .3s;max-width:260px;
+    background:rgba(30,30,60,.85);border:1px solid rgba(255,255,255,.1);
+}
+#face-att-badge.state-progress { border-color:rgba(245,158,11,.5);background:rgba(40,30,10,.85); }
+#face-att-badge.state-success  { border-color:rgba(16,185,129,.5);background:rgba(5,40,25,.85); }
+#face-att-badge.state-warning  { border-color:rgba(239,68,68,.4);background:rgba(40,10,10,.85); }
+.fa-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#667eea;animation:fa-pulse 1.5s infinite; }
+.state-success .fa-dot { background:#10b981;animation:none; }
+.state-warning .fa-dot { background:#ef4444; }
+.state-progress .fa-dot { background:#f59e0b; }
+@keyframes fa-pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+</style>
+<div id="face-att-badge">
+    <div class="fa-dot"></div>
+    <div>
+        <div id="face-att-text">🔍 Initializing…</div>
+        <div id="face-att-prog-wrap" style="display:none;margin-top:4px;">
+            <div style="background:rgba(255,255,255,.1);border-radius:2px;height:3px;overflow:hidden;">
+                <div id="face-att-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#667eea,#10b981);transition:width .4s;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const MEETING = meetingCode;
+    let attWs = null, captureTimer = null, interval = 15000, marked = false;
+    const badge = document.getElementById('face-att-badge');
+    const text  = document.getElementById('face-att-text');
+    const bar   = document.getElementById('face-att-bar');
+    const wrap  = document.getElementById('face-att-prog-wrap');
+    const canvas = document.createElement('canvas');
+
+    function connect() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        attWs = new WebSocket(`${proto}//${location.host}/ws/attendance/${MEETING}/`);
+        attWs.onopen    = () => {};
+        attWs.onclose   = () => { stopCapture(); setTimeout(connect, 5000); };
+        attWs.onerror   = () => {};
+        attWs.onmessage = e => handle(JSON.parse(e.data));
+    }
+
+    function handle(d) {
+        if (d.type === 'connected') {
+            interval = (d.interval || 15) * 1000;
+            if (d.has_profile) { setState('active', '🔍 Face recognition active'); startCapture(); }
+            else setState('warning', '⚠ No face profile — <a href="/attendance/face/setup/" style="color:#f87171">Register</a>');
+        } else if (d.type === 'no_profile') {
+            setState('warning', '⚠ No face profile — <a href="/attendance/face/setup/" style="color:#f87171">Register</a>');
+            stopCapture();
+        } else if (d.type === 'verification_progress') {
+            const pct = Math.min(100, Math.round((d.verified_seconds || 0) / (d.required_seconds || 30) * 100));
+            setState('progress', `🔍 Verifying… ${pct}%`);
+            wrap.style.display = 'block';
+            bar.style.width = pct + '%';
+        } else if (d.type === 'attendance_marked') {
+            setState('success', '✅ Attendance recorded!');
+            wrap.style.display = 'none';
+            stopCapture();
+            marked = true;
+            setTimeout(() => { badge.style.opacity = '0'; }, 8000);
+        } else if (d.type === 'verification_failed') {
+            setState('warning', `⚠ ${d.message || 'Face not recognized'}`);
+            setTimeout(() => { if (!marked) setState('active', '🔍 Face recognition active'); }, 3000);
+        }
+    }
+
+    function capture() {
+        if (marked || !attWs || attWs.readyState !== WebSocket.OPEN) return;
+        // Find the local video element
+        const vid = document.querySelector(`#video-${currentUserId} video`);
+        if (!vid || vid.readyState < 2) return;
+        canvas.width = 320; canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        // Un-mirror the local video for face recognition
+        ctx.save(); ctx.scale(-1, 1); ctx.drawImage(vid, -320, 0, 320, 240); ctx.restore();
+        const b64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+        attWs.send(JSON.stringify({ type: 'frame', frame: b64 }));
+    }
+
+    function startCapture() {
+        if (captureTimer) return;
+        setTimeout(capture, 3000);
+        captureTimer = setInterval(capture, interval);
+    }
+
+    function stopCapture() {
+        clearInterval(captureTimer); captureTimer = null;
+    }
+
+    function setState(state, html) {
+        badge.className = 'state-' + state;
+        text.innerHTML  = html;
+    }
+
+    window.addEventListener('load', () => setTimeout(connect, 2000));
+})();
+</script>
+{% endif %}
+
+<!-- ── Face Tracking (host only) ─────────────────────────────────────────── -->
+{% if is_host %}
+<style>
+#ft-btn {
+    position:fixed;bottom:90px;right:20px;z-index:1001;
+    padding:10px 18px;border-radius:24px;border:none;cursor:pointer;
+    font-size:.8rem;font-weight:600;color:#fff;
+    background:rgba(102,126,234,.85);backdrop-filter:blur(12px);
+    box-shadow:0 4px 20px rgba(0,0,0,.3);transition:all .3s;
+    display:flex;align-items:center;gap:7px;
+}
+#ft-btn.active { background:rgba(16,185,129,.85); }
+.ft-overlay { position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10; }
+.ft-emotion { position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
+    background:rgba(0,0,0,.65);color:#fff;font-size:.7rem;font-weight:600;
+    padding:2px 8px;border-radius:10px;white-space:nowrap;z-index:11;pointer-events:none; }
+</style>
+<button id="ft-btn" onclick="toggleFaceTracking()">
+    <i data-lucide="scan-face"></i>
+    Face Tracking
+</button>
+<script>
+(function () {
+    let on = false, ftWs = null, ftTimer = null;
+    const ftCanvas = document.createElement('canvas');
+
+    window.toggleFaceTracking = function () {
+        on = !on;
+        const btn = document.getElementById('ft-btn');
+        btn.classList.toggle('active', on);
+        btn.querySelector('svg + *') || (btn.lastChild.textContent = on ? ' Tracking ON' : ' Face Tracking');
+        on ? connectFT() : stopFT();
+    };
+
+    function connectFT() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ftWs = new WebSocket(`${proto}//${location.host}/ws/face-tracking/${meetingCode}/`);
+        ftWs.onopen    = () => { ftTimer = setInterval(captureAll, 5000); setTimeout(captureAll, 1000); };
+        ftWs.onclose   = () => { if (on) setTimeout(connectFT, 4000); };
+        ftWs.onmessage = e => { const d = JSON.parse(e.data); if (d.type === 'bulk_tracking_result') Object.entries(d.results).forEach(([uid, r]) => drawOverlay(uid, r)); };
+    }
+
+    function stopFT() {
+        clearInterval(ftTimer); ftTimer = null;
+        ftWs?.close(); ftWs = null;
+        document.querySelectorAll('.ft-overlay,.ft-emotion').forEach(el => el.remove());
+    }
+
+    function captureAll() {
+        if (!ftWs || ftWs.readyState !== WebSocket.OPEN) return;
+        const frames = {};
+        document.querySelectorAll('.video-box').forEach(box => {
+            const uid = box.dataset.userId;
+            if (!uid || String(uid) === String(currentUserId)) return;
+            const vid = box.querySelector('video');
+            if (!vid || vid.readyState < 2) return;
+            ftCanvas.width = 320; ftCanvas.height = 240;
+            ftCanvas.getContext('2d').drawImage(vid, 0, 0, 320, 240);
+            frames[uid] = ftCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+        });
+        if (Object.keys(frames).length) ftWs.send(JSON.stringify({ type: 'bulk_frame', frames }));
+    }
+
+    function drawOverlay(uid, res) {
+        const box = document.getElementById(`video-${uid}`);
+        if (!box) return;
+        let cv = box.querySelector('.ft-overlay');
+        if (!cv) { cv = document.createElement('canvas'); cv.className = 'ft-overlay'; box.appendChild(cv); }
+        cv.width = box.offsetWidth || 320; cv.height = box.offsetHeight || 240;
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        if (!res.face_visible || !res.faces?.length) { box.querySelector('.ft-emotion')?.remove(); return; }
+        res.faces.forEach(f => {
+            const x = f.box.x * cv.width, y = f.box.y * cv.height, w = f.box.w * cv.width, h = f.box.h * cv.height;
+            ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+            const lbl = f.name !== 'Unknown' ? `${f.name} (${Math.round(f.confidence * 100)}%)` : 'Unknown';
+            ctx.font = 'bold 12px Inter,sans-serif';
+            const tw = ctx.measureText(lbl).width;
+            ctx.fillStyle = 'rgba(34,197,94,.85)'; ctx.fillRect(x, y - 20, tw + 10, 20);
+            ctx.fillStyle = '#fff'; ctx.fillText(lbl, x + 5, y - 5);
+        });
+        let em = box.querySelector('.ft-emotion');
+        if (res.emotion_label) {
+            if (!em) { em = document.createElement('div'); em.className = 'ft-emotion'; box.appendChild(em); }
+            em.textContent = res.emotion_label;
+        } else { em?.remove(); }
+    }
+})();
+</script>
+{% endif %}
+
+</body>
+</html>

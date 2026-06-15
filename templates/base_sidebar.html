@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>{% block title %}EduMi - Educational Management System{% endblock %}</title>
+    {% load static %}
+    {% load compress %}
+    
+    {% compress css %}
+    <link rel="stylesheet" href="{% static 'css/modern-design.css' %}">
+    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    {% block extra_css %}{% endblock %}
+    {% endcompress %}
+
+    <!-- Lucide Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Sidebar Header -->
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <img src="{% static 'logo.svg' %}" alt="EduMi">
+                </div>
+            </div>
+
+            <!-- Sidebar User -->
+            <div class="sidebar-user">
+                <img src="{% if user.userprofile %}{{ user.userprofile.get_profile_picture_url }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff{% endif %}" 
+                     alt="{{ user.username }}" 
+                     class="sidebar-user-avatar"
+                     onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff'">
+                <div class="sidebar-user-info">
+                    <div class="sidebar-user-name">{{ user.userprofile.get_display_name|default:user.username }}</div>
+                    <div class="sidebar-user-role">
+                        {% if user.is_superuser %}
+                            Administrator
+                        {% elif user.userprofile.user_type == 'teacher' %}
+                            Teacher
+                        {% elif user.userprofile.user_type == 'student' %}
+                            Student
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar-nav">
+                {% include 'includes/nav_items.html' with nav_type='sidebar' %}
+            </nav>
+
+            <!-- Sidebar Footer -->
+            <div class="sidebar-footer">
+                <a href="#" class="sidebar-footer-item logout" onclick="event.preventDefault();document.getElementById('logout-form-sidebar').submit();">
+                    <span class="sidebar-nav-icon"><i data-lucide="log-out"></i></span>
+                    <span class="sidebar-nav-text">Logout</span>
+                </a>
+                <form id="logout-form-sidebar" method="post" action="{% url 'logout' %}" style="display:none;">{% csrf_token %}</form>
+            </div>
+        </aside>
+
+        <!-- Sidebar Overlay for Mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="topbar">
+                <div class="topbar-left">
+                    <button class="mobile-menu-btn" onclick="openMobileSidebar()">
+                        <i data-lucide="menu" class="icon" style="width: 24px; height: 24px;"></i>
+                    </button>
+                    <h1 class="topbar-title">{% block page_title %}Dashboard{% endblock %}</h1>
+                </div>
+                <div class="topbar-right">
+                    <div class="topbar-search">
+                        <span class="topbar-search-icon">
+                            <i data-lucide="search" class="icon" style="width: 16px; height: 16px;"></i>
+                        </span>
+                        <input type="text" placeholder="Search..." onkeypress="handleSearch(event)">
+                    </div>
+                    
+                    <!-- Theme Toggle -->
+                    <button type="button" class="topbar-icon-btn theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+                        <i data-lucide="moon" id="moonIcon" style="width: 20px; height: 20px;"></i>
+                        <i data-lucide="sun" id="sunIcon" style="display: none; width: 20px; height: 20px;"></i>
+                    </button>
+
+                    <div class="notification-wrapper">
+                        <button type="button" class="topbar-icon-btn notification-btn" id="notificationBtn" onclick="toggleNotifications(event)">
+                            <i data-lucide="bell" class="icon" style="width: 20px; height: 20px;"></i>
+                            <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+                        </button>
+                        
+                        <div class="notification-dropdown" id="notificationDropdown">
+                            <div class="notification-dropdown-header">
+                                <h3>Notifications</h3>
+                                <button onclick="markAllNotificationsRead(event)" class="mark-all-read-btn">Mark all read</button>
+                            </div>
+                            <div class="notification-dropdown-list" id="notificationList">
+                                <div class="notification-loading">Loading...</div>
+                            </div>
+                            <div class="notification-dropdown-footer">
+                                <a href="{% url 'notifications_list' %}">View all notifications</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                {% block content %}{% endblock %}
+            </div>
+
+            {% include 'includes/welcome_popup.html' %}
+        </main>
+    </div>
+
+    {% compress js %}
+    <script>
+        // Mobile Sidebar
+        function openMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar && overlay) {
+                sidebar.classList.add('mobile-open');
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar && overlay) {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Close mobile sidebar on window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) {
+                closeMobileSidebar();
+            }
+        });
+
+        // Search functionality
+        function handleSearch(event) {
+            if (event.key === 'Enter') {
+                const query = event.target.value.trim();
+                if (query) {
+                    window.location.href = `/search/?q=${encodeURIComponent(query)}`;
+                }
+            }
+        }
+
+        // Notification Dropdown Toggle
+        function toggleNotifications(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const dropdown = document.getElementById('notificationDropdown');
+            const isShowing = dropdown.classList.contains('show');
+            
+            if (!isShowing) {
+                dropdown.classList.add('show');
+                loadRecentNotifications();
+            } else {
+                dropdown.classList.remove('show');
+            }
+        }
+
+        // Load recent notifications via AJAX
+        function loadRecentNotifications() {
+            const list = document.getElementById('notificationList');
+            list.innerHTML = '<div class="notification-loading">Loading...</div>';
+            
+            fetch('/notifications/recent/')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('notificationBadge');
+                    // Update count while we're at it
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+
+                    if (data.notifications && data.notifications.length > 0) {
+                        list.innerHTML = data.notifications.map(n => `
+                            <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="handleNotificationClick(event, '${n.link || '#'}', ${n.id})">
+                                <div class="notification-item-content">
+                                    <h4 class="notification-item-title">${n.title}</h4>
+                                    <p class="notification-item-message">${n.message}</p>
+                                    <span class="notification-item-time">${n.created_at}</span>
+                                </div>
+                                ${n.is_read ? '' : '<span class="unread-dot"></span>'}
+                            </div>
+                        `).join('');
+                    } else {
+                        list.innerHTML = '<div class="notification-empty">No new notifications</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading notifications:', error);
+                    list.innerHTML = '<div class="notification-error">Failed to load notifications</div>';
+                });
+        }
+
+        function handleNotificationClick(event, link, id) {
+            if (event) event.stopPropagation();
+            
+            // Mark as read then navigate
+            fetch(`/notifications/mark-read/${id}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                }
+            }).finally(() => {
+                if (link && link !== '#') {
+                    window.location.href = link;
+                } else {
+                    loadRecentNotifications();
+                    updateNotificationCount();
+                }
+            });
+        }
+
+        function markAllNotificationsRead(event) {
+            if (event) event.stopPropagation();
+            fetch('/notifications/mark-all-read/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    loadRecentNotifications();
+                    updateNotificationCount();
+                }
+            })
+            .catch(error => console.error('Error marking all as read:', error));
+        }
+
+        // Helper to get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('notificationDropdown');
+            const btn = document.getElementById('notificationBtn');
+            if (dropdown && !dropdown.contains(event.target) && !btn.contains(event.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // Notification count update
+        function updateNotificationCount() {
+            fetch('/notifications/unread-count/')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('notificationBadge');
+                    if (data.count > 0) {
+                        badge.textContent = data.count > 99 ? '99+' : data.count;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                })
+                .catch(() => {}); // silently ignore if server unreachable
+        }
+
+        // Update notification count on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Apply saved theme
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                updateThemeIcons(true);
+            }
+
+            updateNotificationCount();
+            // Poll for new notifications every 60 seconds
+            setInterval(updateNotificationCount, 60000);
+        });
+
+        // Theme Toggle Logic
+        function toggleTheme() {
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeIcons(isDark);
+        }
+
+        function updateThemeIcons(isDark) {
+            const sunIcon = document.getElementById('sunIcon');
+            const moonIcon = document.getElementById('moonIcon');
+            if (isDark) {
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            } else {
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            }
+        }
+    </script>
+    {% endcompress %}
+    {% else %}
+    <!-- Not authenticated - redirect to login -->
+    <script>window.location.href = "{% url 'login' %}";</script>
+    {% endif %}
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

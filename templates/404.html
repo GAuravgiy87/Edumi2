@@ -1,0 +1,21 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}404 - Page Not Found{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; text-align: center; padding: 20px;">
+    <div style="font-size: 120px; font-weight: 800; color: var(--primary); line-height: 1; margin-bottom: 20px; opacity: 0.2;">404</div>
+    <div style="background: white; padding: 40px; border-radius: 20px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-width: 500px; width: 100%; position: relative; margin-top: -60px;">
+        <div style="width: 80px; height: 80px; background: #fff1f2; color: #e11d48; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h1 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin-bottom: 10px;">Oops! Page Not Found</h1>
+        <p style="color: var(--text-muted); margin-bottom: 30px; font-size: 15px;">The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.</p>
+        <div style="display: flex; gap: 15px; justify-content: center;">
+            <a href="{% url 'home' %}" class="btn-primary" style="padding: 12px 25px;">Go to Dashboard</a>
+            <button onclick="history.back()" class="btn-secondary" style="padding: 12px 25px; background: var(--gray-100); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; font-weight: 600;">Go Back</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

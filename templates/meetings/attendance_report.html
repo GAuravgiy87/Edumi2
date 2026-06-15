@@ -1,0 +1,137 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Attendance Report - {{ meeting.title }}{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <div>
+            <h1>Attendance Report</h1>
+            <p>{{ meeting.title }} ({{ meeting.meeting_code }})</p>
+        </div>
+        <div class="header-actions">
+            <button onclick="window.print()" class="btn-secondary">
+                <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></span>
+                Print Report
+            </button>
+            <a href="{% url 'teacher_meetings' %}" class="btn-primary">Back to Meetings</a>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: var(--primary);">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <div class="stat-info">
+                <h3>Total Participants</h3>
+                <p class="stat-number">{{ participants.count }}</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: var(--success);">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="stat-info">
+                <h3>Meeting Duration</h3>
+                <p class="stat-number">{{ meeting.duration_minutes }}m</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h2>Student Attendance Details</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Status</th>
+                        <th>First Joined</th>
+                        <th>Last Left</th>
+                        <th>Total Time</th>
+                        <th>Logs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in participants %}
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <img src="https://ui-avatars.com/api/?name={{ p.user.username }}&background=random" style="width: 32px; height: 32px; border-radius: 50%;">
+                                <strong>{{ p.user.get_full_name|default:p.user.username }}</strong>
+                            </div>
+                        </td>
+                        <td>
+                            {% if p.is_active %}
+                                <span class="badge badge-success">Live Now</span>
+                            {% else %}
+                                <span class="badge badge-ended">Offline</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.joined_at|date:"H:i:s"|default:"-" }}</td>
+                        <td>{{ p.left_at|date:"H:i:s"|default:"-" }}</td>
+                        <td>
+                            <span style="font-weight: 700; color: var(--primary);">
+                                {{ p.get_duration_formatted }}
+                            </span>
+                        </td>
+                        <td>
+                            <button onclick="toggleLogs('logs-{{ p.id }}')" class="btn-small">View Logs</button>
+                        </td>
+                    </tr>
+                    <tr id="logs-{{ p.id }}" style="display: none; background: var(--gray-50);">
+                        <td colspan="6">
+                            <div style="padding: 10px; font-size: 12px;">
+                                <strong>Session History:</strong>
+                                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px;">
+                                    {% for log in p.attendance_logs.all %}
+                                        <div class="badge {% if log.event_type == 'join' %}badge-success{% else %}badge-danger{% endif %}" style="opacity: 0.8;">
+                                            {{ log.get_event_type_display }}: {{ log.timestamp|date:"H:i:s" }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            No attendance data recorded yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleLogs(id) {
+    const el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>
+
+<style>
+    @media print {
+        .sidebar, .topbar, .btn-small, .header-actions, .sidebar-overlay {
+            display: none !important;
+        }
+        .main-content {
+            margin-left: 0 !important;
+        }
+        .admin-container {
+            padding: 0 !important;
+        }
+        .content-section {
+            border: none !important;
+        }
+        .stat-card {
+            border: 1px solid #eee !important;
+        }
+    }
+</style>
+{% endblock %}

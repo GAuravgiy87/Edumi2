@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+
+# Logs & runtime
+logs/
+*.log
+.pids/
+ws_debug.log
+
+# Node.js (SFU)
+sfu/node_modules/
+sfu/_build_tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
