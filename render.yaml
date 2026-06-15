@@ -104,8 +104,7 @@ services:
     name: edumi2-livekit
     runtime: docker
     plan: free
-    image:
-      name: livekit/livekit-server:v1.5.2
+    image: livekit/livekit-server:v1.5.2
     autoDeploy: true
     dockerCommand: "--config /etc/livekit/config.yaml"
     envVars:
