@@ -7,7 +7,7 @@ Here's every service and where we'll host it:
 | Service | Purpose | Host |
 |---------|---------|------|
 | **Main Django App** | Core web UI/API | Render (Free Web Service) |
-| **Celery Worker** | Background tasks | Render (Free Worker) |
+| **Celery Worker** | Background tasks | Render (Free Web Service — runs in background of main app) |
 | **Camera Service** | Computer vision (face recognition) | Render (Free Web Service) |
 | **LiveKit SFU** | Video conferencing (WebRTC) | LiveKit Cloud (Free Tier) |
 | **Redis** | Message broker for Celery/Channels | Render (Free Redis) |
