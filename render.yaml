@@ -23,25 +23,15 @@ services:
           name: edumi2-redis
           property: connectionString
       - key: LIVEKIT_URL
-        value: "wss://{{ .Service.Name }}.onrender.com/livekit-proxy"
+        sync: false # You'll set this in Render Dashboard
       - key: LIVEKIT_INTERNAL_URL
-        fromService:
-          name: edumi2-livekit
-          type: web
-          property: host
-          port: 7880
-          protocol: ws
+        sync: false # Same as LIVEKIT_URL
       - key: LIVEKIT_INTERNAL_HTTP_URL
-        fromService:
-          name: edumi2-livekit
-          type: web
-          property: host
-          port: 7880
-          protocol: http
+        sync: false # HTTPS version of LIVEKIT_URL
       - key: LIVEKIT_API_KEY
-        value: devkey
+        sync: false # From LiveKit Cloud
       - key: LIVEKIT_API_SECRET
-        generateValue: true
+        sync: false # From LiveKit Cloud
       - key: FACE_ENCRYPTION_KEY
         generateValue: true
       - key: FACE_MATCH_THRESHOLD
@@ -99,30 +89,6 @@ services:
     autoDeploy: true
     dockerCommand: "python manage.py runserver 0.0.0.0:10000"
     numInstances: 1
-
-  - type: web
-    name: edumi2-livekit
-    runtime: image
-    plan: free
-    image: livekit/livekit-server:v1.5.2
-    autoDeploy: true
-    dockerCommand: "--config /etc/livekit/config.yaml"
-    envVars:
-      - key: LIVEKIT_KEY
-        fromService:
-          type: web
-          name: edumi2-web
-          envVarKey: LIVEKIT_API_KEY
-      - key: LIVEKIT_SECRET
-        fromService:
-          type: web
-          name: edumi2-web
-          envVarKey: LIVEKIT_API_SECRET
-    numInstances: 1
-    disk:
-      name: livekit-config
-      mountPath: /etc/livekit
-      sizeGB: 0.25
 
   - type: redis
     name: edumi2-redis
