@@ -26,7 +26,13 @@ RUN pip install --upgrade pip --quiet && \
 
 COPY . .
 
+# Make start script executable
+RUN chmod +x /app/start.sh
+
 RUN mkdir -p /app/media/temp /app/staticfiles /app/logs && \
     chmod -R 755 /app/media /app/staticfiles /app/logs
 
 EXPOSE 10000
+
+# Use the start script
+CMD ["/app/start.sh"]

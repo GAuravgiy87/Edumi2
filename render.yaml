@@ -42,7 +42,6 @@ services:
         value: WARNING
     healthCheckPath: /
     autoDeploy: true
-    dockerCommand: "sh -c 'python manage.py migrate --noinput && python manage.py collectstatic --noinput && (celery -A school_project worker -l warning --concurrency=1 &) && daphne -b 0.0.0.0 -p 10000 school_project.asgi:application'"
     numInstances: 1
 
   - type: web
