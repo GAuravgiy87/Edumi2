@@ -1,0 +1,287 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block title %}Upload Lecture - Edumi{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0" style="border-radius: 16px;">
+                <div class="card-header bg-white py-4 border-0 text-center">
+                    <h3 class="font-weight-bold mb-1">Upload Your Lecture</h3>
+                    <p class="text-muted">Share your knowledge with students around the world.</p>
+                </div>
+                <div class="card-body px-5 pb-5">
+                    <form id="lectureUploadForm" action="{% url 'upload_video' %}" method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <!-- Step 1: Video File Selection -->
+                        <div id="step1">
+                            <div class="upload-zone mb-4" id="dropZone">
+                                <input type="file" name="video" class="upload-input" id="videoInput" accept="video/*" required>
+                                <div id="uploadPlaceholder">
+                                    <div class="bg-light rounded-circle d-inline-flex p-4 mb-3">
+                                        <i data-lucide="upload" class="text-primary" style="width: 48px; height: 48px;"></i>
+                                    </div>
+                                    <h5>Select video file to upload</h5>
+                                    <p class="text-muted small">Your videos will be private until you publish them.</p>
+                                    <button type="button" class="btn btn-primary px-4">Select File</button>
+                                </div>
+                                <div id="fileInfo" class="d-none">
+                                    <i data-lucide="check-circle" class="text-success mb-2" style="width: 48px; height: 48px;"></i>
+                                    <h5 id="fileName" class="mb-1"></h5>
+                                    <p id="fileSize" class="text-muted small mb-3"></p>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetUpload()">Change File</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Details (Visible after file selection) -->
+                        <div id="step2" class="d-none">
+                            <hr class="my-4 opacity-10">
+                            
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-4">
+                                        <label class="form-label font-weight-bold">Title (required)</label>
+                                        <input type="text" name="title" class="form-control form-control-lg" placeholder="Add a title that describes your video" required>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label font-weight-bold">Description</label>
+                                        <textarea name="description" class="form-control" rows="5" placeholder="Tell viewers about your video"></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="mb-4">
+                                        <label class="form-label font-weight-bold">Thumbnail</label>
+                                        <p class="text-muted small">Select or upload a picture that shows what's in your video.</p>
+                                        <div class="thumbnail-selector" onclick="document.getElementById('thumbInput').click()">
+                                            <input type="file" name="thumbnail" id="thumbInput" accept="image/*" class="d-none">
+                                            <div id="thumbPreviewWrapper" class="w-100 aspect-ratio-16-9 bg-light rounded d-flex flex-column align-items-center justify-content-center border overflow-hidden">
+                                                <i data-lucide="image-plus" class="text-muted mb-2"></i>
+                                                <span class="text-muted small">Upload thumbnail</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <label class="form-label font-weight-bold">Link to Camera</label>
+                                        <select name="camera" class="form-select">
+                                            <option value="">Not linked to a camera</option>
+                                            {% for camera in cameras %}
+                                            <option value="{{ camera.id }}">{{ camera.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="uploadProgress" class="d-none mb-4">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small font-weight-bold">Uploading and Processing...</span>
+                                    <span class="small text-muted" id="progressPercent">0%</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" style="width: 0%;"></div>
+                                </div>
+                                <p class="text-center mt-2 small text-muted">Don't close this tab until upload is complete.</p>
+                            </div>
+
+                            <div class="d-flex justify-content-end gap-3 pt-3">
+                                <button type="button" class="btn btn-light px-4" onclick="resetUpload()">Cancel</button>
+                                <button type="submit" class="btn btn-primary px-5 font-weight-bold" id="submitBtn">Publish Lecture</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .upload-zone {
+        border: 2px dashed #e2e8f0;
+        border-radius: 12px;
+        padding: 60px 20px;
+        text-align: center;
+        position: relative;
+        transition: all 0.3s;
+        background: #f8fafc;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: #6366f1;
+        background: #f5f3ff;
+    }
+    .upload-input {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+    .aspect-ratio-16-9 {
+        aspect-ratio: 16/9;
+    }
+    .thumbnail-selector {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .thumbnail-selector:hover {
+        transform: scale(1.02);
+    }
+    #thumbPreviewWrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+</style>
+
+<script>
+    const videoInput = document.getElementById('videoInput');
+    const thumbInput = document.getElementById('thumbInput');
+    const dropZone = document.getElementById('dropZone');
+    const step2 = document.getElementById('step2');
+    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileNameDisplay = document.getElementById('fileName');
+    const fileSizeDisplay = document.getElementById('fileSize');
+
+    // Drag and drop handling
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        videoInput.files = files;
+        handleFiles(files[0]);
+    }
+
+    videoInput.addEventListener('change', function(e) {
+        handleFiles(this.files[0]);
+    });
+
+    function handleFiles(file) {
+        if (file) {
+            uploadPlaceholder.classList.add('d-none');
+            fileInfo.classList.remove('d-none');
+            step2.classList.remove('d-none');
+            fileNameDisplay.textContent = file.name;
+            fileSizeDisplay.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            if (window.lucide) lucide.createIcons();
+            
+            // Scroll to details
+            setTimeout(() => {
+                step2.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+    }
+
+    function resetUpload() {
+        videoInput.value = '';
+        thumbInput.value = '';
+        uploadPlaceholder.classList.remove('d-none');
+        fileInfo.classList.add('d-none');
+        step2.classList.add('d-none');
+        document.getElementById('thumbPreviewWrapper').innerHTML = `
+            <i data-lucide="image-plus" class="text-muted mb-2"></i>
+            <span class="text-muted small">Upload thumbnail</span>
+        `;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    // Thumbnail preview
+    thumbInput.addEventListener('change', function(e) {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                document.getElementById('thumbPreviewWrapper').innerHTML = `<img src="${event.target.result}">`;
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Form submission with progress
+    document.getElementById('lectureUploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log("Form submitted!");
+        
+        const formData = new FormData(this);
+        const submitBtn = document.getElementById('submitBtn');
+        const progressDiv = document.getElementById('uploadProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+
+        submitBtn.disabled = true;
+        progressDiv.classList.remove('d-none');
+        console.log("Starting upload...");
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '{% url "upload_video" %}', true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+        xhr.upload.onprogress = function(e) {
+            console.log("Upload progress:", e.loaded, "/", e.total);
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                console.log("Percent:", percent);
+                progressBar.style.width = percent + '%';
+                progressPercent.textContent = percent + '%';
+            }
+        };
+
+        xhr.onload = function() {
+            console.log("XHR onload!", xhr.status);
+            if (xhr.status === 200) {
+                console.log("Response text:", xhr.responseText);
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.status === 'success') {
+                        window.location.href = response.redirect_url || '{% url "manage_recordings" %}';
+                    } else {
+                        alert('Error: ' + response.message);
+                        submitBtn.disabled = false;
+                    }
+                } catch (e) {
+                    console.error("JSON parse error:", e);
+                    alert("Invalid server response. Please try again.");
+                    submitBtn.disabled = false;
+                }
+            } else {
+                alert('Error uploading video. Status: ' + xhr.status);
+                submitBtn.disabled = false;
+            }
+        };
+
+        xhr.onerror = function() {
+            alert('Network error. Please check your connection.');
+            submitBtn.disabled = false;
+        };
+
+        xhr.send(formData);
+    });
+</script>
+{% endblock %}

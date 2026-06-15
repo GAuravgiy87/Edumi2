@@ -1,0 +1,60 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block title %}Edit Recording - {{ recording.title }} | EduMi{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="font-weight-bold">Edit Recording</h2>
+            <p class="text-muted small mb-0">{{ recording.title }}</p>
+        </div>
+        <a href="{% url 'manage_recordings' %}" class="btn btn-secondary">
+            <i data-lucide="arrow-left"></i> Back to Recordings
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Video Preview -->
+        <div class="col-lg-8 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <video id="videoPreview" controls class="w-100" style="border-radius: 12px; max-height: 500px;">
+                        <source src="{% url 'stream_video' recording.id %}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Edit Controls -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="font-weight-bold mb-4">Recording Details</h5>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label font-weight-semibold">Title</label>
+                            <input type="text" name="title" class="form-control" 
+                                   value="{{ recording.title }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label font-weight-semibold">Description</label>
+                            <textarea name="description" class="form-control" rows="4">{{ recording.description }}</textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i data-lucide="save"></i> Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

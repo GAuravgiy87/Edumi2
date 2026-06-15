@@ -1,0 +1,162 @@
+x-django-env: &django-env
+  SECRET_KEY: "${SECRET_KEY}"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+  LIVEKIT_API_KEY: "${LIVEKIT_API_KEY}"
+  LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET}"
+  FACE_ENCRYPTION_KEY: "${FACE_ENCRYPTION_KEY}"
+  LIVEKIT_URL: "ws://${SERVER_IP}:8080/livekit-proxy"
+  CSRF_TRUSTED_ORIGINS: "http://localhost,http://localhost:8080,http://127.0.0.1,http://127.0.0.1:8080,http://${SERVER_IP},http://${SERVER_IP}:8080"
+  DEBUG: "False"
+  ALLOWED_HOSTS: "*"
+  REDIS_URL: "redis://redis:6379/0"
+  LIVEKIT_INTERNAL_URL: "ws://livekit:7880"
+  LIVEKIT_INTERNAL_HTTP_URL: "http://livekit:7880"
+  CAMERA_SERVICE_URL: "http://camera_service:8003"
+  FACE_MATCH_THRESHOLD: "0.50"
+  FACE_PRESENCE_DURATION: "30"
+  LOG_LEVEL: "WARNING"
+
+services:
+
+  db:
+    image: postgres:15-alpine
+    container_name: edumi2_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edumi_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: edumi2_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edumi_net
+
+  livekit:
+    image: livekit/livekit-server:v1.5.2
+    container_name: edumi2_livekit
+    restart: unless-stopped
+    command: --config /etc/livekit/config.yaml
+    volumes:
+      - ./config/livekit.yaml:/etc/livekit/config.yaml:ro
+    networks:
+      - edumi_net
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edumi2_web
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput --clear &&
+        daphne -b 0.0.0.0 -p 8002 school_project.asgi:application
+    environment:
+      <<: *django-env
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edumi_net
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edumi2_worker
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - celery -A school_project worker -l warning --concurrency=2
+    environment:
+      <<: *django-env
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edumi_net
+
+  camera_service:
+    build:
+      context: .
+      dockerfile: camera_service/Dockerfile
+    container_name: edumi2_camera
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - python manage.py runserver 0.0.0.0:8003
+    environment:
+      DEBUG: "False"
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - edumi_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: edumi2_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_data:/app/static:ro
+      - media_data:/app/media:ro
+    depends_on:
+      - web
+      - camera_service
+    networks:
+      - edumi_net
+
+volumes:
+  postgres_data:
+    name: edumi2_postgres
+  redis_data:
+    name: edumi2_redis
+  static_data:
+    name: edumi2_static
+  media_data:
+    name: edumi2_media
+
+networks:
+  edumi_net:
+    name: edumi2_network
+    driver: bridge

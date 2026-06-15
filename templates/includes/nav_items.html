@@ -1,0 +1,131 @@
+{% comment %} 
+    Role-based navigation items consolidated to prevent duplication.
+    Expected context: 'nav_type' (sidebar or topbar)
+{% endcomment %}
+
+{% if user.is_authenticated %}
+    {% if user.is_superuser %}
+        {% if nav_type == 'topbar' %}
+            <a href="{% url 'admin_panel' %}">Admin Panel</a>
+            <a href="{% url 'user_management' %}">Users</a>
+            <a href="{% url 'admin_dashboard' %}">Cameras</a>
+            <a href="{% url 'teacher_meetings' %}">Meetings</a>
+            <a href="{% url 'inbox' %}">Inbox</a>
+        {% else %}
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Management</div>
+                <a href="{% url 'admin_panel' %}" class="sidebar-nav-item {% if '/admin-panel/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="layout-dashboard"></i></span>
+                    <span class="sidebar-nav-text">Admin Panel</span>
+                </a>
+                <a href="{% url 'user_management' %}" class="sidebar-nav-item {% if '/users/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="users"></i></span>
+                    <span class="sidebar-nav-text">User Manager</span>
+                </a>
+                <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item {% if '/meetings/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
+                    <span class="sidebar-nav-text">Meeting Logs</span>
+                </a>
+                <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item {% if '/cameras/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
+                    <span class="sidebar-nav-text">Camera Fleet</span>
+                </a>
+                <a href="{% url 'admin_content_manager' %}" class="sidebar-nav-item {% if '/content-manager/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="folder-kanban"></i></span>
+                    <span class="sidebar-nav-text">Content Manager</span>
+                </a>
+                <a href="{% url 'recordings_folder' %}" class="sidebar-nav-item {% if '/recordings-folder/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="library"></i></span>
+                    <span class="sidebar-nav-text">Recordings Library</span>
+                </a>
+                <a href="{% url 'live_monitor' %}" class="sidebar-nav-item">
+                    <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
+                    <span class="sidebar-nav-text">Live Monitor</span>
+                </a>
+            </div>
+        {% endif %}
+    {% elif user.userprofile.user_type == 'teacher' %}
+        {% if nav_type == 'topbar' %}
+            <a href="{% url 'teacher_dashboard' %}">Dashboard</a>
+            <a href="{% url 'teacher_classrooms' %}">Classrooms</a>
+            <a href="{% url 'teacher_meetings' %}">Meetings</a>
+            <a href="{% url 'inbox' %}">Inbox</a>
+        {% else %}
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Academic</div>
+                <a href="{% url 'teacher_dashboard' %}" class="sidebar-nav-item {% if '/teacher-dashboard/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="layout-dashboard"></i></span>
+                    <span class="sidebar-nav-text">Dashboard</span>
+                </a>
+                <a href="{% url 'teacher_classrooms' %}" class="sidebar-nav-item">
+                    <span class="sidebar-nav-icon"><i data-lucide="school"></i></span>
+                    <span class="sidebar-nav-text">My Classrooms</span>
+                </a>
+                <a href="{% url 'teacher_meetings' %}" class="sidebar-nav-item">
+                    <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
+                    <span class="sidebar-nav-text">Meetings</span>
+                </a>
+                <a href="{% url 'teacher_camera_dashboard' %}" class="sidebar-nav-item {% if '/control-room/' in request.path or '/teacher-camera-dashboard/' in request.path or '/cameras/teacher/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
+                    <span class="sidebar-nav-text">Live / Videos</span>
+                </a>
+            </div>
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Content</div>
+                <a href="{% url 'manage_recordings' %}" class="sidebar-nav-item {% if '/manage-recordings/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
+                    <span class="sidebar-nav-text">Manage Recordings</span>
+                </a>
+                <a href="{% url 'upload_video' %}" class="sidebar-nav-item {% if '/upload-video/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="upload"></i></span>
+                    <span class="sidebar-nav-text">Upload Video</span>
+                </a>
+            </div>
+        {% endif %}
+    {% elif user.userprofile.user_type == 'student' %}
+        {% if nav_type == 'topbar' %}
+            <a href="{% url 'student_dashboard' %}">Dashboard</a>
+            <a href="{% url 'student_classrooms' %}">Classrooms</a>
+            <a href="{% url 'student_meetings' %}">Meetings</a>
+            <a href="{% url 'inbox' %}">Inbox</a>
+        {% else %}
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Student Portal</div>
+                <a href="{% url 'student_dashboard' %}" class="sidebar-nav-item {% if '/student-dashboard/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="layout-dashboard"></i></span>
+                    <span class="sidebar-nav-text">Home</span>
+                </a>
+                <a href="{% url 'student_classrooms' %}" class="sidebar-nav-item">
+                    <span class="sidebar-nav-icon"><i data-lucide="book-open"></i></span>
+                    <span class="sidebar-nav-text">Classrooms</span>
+                </a>
+                <a href="{% url 'student_meetings' %}" class="sidebar-nav-item">
+                    <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
+                    <span class="sidebar-nav-text">Meetings</span>
+                </a>
+                <a href="{% url 'student_lecture_list' %}" class="sidebar-nav-item {% if '/lectures/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="play-circle"></i></span>
+                    <span class="sidebar-nav-text">Live / Videos</span>
+                </a>
+                <a href="{% url 'face_setup' %}" class="sidebar-nav-item">
+                    <span class="sidebar-nav-icon"><i data-lucide="user-check"></i></span>
+                    <span class="sidebar-nav-text">Face Identity</span>
+                </a>
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {% if nav_type == 'sidebar' %}
+        <div class="sidebar-nav-section">
+            <div class="sidebar-nav-title">Communication</div>
+            <a href="{% url 'inbox' %}" class="sidebar-nav-item">
+                <span class="sidebar-nav-icon"><i data-lucide="message-square"></i></span>
+                <span class="sidebar-nav-text">Messages</span>
+            </a>
+            <a href="{% url 'profile_view' user.username %}" class="sidebar-nav-item">
+                <span class="sidebar-nav-icon"><i data-lucide="user"></i></span>
+                <span class="sidebar-nav-text">Profile</span>
+            </a>
+        </div>
+    {% endif %}
+{% endif %}

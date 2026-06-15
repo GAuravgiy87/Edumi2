@@ -1,0 +1,525 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block title %}Edit Video - {{ video.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Video Preview and Timeline -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Video Preview</h5>
+                    <div class="btn-group">
+                        <button id="playPauseBtn" class="btn btn-primary" onclick="togglePlayPause()">
+                            <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+                        </button>
+                        <button class="btn btn-secondary" onclick="skipToStart()">
+                            <i data-lucide="skip-back" style="width: 20px; height: 20px;"></i>
+                        </button>
+                        <button class="btn btn-secondary" onclick="skipToEnd()">
+                            <i data-lucide="skip-forward" style="width: 20px; height: 20px;"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <video id="videoPreview" class="w-100" style="max-height: 500px;">
+                        <source src="{{ video.original_file.url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div class="mt-3">
+                        <span id="currentTimeDisplay">0:00</span> / <span id="durationDisplay">0:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline-container" style="background: #1a1a1a; padding: 20px; border-radius: 8px;">
+                        <input 
+                            type="range" 
+                            id="timelineSlider" 
+                            min="0" 
+                            max="100" 
+                            value="0" 
+                            style="width: 100%;"
+                            oninput="seekTo(this.value)"
+                        >
+                        <div class="d-flex justify-content-between mt-2">
+                            <span id="timelineStart">0:00</span>
+                            <span id="timelineEnd">0:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Editing Tools -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Editing Tools</h5>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="editingToolsAccordion">
+                        <!-- Trim Tool -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trimCollapse">
+                                    <i data-lucide="scissors" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                                    Trim Video
+                                </button>
+                            </h2>
+                            <div id="trimCollapse" class="accordion-collapse collapse" data-bs-parent="#editingToolsAccordion">
+                                <div class="accordion-body">
+                                    <form id="trimForm">
+                                        <div class="mb-3">
+                                            <label for="trimStart" class="form-label">Start Time (seconds)</label>
+                                            <input type="number" class="form-control" id="trimStart" name="start_time" step="0.1" value="0">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="trimEnd" class="form-label">End Time (seconds)</label>
+                                            <input type="number" class="form-control" id="trimEnd" name="end_time" step="0.1">
+                                        </div>
+                                        <button type="button" class="btn btn-primary w-100" onclick="addEditAction('trim')">Add Trim</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mute Tool -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#muteCollapse">
+                                    <i data-lucide="volume-x" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                                    Mute Audio
+                                </button>
+                            </h2>
+                            <div id="muteCollapse" class="accordion-collapse collapse" data-bs-parent="#editingToolsAccordion">
+                                <div class="accordion-body">
+                                    <form id="muteForm">
+                                        <div class="mb-3">
+                                            <label for="muteStart" class="form-label">Start Time (seconds)</label>
+                                            <input type="number" class="form-control" id="muteStart" name="start_time" step="0.1" value="0">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="muteEnd" class="form-label">End Time (seconds)</label>
+                                            <input type="number" class="form-control" id="muteEnd" name="end_time" step="0.1">
+                                        </div>
+                                        <button type="button" class="btn btn-primary w-100" onclick="addEditAction('mute')">Add Mute</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Text Overlay Tool -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#textCollapse">
+                                    <i data-lucide="type" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                                    Add Text Overlay
+                                </button>
+                            </h2>
+                            <div id="textCollapse" class="accordion-collapse collapse" data-bs-parent="#editingToolsAccordion">
+                                <div class="accordion-body">
+                                    <form id="textForm">
+                                        <div class="mb-3">
+                                            <label for="textContent" class="form-label">Text Content</label>
+                                            <input type="text" class="form-control" id="textContent" name="text" placeholder="Enter your text">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="textSize" class="form-label">Font Size</label>
+                                            <input type="number" class="form-control" id="textSize" name="font_size" value="24" min="12" max="72">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="textColor" class="form-label">Text Color</label>
+                                            <input type="color" class="form-control form-control-color" id="textColor" name="color" value="#ffffff">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="textPosition" class="form-label">Position</label>
+                                            <select class="form-select" id="textPosition" name="position">
+                                                <option value="center">Center</option>
+                                                <option value="top">Top</option>
+                                                <option value="bottom">Bottom</option>
+                                                <option value="top_left">Top Left</option>
+                                                <option value="top_right">Top Right</option>
+                                                <option value="bottom_left">Bottom Left</option>
+                                                <option value="bottom_right">Bottom Right</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="textStart" class="form-label">Start Time (seconds)</label>
+                                            <input type="number" class="form-control" id="textStart" name="start_time" step="0.1" value="0">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="textEnd" class="form-label">End Time (seconds)</label>
+                                            <input type="number" class="form-control" id="textEnd" name="end_time" step="0.1">
+                                        </div>
+                                        <button type="button" class="btn btn-primary w-100" onclick="addEditAction('add_text')">Add Text</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Audio Tool -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#audioCollapse">
+                                    <i data-lucide="music" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                                    Add/Replace Audio
+                                </button>
+                            </h2>
+                            <div id="audioCollapse" class="accordion-collapse collapse" data-bs-parent="#editingToolsAccordion">
+                                <div class="accordion-body">
+                                    <form id="audioForm" enctype="multipart/form-data">
+                                        <div class="mb-3">
+                                            <label for="audioActionType" class="form-label">Audio Action</label>
+                                            <select class="form-select" id="audioActionType" name="audio_action_type">
+                                                <option value="add_audio">Overlay Audio (keep original)</option>
+                                                <option value="replace_audio">Replace Original Audio</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="audioFile" class="form-label">Audio File</label>
+                                            <input type="file" class="form-control" id="audioFile" name="audio" accept="audio/*">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="audioStart" class="form-label">Start Time (seconds)</label>
+                                            <input type="number" class="form-control" id="audioStart" name="start_time" step="0.1" value="0">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="audioVolume" class="form-label">Audio Volume (%)</label>
+                                            <input type="number" class="form-control" id="audioVolume" name="volume" value="100" min="0" max="200">
+                                        </div>
+                                        <button type="button" class="btn btn-primary w-100" onclick="addAudioAction()">Add Audio</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rotate Tool -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rotateCollapse">
+                                    <i data-lucide="rotate-ccw" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                                    Rotate Video
+                                </button>
+                            </h2>
+                            <div id="rotateCollapse" class="accordion-collapse collapse" data-bs-parent="#editingToolsAccordion">
+                                <div class="accordion-body">
+                                    <form id="rotateForm">
+                                        <div class="mb-3">
+                                            <label for="rotateDegrees" class="form-label">Degrees</label>
+                                            <select class="form-select" id="rotateDegrees" name="degrees">
+                                                <option value="90">90° Clockwise</option>
+                                                <option value="180">180°</option>
+                                                <option value="270">270° Clockwise (90° Counter-Clockwise)</option>
+                                            </select>
+                                        </div>
+                                        <button type="button" class="btn btn-primary w-100" onclick="addEditAction('rotate')">Add Rotation</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action History -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Edit Actions (<span id="actionCount">{{ actions|length }}</span>)</h5>
+                </div>
+                <div class="card-body" id="actionListContainer">
+                    {% if actions %}
+                    <ul class="list-group" id="actionList">
+                        {% for action in actions %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ action.get_action_type_display }}</strong>
+                                {% if action.parameters.text %}
+                                <br><small>"{{ action.parameters.text }}"</small>
+                                {% endif %}
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="removeEditAction({{ action.id }})">
+                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">No edit actions added yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Process & Download -->
+            <div class="card">
+                <div class="card-body">
+                    {% if session.status == 'processing' %}
+                    <div class="alert alert-info mb-3 text-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        Processing edits... This may take a few minutes.
+                    </div>
+                    {% elif session.status == 'completed' %}
+                    <div class="alert alert-success mb-3 text-center">
+                        Editing complete!
+                    </div>
+                    <a href="{% url 'download_edited_video' session.id %}" class="btn btn-success w-100">
+                        <i data-lucide="download" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                        Download Edited Video
+                    </a>
+                    {% else %}
+                    <button id="processBtn" class="btn btn-primary w-100" onclick="processEdits()">
+                        <i data-lucide="save" style="width: 20px; height: 20px; margin-right: 8px;"></i>
+                        Process & Save Edits
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .timeline-container {
+        background: #1a1a1a;
+        padding: 20px;
+        border-radius: 8px;
+    }
+    
+    #timelineSlider {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 10px;
+        background: #333;
+        border-radius: 5px;
+        outline: none;
+    }
+    
+    #timelineSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: #6366f1;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+    
+    #timelineSlider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #6366f1;
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+    }
+</style>
+
+<script>
+let videoElement;
+
+document.addEventListener('DOMContentLoaded', function() {
+    videoElement = document.getElementById('videoPreview');
+    
+    videoElement.addEventListener('loadedmetadata', function() {
+        const duration = this.duration;
+        document.getElementById('durationDisplay').textContent = formatTime(duration);
+        document.getElementById('timelineEnd').textContent = formatTime(duration);
+        document.getElementById('trimEnd').value = duration;
+        document.getElementById('muteEnd').value = duration;
+        document.getElementById('textEnd').value = duration;
+    });
+    
+    videoElement.addEventListener('timeupdate', function() {
+        const currentTime = this.currentTime;
+        document.getElementById('currentTimeDisplay').textContent = formatTime(currentTime);
+        document.getElementById('timelineSlider').value = (currentTime / this.duration) * 100;
+    });
+    
+    lucide.createIcons();
+});
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function togglePlayPause() {
+    const btn = document.getElementById('playPauseBtn');
+    if (videoElement.paused) {
+        videoElement.play();
+        btn.innerHTML = '<i data-lucide="pause" style="width: 20px; height: 20px;"></i>';
+    } else {
+        videoElement.pause();
+        btn.innerHTML = '<i data-lucide="play" style="width: 20px; height: 20px;"></i>';
+    }
+    lucide.createIcons();
+}
+
+function skipToStart() {
+    videoElement.currentTime = 0;
+}
+
+function skipToEnd() {
+    videoElement.currentTime = videoElement.duration;
+}
+
+function seekTo(percentage) {
+    if (videoElement.duration) {
+        videoElement.currentTime = (percentage / 100) * videoElement.duration;
+    }
+}
+
+async function addEditAction(actionType) {
+    let form;
+    let formData = new FormData();
+    formData.append('action_type', actionType);
+    
+    switch(actionType) {
+        case 'trim':
+            form = document.getElementById('trimForm');
+            formData.append('start_time', document.getElementById('trimStart').value);
+            formData.append('end_time', document.getElementById('trimEnd').value);
+            break;
+        case 'mute':
+            form = document.getElementById('muteForm');
+            formData.append('start_time', document.getElementById('muteStart').value);
+            formData.append('end_time', document.getElementById('muteEnd').value);
+            break;
+        case 'add_text':
+            form = document.getElementById('textForm');
+            formData.append('text', document.getElementById('textContent').value);
+            formData.append('font_size', document.getElementById('textSize').value);
+            formData.append('color', document.getElementById('textColor').value);
+            formData.append('position', document.getElementById('textPosition').value);
+            formData.append('start_time', document.getElementById('textStart').value);
+            formData.append('end_time', document.getElementById('textEnd').value);
+            break;
+        case 'rotate':
+            form = document.getElementById('rotateForm');
+            formData.append('degrees', document.getElementById('rotateDegrees').value);
+            break;
+    }
+    
+    try {
+        const response = await fetch('{% url "add_edit_action" session.id %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Error adding action: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error adding action: ' + error);
+    }
+}
+
+async function addAudioAction() {
+    const formData = new FormData(document.getElementById('audioForm'));
+    formData.append('action_type', document.getElementById('audioActionType').value);
+    
+    try {
+        const response = await fetch('{% url "add_edit_action" session.id %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Error adding audio: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error adding audio: ' + error);
+    }
+}
+
+async function removeEditAction(actionId) {
+    try {
+        const response = await fetch('{% url "remove_edit_action" 0 %}'.replace('0', actionId), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Error removing action: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error removing action: ' + error);
+    }
+}
+
+async function processEdits() {
+    const btn = document.getElementById('processBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+    
+    try {
+        const response = await fetch('{% url "process_edits" session.id %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            alert('Error processing edits: ' + (data.message || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="save" style="width: 20px; height: 20px; margin-right: 8px;"></i>Process & Save Edits';
+            lucide.createIcons();
+        }
+    } catch (error) {
+        alert('Error processing edits: ' + error);
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save" style="width: 20px; height: 20px; margin-right: 8px;"></i>Process & Save Edits';
+        lucide.createIcons();
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

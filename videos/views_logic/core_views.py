@@ -1,0 +1,107 @@
+"""
+Core video management views
+"""
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse, HttpResponseForbidden
+from django.views.decorators.http import require_http_methods
+from django.contrib import messages
+
+from videos.models import Video
+
+
+@login_required
+def video_list(request):
+    """List all uploaded videos with YouTube-like grid."""
+    videos = Video.objects.all().select_related('uploaded_by')
+    return render(request, 'videos/video_list.html', {'videos': videos})
+
+
+@login_required
+def video_detail(request, video_id):
+    """Show video detail page with player and quality selector."""
+    video = get_object_or_404(Video, id=video_id)
+    # Get other videos for recommendations
+    recommendations = Video.objects.exclude(id=video.id)[:8]
+    return render(request, 'videos/video_detail.html', {
+        'video': video,
+        'recommendations': recommendations
+    })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def upload_video(request):
+    """Handle video upload and start processing."""
+    if request.method == 'POST' and request.FILES.get('video'):
+        title = request.POST.get('title', 'Untitled Video')
+        description = request.POST.get('description', '')
+        video_file = request.FILES['video']
+        thumbnail = request.FILES.get('thumbnail')
+
+        # Create video object
+        video = Video.objects.create(
+            title=title,
+            description=description,
+            original_file=video_file,
+            thumbnail=thumbnail,
+            uploaded_by=request.user,
+            file_size=video_file.size,
+            mime_type=video_file.content_type,
+        )
+
+        # Start processing asynchronously
+        try:
+            from videos.tasks import process_video
+            process_video.delay(video.id)
+        except Exception:
+            # Fallback to sync processing if Celery not available
+            process_video_sync(video.id)
+
+        return JsonResponse({'status': 'success', 'video_id': video.id})
+
+    # For GET requests, show upload page (using cameras/upload_video.html which we will overhaul)
+    from cameras.models import Camera
+    cameras = Camera.objects.filter(is_active=True)
+    if request.user.userprofile.user_type == 'teacher':
+        cameras = cameras.filter(camerapermission__teacher=request.user)
+    
+    return render(request, 'cameras/upload_video.html', {'cameras': cameras})
+
+
+@login_required
+def edit_video(request, video_id):
+    """Allow teachers to edit their own videos."""
+    video = get_object_or_404(Video, id=video_id)
+    
+    # Only uploader or superuser can edit
+    if video.uploaded_by != request.user and not request.user.is_superuser:
+        return HttpResponseForbidden("You don't have permission to edit this video.")
+        
+    if request.method == 'POST':
+        video.title = request.POST.get('title', video.title)
+        video.description = request.POST.get('description', video.description)
+        
+        if request.FILES.get('thumbnail'):
+            video.thumbnail = request.FILES['thumbnail']
+            
+        video.save()
+        messages.success(request, "Video updated successfully!")
+        return redirect('video_detail', video_id=video.id)
+        
+    return render(request, 'videos/edit_video.html', {'video': video})
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_video(request, video_id):
+    """Allow teachers to delete their own videos."""
+    video = get_object_or_404(Video, id=video_id)
+    
+    # Only uploader or superuser can delete
+    if video.uploaded_by != request.user and not request.user.is_superuser:
+        return HttpResponseForbidden("You don't have permission to delete this video.")
+        
+    video.delete()
+    messages.success(request, "Video deleted successfully!")
+    return redirect('video_list')

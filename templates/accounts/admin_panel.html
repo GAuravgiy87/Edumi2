@@ -1,0 +1,271 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Admin Panel{% endblock %}
+
+{% block content %}
+<style>
+    .admin-container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; font-family: 'Inter', sans-serif; }
+    
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .admin-header h1 { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0; }
+    
+    /* Service Health */
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .health-card { background: white; border-radius: 1rem; padding: 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .indicator { width: 10px; height: 10px; border-radius: 50%; position: relative; }
+    .indicator.online { background: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); }
+    .indicator.online::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: inherit; animation: pulse 2s infinite; }
+    .indicator.offline { background: #ef4444; }
+    .health-info .label { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
+    .health-info .value { font-size: 0.9375rem; font-weight: 700; color: #0f172a; }
+
+    /* Admin Tabs */
+    .admin-tabs { display: flex; gap: 0.5rem; background: #f1f5f9; padding: 0.4rem; border-radius: 0.75rem; margin-bottom: 2rem; width: fit-content; }
+    .tab-btn { 
+        padding: 0.75rem 1.5rem; 
+        border-radius: 0.5rem; 
+        border: none; 
+        background: transparent; 
+        color: #64748b; 
+        font-weight: 600; 
+        cursor: pointer; 
+        display: flex; 
+        align-items: center; 
+        gap: 0.5rem; 
+        transition: all 0.2s; 
+    }
+    .tab-btn.active { background: white; color: #4f46e5; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .tab-btn i { width: 18px; height: 18px; }
+
+    /* Stats Row */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .stat-mini-card { background: white; padding: 1.5rem; border-radius: 1rem; border: 1px solid #e2e8f0; text-align: center; }
+    .stat-mini-card .val { font-size: 1.75rem; font-weight: 800; color: #4f46e5; }
+    .stat-mini-card .lab { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
+
+    /* Tables */
+    .table-card { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .table-header { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .table-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+    
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { background: #f8fafc; padding: 1rem 1.5rem; text-align: left; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+    .data-table td { padding: 1rem 1.5rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
+    .data-table tr:last-child td { border-bottom: none; }
+    
+    .user-pill { display: flex; align-items: center; gap: 0.75rem; }
+    .user-pill img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+    
+    .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-admin { background: #fee2e2; color: #991b1b; }
+    .badge-teacher { background: #e0f2fe; color: #075985; }
+    .badge-student { background: #dcfce7; color: #166534; }
+
+    @keyframes pulse { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(2.5); opacity: 0; } }
+
+    .btn-action { padding: 0.5rem 1rem; border-radius: 0.5rem; background: #f1f5f9; color: #475569; font-weight: 600; text-decoration: none; font-size: 0.8125rem; }
+    .btn-action:hover { background: #e2e8f0; }
+</style>
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h1>Admin Control Panel</h1>
+        <div style="display: flex; gap: 1rem;">
+            <a href="{% url 'user_management' %}" class="btn-action" style="background: #4f46e5; color: white;">Manage Users</a>
+            <button onclick="toggleBroadcast()" class="btn-action">Broadcast Message</button>
+        </div>
+    </div>
+
+    <!-- System Health -->
+    <div class="health-grid">
+        <div class="health-card">
+            <div class="indicator online"></div>
+            <div class="health-info">
+                <p class="label">App Server</p>
+                <p class="value">Active (Port 8002)</p>
+            </div>
+        </div>
+        <div class="health-card">
+            <div class="indicator {% if camera_service_online %}online{% else %}offline{% endif %}"></div>
+            <div class="health-info">
+                <p class="label">AI Microservice</p>
+                <p class="value">{% if camera_service_online %}Running{% else %}Offline{% endif %}</p>
+            </div>
+        </div>
+        <div class="health-card">
+            <div class="indicator online"></div>
+            <div class="health-info">
+                <p class="label">Database</p>
+                <p class="value">SQLite Connected</p>
+            </div>
+        </div>
+        <div class="health-card">
+            <div class="indicator online"></div>
+            <div class="health-info">
+                <p class="label">WebSockets</p>
+                <p class="value">Engine Live</p>
+            </div>
+        </div>
+        {% if user.userprofile.user_type == 'student' %}
+        <div class="health-card">
+            <div class="indicator {% if face_registered %}online{% else %}offline{% endif %}"></div>
+            <div class="health-info">
+                <p class="label">Facial ID</p>
+                <p class="value">{% if face_registered %}Registered{% else %}Missing{% endif %}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-row">
+        <div class="stat-mini-card">
+            <p class="val">{{ total_users }}</p>
+            <p class="lab">Total Users</p>
+        </div>
+        <div class="stat-mini-card">
+            <p class="val">{{ total_students }}</p>
+            <p class="lab">Students</p>
+        </div>
+        <div class="stat-mini-card">
+            <p class="val">{{ total_teachers }}</p>
+            <p class="lab">Teachers</p>
+        </div>
+        <div class="stat-mini-card">
+            <p class="val">{{ live_meetings_count }}</p>
+            <p class="lab">Live Sessions</p>
+        </div>
+    </div>
+
+    <!-- Tabbed Content -->
+    <div class="admin-tabs">
+        <button class="tab-btn active" onclick="switchTab('users')"><i data-lucide="users"></i> Users</button>
+        <button class="tab-btn" onclick="switchTab('meetings')"><i data-lucide="video"></i> Meetings</button>
+        <button class="tab-btn" onclick="switchTab('cameras')"><i data-lucide="camera"></i> Cameras</button>
+    </div>
+
+    <div id="tab-users" class="tab-content">
+        <div class="table-card">
+            <div class="table-header">
+                <h2>Recent Registered Users</h2>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Joined</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in recent_users %}
+                    <tr>
+                        <td>
+                            <div class="user-pill">
+                                <img src="{{ user.userprofile.get_profile_picture_url }}" alt="">
+                                <div>
+                                    <div style="font-weight: 700;">{{ user.get_full_name|default:user.username }}</div>
+                                    <div style="font-size: 0.75rem; color: #64748b;">{{ user.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge badge-{{ user.userprofile.user_type }}">
+                                {{ user.userprofile.get_user_type_display }}
+                            </span>
+                        </td>
+                        <td>{{ user.date_joined|date:"M d, Y" }}</td>
+                        <td><span style="color: #10b981;">● Active</span></td>
+                        <td><a href="{% url 'profile_view' user.username %}" class="btn-action">View</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-meetings" class="tab-content" style="display: none;">
+        <div class="table-card">
+            <div class="table-header">
+                <h2>Live & Recent Meetings</h2>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Meeting</th>
+                        <th>Teacher</th>
+                        <th>Status</th>
+                        <th>Participants</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for meeting in all_meetings|slice:":10" %}
+                    <tr>
+                        <td>
+                            <div style="font-weight: 700;">{{ meeting.title }}</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">Code: {{ meeting.meeting_code }}</div>
+                        </td>
+                        <td>{{ meeting.teacher.username }}</td>
+                        <td>
+                            {% if meeting.status == 'live' %}
+                            <span style="color: #ef4444; font-weight: 700;">🔴 LIVE</span>
+                            {% else %}
+                            <span style="color: #64748b;">{{ meeting.get_status_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ meeting.participants.count }}</td>
+                        <td><a href="{% url 'join_meeting' meeting.meeting_code %}" class="btn-action">Join</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-cameras" class="tab-content" style="display: none;">
+        <div class="table-card">
+            <div class="table-header">
+                <h2>Connected Cameras</h2>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Camera Name</th>
+                        <th>Address</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camera in all_cameras %}
+                    <tr>
+                        <td style="font-weight: 700;">{{ camera.name }}</td>
+                        <td style="font-family: monospace;">{{ camera.ip_address }}:{{ camera.port }}</td>
+                        <td>{% if camera.is_active %}<span style="color: #10b981;">Online</span>{% else %}Offline{% endif %}</td>
+                        <td><a href="#" class="btn-action">Config</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        
+        document.getElementById('tab-' + tabId).style.display = 'block';
+        event.currentTarget.classList.add('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        lucide.createIcons();
+    });
+</script>
+{% endblock %}

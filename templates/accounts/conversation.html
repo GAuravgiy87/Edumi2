@@ -1,0 +1,677 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Chat{% endblock %}
+
+{% block title %}Chat with {{ other_user.username }} - EduMi{% endblock %}
+
+{% block content %}
+<style>
+.chat-container {
+    max-width: 100%;
+    margin: 0;
+    height: calc(100vh - 60px);
+    display: flex;
+    background: #fff;
+    overflow: hidden;
+}
+
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+}
+
+.chat-header {
+    padding: 12px 20px;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.back-btn {
+    color: #667eea;
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: 600;
+    transition: transform 0.2s;
+}
+
+.back-btn:hover {
+    transform: translateX(-3px);
+}
+
+.chat-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.chat-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.chat-avatar.online::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background: #10b981;
+    border: 2px solid white;
+    border-radius: 50%;
+}
+
+.chat-user-info {
+    flex: 1;
+}
+
+.chat-user-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #111827;
+    margin-bottom: 0;
+}
+
+.chat-user-meta {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.profile-btn {
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.profile-btn:hover {
+    background: #5568d3;
+}
+
+.messages-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.message-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.message-wrapper.sent {
+    justify-content: flex-end;
+}
+
+.message-wrapper.received {
+    justify-content: flex-start;
+}
+
+.message-bubble {
+    max-width: 60%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    position: relative;
+}
+
+.message-wrapper.sent .message-bubble {
+    background: #667eea;
+    color: white;
+    border-bottom-right-radius: 3px;
+}
+
+.message-wrapper.received .message-bubble {
+    background: white;
+    color: #111827;
+    border-bottom-left-radius: 3px;
+}
+
+.message-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+
+.message-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.message-wrapper.sent .message-file {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.message-wrapper.received .message-file {
+    background: #f3f4f6;
+    color: #667eea;
+}
+
+.message-content {
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    line-height: 1.4;
+    font-size: 14px;
+}
+
+.message-time {
+    font-size: 10px;
+    margin-top: 4px;
+    opacity: 0.7;
+    text-align: right;
+}
+
+.empty-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+}
+
+.empty-chat-icon {
+    font-size: 60px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+}
+
+.empty-chat h3 {
+    color: #6b7280;
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+
+.message-input-area {
+    padding: 12px 16px;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+}
+
+.message-form {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.emoji-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.emoji-btn:hover {
+    background: #f3f4f6;
+}
+
+.emoji-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: #6b7280;
+}
+
+.input-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.message-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    transition: all 0.2s;
+    max-height: 100px;
+}
+
+.message-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.attachment-buttons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.attachment-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.attachment-btn:hover {
+    background: #f3f4f6;
+}
+
+.attachment-btn svg {
+    width: 22px;
+    height: 22px;
+    stroke: #6b7280;
+}
+
+.attachment-btn input {
+    display: none;
+}
+
+.send-btn {
+    width: 40px;
+    height: 40px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.send-btn:hover {
+    background: #5568d3;
+}
+
+.send-btn:active {
+    transform: scale(0.95);
+}
+
+.send-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: white;
+}
+
+/* Emoji Picker */
+.emoji-picker {
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: none;
+    z-index: 1000;
+    width: 280px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.emoji-picker.active {
+    display: block;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+}
+
+.emoji-item {
+    font-size: 24px;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.emoji-item:hover {
+    background: #f3f4f6;
+    transform: scale(1.2);
+}
+
+/* Scrollbar styling */
+.messages-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.messages-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.messages-area::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+}
+
+.messages-area::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .message-bubble {
+        max-width: 80%;
+    }
+    
+    .profile-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    .chat-header {
+        padding: 10px 12px;
+    }
+    
+    .messages-area {
+        padding: 12px;
+    }
+}
+</style>
+
+<div class="chat-container">
+    <div class="chat-main">
+        <!-- Chat Header -->
+        <div class="chat-header">
+            <a href="{% url 'inbox' %}" class="back-btn">←</a>
+            
+            <div class="chat-avatar {% if other_user.is_active %}online{% endif %}">
+                <img src="{{ other_user.userprofile.get_profile_picture_url }}" alt="{{ other_user.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ other_user.username }}&background=667eea&color=fff'">
+            </div>
+            
+            <div class="chat-user-info">
+                <div class="chat-user-name">
+                    {{ other_user.userprofile.display_name|default:other_user.get_full_name|default:other_user.username }}
+                </div>
+                <div class="chat-user-meta">
+                    @{{ other_user.username }}
+                    {% if other_user.userprofile.user_type == 'teacher' %}
+                        • Teacher 👨‍🏫
+                    {% else %}
+                        • Student 👨‍🎓
+                    {% endif %}
+                </div>
+            </div>
+            
+            <a href="{% url 'profile_view' other_user.username %}" class="profile-btn">
+                View Profile
+            </a>
+        </div>
+        
+        <!-- Messages Area -->
+        <div class="messages-area" id="messagesContainer">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="message-wrapper {% if message.sender == user %}sent{% else %}received{% endif %}">
+                        <div class="message-bubble">
+                            {% if message.image %}
+                                <img src="{{ message.image.url }}" alt="Image" class="message-image">
+                            {% endif %}
+                            
+                            {% if message.file %}
+                                <a href="{{ message.file.url }}" download class="message-file">
+                                    <span style="font-size: 20px;">📎</span>
+                                    <span>{{ message.file.name|slice:"12:" }}</span>
+                                </a>
+                            {% endif %}
+                            
+                            {% if message.content %}
+                                <div class="message-content">{{ message.content }}</div>
+                            {% endif %}
+                            
+                            <div class="message-time">
+                                {{ message.created_at|date:"g:i A" }}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-chat">
+                    <div class="empty-chat-icon">💬</div>
+                    <h3>No messages yet</h3>
+                    <p>Start the conversation!</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Message Input -->
+        <div class="message-input-area">
+            <form id="messageForm" method="POST" action="{% url 'send_message' conversation.id %}" enctype="multipart/form-data" class="message-form">
+                {% csrf_token %}
+                
+                <!-- Emoji Button -->
+                <button type="button" class="emoji-btn" id="emojiBtn" onclick="toggleEmojiPicker()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="9" cy="9" r="1" fill="currentColor"/>
+                        <circle cx="15" cy="9" r="1" fill="currentColor"/>
+                    </svg>
+                    
+                    <!-- Emoji Picker -->
+                    <div class="emoji-picker" id="emojiPicker" onclick="event.stopPropagation()">
+                        <div class="emoji-grid" id="emojiGrid"></div>
+                    </div>
+                </button>
+                
+                <div class="input-wrapper">
+                    <textarea name="content" id="messageInput" placeholder="Type a message..." 
+                              class="message-textarea" rows="1"></textarea>
+                </div>
+                
+                <!-- Attachment Buttons -->
+                <div class="attachment-buttons">
+                    <label class="attachment-btn" title="Attach Image">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        <input type="file" name="image" id="imageInput" accept="image/*">
+                    </label>
+                    
+                    <label class="attachment-btn" title="Attach File">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        </svg>
+                        <input type="file" name="file" id="fileInput">
+                    </label>
+                </div>
+                
+                <button type="submit" class="send-btn" title="Send">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <line x1="22" y1="2" x2="11" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor"></polygon>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Emoji list
+const emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊','💋','💌','💘','💝','💖','💗','💓','💞','💕','💟','❣️','💔','❤️','🧡','💛','💚','💙','💜','🤎','🖤','🤍','💯','💢','💥','💫','💦','💨','🕳️','💣','💬','👁️‍🗨️','🗨️','🗯️','💭','💤','👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄'];
+
+// Populate emoji picker
+const emojiGrid = document.getElementById('emojiGrid');
+emojis.forEach(emoji => {
+    const span = document.createElement('span');
+    span.className = 'emoji-item';
+    span.textContent = emoji;
+    span.onclick = () => insertEmoji(emoji);
+    emojiGrid.appendChild(span);
+});
+
+// Toggle emoji picker
+function toggleEmojiPicker() {
+    const picker = document.getElementById('emojiPicker');
+    picker.classList.toggle('active');
+}
+
+// Close emoji picker when clicking outside
+document.addEventListener('click', function(e) {
+    const picker = document.getElementById('emojiPicker');
+    const btn = document.getElementById('emojiBtn');
+    if (!btn.contains(e.target)) {
+        picker.classList.remove('active');
+    }
+});
+
+// Insert emoji into textarea
+function insertEmoji(emoji) {
+    const textarea = document.getElementById('messageInput');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + emoji + text.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+    textarea.focus();
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('messagesContainer');
+    container.scrollTop = container.scrollHeight;
+}
+
+// Scroll to bottom on load
+window.addEventListener('load', scrollToBottom);
+
+// Handle Real-time Messages from WebSocket (dispatched via base_sidebar.html)
+window.addEventListener('new_message', function(e) {
+    const data = e.detail;
+    // Only append if it's for THIS conversation
+    if (data.conversation_id == {{ conversation.id }}) {
+        appendMessage(data.sender, data.message, false);
+    }
+});
+
+function appendMessage(sender, content, isSent, imageUrl = null, fileUrl = null, fileName = null) {
+    const container = document.getElementById('messagesContainer');
+    const emptyChat = container.querySelector('.empty-chat');
+    if (emptyChat) emptyChat.remove();
+
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper ${isSent ? 'sent' : 'received'}`;
+    
+    let contentHtml = '';
+    if (imageUrl) contentHtml += `<img src="${imageUrl}" alt="Image" class="message-image">`;
+    if (fileUrl) contentHtml += `
+        <a href="${fileUrl}" download class="message-file">
+            <span style="font-size: 20px;">📎</span>
+            <span>${fileName || 'File'}</span>
+        </a>`;
+    if (content) contentHtml += `<div class="message-content">${content}</div>`;
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    wrapper.innerHTML = `
+        <div class="message-bubble">
+            ${contentHtml}
+            <div class="message-time">${timeStr}</div>
+        </div>
+    `;
+    
+    container.appendChild(wrapper);
+    scrollToBottom();
+}
+
+// Handle Form Submission via AJAX
+document.getElementById('messageForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const input = document.getElementById('messageInput');
+    const content = input.value.trim();
+    const form = this;
+    const formData = new FormData(form);
+
+    if (!content && !document.getElementById('imageInput').files.length && !document.getElementById('fileInput').files.length) return;
+
+    // Optimistically append (optional, but better to wait for server success for time/ID)
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            appendMessage('{{ user.username }}', data.content, true, data.image_url, data.file_url, data.file_name);
+            input.value = '';
+            input.style.height = 'auto';
+            form.reset();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error sending message:', error);
+    });
+});
+
+// Handle Enter key to send (Shift+Enter for new line)
+document.getElementById('messageInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const event = new Event('submit', { cancelable: true });
+        document.getElementById('messageForm').dispatchEvent(event);
+    }
+});
+
+// Auto-resize textarea
+document.getElementById('messageInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+});
+</script>
+{% endblock %}

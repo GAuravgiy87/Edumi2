@@ -1,0 +1,166 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Video Library - Edumi{% endblock %}
+
+{% block extra_css %}
+<style>
+    .video-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem 0;
+    }
+    .video-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 1px solid #e2e8f0;
+    }
+    .video-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    .video-thumbnail-wrapper {
+        position: relative;
+        aspect-ratio: 16/9;
+        background: #0f172a;
+    }
+    .video-thumbnail {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .video-duration {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .video-info {
+        padding: 1rem;
+        display: flex;
+        gap: 0.75rem;
+    }
+    .uploader-avatar {
+        width: 36px;
+        height: 36px;
+        background: #6366f1;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .video-details {
+        flex: 1;
+        min-width: 0;
+    }
+    .video-title {
+        font-weight: 700;
+        font-size: 1rem;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.4;
+    }
+    .video-meta {
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+    .video-link {
+        text-decoration: none;
+        color: inherit;
+    }
+    .video-link:hover .video-title {
+        color: #6366f1;
+    }
+    .processing-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: #f59e0b;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="font-weight-bold mb-1">Learning Library</h2>
+            <p class="text-muted small mb-0">Browse through all available video lectures and tutorials.</p>
+        </div>
+        {% if user.userprofile.user_type == 'teacher' %}
+        <a href="{% url 'upload_video' %}" class="btn btn-primary d-flex align-items-center gap-2">
+            <i data-lucide="plus-circle" style="width: 20px;"></i>
+            Upload Lecture
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="video-grid">
+        {% for video in videos %}
+        <div class="video-card">
+            <a href="{% url 'video_detail' video.id %}" class="video-link">
+                <div class="video-thumbnail-wrapper">
+                    {% if not video.is_processed %}
+                    <div class="processing-badge">Processing</div>
+                    {% endif %}
+                    
+                    {% if video.thumbnail %}
+                    <img src="{{ video.thumbnail.url }}" alt="{{ video.title }}" class="video-thumbnail">
+                    {% else %}
+                    <div class="d-flex align-items-center justify-content-center h-100 text-white opacity-20">
+                        <i data-lucide="video" style="width: 48px; height: 48px;"></i>
+                    </div>
+                    {% endif %}
+                    
+                    {% if video.duration_seconds %}
+                    <div class="video-duration">{{ video.duration_seconds|format_duration }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="video-info">
+                    <div class="uploader-avatar">
+                        {{ video.uploaded_by.username|slice:":1"|upper }}
+                    </div>
+                    <div class="video-details">
+                        <h3 class="video-title">{{ video.title }}</h3>
+                        <div class="video-meta">
+                            <div>{{ video.uploaded_by.username }}</div>
+                            <div>{{ video.uploaded_at|timesince }} ago</div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="bg-light rounded-circle d-inline-flex p-4 mb-3">
+                <i data-lucide="video-off" class="text-muted" style="width: 48px; height: 48px;"></i>
+            </div>
+            <h4>No videos yet</h4>
+            <p class="text-muted">Start by uploading your first lecture video.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

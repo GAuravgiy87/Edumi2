@@ -1,0 +1,164 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Edit Profile{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v={{ timestamp }}">
+{% endblock %}
+
+{% block content %}
+<div class="edit-profile-container">
+    <div class="form-card-large">
+        <h2>Edit Profile</h2>
+        <p class="subtitle">Update your personal information</p>
+        
+        <div style="background: #e8f4fd; border-left: 4px solid #667eea; padding: 12px 16px; margin-bottom: 20px; border-radius: 6px;">
+            <p style="margin: 0; color: #374151; font-size: 14px;">
+                ℹ️ <strong>All fields are optional.</strong> Fill out only what you want to share. You can always update this later.
+            </p>
+        </div>
+        
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <h3 class="section-title">Basic Information</h3>
+            
+            <div class="form-group">
+                <label for="display_name">Display Name</label>
+                <input type="text" id="display_name" name="display_name" value="{{ profile.display_name }}" placeholder="How you want to be called">
+                <small>This will be shown instead of your username</small>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="first_name">First Name</label>
+                    <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Last Name</label>
+                    <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="{{ user.email }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="bio">Bio</label>
+                <textarea id="bio" name="bio" rows="4" style="width: 100%; padding: 0.75rem; border: 1px solid #dddfe2; border-radius: 6px; font-size: 1rem; font-family: inherit;">{{ profile.bio }}</textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" name="phone" value="{{ profile.phone }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="date_of_birth">Date of Birth</label>
+                    <input type="date" id="date_of_birth" name="date_of_birth" value="{{ profile.date_of_birth|date:'Y-m-d' }}">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="address">Address</label>
+                <textarea id="address" name="address" rows="2" style="width: 100%; padding: 0.75rem; border: 1px solid #dddfe2; border-radius: 6px; font-size: 1rem; font-family: inherit;">{{ profile.address }}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="profile_picture">Profile Picture</label>
+                <input type="file" id="profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this)">
+                <small>Upload a profile picture (JPG, PNG, GIF - Max 5MB)</small>
+                <div class="profile-picture-preview">
+                    <img id="profile-preview-img" src="{{ profile.get_profile_picture_url }}" alt="Profile Preview" onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=1877f2&color=fff&size=200'">
+                </div>
+            </div>
+            
+            <script>
+            function previewImage(input) {
+                const img = document.getElementById('profile-preview-img');
+                if (input.files && input.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(input.files[0]);
+                }
+            }
+            </script>
+            
+            {% if profile.user_type == 'student' %}
+            <h3 class="section-title">Student Information</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="student_id">Student ID</label>
+                    <input type="text" id="student_id" name="student_id" value="{{ profile.student_id }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="grade">Grade</label>
+                    <input type="text" id="grade" name="grade" value="{{ profile.grade }}" placeholder="e.g., 10th Grade">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="enrollment_date">Enrollment Date</label>
+                <input type="date" id="enrollment_date" name="enrollment_date" value="{{ profile.enrollment_date|date:'Y-m-d' }}">
+            </div>
+            
+            {% elif profile.user_type == 'teacher' %}
+            <h3 class="section-title">Teacher Information</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="employee_id">Employee ID</label>
+                    <input type="text" id="employee_id" name="employee_id" value="{{ profile.employee_id }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <input type="text" id="department" name="department" value="{{ profile.department }}" placeholder="e.g., Mathematics">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="specialization">Specialization</label>
+                <input type="text" id="specialization" name="specialization" value="{{ profile.specialization }}" placeholder="e.g., Calculus, Algebra">
+            </div>
+            
+            <div class="form-group">
+                <label for="join_date">Join Date</label>
+                <input type="date" id="join_date" name="join_date" value="{{ profile.join_date|date:'Y-m-d' }}">
+            </div>
+            {% endif %}
+            
+            <h3 class="section-title">Social Links</h3>
+            
+            <div class="form-group">
+                <label for="linkedin">LinkedIn</label>
+                <input type="text" id="linkedin" name="linkedin" value="{{ profile.linkedin }}" placeholder="https://linkedin.com/in/username">
+            </div>
+            
+            <div class="form-group">
+                <label for="twitter">Twitter</label>
+                <input type="text" id="twitter" name="twitter" value="{{ profile.twitter }}" placeholder="https://twitter.com/username">
+            </div>
+            
+            <div class="form-group">
+                <label for="website">Website</label>
+                <input type="text" id="website" name="website" value="{{ profile.website }}" placeholder="https://yourwebsite.com">
+            </div>
+            
+            <div class="form-actions">
+                <a href="{% url 'profile_view' user.username %}" class="btn-cancel">Cancel</a>
+                <button type="submit" class="btn-submit">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

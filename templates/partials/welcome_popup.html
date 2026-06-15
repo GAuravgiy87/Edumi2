@@ -1,0 +1,227 @@
+{% if request.session.show_welcome %}
+<style>
+    :root {
+        --wp-primary: #6366f1;
+        --wp-secondary: #a855f7;
+        --wp-glass: rgba(255, 255, 255, 0.7);
+        --wp-text: #1e293b;
+    }
+
+    #welcome-overlay {
+        position: fixed; inset: 0; z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+        background: radial-gradient(circle at center, rgba(99, 102, 241, 0.15) 0%, rgba(15, 23, 42, 0.4) 100%);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        animation: wp-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    #welcome-card {
+        position: relative;
+        background: var(--wp-glass);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-radius: 32px;
+        max-width: 520px;
+        width: 90%;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.3);
+        transform-origin: center;
+        animation: wp-card-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .wc-header {
+        position: relative;
+        padding: 48px 40px 32px;
+        text-align: center;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+    }
+
+    .wc-icon-wrapper {
+        width: 80px; height: 80px;
+        margin: 0 auto 24px;
+        background: linear-gradient(135deg, var(--wp-primary), var(--wp-secondary));
+        border-radius: 24px;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.5);
+        transform: rotate(-5deg);
+        animation: wp-icon-float 4s ease-in-out infinite;
+    }
+
+    @keyframes wp-icon-float {
+        0%, 100% { transform: rotate(-5deg) translateY(0); }
+        50% { transform: rotate(5deg) translateY(-10px); }
+    }
+
+    .wc-header h2 {
+        font-size: 2.2rem; font-weight: 800;
+        color: var(--wp-text); margin: 0;
+        letter-spacing: -1px; line-height: 1.1;
+    }
+
+    .wc-header p {
+        margin: 12px 0 0; color: #64748b;
+        font-size: 1.1rem; font-weight: 500;
+    }
+
+    .wc-body { padding: 0 40px 48px; }
+
+    .wc-features {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 16px; margin: 32px 0;
+    }
+
+    .wc-feature {
+        background: white;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        border-radius: 20px; padding: 20px 12px;
+        text-align: center; transition: all 0.3s ease;
+    }
+
+    .wc-feature:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.1);
+        border-color: var(--wp-primary);
+    }
+
+    .wc-feat-icon {
+        width: 40px; height: 40px;
+        margin: 0 auto 12px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--wp-primary);
+    }
+
+    .wc-feature strong {
+        display: block; font-size: 0.85rem;
+        color: var(--wp-text); margin-bottom: 4px;
+    }
+
+    .wc-feature span {
+        font-size: 0.75rem; color: #94a3b8;
+    }
+
+    .wc-btn {
+        width: 100%; padding: 18px;
+        background: linear-gradient(135deg, var(--wp-primary), var(--wp-secondary));
+        color: white; border: none; border-radius: 18px;
+        font-size: 1.1rem; font-weight: 700;
+        cursor: pointer; transition: all 0.3s ease;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+    }
+
+    .wc-btn:hover {
+        transform: scale(1.02);
+        box-shadow: 0 15px 35px -5px rgba(99, 102, 241, 0.5);
+    }
+
+    .wc-close {
+        position: absolute; top: 20px; right: 20px;
+        background: rgba(0, 0, 0, 0.05); border: none;
+        width: 36px; height: 36px; border-radius: 12px;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        color: #64748b; transition: all 0.2s; z-index: 10;
+    }
+
+    .wc-close:hover { background: rgba(0, 0, 0, 0.1); color: var(--wp-text); }
+
+    @keyframes wp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes wp-card-in {
+        from { transform: scale(0.9) translateY(30px); opacity: 0; }
+        to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .wp-closing { animation: wp-fade-out 0.3s ease forwards !important; }
+    @keyframes wp-fade-out { to { opacity: 0; transform: scale(0.95); } }
+</style>
+
+<div id="welcome-overlay" style="display: none;">
+    <div id="welcome-card">
+        <button class="wc-close" onclick="closeWelcome()" aria-label="Close">
+            <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+        </button>
+        
+        <div class="wc-header">
+            <div class="wc-icon-wrapper">
+                <i data-lucide="graduation-cap" style="width: 40px; height: 40px; color: white;"></i>
+            </div>
+            <h2>Welcome to Edumi</h2>
+            <p>Empowering your learning journey.</p>
+        </div>
+
+        <div class="wc-body">
+            <div class="wc-features">
+                <div class="wc-feature">
+                    <div class="wc-feat-icon">
+                        <i data-lucide="home"></i>
+                    </div>
+                    <strong>Classrooms</strong>
+                    <span>Interactive spaces</span>
+                </div>
+                <div class="wc-feature">
+                    <div class="wc-feat-icon">
+                        <i data-lucide="video"></i>
+                    </div>
+                    <strong>Meetings</strong>
+                    <span>Live sessions</span>
+                </div>
+                <div class="wc-feature">
+                    <div class="wc-feat-icon">
+                        <i data-lucide="mail"></i>
+                    </div>
+                    <strong>Inbox</strong>
+                    <span>Stay updated</span>
+                </div>
+            </div>
+
+            <button class="wc-btn" onclick="closeWelcome()">
+                Get Started
+                <i data-lucide="arrow-right" style="width: 20px; height: 20px;"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const welcomeOverlay = document.getElementById('welcome-overlay');
+        const welcomeDismissed = localStorage.getItem('welcomeDismissed');
+
+        if (!welcomeDismissed) {
+            welcomeOverlay.style.display = 'flex';
+        }
+
+        window.closeWelcome = function() {
+            const card = document.getElementById('welcome-card');
+            card.classList.add('closing');
+            welcomeOverlay.classList.add('closing');
+            
+            localStorage.setItem('welcomeDismissed', 'true');
+            
+            setTimeout(() => welcomeOverlay.remove(), 350);
+            
+            // Background notify the server
+            fetch('/accounts/dismiss-welcome/', {
+                method: 'POST', 
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}'
+                }
+            });
+        };
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    })();
+</script>
+{% endif %}

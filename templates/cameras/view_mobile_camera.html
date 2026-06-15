@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="camera-view-container">
+    <div class="camera-header">
+        <div>
+            <h1>📱 {{ mobile_camera.name }}</h1>
+            <p class="camera-type">{{ mobile_camera.get_camera_type_display }}</p>
+        </div>
+        <a href="{% url 'mobile_cameras:dashboard' %}" class="btn-back">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Dashboard
+        </a>
+    </div>
+    
+    <div class="camera-feed-wrapper">
+        <img src="{% url 'mobile_cameras:feed' mobile_camera.id %}" alt="{{ mobile_camera.name }}" class="camera-feed">
+    </div>
+    
+    <div class="camera-info-card">
+        <h3>Camera Information</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="label">Type:</span>
+                <span class="value">{{ mobile_camera.get_camera_type_display }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">IP Address:</span>
+                <span class="value">{{ mobile_camera.ip_address }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Port:</span>
+                <span class="value">{{ mobile_camera.port }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Stream Path:</span>
+                <span class="value">{{ mobile_camera.stream_path }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Status:</span>
+                <span class="value">
+                    {% if mobile_camera.is_active %}
+                        <span class="status-active">● Active</span>
+                    {% else %}
+                        <span class="status-inactive">● Inactive</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="label">Stream URL:</span>
+                <span class="value url">{{ mobile_camera.get_stream_url }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.camera-view-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 2rem;
+}
+
+.camera-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.camera-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 0.5rem;
+}
+
+.camera-type {
+    color: #6c757d;
+    font-size: 1rem;
+}
+
+.btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-back:hover {
+    background: var(--gray-200);
+}
+
+.btn-back svg {
+    width: 20px;
+    height: 20px;
+}
+
+.camera-feed-wrapper {
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.camera-feed {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.camera-info-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+}
+
+.camera-info-card h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 1.5rem;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.info-item .label {
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.info-item .value {
+    color: #212529;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.info-item .value.url {
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+    background: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 6px;
+}
+
+.status-active {
+    color: #28a745;
+}
+
+.status-inactive {
+    color: #dc3545;
+}
+
+@media (max-width: 768px) {
+    .camera-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
