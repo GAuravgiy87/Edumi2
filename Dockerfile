@@ -16,9 +16,10 @@ RUN apt-get update && \
 
 COPY requirements.txt .
 RUN pip install --upgrade pip --quiet && \
-    grep -v '^opencv-python' requirements.txt | grep -v '^numpy' > /tmp/req.txt && \
+    grep -v '^opencv-python' requirements.txt | grep -v '^numpy' | grep -v '^dlib-bin' > /tmp/req.txt && \
     pip install --quiet "numpy==1.26.4" && \
     pip install --quiet "opencv-python-headless==4.8.1.78" && \
+    pip install --quiet "dlib-bin==20.0.1" && \
     pip install --quiet -r /tmp/req.txt && \
     pip install --quiet psycopg2-binary django-redis channels-redis dj-database-url whitenoise
 
