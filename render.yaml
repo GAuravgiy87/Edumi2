@@ -102,7 +102,7 @@ services:
 
   - type: web
     name: edumi2-livekit
-    runtime: docker
+    runtime: image
     plan: free
     image: livekit/livekit-server:v1.5.2
     autoDeploy: true
