@@ -42,35 +42,7 @@ services:
         value: WARNING
     healthCheckPath: /
     autoDeploy: true
-    dockerCommand: "sh -c 'python manage.py migrate --noinput && python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p 10000 school_project.asgi:application'"
-    numInstances: 1
-
-  - type: worker
-    name: edumi2-worker
-    runtime: docker
-    plan: free
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    envVars:
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: edumi2-web
-          envVarKey: SECRET_KEY
-      - key: DATABASE_URL
-        fromDatabase:
-          name: edumi2-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: edumi2-redis
-          property: connectionString
-      - key: DEBUG
-        value: false
-      - key: LOG_LEVEL
-        value: WARNING
-    dockerCommand: "celery -A school_project worker -l warning --concurrency=1"
+    dockerCommand: "sh -c 'python manage.py migrate --noinput && python manage.py collectstatic --noinput && (celery -A school_project worker -l warning --concurrency=1 &) && daphne -b 0.0.0.0 -p 10000 school_project.asgi:application'"
     numInstances: 1
 
   - type: web
