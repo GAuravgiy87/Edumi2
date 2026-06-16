@@ -34,7 +34,6 @@ logs/
 __pycache__/
 local_settings.py
 staticfiles/
-static/
 *.sqlite3
 media/
 .env
