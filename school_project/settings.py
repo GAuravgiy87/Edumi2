@@ -74,6 +74,12 @@ csrf_origins_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
 if csrf_origins_env:
     CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
 
+# Add Render URL from environment if available
+render_url = os.environ.get('RENDER_EXTERNAL_URL')
+if render_url:
+    if render_url not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_url)
+
 # Always add these defaults for local development
 DEFAULT_CSRF_ORIGINS = [
     'http://localhost',
