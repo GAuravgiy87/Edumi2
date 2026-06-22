@@ -1,0 +1,230 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+{% load common_tags %}
+
+{% block title %}{{ recording.title }} - Recorded Lecture{% endblock %}
+
+{% block extra_css %}
+<style>
+    .watch-container {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        gap: 1.5rem;
+        padding: 1.5rem;
+    }
+    @media (max-width: 1024px) {
+        .watch-container {
+            grid-template-columns: 1fr;
+        }
+    }
+    .video-player-section {
+        min-width: 0;
+    }
+    .video-wrapper {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .video-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin-bottom: 0.75rem;
+    }
+    .video-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 1.5rem;
+    }
+    .uploader-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .uploader-avatar {
+        width: 40px;
+        height: 40px;
+        background: #6366f1;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+    }
+    .description-box {
+        background: #f1f5f9;
+        padding: 1rem;
+        border-radius: 12px;
+        font-size: 0.9375rem;
+        color: #334155;
+        white-space: pre-wrap;
+    }
+    .recommendation-card {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        text-decoration: none;
+        color: inherit;
+    }
+    .rec-thumb-wrapper {
+        width: 160px;
+        aspect-ratio: 16/9;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #0f172a;
+        flex-shrink: 0;
+    }
+    .rec-thumb {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .rec-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .rec-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.2;
+    }
+    .rec-meta {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+    .badge-live {
+        background: #ef4444;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+</style>
+<!-- Include HLS.js for chunked video support -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+{% endblock %}
+
+{% block content %}
+<div class="watch-container">
+    <div class="video-player-section">
+        <div class="video-wrapper">
+            {% if recording.recording_status == 'completed' or recording.recording_status == 'processing' %}
+                <video id="videoPlayer" controls class="w-100 h-100" {% if recording.thumbnail %}poster="{{ recording.thumbnail.url }}"{% endif %}>
+                    {% if recording.is_chunked %}
+                        <!-- HLS Playlist will be loaded by JavaScript -->
+                    {% else %}
+                        <source src="{% url 'stream_video' recording.id %}" type="video/mp4">
+                    {% endif %}
+                    Your browser does not support the video tag.
+                </video>
+            {% elif recording.recording_status == 'recording' %}
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-white p-4 text-center">
+                    <div class="spinner-grow text-danger mb-3" role="status"></div>
+                    <h4 class="text-danger font-weight-bold">LIVE RECORDING IN PROGRESS</h4>
+                    <p class="small text-muted">This lecture is currently being recorded. You can watch the full recording once it's finished.</p>
+                </div>
+            {% else %}
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-white p-4">
+                    <i data-lucide="alert-circle" class="text-warning mb-3" style="width: 48px; height: 48px;"></i>
+                    <h4>Recording not available</h4>
+                    <p class="text-center small text-muted">There was an issue with this recording or it's still being prepared.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <h1 class="video-title">{{ recording.title }}</h1>
+        
+        <div class="video-actions">
+            <div class="uploader-info">
+                <div class="uploader-avatar">
+                    {{ recording.teacher.username|slice:":1"|upper }}
+                </div>
+                <div>
+                    <div class="font-weight-bold" style="color:#1e293b;">{{ recording.teacher.username }}</div>
+                    <div class="text-muted small">Recorded on {{ recording.created_at|date:"M d, Y" }}</div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {% if user == recording.teacher or user.is_superuser %}
+                <a href="{% url 'manage_recordings' %}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+                    <i data-lucide="settings" style="width: 16px;"></i> Manage
+                </a>
+                {% endif %}
+                <button class="btn btn-light btn-sm d-flex align-items-center gap-1">
+                    <i data-lucide="share-2" style="width: 16px;"></i> Share
+                </button>
+            </div>
+        </div>
+
+        <div class="description-box">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="font-weight-bold">Description</span>
+                <span class="text-muted small">{{ recording.duration|default:"--" }} duration</span>
+            </div>
+            {{ recording.description|default:"No description provided for this lecture." }}
+        </div>
+    </div>
+
+    <div class="sidebar-section">
+        <h5 class="font-weight-bold mb-3">Related Lectures</h5>
+        {% for rec in recommended %}
+        <a href="{% url 'watch_recording' rec.id %}" class="recommendation-card">
+            <div class="rec-thumb-wrapper">
+                {% if rec.thumbnail %}
+                <img src="{{ rec.thumbnail.url }}" alt="{{ rec.title }}" class="rec-thumb">
+                {% else %}
+                <img src="{% static 'images/video-placeholder.svg' %}" alt="{{ rec.title }}" class="rec-thumb">
+                {% endif %}
+            </div>
+            <div class="rec-info">
+                <h4 class="rec-title">{{ rec.title }}</h4>
+                <div class="rec-meta">
+                    <div>{{ rec.teacher.username }}</div>
+                    <div>{{ rec.created_at|timesince }} ago</div>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-muted small">No related lectures found.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const video = document.getElementById('videoPlayer');
+        
+        {% if recording.is_chunked %}
+        const playlistUrl = "{% url 'recording_playlist' recording.id %}";
+        
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(playlistUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                // video.play();
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // For Safari
+            video.src = playlistUrl;
+        }
+        {% endif %}
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,202 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .live-view-container {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        height: calc(100vh - 100px);
+    }
+    .video-section {
+        background: #000;
+        border-radius: 1rem;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+    .video-header {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        padding: 1rem;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+        color: white;
+        z-index: 10;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .video-feed {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    .sidebar-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        overflow-y: auto;
+    }
+    .info-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .info-title {
+        font-size: 0.875rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.75rem;
+        font-weight: 600;
+    }
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+    .stat-label { color: #64748b; }
+    .stat-value { font-weight: 600; color: #1e293b; }
+    
+    .chat-container {
+        flex: 1;
+        background: white;
+        border-radius: 1rem;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .chat-header {
+        padding: 1rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 600;
+    }
+    .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .message {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .msg-user { font-weight: 600; font-size: 0.75rem; color: #6366f1; }
+    .msg-text { 
+        background: #f1f5f9; 
+        padding: 0.5rem 0.75rem; 
+        border-radius: 0.5rem; 
+        font-size: 0.875rem;
+        width: fit-content;
+    }
+    
+    .student-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .student-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        transition: background 0.2s;
+        cursor: pointer;
+    }
+    .student-item:hover { background: #f1f5f9; }
+    .student-avatar {
+        width: 32px; height: 32px;
+        background: #e2e8f0;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; font-weight: 600; color: #64748b;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="live-view-container">
+    <div class="video-section">
+        <div class="video-header">
+            <div>
+                <h2 style="margin:0; font-size:1.25rem;">{{ camera.name }}</h2>
+                <div style="font-size:0.75rem; opacity:0.8;">{{ camera.ip_address }}:{{ camera.port }} • {{ camera.get_camera_type_display }}</div>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+                <span class="status-badge" style="background:rgba(34,197,94,0.2); color:#4ade80; border:1px solid #22c55e;">LIVE</span>
+            </div>
+        </div>
+        <img src="{% url 'camera_feed' camera.id %}" class="video-feed" alt="Camera Feed">
+    </div>
+
+    <div class="sidebar-section">
+        <div class="info-card">
+            <div class="info-title">Active Session</div>
+            <div class="stat-row">
+                <span class="stat-label">Teacher:</span>
+                <span class="stat-value">{% if active_session %}{{ active_session.teacher.username }}{% else %}No Active Session{% endif %}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Started:</span>
+                <span class="stat-value">{{ start_time|date:"H:i" }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Duration:</span>
+                <span class="stat-value" id="duration">00:00:00</span>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div class="info-title">Students Watching ({{ total_students }})</div>
+            <div class="student-list">
+                {% for student in watching_students %}
+                <div class="student-item" onclick="viewStudentDetails('{{ student.id }}')">
+                    <div class="student-avatar">{{ student.username|slice:":1"|upper }}</div>
+                    <div style="font-size:0.875rem; font-weight:500;">{{ student.username }}</div>
+                </div>
+                {% empty %}
+                <p style="font-size:0.875rem; color:#94a3b8; text-align:center;">No students watching</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-header">Live Chat</div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="message">
+                    <span class="msg-user">System</span>
+                    <span class="msg-text">Welcome to the camera live monitor.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Mock duration timer
+    let startTime = new Date('{{ start_time|date:"c" }}');
+    setInterval(() => {
+        let now = new Date();
+        let diff = Math.floor((now - startTime) / 1000);
+        let h = Math.floor(diff / 3600).toString().padStart(2, '0');
+        let m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+        let s = (diff % 60).toString().padStart(2, '0');
+        document.getElementById('duration').innerText = `${h}:${m}:${s}`;
+    }, 1000);
+
+    function viewStudentDetails(id) {
+        // This could open a student profile or specific view
+        console.log('Viewing student:', id);
+    }
+</script>
+{% endblock %}

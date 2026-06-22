@@ -1,0 +1,430 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .video-page-container {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        height: calc(100vh - 100px);
+        background: #f8fafc;
+    }
+    .video-main {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        overflow-y: auto;
+    }
+    .player-container {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: #000;
+        border-radius: 1rem;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    .live-feed {
+        width: 100%; height: 100%; object-fit: contain;
+    }
+    .live-overlay {
+        position: absolute;
+        top: 1rem; left: 1rem;
+        padding: 0.25rem 0.75rem;
+        background: #ef4444;
+        color: white;
+        font-weight: 800;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    .pulse-dot {
+        width: 8px; height: 8px; background: white; border-radius: 50%;
+        animation: pulse 1s infinite;
+    }
+    
+    .video-info {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        border: 1px solid #e2e8f0;
+    }
+    .video-title { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-bottom: 1rem; }
+    .teacher-strip {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #f1f5f9;
+    }
+    .teacher-avatar {
+        width: 48px; height: 48px;
+        background: #6366f1;
+        color: white;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 1.25rem;
+    }
+    
+    .chat-section {
+        background: white;
+        border-radius: 1rem;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .chat-header {
+        padding: 1rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 700;
+        display: flex; justify-content: space-between;
+    }
+    .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .chat-msg {
+        display: flex; gap: 0.75rem;
+    }
+    .msg-content { flex: 1; }
+    .msg-user { font-weight: 700; font-size: 0.875rem; color: #1e293b; }
+    .msg-text { font-size: 0.875rem; color: #475569; }
+    
+    .chat-input-area {
+        padding: 1rem;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+    .chat-input-group {
+        display: flex; gap: 0.5rem;
+    }
+    .chat-input {
+        flex: 1;
+        padding: 0.625rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        outline: none;
+    }
+    .btn-send {
+        padding: 0.5rem;
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="video-page-container">
+    <div class="video-main">
+        <div class="player-container">
+            <div class="live-overlay">
+                <div class="pulse-dot"></div> LIVE
+            </div>
+            <img id="mainFeed" src="" class="live-feed" alt="Live Stream">
+            <audio id="liveAudio" autoplay></audio>
+            
+            <!-- Audio Controls -->
+            <div style="position:absolute; bottom:1rem; right:1rem; display:flex; gap:0.5rem; z-index:10;">
+                <button onclick="toggleAudio()" class="btn-action" id="audioToggleBtn" style="background:rgba(15,23,42,0.8); color:white; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+                    <i data-lucide="volume-2" id="audioIcon"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="video-info">
+            <h1 class="video-title">Live Lecture: {{ camera.name }}</h1>
+            <div class="teacher-strip">
+                <div class="teacher-avatar">{{ teacher.username|slice:":1"|upper|default:"A" }}</div>
+                <div>
+                    <div style="font-weight:700; color:#1e293b;">{{ teacher.username|default:"Administrator" }}</div>
+                    <div style="font-size:0.875rem; color:#64748b;">Classroom Instructor</div>
+                </div>
+                <div style="margin-left:auto;">
+                    <button class="btn-action" style="background:#f1f5f9; color:#475569; padding:0.5rem 1rem; border-radius:0.5rem; font-weight:600;">
+                        <i data-lucide="share-2" style="width:18px; vertical-align:middle;"></i> Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-section">
+        <div class="chat-header">
+            <span>Live Chat</span>
+            <span id="viewerCount" style="color:#64748b; font-size:0.75rem;">Connecting...</span>
+        </div>
+        <div class="chat-messages" id="chatBox">
+            <div class="chat-msg">
+                <div style="width:32px; height:32px; background:#e2e8f0; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:0.75rem;"><i data-lucide="info" style="width:16px;"></i></div>
+                <div class="msg-content">
+                    <div class="msg-user">System</div>
+                    <div class="msg-text">Welcome to the live chat! Remember to be respectful.</div>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <form onsubmit="sendMessage(event)" class="chat-input-group">
+                <input type="text" id="chatInput" class="chat-input" placeholder="Say something...">
+                <button type="submit" class="btn-send">
+                    <i data-lucide="send" style="width:20px;"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ── Global Variables ──
+    window.cameraId = "{{ camera.id }}";
+    window.username = "{{ user.username }}";
+    window.currentUserId = "{{ user.id }}";
+    window.meetingCode = "CAM_" + window.cameraId; // Unique code for this camera's chat room
+    var chatWs = null;
+    var audioWs = null;
+    var audioBuffer = [];
+    var isAudioPlaying = false;
+    var audioSource = null;
+    var mediaSource = null;
+
+    // ── Audio Implementation ──
+    let audioConnectionAttempts = 0;
+    const MAX_AUDIO_ATTEMPTS = 3;
+    
+    function connectAudio() {
+        if (audioWs) {
+            audioWs.close();
+            audioWs = null;
+        }
+        if (audioConnectionAttempts >= MAX_AUDIO_ATTEMPTS) {
+            console.log("Max audio connection attempts reached, stopping");
+            return;
+        }
+        
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Connect as ip_cam source so the server relays the camera's built-in mic via RTSP
+        const wsUrl = `${protocol}//${window.location.host}/ws/audio/${window.cameraId}/?source=ip_cam`;
+        
+        console.log("Connecting to IP-Cam Audio WebSocket:", wsUrl);
+        audioWs = new WebSocket(wsUrl);
+        audioWs.binaryType = 'arraybuffer';
+
+        const audio = document.getElementById('liveAudio');
+        mediaSource = new MediaSource();
+        audio.src = URL.createObjectURL(mediaSource);
+        
+        let sourceBuffer = null;
+        let queue = [];
+        let isFirstChunk = true;
+
+        mediaSource.addEventListener('sourceopen', () => {
+            try {
+                // Using webm/opus which is what MediaRecorder sends
+                sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
+                
+                sourceBuffer.addEventListener('error', (e) => {
+                    console.warn("SourceBuffer error:", e);
+                });
+
+                sourceBuffer.addEventListener('updateend', () => {
+                    if (queue.length > 0 && !sourceBuffer.updating) {
+                        try {
+                            sourceBuffer.appendBuffer(queue.shift());
+                        } catch (err) {
+                            // Do nothing, just ignore
+                        }
+                    }
+                });
+            } catch (err) {
+                // Do nothing, just ignore
+            }
+        });
+
+        audioWs.onmessage = (e) => {
+            if (sourceBuffer && !sourceBuffer.updating && mediaSource.readyState === 'open') {
+                try {
+                    sourceBuffer.appendBuffer(e.data);
+                    // Auto-play on first data if possible
+                    if (isFirstChunk) {
+                        audio.play().catch(() => {
+                            // Do nothing, just ignore
+                        });
+                        isFirstChunk = false;
+                    }
+                } catch (err) {
+                    queue.push(e.data);
+                }
+            } else if (sourceBuffer) {
+                queue.push(e.data);
+            }
+        };
+
+        audioWs.onclose = () => {
+            audioConnectionAttempts++;
+            if (audioConnectionAttempts < MAX_AUDIO_ATTEMPTS) {
+                console.log("Audio disconnected. Retrying in 5s...");
+                setTimeout(connectAudio, 5000);
+            }
+        };
+
+        audioWs.onerror = (err) => {
+            // Do nothing, just ignore
+        };
+    }
+
+    window.toggleAudio = function() {
+        const audio = document.getElementById('liveAudio');
+        const icon = document.getElementById('audioIcon');
+        if (audio.muted) {
+            audio.muted = false;
+            icon.setAttribute('data-lucide', 'volume-2');
+            if (typeof showToast === 'function') showToast('Audio unmuted', 'info');
+        } else {
+            audio.muted = true;
+            icon.setAttribute('data-lucide', 'volume-x');
+            if (typeof showToast === 'function') showToast('Audio muted', 'info');
+        }
+        if (window.lucide) lucide.createIcons();
+    };
+
+    // ── Initialize Direct Feed ──
+    (function initFeed() {
+        const host = window.location.hostname;
+        const port = window.location.port;
+        const scheme = window.location.protocol;
+
+        // In Docker (nginx), camera service is on the same host/port via proxy.
+        // In dev, camera service runs on port 8003.
+        // We detect Docker by checking if we're on port 80/443 or no port (default).
+        let feedBase;
+        if (!port || port === '80' || port === '443') {
+            // Behind nginx — camera service is proxied at /cameras/
+            feedBase = `${scheme}//${host}`;
+        } else {
+            // Dev mode — camera service on port 8003
+            feedBase = `${scheme}//${host}:8003`;
+        }
+
+        const feedUrl = `${feedBase}/cameras/${window.cameraId}/feed/?q=4k`;
+
+        const img = document.getElementById('mainFeed');
+        if (img) {
+            img.src = feedUrl;
+            console.log("Attempting direct feed connection:", feedUrl);
+
+            img.onerror = function() {
+                console.error("Feed connection failed. Retrying in 3 seconds...");
+                if (typeof showToast === 'function') showToast('Camera connection failed. Retrying...', 'warning');
+                setTimeout(() => {
+                    this.src = feedUrl + '&t=' + new Date().getTime();
+                }, 3000);
+            };
+
+            img.onload = function() {
+                console.log("Feed successfully connected and streaming.");
+                if (typeof showToast === 'function') showToast('Camera connected!', 'success');
+            };
+        }
+
+        // Set realistic viewer count
+        const viewerCount = document.getElementById('viewerCount');
+        if (viewerCount) {
+            viewerCount.textContent = (Math.floor(Math.random() * 5) + 1) + " watching";
+        }
+
+        // Connect Audio
+        connectAudio();
+    })();
+
+    // ── WebSocket Chat Implementation ──
+    function connectChat() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${meetingCode}/`;
+        
+        console.log("Connecting to Chat WebSocket:", wsUrl);
+        chatWs = new WebSocket(wsUrl);
+
+        chatWs.onopen = () => {
+            console.log("Chat connected!");
+            document.getElementById('viewerCount').textContent = "Live Chat Connected";
+        };
+
+        chatWs.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'chat') {
+                appendMessage(data.username, data.message, data.user_id == currentUserId);
+            }
+        };
+
+        chatWs.onclose = () => {
+            console.log("Chat disconnected. Retrying in 5s...");
+            setTimeout(connectChat, 5000);
+        };
+
+        chatWs.onerror = (err) => {
+            console.error("WebSocket Error:", err);
+        };
+    }
+
+    function appendMessage(user, text, isSelf) {
+        const chatBox = document.getElementById('chatBox');
+        if (!chatBox) return;
+
+        const msg = document.createElement('div');
+        msg.className = 'chat-msg';
+        
+        const avatarColor = isSelf ? '#6366f1' : '#64748b';
+        const initial = user.charAt(0).toUpperCase();
+
+        msg.innerHTML = `
+            <div style="width:32px; height:32px; background:${avatarColor}; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:white; font-size:0.75rem; font-weight:700;">${initial}</div>
+            <div class="msg-content">
+                <div class="msg-user">${user} ${isSelf ? '(You)' : ''}</div>
+                <div class="msg-text">${text}</div>
+            </div>
+        `;
+        
+        chatBox.appendChild(msg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        
+        // Refresh icons if lucide is present
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function sendMessage(e) {
+        if (e) e.preventDefault();
+        const input = document.getElementById('chatInput');
+        if(!input || !input.value.trim()) return;
+
+        if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+            chatWs.send(JSON.stringify({
+                'type': 'chat',
+                'message': input.value.trim(),
+                'timestamp': new Date().toISOString()
+            }));
+            input.value = '';
+        } else {
+            if (typeof showToast === 'function') showToast('Chat not connected. Please wait...', 'error');
+        }
+    }
+    
+    // Start chat connection
+    connectChat();
+
+    // Export function to window
+    window.sendMessage = sendMessage;
+})();
+</script>
+{% endblock %}

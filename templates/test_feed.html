@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Camera Feed Test</title>
+    <style>
+        body {
+            background: #f0f0f0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        img {
+            width: 100%;
+            border: 2px solid #333;
+            background: #000;
+            display: block;
+        }
+        .info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Camera Feed Test</h1>
+        <div class="info">
+            <p><strong>Feed URL:</strong> {% url 'camera_feed' 10 %}</p>
+            <p><strong>Status:</strong> <span id="status">Loading...</span></p>
+        </div>
+        
+        <h2>Direct Feed:</h2>
+        <img id="feed" src="{% url 'camera_feed' 10 %}" alt="Camera Feed">
+        
+        <div class="info">
+            <p>If you see a video feed above, the camera is working!</p>
+            <p>If you see a black box, the stream might be loading (wait 5 seconds)</p>
+        </div>
+        
+        <div>
+            <a href="{% url 'admin_dashboard' %}" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #1877f2; color: white; text-decoration: none; border-radius: 5px;">← Back to Dashboard</a>
+        </div>
+    </div>
+    
+    <script>
+        const img = document.getElementById('feed');
+        const status = document.getElementById('status');
+        
+        // For MJPEG streams, the onload event doesn't fire
+        // So we'll just assume it's loading after 2 seconds
+        setTimeout(() => {
+            status.textContent = '✓ Stream should be playing (MJPEG streams don\'t trigger onload)';
+            status.style.color = 'green';
+        }, 2000);
+        
+        img.onerror = function() {
+            status.textContent = '✗ Failed to load feed - Check if both services are running';
+            status.style.color = 'red';
+        };
+        
+        // Log to console
+        console.log('Feed URL:', img.src);
+        console.log('Waiting for feed to load...');
+        console.log('Note: MJPEG streams may not trigger onload event');
+    </script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}My Attendance — EduMi{% endblock %}
+{% block page_title %}My Attendance{% endblock %}
+
+{% block extra_css %}
+<style>
+.att-page { max-width: 900px; margin: 0 auto; padding-bottom: 48px; }
+
+/* Summary Cards */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.summary-card {
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, rgba(0,0,0,.08));
+    border-radius: 16px; padding: 20px; text-align: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,.05); transition: transform .2s;
+}
+.summary-card:hover { transform: translateY(-2px); }
+.summary-card .label { font-size: .78rem; font-weight: 600; opacity: .55; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.summary-card .value { font-size: 2rem; font-weight: 800; }
+.summary-card .sub   { font-size: .8rem; opacity: .6; margin-top: 4px; }
+.value.green  { color: #10b981; }
+.value.amber  { color: #f59e0b; }
+.value.red    { color: #ef4444; }
+.value.blue   { color: #667eea; }
+
+/* Classroom breakdown */
+.classroom-section { margin-bottom: 28px; }
+.classroom-section h3 { font-size: 1rem; font-weight: 700; margin: 0 0 12px; }
+.progress-bar-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.progress-bar { flex: 1; height: 10px; background: rgba(0,0,0,.08); border-radius: 5px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 1s ease; }
+.progress-fill.good { background: linear-gradient(90deg, #10b981, #059669); }
+.progress-fill.warn { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.progress-fill.bad  { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.progress-pct { font-weight: 700; font-size: .9rem; min-width: 42px; text-align: right; }
+
+/* Records Table */
+.att-table-card {
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, rgba(0,0,0,.08));
+    border-radius: 20px; overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,.05);
+}
+.att-table-header { padding: 20px 24px; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.06)); }
+.att-table-header h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+table { width: 100%; border-collapse: collapse; }
+thead th { padding: 12px 16px; text-align: left; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .5; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.06)); }
+tbody td { padding: 13px 16px; font-size: .875rem; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.04)); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(102,126,234,.04); }
+
+.badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: .75rem; font-weight: 700; letter-spacing: .03em;
+}
+.badge-present { background: rgba(16,185,129,.15); color: #10b981; }
+.badge-absent  { background: rgba(239,68,68,.12); color: #ef4444; }
+.badge-late    { background: rgba(245,158,11,.15); color: #f59e0b; }
+.badge-partial { background: rgba(99,102,241,.12); color: #6366f1; }
+
+/* Face register CTA */
+.cta-face {
+    background: linear-gradient(135deg, rgba(102,126,234,.1), rgba(118,75,162,.08));
+    border: 1px solid rgba(102,126,234,.25); border-radius: 16px;
+    padding: 20px 24px; margin-bottom: 28px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.cta-face p { margin: 0; font-size: .9rem; }
+.cta-face a {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff; text-decoration: none; padding: 10px 22px; border-radius: 10px;
+    font-size: .875rem; font-weight: 600; white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(102,126,234,.35);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="att-page">
+
+    <!-- Face registration CTA if not registered -->
+    {% if not request.user.face_profile %}
+    <div class="cta-face">
+        <p>🔒 <strong>Register your face</strong> to enable automatic attendance tracking during online classes.</p>
+        <a href="{% url 'face_setup' %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+            Register Face
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Overall summary cards -->
+    {% if records %}
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="label">Total Classes</div>
+            <div class="value blue">{{ records.count }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Present</div>
+            <div class="value green">{{ records|length }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">Classrooms</div>
+            <div class="value blue">{{ summary|length }}</div>
+        </div>
+    </div>
+
+    <!-- Per-classroom breakdown -->
+    {% if summary %}
+    <div class="att-table-card" style="margin-bottom:24px;">
+        <div class="att-table-header"><h2>Attendance by Classroom</h2></div>
+        <div style="padding:20px 24px;">
+            {% for s in summary %}
+            <div class="classroom-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <h3>{{ s.classroom.title }}</h3>
+                    <span style="font-size:.8rem; opacity:.6;">{{ s.present }} / {{ s.total }} classes</span>
+                </div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar">
+                        <div class="progress-fill {% if s.percentage >= 75 %}good{% elif s.percentage >= 50 %}warn{% else %}bad{% endif %}"
+                             style="width:{{ s.percentage }}%"></div>
+                    </div>
+                    <div class="progress-pct">{{ s.percentage }}%</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Records table -->
+    <div class="att-table-card">
+        <div class="att-table-header">
+            <h2>Attendance History</h2>
+        </div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Classroom</th>
+                        <th>Meeting</th>
+                        <th>Status</th>
+                        <th>Time In</th>
+                        <th>Confidence</th>
+                        <th>Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in records %}
+                    <tr>
+                        <td><strong>{{ rec.date|date:"M d, Y" }}</strong></td>
+                        <td>{{ rec.classroom.title }}</td>
+                        <td>{{ rec.meeting.title }}</td>
+                        <td>
+                            <span class="badge badge-{{ rec.status }}">
+                                {% if rec.status == 'present' %}✓ Present
+                                {% elif rec.status == 'absent' %}✗ Absent
+                                {% elif rec.status == 'late' %}⏰ Late
+                                {% else %}Partial{% endif %}
+                            </span>
+                        </td>
+                        <td>{% if rec.marked_present_at %}{{ rec.marked_present_at|time:"H:i" }}{% else %}—{% endif %}</td>
+                        <td>{% if rec.face_match_confidence %}{{ rec.face_match_confidence|floatformat:0 }}%{% else %}—{% endif %}</td>
+                        <td style="opacity:.7; font-size:.8rem;">{{ rec.get_verification_method_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% else %}
+    <div style="text-align:center; padding:60px 20px; opacity:.5;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin-bottom:12px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <p>No attendance records yet. Join a class to get started.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

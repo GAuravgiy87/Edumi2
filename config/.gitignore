@@ -1,0 +1,36 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite database
+db.sqlite3
+db.sqlite3-journal
+
+# Media files
+media/
+
+# Static collected files
+staticfiles/
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+
+# VSCode
+.vscode/
+
+# Python environment
+.env
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# SSL certificates (auto-generated)
+ssl/

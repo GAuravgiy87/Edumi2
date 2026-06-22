@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ meeting.title }} - Edumi Meet</title>
+    {% load static %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/meeting-room.css' %}">
+    
+    <!-- LiveKit JS SDK (browser bundle) - Multiple CDNs for reliability -->
+    <script id="livekit-sdk" 
+            src="https://cdn.jsdelivr.net/npm/livekit-client@1.15.11/dist/livekit-client.umd.min.js"
+            onload="console.log('LiveKit SDK (v1.15) loaded via Primary CDN')"
+            onerror="this.onerror=null; this.src='https://unpkg.com/livekit-client@1.15.11/dist/livekit-client.umd.min.js'; console.warn('Primary CDN failed, trying backup...');">
+    </script>
+
+    <script>
+        // Robust SDK Mapping and Global Initialization
+        window.LiveKitBundle = null;
+        
+        function mapLiveKitSDK() {
+            // 1. Direct check of common global names
+            var bundle = window.LiveKit || window.LiveKitClient || window.livekit || window.livekitClient;
+            
+            // 2. Deep discovery: look for any object on window that has 'Room' and 'Track'
+            if (!bundle || !bundle.Room) {
+                console.log("Starting deep discovery for LiveKit SDK...");
+                for (var key in window) {
+                    if (key.toLowerCase().indexOf('livekit') !== -1 && window[key] && window[key].Room) {
+                        bundle = window[key];
+                        console.log("Deep discovery found SDK at window." + key);
+                        break;
+                    }
+                }
+            }
+
+            // 3. Structural validation and mapping
+            if (bundle) {
+                // If it's the v2 bundle, symbols like Room, Track are directly on the bundle
+                if (bundle.Room) {
+                    window.LiveKitBundle = bundle;
+                    console.log("LiveKit SDK successfully mapped via Room property.");
+                    return true;
+                }
+                
+                // Sometimes it's nested (version dependent)
+                if (bundle.LiveKit && bundle.LiveKit.Room) {
+                    window.LiveKitBundle = bundle.LiveKit;
+                    console.log("LiveKit SDK successfully mapped via nested LiveKit property.");
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Periodic check to ensure mapping happens as soon as script executes
+        var sdkCheckInterval = setInterval(function() {
+            if (mapLiveKitSDK()) {
+                clearInterval(sdkCheckInterval);
+            }
+        }, 100);
+
+        // Fail-safe: stop checking after 10 seconds
+        setTimeout(function() {
+            clearInterval(sdkCheckInterval);
+            if (!window.LiveKitBundle) {
+                console.error("LiveKit SDK failed to initialize after 10s.");
+            }
+        }, 10000);
+    </script>
+
+    <style>
+        /* AI Monitoring Styles */
+    #face-att-badge {
+        position: fixed; bottom: 100px; right: 24px; z-index: 1000;
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 20px; border-radius: 16px;
+        font-size: 13px; font-weight: 600; color: #fff;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 300px;
+    }
+    #face-att-badge.state-active    { border-color: rgba(99, 102, 241, 0.4); }
+    #face-att-badge.state-progress  { border-color: rgba(245, 158, 11, 0.4); }
+    #face-att-badge.state-success   { border-color: rgba(16, 185, 129, 0.4); }
+    #face-att-badge.state-warning   { border-color: rgba(239, 68, 68, 0.4); }
+    
+    .fa-dot {
+        width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        background: #6366f1; animation: fa-pulse 2s infinite;
+    }
+    .state-success .fa-dot { background: #10b981; animation: none; }
+    .state-warning .fa-dot { background: #ef4444; }
+    @keyframes fa-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+
+    #face-att-progress-bar {
+        height: 4px; background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px; margin-top: 6px; overflow: hidden;
+    }
+    #face-att-progress-fill {
+        height: 100%; background: linear-gradient(90deg, #6366f1, #10b981);
+        width: 0%; transition: width 0.5s ease;
+    }
+
+    /* Participant List Dark Mode UI Fix */
+    .meet-sidebar {
+        background: #111827 !important; /* Darker Slate/Gray */
+        color: #f8fafc !important;
+        border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .sidebar-header {
+        background: #0f172a !important; /* Dark Slate 900 */
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 16px !important;
+    }
+    .sidebar-tab {
+        color: #94a3b8 !important;
+    }
+    .sidebar-tab:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #fff !important;
+    }
+    .sidebar-tab.active {
+        background: rgba(99, 102, 241, 0.2) !important;
+        color: #818cf8 !important;
+    }
+    .close-sidebar {
+        color: #94a3b8 !important;
+    }
+    .close-sidebar:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+        color: #fff !important;
+    }
+
+    /* Camera Switch Modal Styles */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2000;
+    }
+    .modal-card {
+        background: #fff; width: 90%; max-width: 450px;
+        border-radius: 16px; overflow: hidden;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    }
+    .modal-header {
+        padding: 20px; border-bottom: 1px solid #f1f5f9;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-header h3 { margin: 0; font-size: 1.25rem; color: #1e293b; }
+    .close-modal { 
+        background: none; border: none; font-size: 1.5rem; color: #64748b; 
+        cursor: pointer; padding: 4px; line-height: 1;
+    }
+    .modal-body { padding: 12px; max-height: 400px; overflow-y: auto; }
+    .camera-option {
+        display: flex; align-items: center; gap: 16px; padding: 16px;
+        border-radius: 12px; cursor: pointer; transition: all 0.2s;
+        border: 2px solid transparent; margin-bottom: 8px;
+    }
+    .camera-option:hover { background: #f8fafc; }
+    .camera-option.active { 
+        background: #eff6ff; border-color: #3b82f6; 
+    }
+    .camera-icon {
+        width: 40px; height: 40px; border-radius: 10px;
+        background: #f1f5f9; display: flex; align-items: center;
+        justify-content: center; color: #64748b;
+    }
+    .active .camera-icon { background: #3b82f6; color: #fff; }
+    .camera-info { flex: 1; }
+    .camera-name { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+    .camera-type { font-size: 0.75rem; color: #64748b; }
+    .camera-check { color: #3b82f6; font-weight: bold; opacity: 0; }
+    .active .camera-check { opacity: 1; }
+
+    /* Monitoring View Styles */
+    #monitoringOverlay {
+        position: fixed; bottom: 100px; right: 20px;
+        width: 320px; height: 180px;
+        background: #000; border-radius: 12px;
+        overflow: hidden; border: 2px solid #3b82f6;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        z-index: 1000; display: none;
+        transition: all 0.3s ease;
+    }
+    #monitoringOverlay video { width: 100%; height: 100%; object-fit: cover; }
+    .monitoring-label {
+        position: absolute; top: 8px; left: 8px;
+        background: rgba(0,0,0,0.6); color: #fff;
+        padding: 2px 8px; border-radius: 4px; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .monitoring-close {
+        position: absolute; top: 8px; right: 8px;
+        background: rgba(0,0,0,0.6); color: #fff;
+        width: 20px; height: 20px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; border: none; font-size: 12px;
+    }
+</style>    .participants-count {
+        background: #1e293b !important;
+        color: #cbd5e1 !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+        padding: 12px 16px !important;
+    }
+    .participant-item {
+        margin: 4px 8px !important;
+        padding: 10px !important;
+        border-radius: 8px !important;
+    }
+    .participant-item:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+    }
+    .participant-name {
+        color: #f8fafc !important;
+        font-weight: 500 !important;
+    }
+    .host-label {
+        background: rgba(99, 102, 241, 0.2) !important;
+        color: #818cf8 !important;
+        border: 1px solid rgba(99, 102, 241, 0.3) !important;
+    }
+    .chat-messages {
+        background: #111827 !important;
+        padding: 16px !important;
+    }
+    .chat-msg-text {
+        background: #1f2937 !important; /* Gray 800 */
+        color: #f1f5f9 !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 12px !important;
+        padding: 10px 14px !important;
+    }
+    .chat-msg.own .chat-msg-text {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    .chat-input-box {
+        background: #0f172a !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 16px !important;
+    }
+    .chat-input-box input {
+        background: #1f2937 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #f8fafc !important;
+        border-radius: 20px !important;
+        padding: 10px 16px !important;
+    }
+    .chat-input-box input::placeholder {
+        color: #6b7280 !important;
+    }
+    .chat-input-box input:focus {
+        border-color: #6366f1 !important;
+        background: #111827 !important;
+    }
+    .send-btn {
+        background: #6366f1 !important;
+        border-radius: 20px !important;
+        padding: 0 20px !important;
+        height: 40px !important;
+    }
+    .chat-msg-header strong {
+        color: #94a3b8 !important;
+    }
+    .chat-msg-time {
+        color: #6b7280 !important;
+    }
+
+    /* Video Box Controls */
+    .video-box {
+        background: #000 !important;
+    }
+    .video-nametag {
+        background: rgba(15, 23, 42, 0.8) !important;
+        backdrop-filter: blur(8px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Face Tracking Overlays */
+        .ft-canvas-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10; border-radius: inherit;
+        }
+        .ft-emotion-badge {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.9); color: #fff; font-size: 11px; font-weight: 700;
+            padding: 4px 10px; border-radius: 20px; white-space: nowrap; z-index: 11;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .video-box { position: relative; overflow: hidden; }
+    </style>
+</head>
+<body class="meeting-body" data-turbo="false">
+<div class="meet-container">
+
+    <!-- Top Bar -->
+    <div class="meet-topbar">
+        <div class="meet-info">
+            <h3>{{ meeting.title }}</h3>
+            <span class="meet-code">{{ meeting.meeting_code }}</span>
+        </div>
+        <div class="recording-indicator" id="recordingIndicator" style="display:none;">
+            <span class="recording-dot"></span>
+            <span class="recording-text">Recording</span>
+            <span class="recording-timer" id="recordingTimer">00:00</span>
+        </div>
+        <div class="meet-timer" id="meetTimer">00:00</div>
+    </div>
+
+    <!-- Video Area -->
+    <div class="meet-main" id="meetMain">
+        <div class="video-grid-container grid-view count-1" id="videoGridContainer">
+            <div id="mainVideoArea" class="main-video-area"></div>
+            <div id="sidebarVideoArea" class="sidebar-video-area"></div>
+        </div>
+
+        <!-- People / Chat Sidebar -->
+        <div class="meet-sidebar" id="meetSidebar" style="display:none;">
+            <div class="sidebar-header">
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" onclick="switchSidebarTab('people')">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span>People</span>
+                    </button>
+                    <button class="sidebar-tab" onclick="switchSidebarTab('chat')">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span>Chat</span>
+                    </button>
+                </div>
+                <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+            </div>
+            <div class="sidebar-content">
+                <div class="sidebar-panel active" id="peoplePanel">
+                    <div class="participants-count"><span id="participantCount">1</span> in call</div>
+                    <div class="participants-list" id="participantsList"></div>
+                    {% if is_host %}
+                    <div class="banned-section" style="margin-top: 2rem; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 1rem;">
+                        <div class="participants-count" style="background: rgba(239, 68, 68, 0.05); color: #ef4444; border-bottom: none;">Banned Students</div>
+                        <div class="participants-list" id="bannedList"></div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="sidebar-panel" id="chatPanel">
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="chat-input-box">
+                        <input type="text" id="chatInput" placeholder="Send a message to everyone"
+                               onkeydown="if(event.key==='Enter') sendChatMessage()"/>
+                        <button onclick="sendChatMessage()" class="send-btn">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="meet-controls">
+        <button class="control-button" id="micBtn" onclick="toggleMic()" title="Microphone">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+        <button class="control-button" id="camBtn" onclick="toggleCamera()" title="Camera">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        </button>
+
+        <div class="more-options-container">
+            <button class="control-button" id="moreBtn" onclick="toggleMoreOptions()" title="More Options">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+            <div class="more-options-menu" id="moreOptionsMenu">
+                <button class="menu-item" id="screenBtn" onclick="toggleScreenShare(); toggleMoreOptions();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <span>Share Screen</span>
+                </button>
+                {% if is_host %}
+                <button class="menu-item" id="switchCamBtn" onclick="toggleCameraModal(); toggleMoreOptions();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <span>Switch Camera</span>
+                </button>
+                {% endif %}
+                <button class="menu-item" id="peopleBtn" onclick="openSidebar('people'); toggleMoreOptions();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Participants</span>
+                </button>
+                <button class="menu-item" id="chatBtn" onclick="openSidebar('chat'); toggleMoreOptions();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>Chat</span>
+                    <span class="notification-badge" id="chatBadge" style="display:none; margin-left:auto;">0</span>
+                </button>
+            </div>
+        </div>
+
+        <button class="control-button danger" onclick="leaveMeeting()" title="Leave call">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </button>
+    </div>
+</div>
+
+<!-- Meeting metadata -->
+<script id="meeting-data"
+    data-meeting-id="{{ meeting.id }}"
+    data-meeting-code="{{ meeting.meeting_code }}"
+    data-user-id="{{ user.id }}"
+    data-username="{{ user.username }}"
+    data-is-host="{% if is_host %}true{% else %}false{% endif %}"
+    data-user-type="{{ user_type }}"
+    data-host-id="{{ host_id }}"
+    data-can-speak="{% if participant.audio_permitted %}true{% else %}false{% endif %}"
+    data-can-video="{% if participant.video_permitted %}true{% else %}false{% endif %}"
+    data-can-share="{% if participant.screenshare_permitted %}true{% else %}false{% endif %}"
+    data-token-url="{% url 'livekit_token' meeting.meeting_code %}"
+    data-leave-url="{% url 'leave_meeting' meeting.id %}"
+    data-sleep-url="{% url 'sleep_meeting' meeting.meeting_code %}"
+    data-unfreeze-url="{% url 'unfreeze_meeting' meeting.meeting_code %}"
+    data-after-leave-url="{% if is_host %}{% url 'teacher_dashboard' %}{% else %}{% url 'student_dashboard' %}{% endif %}"
+    data-csrf="{{ csrf_token }}"
+    data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
+    data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
+    data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}"
+    data-global-control-url="{% url 'meeting_global_control' meeting.id %}">
+</script>
+
+{% if is_host %}
+<!-- Camera Selection Modal -->
+<div id="cameraModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Switch Camera Source</h3>
+            <button class="close-modal" onclick="toggleCameraModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="camera-option active" id="webcamOption" onclick="switchCameraSource('webcam')">
+                <div class="camera-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></div>
+                <div class="camera-info">
+                    <div class="camera-name">Default Webcam</div>
+                    <div class="camera-type">Built-in or USB Camera</div>
+                </div>
+                <div class="camera-check">✓</div>
+            </div>
+            
+            {% for cam in teacher_cameras %}
+            <div class="camera-option" id="ipOption-{{ cam.id }}" onclick="switchCameraSource('ip', '{{ cam.id }}', '{{ cam.name }}')">
+                <div class="camera-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+                <div class="camera-info">
+                    <div class="camera-name">{{ cam.name }}</div>
+                    <div class="camera-type">{{ cam.get_camera_type_display }}</div>
+                </div>
+                <div class="camera-check">✓</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Hidden elements for IP camera streaming -->
+<canvas id="ipCamCanvas" style="visibility:hidden; position:absolute; left:-9999px;" width="1280" height="720"></canvas>
+<img id="ipCamImg" style="visibility:hidden; position:absolute; left:-9999px;" crossorigin="anonymous">
+
+<!-- Monitoring Overlay (Teacher ONLY) -->
+<div id="monitoringOverlay">
+    <div class="monitoring-label">IP Camera Monitoring</div>
+    <button class="monitoring-close" onclick="stopIpCameraStream()">✕</button>
+    <div id="monitoringVideoContainer"></div>
+</div>
+{% endif %}
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+// Global scope variables for access across functions
+var _d = document.getElementById('meeting-data').dataset;
+
+// Assign to window for Turbo Drive compatibility
+window.meetingConfig = {
+    meetingCode: _d.meetingCode,
+    currentUserId: _d.userId,
+    currentUsername: _d.username,
+    isHost: _d.isHost === 'true',
+    userType: _d.userType,
+    hostId: _d.hostId,
+    TOKEN_URL: _d.tokenUrl,
+    LEAVE_URL: _d.leaveUrl,
+    SLEEP_URL: _d.sleepUrl,
+    UNFREEZE_URL: _d.unfreezeUrl,
+    AFTER_LEAVE: _d.afterLeaveUrl,
+    CSRF: _d.csrf,
+    kickUrl: _d.kickUrl,
+    bannedUsersUrl: _d.bannedUsersUrl,
+    revokeBanUrl: _d.revokeBanUrl,
+    globalControlUrl: _d.globalControlUrl
+};
+
+// Global shortcuts using window properties to prevent Turbo redeclaration errors
+window.meetingCode     = window.meetingConfig.meetingCode;
+window.currentUserId   = window.meetingConfig.currentUserId;
+window.currentUsername = window.meetingConfig.currentUsername;
+window.isHost          = window.meetingConfig.isHost;
+window.userType        = window.meetingConfig.userType;
+window.hostId          = window.meetingConfig.hostId;
+window.TOKEN_URL       = window.meetingConfig.TOKEN_URL;
+window.LEAVE_URL       = window.meetingConfig.LEAVE_URL;
+window.SLEEP_URL       = window.meetingConfig.SLEEP_URL;
+window.UNFREEZE_URL    = window.meetingConfig.UNFREEZE_URL;
+window.AFTER_LEAVE     = window.meetingConfig.AFTER_LEAVE;
+window.CSRF            = window.meetingConfig.CSRF;
+
+// ── LiveKit SDK Initialization ────────────────────────────────────────────────
+var Room, RoomEvent, Track, TrackEvent, LocalTrack,
+    createLocalScreenTracks, VideoPresets, ScreenSharePresets, ConnectionState;
+
+function extractLiveKitSymbols() {
+    if (!window.LiveKitBundle) return false;
+    try {
+        const bundle = window.LiveKitBundle;
+        Room = bundle.Room;
+        RoomEvent = bundle.RoomEvent;
+        Track = bundle.Track;
+        TrackEvent = bundle.TrackEvent;
+        LocalTrack = bundle.LocalTrack;
+        createLocalScreenTracks = bundle.createLocalScreenTracks;
+        VideoPresets = bundle.VideoPresets;
+        ScreenSharePresets = bundle.ScreenSharePresets;
+        ConnectionState = bundle.ConnectionState;
+        return !!Room;
+    } catch (e) {
+        console.error("SDK symbol extraction failed:", e);
+        return false;
+    }
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+window.room = null;
+window.isMicOn    = true;
+window.isCameraOn = true;
+window.isScreenSharing = false;
+window.screenTrackPub  = null;
+window.isSleeping = false;
+window.unreadMessages = 0;
+window.timerInterval  = null;
+window.timerSeconds   = 0;
+window.signalingWs    = null;
+
+// IP Camera State
+window.currentVideoSource = 'webcam'; // 'webcam' or 'ip'
+window.currentIpCamId = null;
+window.ipCamImg = null;
+window.ipCamAnimationId = null;
+window.ipCamTrackPub = null;
+window.ipCamCanvas = null;
+window.ipCamCtx = null;
+
+// Permission State (Always allowed as per teacher request)
+window.canSpeak = true;
+window.canVideo = true;
+window.canShare = true;
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+    if (!extractLiveKitSymbols()) {
+        console.warn('LiveKit SDK missing or incomplete! Retrying init in 1s...');
+        setTimeout(init, 1000);
+        return;
+    }
+
+    // ── Signaling WebSocket ──────────────────────────────────────────────────
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    window.signalingWs = new WebSocket(`${proto}//${window.location.host}/ws/meeting/${window.meetingCode}/`);
+    
+    window.signalingWs.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            handleSignalingMessage(data);
+        } catch(err) {
+            console.error('Signaling parse error:', err);
+        }
+    };
+
+    // Fetch token from Django
+    try {
+        const res   = await fetch(window.TOKEN_URL);
+        const data  = await res.json();
+        if (data.error) { 
+            showNotification('Access denied: ' + data.error, 'error'); 
+            return; 
+        }
+
+        const { token, url } = data;
+
+        // Show registration warning for students if not registered
+        {% if not is_host and not user.is_superuser %}
+        if (data.face_not_registered || "{{ face_not_registered }}" === "True") {
+            showNotification('Face not registered! Please register in Attendance Settings.', 'warning');
+        }
+        {% endif %}
+
+        window.room = new Room({
+            adaptiveStream: true,
+            dynacast: true,
+            videoCaptureDefaults: { resolution: VideoPresets.h1080.resolution },
+            publishDefaults: {
+                simulcast: true,
+                videoCodec: 'h264',
+                videoEncoding: VideoPresets.h1080.encoding,
+                screenShareEncoding: {
+                    maxBitrate: 6_000_000,
+                    maxFramerate: 30,
+                }
+            },
+        });
+
+        // ── Room events ───────────────────────────────────────────────────────────
+        window.room
+            .on(RoomEvent.ParticipantConnected,    onParticipantConnected)
+            .on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected)
+            .on(RoomEvent.TrackSubscribed,         onTrackSubscribed)
+            .on(RoomEvent.TrackUnsubscribed,       onTrackUnsubscribed)
+            .on(RoomEvent.TrackMuted,              onTrackMuted)
+            .on(RoomEvent.TrackUnmuted,            onTrackUnmuted)
+            .on(RoomEvent.ActiveSpeakersChanged,   onActiveSpeakersChanged)
+            .on(RoomEvent.DataReceived,            onDataReceived)
+            .on(RoomEvent.Disconnected,            onDisconnected)
+            .on(RoomEvent.ConnectionStateChanged,  onConnectionStateChanged);
+
+        await window.room.connect(url, token);
+        console.log('Connected to LiveKit room:', window.room.name);
+
+        // Initial state
+        window.isMicOn = window.isHost ? true : window.canSpeak;
+        window.isCameraOn = window.isHost ? true : window.canVideo;
+
+        // Publish local camera + mic
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            // Attempt Microphone
+            if (window.isMicOn) {
+                try {
+                    await window.room.localParticipant.setMicrophoneEnabled(true);
+                } catch (micErr) {
+                    console.warn('Microphone initialization failed:', micErr);
+                    window.isMicOn = false;
+                    if (micErr.name === 'NotFoundError' || micErr.name === 'DevicesNotFoundError') {
+                        showNotification('No microphone found on this device.', 'warning');
+                    } else if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+                        showNotification('Microphone access denied.', 'error');
+                    }
+                }
+            }
+
+            // Attempt Camera
+            if (window.isCameraOn) {
+                try {
+                    await window.room.localParticipant.setCameraEnabled(true);
+                } catch (camErr) {
+                    console.warn('Camera initialization failed:', camErr);
+                    window.isCameraOn = false;
+                    if (camErr.name === 'NotFoundError' || camErr.name === 'DevicesNotFoundError') {
+                        showNotification('No camera found on this device.', 'warning');
+                    } else if (camErr.name === 'NotAllowedError' || camErr.name === 'PermissionDeniedError') {
+                        showNotification('Camera access denied.', 'error');
+                    }
+                }
+            }
+        }
+
+        // Update UI buttons
+        updateControlButtons();
+        renderLocalParticipant();
+
+        if (window.room.remoteParticipants) {
+            window.room.remoteParticipants.forEach(p => onParticipantConnected(p));
+        }
+
+        updateParticipantCount();
+        startTimer();
+    } catch (err) {
+        console.error('Init failed:', err);
+        showNotification('Failed to initialize meeting: ' + err.message, 'error');
+    }
+}
+
+function updateControlButtons() {
+    const micBtn = document.getElementById('micBtn');
+    const camBtn = document.getElementById('camBtn');
+    
+    micBtn.classList.toggle('off', !isMicOn);
+    camBtn.classList.toggle('off', !isCameraOn);
+    
+    const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+    const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+    const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+    const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
+    
+    micBtn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
+    camBtn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function getOrCreateBox(identity, displayName, isLocal) {
+    let box = document.getElementById(`video-box-${identity}`);
+    if (box) return box;
+
+    box = document.createElement('div');
+    box.id = `video-box-${identity}`;
+    box.className = 'video-box';
+    box.dataset.identity = identity;
+    box.dataset.userId   = identity; // Required for Face Tracking
+    box.style.cursor = 'pointer'; // Make it look clickable
+    
+    // Click to enlarge this video
+    box.onclick = () => {
+        if (box.parentElement.id !== 'mainVideoArea') {
+            const mainArea = document.getElementById('mainVideoArea');
+            if (mainArea.children.length > 0) {
+                const currentMain = mainArea.children[0];
+                currentMain.classList.remove('main-presents');
+                const v = currentMain.querySelector('video');
+                if (v) { 
+                    v.style.objectFit = 'cover'; 
+                    v.style.transform = currentMain.dataset.identity === room.localParticipant.identity ? 'scaleX(-1)' : 'none'; 
+                }
+                document.getElementById('sidebarVideoArea').appendChild(currentMain);
+            }
+            moveToMain(box, displayName, identity === 'local-screen');
+        }
+    };
+
+    const nameTag = document.createElement('div');
+    nameTag.className = 'video-nametag';
+    nameTag.textContent = isLocal ? 'You' : displayName;
+    box.appendChild(nameTag);
+
+    document.getElementById('sidebarVideoArea').appendChild(box);
+    updateLayout();
+    updateParticipantsList(); // Update list when new box is created
+    return box;
+}
+
+function renderLocalParticipant() {
+    if (!room || !room.localParticipant) return;
+    const lp  = room.localParticipant;
+    const box = getOrCreateBox(lp.identity, currentUsername, true);
+
+    // Attach camera track if already published
+    if (lp.videoTrackPublications) {
+        lp.videoTrackPublications.forEach(pub => {
+            if (pub.track && pub.source === Track.Source.Camera) {
+                attachTrackToBox(pub.track, box, true);
+            }
+        });
+    }
+
+    // Also listen for future local track publications (e.g. screen share or IP camera)
+    lp.on(window.LiveKitBundle.ParticipantEvent.LocalTrackPublished || 'localTrackPublished', pub => {
+        console.log('Local track published:', pub.source, pub.trackSid);
+        
+        if (pub.source === Track.Source.ScreenShare) {
+            // Handle screen share
+            if (pub.track) {
+                showLocalScreenShare(pub.track);
+            } else {
+                const checkTrack = setInterval(() => {
+                    if (pub.track) {
+                        showLocalScreenShare(pub.track);
+                        clearInterval(checkTrack);
+                    }
+                }, 100);
+                setTimeout(() => clearInterval(checkTrack), 5000);
+            }
+        } else if (pub.source === Track.Source.Camera) {
+            // Handle camera (including IP camera)
+            if (pub.track) {
+                attachTrackToBox(pub.track, box, true);
+            } else {
+                const checkTrack = setInterval(() => {
+                    if (pub.track) {
+                        attachTrackToBox(pub.track, box, true);
+                        clearInterval(checkTrack);
+                    }
+                }, 100);
+                setTimeout(() => clearInterval(checkTrack), 5000);
+            }
+        }
+    });
+    lp.on(window.LiveKitBundle.ParticipantEvent.LocalTrackUnpublished || 'localTrackUnpublished', pub => {
+        if (pub.source === Track.Source.ScreenShare) {
+            hideLocalScreenShare();
+        }
+    });
+}
+
+function updateParticipantsList() {
+    const list = document.getElementById('participantsList');
+    if (!list || !room) return;
+    
+    list.innerHTML = '';
+    
+    // Add local participant
+    const lp = room.localParticipant;
+    addParticipantToList(lp, true);
+    
+    // Add remote participants
+    room.remoteParticipants.forEach(p => {
+        // Privacy Logic: Students only see Host
+        if (!isHost && userType === 'student') {
+            if (p.identity !== hostId) return;
+        }
+        addParticipantToList(p, false);
+    });
+    
+    updateParticipantCount();
+}
+
+function addParticipantToList(participant, isLocal) {
+    const list = document.getElementById('participantsList');
+    const item = document.createElement('div');
+    item.className = 'participant-item';
+    
+    const identity = participant.identity;
+    const name = isLocal ? 'You' : (participant.name || identity);
+    const isHost = participant.metadata && participant.metadata.includes('host');
+    
+    item.innerHTML = `
+        <div class="participant-avatar">
+            <img src="https://ui-avatars.com/api/?name=${name}&background=6366f1&color=fff" alt="${name}">
+        </div>
+        <div class="participant-info">
+            <div class="participant-name">
+                ${name}
+                ${isLocal ? '<span class="host-label">You</span>' : ''}
+                ${participant.identity == _d.hostId ? '<span class="host-label">Host</span>' : ''}
+            </div>
+        </div>
+        <div class="participant-status" id="status-${identity}">
+            <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+    `;
+    
+    list.appendChild(item);
+}
+
+function updateParticipantCount() {
+    let count = (room ? room.remoteParticipants.size : 0) + 1;
+    
+    // Privacy Logic: Students only see themselves and host
+    if (!isHost && userType === 'student') {
+        let hasHost = false;
+        if (room) {
+            room.remoteParticipants.forEach(p => {
+                if (p.identity === hostId) hasHost = true;
+            });
+        }
+        count = hasHost ? 2 : 1;
+    }
+
+    const el = document.getElementById('participantCount');
+    if (el) el.textContent = count;
+}
+
+function attachTrackToBox(track, box, isLocal) {
+    if (!track || !box) return;
+    console.log(`Attaching ${track.kind} track to ${box.id} (Local: ${isLocal}, Source: ${track.source})`);
+    
+    // Remove existing element for this track kind
+    const existing = box.querySelector(`[data-kind="${track.kind}"]`);
+    if (existing) {
+        track.detach(existing);
+        existing.remove();
+    }
+
+    const el = track.attach();
+    el.dataset.kind = track.kind;
+    el.dataset.source = track.source;
+    
+    if (track.kind === Track.Kind.Video) {
+        el.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        
+        // Mirror only for webcam, not for IP camera or screen share
+        const isIpCam = track.name === 'camera' && currentVideoSource === 'ip';
+        if (isLocal && !isIpCam && track.source !== Track.Source.ScreenShare) {
+            el.style.transform = 'scaleX(-1)';
+        }
+        
+        el.muted = true;
+        el.autoplay = true;
+        el.playsInline = true;
+        
+        if (isLocal) {
+            el.id = 'localVideo';
+            el.dataset.local = 'true';
+        }
+        
+        // Ensure srcObject is set (redundant but safe)
+        if (track.mediaStreamTrack && !el.srcObject) {
+            el.srcObject = new MediaStream([track.mediaStreamTrack]);
+        }
+        
+        box.insertBefore(el, box.querySelector('.video-nametag'));
+        
+        // Explicitly play and handle potential play errors
+        const playPromise = el.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(e => {
+                console.warn(`Autoplay blocked or failed for ${track.kind} on ${box.id}:`, e);
+            });
+        }
+    }
+}
+
+function detachTrackFromBox(track, box) {
+    track.detach().forEach(el => el.remove());
+}
+
+// ── Local screen share preview ────────────────────────────────────────────────
+function showLocalScreenShare(track) {
+    console.log('Rendering local screen share UI...');
+    // Create a dedicated screen-share box for the presenter
+    let box = document.getElementById('local-screen-box');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'local-screen-box';
+        box.className = 'video-box';
+        box.dataset.identity = 'local-screen';
+        const tag = document.createElement('div');
+        tag.className = 'video-nametag';
+        tag.textContent = 'Your Screen';
+        box.appendChild(tag);
+        document.getElementById('sidebarVideoArea').appendChild(box);
+    }
+    
+    // Clear existing video elements in the box
+    box.querySelectorAll('video').forEach(v => v.remove());
+    
+    const el = track.attach();
+    el.dataset.kind = 'video';
+    el.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;background:#000;';
+    el.muted = true;
+    el.autoplay = true;
+    el.playsInline = true;
+    box.insertBefore(el, box.querySelector('.video-nametag'));
+
+    // Add stop button overlay
+    let stopBtn = box.querySelector('.screen-stop-btn');
+    if (!stopBtn) {
+        stopBtn = document.createElement('button');
+        stopBtn.className = 'screen-stop-btn';
+        stopBtn.textContent = 'Stop Sharing';
+        stopBtn.style.cssText = `position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+            background:rgba(239,68,68,0.9);color:#fff;border:none;border-radius:8px;
+            padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;z-index:10;`;
+        stopBtn.onclick = stopScreenShare;
+        box.appendChild(stopBtn);
+    }
+
+    moveToMain(box, 'Your Screen', true);
+}
+
+function hideLocalScreenShare() {
+    const box = document.getElementById('local-screen-box');
+    if (box) box.remove();
+    clearMain();
+    // Restore camera box to sidebar
+    const camBox = document.getElementById(`video-box-${room.localParticipant.identity}`);
+    if (camBox) {
+        camBox.classList.remove('main-presents');
+        document.getElementById('sidebarVideoArea').appendChild(camBox);
+        const v = camBox.querySelector('video');
+        if (v) { v.style.objectFit = 'cover'; v.style.transform = 'scaleX(-1)'; }
+    }
+    updateLayout();
+}
+
+// ── Participant events ────────────────────────────────────────────────────────
+function onParticipantConnected(participant) {
+    if (!participant) return;
+    
+    // Privacy Logic: Students only see Host
+    if (!isHost && userType === 'student') {
+        if (participant.identity !== hostId) {
+            console.log('Hiding student participant:', participant.identity);
+            return; 
+        }
+    }
+
+    console.log('Participant joined:', participant.identity);
+    getOrCreateBox(participant.identity, participant.name || participant.identity, false);
+    updateParticipantsList();
+    updateParticipantCount();
+
+    // Subscribe to any already-published tracks
+    if (participant.trackPublications) {
+        participant.trackPublications.forEach(pub => {
+            if (pub.isSubscribed && pub.track) {
+                onTrackSubscribed(pub.track, pub, participant);
+            }
+        });
+    }
+}
+
+function onParticipantDisconnected(participant) {
+    console.log('Participant left:', participant.identity);
+    const box = document.getElementById(`video-box-${participant.identity}`);
+    if (box) box.remove();
+    updateParticipantsList();
+    updateParticipantCount();
+    updateLayout();
+}
+
+function onTrackSubscribed(track, publication, participant) {
+    // Never process our own tracks here — handled by renderLocalParticipant
+    if (room && room.localParticipant && participant.identity === room.localParticipant.identity) return;
+
+    // Privacy Logic: Students only see Host
+    if (!isHost && userType === 'student') {
+        if (participant.identity !== hostId) return;
+    }
+
+    console.log(`Subscribed to track: ${track.kind} from ${participant.identity} (Source: ${publication.source})`);
+
+    const box = getOrCreateBox(participant.identity, participant.name || participant.identity, false);
+    if (track.kind === Track.Kind.Video) {
+        attachTrackToBox(track, box, false);
+        // If it's a screen share, automatically enlarge it in the main area
+        if (publication.source === Track.Source.ScreenShare || publication.source === 'screen_share') {
+            console.log('Enlarging remote screen share...');
+            moveToMain(box, participant.name || participant.identity, true);
+        }
+    } else if (track.kind === Track.Kind.Audio) {
+        track.attach(); 
+    }
+}
+
+function onTrackUnsubscribed(track, publication, participant) {
+    const box = document.getElementById(`video-box-${participant.identity}`);
+    if (box) detachTrackFromBox(track, box);
+
+    if (publication.source === Track.Source.ScreenShare) {
+        // Return box to sidebar
+        document.getElementById('sidebarVideoArea').appendChild(box);
+        clearMain();
+        updateLayout();
+    }
+}
+
+function onTrackMuted(publication, participant) {
+    const box = document.getElementById(`video-box-${participant.identity}`);
+    if (!box) return;
+    if (publication.kind === Track.Kind.Video) box.classList.add('cam-off');
+    if (publication.kind === Track.Kind.Audio) box.classList.add('muted');
+}
+
+function onTrackUnmuted(publication, participant) {
+    const box = document.getElementById(`video-box-${participant.identity}`);
+    if (!box) return;
+    if (publication.kind === Track.Kind.Video) box.classList.remove('cam-off');
+    if (publication.kind === Track.Kind.Audio) box.classList.remove('muted');
+}
+
+function onActiveSpeakersChanged(speakers) {
+    // Clear all speaking indicators
+    document.querySelectorAll('.video-box.speaking').forEach(b => b.classList.remove('speaking'));
+    speakers.forEach(p => {
+        const box = document.getElementById(`video-box-${p.identity}`);
+        if (box) box.classList.add('speaking');
+    });
+}
+
+function onDataReceived(payload, participant) {
+    try {
+        const msg = JSON.parse(new TextDecoder().decode(payload));
+        if (msg.type === 'meeting_sleeping') {
+            isSleeping = true;
+            showNotification('Meeting has been put to sleep by the host', 'warning');
+        } else if (msg.type === 'meeting_unfrozen') {
+            isSleeping = false;
+            showNotification('Meeting is now active', 'success');
+        }
+    } catch(e) { console.warn('Data parse error:', e); }
+}
+
+function onDisconnected() {
+    showNotification('Disconnected from meeting', 'error');
+}
+
+function onConnectionStateChanged(state) {
+    console.log('Connection state:', state);
+}
+
+// ── Signaling Handlers ────────────────────────────────────────────────────────
+function handleSignalingMessage(data) {
+    switch(data.type) {
+        case 'chat':
+            appendChatMessage(data.username, data.message, data.user_id == currentUserId);
+            break;
+        case 'kick_user':
+            if (data.user_id == currentUserId) {
+                alert(data.message);
+                leaveMeeting();
+            } else {
+                showNotification(`User kicked: ${data.user_id}`, 'info');
+            }
+            break;
+    }
+}
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+function moveToMain(box, label, isScreenShare) {
+    const mainArea   = document.getElementById('mainVideoArea');
+    const container  = document.getElementById('videoGridContainer');
+    container.className = 'video-grid-container sidebar-view';
+    box.classList.add('main-presents');
+    mainArea.innerHTML = '';
+    mainArea.appendChild(box);
+
+    if (isScreenShare) {
+        // Fix video to contain (not crop) for screen share
+        const v = box.querySelector('video');
+        if (v) { v.style.objectFit = 'contain'; v.style.transform = 'none'; }
+    }
+}
+
+function clearMain() {
+    const mainArea  = document.getElementById('mainVideoArea');
+    const container = document.getElementById('videoGridContainer');
+    mainArea.innerHTML = '';
+    container.className = 'video-grid-container grid-view count-' + getAllBoxes().length;
+}
+
+function getAllBoxes() {
+    return Array.from(document.querySelectorAll('.video-box'));
+}
+
+function updateLayout() {
+    if (!room || !room.localParticipant) return;
+    
+    const boxes = getAllBoxes();
+    const container = document.getElementById('videoGridContainer');
+    const mainArea = document.getElementById('mainVideoArea');
+    
+    // Force sidebar view
+    container.className = 'video-grid-container sidebar-view';
+    
+    // If main area is empty, pick a video to enlarge
+    if (mainArea.children.length === 0 && boxes.length > 0) {
+        // Prioritize remote participants over local camera
+        const localIdentity = room.localParticipant.identity;
+        const remoteBox = boxes.find(b => b.dataset.identity !== localIdentity && b.dataset.identity !== 'local-screen');
+        const targetBox = remoteBox || boxes[0];
+        const isScreenShare = targetBox.dataset.identity === 'local-screen';
+        const label = targetBox.querySelector('.video-nametag') ? targetBox.querySelector('.video-nametag').textContent : '';
+        moveToMain(targetBox, label, isScreenShare);
+    }
+    
+    updateParticipantCount();
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+async function toggleMic() {
+    try {
+        isMicOn = !isMicOn;
+        await room.localParticipant.setMicrophoneEnabled(isMicOn);
+        const btn = document.getElementById('micBtn');
+        btn.classList.toggle('off', !isMicOn);
+        const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+        const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+        btn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
+    } catch (e) {
+        console.error('Mic toggle error:', e);
+        isMicOn = !isMicOn; // Revert state
+        if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+            showNotification('No microphone found on this device.', 'warning');
+        } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            showNotification('Microphone access denied.', 'error');
+        } else {
+            showNotification('Could not access microphone.', 'error');
+        }
+    }
+}
+
+async function toggleCamera() {
+    try {
+        isCameraOn = !isCameraOn;
+        
+        // Handle IP camera source
+        if (currentVideoSource === 'ip' && !isCameraOn) {
+            await stopIpCameraStream();
+        } else {
+            await room.localParticipant.setCameraEnabled(isCameraOn);
+        }
+
+        const btn = document.getElementById('camBtn');
+        btn.classList.toggle('off', !isCameraOn);
+        const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+        const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
+        btn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
+
+        // Update UI
+        const localBox = document.getElementById(`video-box-${room.localParticipant.identity}`);
+        if (localBox) localBox.classList.toggle('cam-off', !isCameraOn);
+    } catch (e) {
+        console.error('Camera toggle error:', e);
+        isCameraOn = !isCameraOn; // Revert state
+        if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+            showNotification('No camera found on this device.', 'warning');
+        } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            showNotification('Camera access denied.', 'error');
+        } else {
+            showNotification('Could not access camera.', 'error');
+        }
+    }
+}
+
+async function toggleScreenShare() {
+    if (!isScreenSharing) {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                throw new Error("Screen sharing is not supported or blocked (check HTTPS/localhost).");
+            }
+
+            // Get the creation function with fallbacks
+            const createScreen = createLocalScreenTracks || (window.LiveKitBundle && window.LiveKitBundle.createLocalScreenTracks);
+            
+            if (typeof createScreen !== 'function') {
+                throw new Error("Screen share function not found in SDK.");
+            }
+
+            // Use ScreenSharePresets for better text clarity if available, else fallback to VideoPresets
+            const ssPreset = ScreenSharePresets.h1080fps15 || VideoPresets.h1080;
+
+            const tracks = await createScreen({ 
+                audio: false,
+                resolution: ssPreset.resolution
+            });
+            const screenTrack = Array.isArray(tracks) ? tracks[0] : tracks;
+            
+            if (!screenTrack) throw new Error("No screen track created.");
+
+            // Set content hint to 'text' for sharper screenshare
+            if (screenTrack.mediaStreamTrack) {
+                screenTrack.mediaStreamTrack.contentHint = 'text';
+            }
+
+            screenTrackPub = await room.localParticipant.publishTrack(screenTrack, {
+                name: 'screen_share',
+                source: Track.Source.ScreenShare,
+                videoEncoding: ssPreset.encoding,
+                simulcast: false, // Usually screenshare doesn't need simulcast and it can degrade quality
+            });
+            isScreenSharing = true;
+            document.getElementById('screenBtn').classList.add('active');
+
+            // --- AUTO-HIDE CAMERA ON SCREENSHARE ---
+            if (isHost && isCameraOn) {
+                await room.localParticipant.setCameraEnabled(false);
+                // Keep isCameraOn=true internally so we know to restore it later
+                document.getElementById('camBtn').classList.add('off');
+            }
+            
+            // Handle manual stop from browser UI
+            const mediaTrack = screenTrack.mediaStreamTrack || screenTrack;
+            mediaTrack.addEventListener('ended', stopScreenShare);
+            
+            showNotification('Screen sharing started', 'info');
+        } catch(e) {
+            console.error('Screen share error:', e);
+            let msg = e.message;
+            if (e.name === 'NotAllowedError') msg = "Permission denied by user.";
+            showNotification('Screen share failed: ' + msg, 'error');
+        }
+    } else {
+        stopScreenShare();
+    }
+}
+
+async function stopScreenShare() {
+    if (!isScreenSharing) return;
+    isScreenSharing = false;
+    document.getElementById('screenBtn').classList.remove('active');
+    if (screenTrackPub) {
+        try {
+            const track = screenTrackPub.track;
+            await room.localParticipant.unpublishTrack(track);
+            if (track) track.stop();
+        } catch (err) {
+            console.warn('Error stopping screen share track:', err);
+        }
+        screenTrackPub = null;
+    }
+
+    // --- RESTORE CAMERA AFTER SCREENSHARE ---
+    if (isHost && isCameraOn) {
+        try {
+            await room.localParticipant.setCameraEnabled(true);
+            document.getElementById('camBtn').classList.remove('off');
+        } catch (err) {
+            console.warn('Failed to restore camera after screenshare:', err);
+        }
+    }
+
+    // Layout cleanup handled by localTrackUnpublished → hideLocalScreenShare()
+    showNotification('Screen sharing stopped', 'info');
+}
+
+// ── Teacher Camera Switching ──────────────────────────────────────────────────
+function toggleCameraModal() {
+    const modal = document.getElementById('cameraModal');
+    if (!modal) return;
+    modal.style.display = modal.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function switchCameraSource(type, id, name) {
+    if (type === currentVideoSource && (type === 'webcam' || id === currentIpCamId)) {
+        toggleCameraModal();
+        return;
+    }
+
+    // Set source state BEFORE starting stream so listeners know which source it is
+    currentVideoSource = type;
+
+    try {
+        if (type === 'ip') {
+            await startIpCameraStream(id, name);
+            currentIpCamId = id;
+        } else {
+            await stopIpCameraStream();
+            currentIpCamId = null;
+        }
+        
+        // Update UI
+        document.querySelectorAll('.camera-option').forEach(opt => opt.classList.remove('active'));
+        if (type === 'webcam') {
+            document.getElementById('webcamOption').classList.add('active');
+        } else {
+            const opt = document.getElementById(`ipOption-${id}`);
+            if (opt) opt.classList.add('active');
+        }
+        
+        toggleCameraModal();
+    } catch (err) {
+        console.error('Failed to switch camera:', err);
+        showNotification('Failed to switch camera: ' + err.message, 'error');
+        // Revert state on failure
+        currentVideoSource = (type === 'ip') ? 'webcam' : 'ip';
+    }
+}
+
+async function startIpCameraStream(id, name) {
+    showNotification(`Starting monitoring for ${name}...`, 'info');
+    
+    const overlay = document.getElementById('monitoringOverlay');
+    const container = document.getElementById('monitoringVideoContainer');
+    if (!overlay || !container) return;
+
+    // 1. Setup Canvas and Image
+    if (!ipCamCanvas) {
+        ipCamCanvas = document.getElementById('ipCamCanvas');
+        ipCamCtx = ipCamCanvas.getContext('2d');
+    }
+    if (!ipCamImg) ipCamImg = document.getElementById('ipCamImg');
+    
+    ipCamImg.src = "";
+    const feedUrl = `/cameras/camera-feed/${id}/?q=high`;
+    ipCamImg.src = feedUrl;
+
+    // 2. Start Animation loop
+    const drawFrame = () => {
+        if (currentVideoSource !== 'ip') return;
+        
+        if (ipCamImg.naturalWidth > 0) {
+            const canvasAspect = ipCamCanvas.width / ipCamCanvas.height;
+            const imgAspect = ipCamImg.naturalWidth / ipCamImg.naturalHeight;
+            
+            let drawWidth, drawHeight, offsetX, offsetY;
+            if (imgAspect > canvasAspect) {
+                drawWidth = ipCamCanvas.width;
+                drawHeight = ipCamCanvas.width / imgAspect;
+                offsetX = 0;
+                offsetY = (ipCamCanvas.height - drawHeight) / 2;
+            } else {
+                drawHeight = ipCamCanvas.height;
+                drawWidth = ipCamCanvas.height * imgAspect;
+                offsetY = 0;
+                offsetX = (ipCamCanvas.width - drawWidth) / 2;
+            }
+            
+            ipCamCtx.fillStyle = '#000';
+            ipCamCtx.fillRect(0, 0, ipCamCanvas.width, ipCamCanvas.height);
+            ipCamCtx.drawImage(ipCamImg, offsetX, offsetY, drawWidth, drawHeight);
+        } else {
+            ipCamCtx.fillStyle = '#0f172a';
+            ipCamCtx.fillRect(0, 0, ipCamCanvas.width, ipCamCanvas.height);
+            ipCamCtx.fillStyle = '#ffffff';
+            ipCamCtx.font = 'bold 30px Inter, sans-serif';
+            ipCamCtx.textAlign = 'center';
+            ipCamCtx.fillText(`Connecting to ${name}...`, ipCamCanvas.width/2, ipCamCanvas.height/2);
+        }
+        ipCamAnimationId = requestAnimationFrame(drawFrame);
+    };
+
+    if (ipCamAnimationId) cancelAnimationFrame(ipCamAnimationId);
+    ipCamAnimationId = requestAnimationFrame(drawFrame);
+
+    // 3. Show Overlay and Attach Video
+    overlay.style.display = 'block';
+    container.innerHTML = '';
+    
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    const stream = ipCamCanvas.captureStream(15);
+    video.srcObject = stream;
+    container.appendChild(video);
+
+    // --- PUBLISH TO LIVEKIT ---
+    if (window.room && window.room.localParticipant && isCameraOn) {
+        try {
+            // Clean up existing IP track if switching between IP cameras
+            if (ipCamTrackPub) {
+                await window.room.localParticipant.unpublishTrack(ipCamTrackPub.track);
+                if (ipCamTrackPub.track) ipCamTrackPub.track.stop();
+                ipCamTrackPub = null;
+            }
+
+            // Unpublish existing webcam track
+            await window.room.localParticipant.setCameraEnabled(false);
+
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                ipCamTrackPub = await window.room.localParticipant.publishTrack(videoTrack, {
+                    name: 'camera',
+                    source: Track.Source.Camera,
+                    simulcast: true,
+                });
+                console.log('IP Camera track published to LiveKit');
+            }
+        } catch (err) {
+            console.error('Failed to publish IP camera track:', err);
+        }
+    }
+
+    showNotification(`${name} monitoring active`, 'success');
+}
+
+async function stopIpCameraStream() {
+    const overlay = document.getElementById('monitoringOverlay');
+    const container = document.getElementById('monitoringVideoContainer');
+    
+    if (overlay) overlay.style.display = 'none';
+    if (container) container.innerHTML = '';
+
+    if (ipCamAnimationId) {
+        cancelAnimationFrame(ipCamAnimationId);
+        ipCamAnimationId = null;
+    }
+    
+    // --- UNPUBLISH FROM LIVEKIT ---
+    if (ipCamTrackPub && window.room && window.room.localParticipant) {
+        try {
+            await window.room.localParticipant.unpublishTrack(ipCamTrackPub.track);
+            if (ipCamTrackPub.track) ipCamTrackPub.track.stop();
+            ipCamTrackPub = null;
+            console.log('IP Camera track unpublished');
+        } catch (err) {
+            console.warn('Error unpublishing IP camera track:', err);
+        }
+    }
+
+    if (ipCamImg) {
+        ipCamImg.onload = null;
+        ipCamImg.onerror = null;
+        ipCamImg.src = "";
+    }
+
+    currentVideoSource = 'webcam';
+    currentIpCamId = null;
+    
+    // Restore webcam if global camera state is still ON
+    if (isCameraOn && window.room && window.room.localParticipant) {
+        try {
+            await window.room.localParticipant.setCameraEnabled(true);
+        } catch (err) {
+            console.warn('Failed to restore webcam:', err);
+        }
+    }
+
+    document.querySelectorAll('.camera-option').forEach(opt => opt.classList.remove('active'));
+    document.getElementById('webcamOption').classList.add('active');
+    
+    showNotification('Monitoring stopped', 'info');
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const text  = input.value.trim();
+    if (!text || !signalingWs || signalingWs.readyState !== WebSocket.OPEN) {
+        if (!signalingWs || signalingWs.readyState !== WebSocket.OPEN) {
+            showNotification('Chat connection not ready. Please wait.', 'warning');
+        }
+        return;
+    }
+    input.value = '';
+
+    const payload = JSON.stringify({ 
+        type: 'chat', 
+        message: text,
+        timestamp: new Date().toISOString()
+    });
+    signalingWs.send(payload);
+}
+
+function appendChatMessage(username, text, isOwn) {
+    const panel = document.getElementById('chatMessages');
+    const div   = document.createElement('div');
+    div.className = 'chat-msg' + (isOwn ? ' own' : '');
+    div.innerHTML = `
+        <div class="chat-msg-header"><strong style="color: #cbd5e1;">${username}</strong><span class="chat-msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span></div>
+        <div class="chat-msg-text">${text}</div>`;
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+
+    // Fixed badge notification logic
+    const sidebar = document.getElementById('meetSidebar');
+    const chatPanel = document.getElementById('chatPanel');
+    const isSidebarHidden = sidebar.style.display === 'none';
+    const isChatPanelHidden = chatPanel.classList.contains('active') === false;
+
+    if (!isOwn && (isSidebarHidden || isChatPanelHidden)) {
+        unreadMessages++;
+        const badge = document.getElementById('chatBadge');
+        if (badge) {
+            badge.textContent = unreadMessages;
+            badge.style.display = 'block';
+        }
+    }
+}
+
+// ── Sleep mode (host only) ────────────────────────────────────────────────────
+async function toggleSleepMode() {
+    const url = isSleeping ? UNFREEZE_URL : SLEEP_URL;
+    await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
+
+    // Broadcast to all via data channel
+    const type = isSleeping ? 'meeting_unfrozen' : 'meeting_sleeping';
+    const payload = JSON.stringify({ type });
+    await room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+
+    isSleeping = !isSleeping;
+    const btn = document.getElementById('sleepBtn');
+    if (btn) btn.classList.toggle('active', isSleeping);
+}
+
+// ── Teacher Controls ──────────────────────────────────────────────────────────
+async function toggleGlobalControl(type) {
+    const btn = type === 'mute_all' ? document.getElementById('muteAllBtn') : document.getElementById('camOffAllBtn');
+    const currentState = btn.classList.contains('active');
+    const newState = !currentState;
+    
+    const res = await fetch(window.meetingConfig.globalControlUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, value: newState })
+    });
+    
+    if (res.ok) {
+        btn.classList.toggle('active', newState);
+        showNotification(`Global ${type.replace('_', ' ')} ${newState ? 'Enabled' : 'Disabled'}`, 'success');
+    }
+}
+
+async function kickUser(userId) {
+    if (!confirm('Are you sure you want to kick this student for 1 hour?')) return;
+    
+    const url = window.meetingConfig.kickUrl.replace('0', userId);
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    
+    if (res.ok) showNotification('Student kicked successfully', 'success');
+}
+
+async function unbanUser(userId) {
+    const url = window.meetingConfig.revokeBanUrl.replace('0', userId);
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF }
+    });
+    
+    if (res.ok) {
+        showNotification('Student unbanned successfully', 'success');
+        fetchBannedUsers();
+    }
+}
+
+async function fetchBannedUsers() {
+    if (!isHost) return;
+    const res = await fetch(window.meetingConfig.bannedUsersUrl);
+    const data = await res.json();
+    const list = document.getElementById('bannedList');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    if (data.banned && data.banned.length > 0) {
+        data.banned.forEach(u => {
+            const item = document.createElement('div');
+            item.className = 'participant-item';
+            item.innerHTML = `
+                <div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${u.username}&background=ef4444&color=fff" alt="${u.username}"></div>
+                <div class="participant-info">
+                    <div class="participant-name">${u.username}</div>
+                    <div style="font-size:10px; color:#ef4444;">Banned until ${new Date(u.banned_until).toLocaleTimeString()}</div>
+                </div>
+                <div class="participant-actions">
+                    <button class="action-btn" onclick="window.unbanUser('${u.id}')" title="Unban Student">✅</button>
+                </div>`;
+            list.appendChild(item);
+        });
+    } else {
+        list.innerHTML = '<p style="text-align:center; color:#999; font-size:12px; padding:10px;">No banned students</p>';
+    }
+}
+
+// Attach to window for Turbo/Inline events
+window.toggleMic = toggleMic;
+window.toggleCamera = toggleCamera;
+window.toggleScreenShare = toggleScreenShare;
+window.stopScreenShare = stopScreenShare;
+window.toggleCameraModal = toggleCameraModal;
+window.switchCameraSource = switchCameraSource;
+window.stopIpCameraStream = stopIpCameraStream;
+window.sendChatMessage = sendChatMessage;
+window.toggleSleepMode = toggleSleepMode;
+window.toggleGlobalControl = toggleGlobalControl;
+window.kickUser = kickUser;
+window.unbanUser = unbanUser;
+window.fetchBannedUsers = fetchBannedUsers;
+window.leaveMeeting = leaveMeeting;
+window.openSidebar = openSidebar;
+window.toggleSidebar = toggleSidebar;
+window.toggleMoreOptions = toggleMoreOptions;
+window.switchSidebarTab = switchSidebarTab;
+
+// ── Leave ─────────────────────────────────────────────────────────────────────
+async function leaveMeeting() {
+    if (room) await room.disconnect();
+    await fetch(LEAVE_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
+    window.location.href = AFTER_LEAVE;
+}
+
+// ── Sidebar helpers ───────────────────────────────────────────────────────────
+function openSidebar(tab) {
+    document.getElementById('meetSidebar').style.display = 'flex';
+    document.getElementById('meetMain').classList.add('sidebar-open');
+    switchSidebarTab(tab);
+}
+
+function toggleSidebar() {
+    const s = document.getElementById('meetSidebar');
+    const isOpen = s.style.display !== 'none';
+    s.style.display = isOpen ? 'none' : 'flex';
+    document.getElementById('meetMain').classList.toggle('sidebar-open', !isOpen);
+}
+
+// ── More Options ──────────────────────────────────────────────────────────────
+function toggleMoreOptions() {
+    const menu = document.getElementById('moreOptionsMenu');
+    menu.classList.toggle('show');
+}
+
+// Close menu when clicking outside
+document.addEventListener('click', function(e) {
+    const container = document.querySelector('.more-options-container');
+    const menu = document.getElementById('moreOptionsMenu');
+    if (menu && container && !container.contains(e.target)) {
+        menu.classList.remove('show');
+    }
+});
+
+function switchSidebarTab(tab) {
+    document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.sidebar-panel').forEach(p => p.style.display = 'none');
+    document.querySelector(`.sidebar-tab[onclick*="${tab}"]`).classList.add('active');
+    document.getElementById(tab + 'Panel').style.display = 'flex';
+
+    if (tab === 'chat') {
+        unreadMessages = 0;
+        const badge = document.getElementById('chatBadge');
+        badge.style.display = 'none';
+    }
+}
+
+// ── Participants list ─────────────────────────────────────────────────────────
+function updateParticipantsList() {
+    const list = document.getElementById('participantsList');
+    list.innerHTML = `
+        <div class="participant-item">
+            <div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${currentUsername}&background=1877f2&color=fff" alt="${currentUsername}"></div>
+            <div class="participant-info">
+                <div class="participant-name">${currentUsername} (You)</div>
+                ${isHost ? '<span class="host-label">Host</span>' : ''}
+            </div>
+        </div>`;
+
+    if (room && room.remoteParticipants) {
+        room.remoteParticipants.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'participant-item';
+            item.innerHTML = `
+                <div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${p.name||p.identity}&background=6366f1&color=fff" alt="${p.name||p.identity}"></div>
+                <div class="participant-info">
+                    <div class="participant-name">${p.name || p.identity}</div>
+                </div>
+                ${isHost ? `
+                <div class="participant-actions">
+                    <button class="action-btn danger" onclick="kickUser('${p.identity}')" title="Kick Out">🚫</button>
+                </div>
+                ` : ''}`;
+            list.appendChild(item);
+        });
+    }
+    
+    if (isHost) fetchBannedUsers();
+}
+
+function updateParticipantCount() {
+    try {
+        const remoteCount = (room && room.remoteParticipants) ? room.remoteParticipants.size : 0;
+        document.getElementById('participantCount').textContent = remoteCount + 1;
+    } catch (e) {
+        document.getElementById('participantCount').textContent = '1';
+    }
+}
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
+function startTimer() {
+    timerInterval = setInterval(() => {
+        timerSeconds++;
+        const m = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+        const s = String(timerSeconds % 60).padStart(2, '0');
+        document.getElementById('meetTimer').textContent = `${m}:${s}`;
+    }, 1000);
+}
+
+// ── Notification ──────────────────────────────────────────────────────────────
+function showNotification(msg, type = 'info') {
+    const colors = { info: '#6366f1', success: '#10b981', warning: '#f59e0b', error: '#ef4444' };
+    const n = document.createElement('div');
+    n.style.cssText = `position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+        background:${colors[type]};color:#fff;padding:10px 20px;border-radius:8px;
+        font-size:13px;font-weight:600;z-index:9999;pointer-events:none;
+        box-shadow:0 4px 16px rgba(0,0,0,0.3);`;
+    n.textContent = msg;
+    document.body.appendChild(n);
+    setTimeout(() => n.remove(), 3000);
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+window.addEventListener('beforeunload', () => { if (room) room.disconnect(); });
+init().catch(e => { console.error('Init error:', e); showNotification('Failed to connect: ' + e.message, 'error'); });
+
+// ── Face Attendance Module (Students Only) ───────────────────────────────────
+{% if not is_host and not user.is_superuser %}
+(function() {
+    let attWs = null;
+    let captureTimer = null;
+    let marked = false;
+
+    // Create Badge UI
+    const badge = document.createElement('div');
+    badge.id = 'face-att-badge';
+    badge.className = 'state-active';
+    badge.innerHTML = `
+        <div class="fa-dot"></div>
+        <div style="flex:1">
+            <div id="face-att-text">Initializing Face Recognition...</div>
+            <div id="face-att-prog-wrap" style="display:none">
+                <div id="face-att-progress-bar"><div id="face-att-progress-fill"></div></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(badge);
+
+    const badgeText = badge.querySelector('#face-att-text');
+    const progWrap  = badge.querySelector('#face-att-prog-wrap');
+    const progFill  = badge.querySelector('#face-att-progress-fill');
+
+    function connect() {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        attWs = new WebSocket(`${proto}//${window.location.host}/ws/attendance/${meetingCode}/`);
+        attWs.onmessage = e => {
+            const data = JSON.parse(e.data);
+            switch(data.type) {
+                case 'connected':
+                    if (data.has_profile) {
+                        badgeText.textContent = 'Face Recognition Active';
+                        startCapture(data.interval * 1000);
+                    } else {
+                        badge.className = 'state-warning';
+                        badgeText.innerHTML = 'No profile found. <a href="/attendance/face/setup/" style="color:#f87171">Register Now</a>';
+                    }
+                    break;
+                case 'verification_progress':
+                    const pct = Math.round((data.verified_seconds / data.required_seconds) * 100);
+                    badge.className = 'state-progress';
+                    badgeText.textContent = `Verifying... ${pct}%`;
+                    progWrap.style.display = 'block';
+                    progFill.style.width = pct + '%';
+                    break;
+                case 'attendance_marked':
+                    marked = true;
+                    badge.className = 'state-success';
+                    badgeText.textContent = 'Attendance Recorded!';
+                    progWrap.style.display = 'none';
+                    stopCapture();
+                    setTimeout(() => badge.style.opacity = '0', 5000);
+                    break;
+                case 'verification_failed':
+                    badge.className = 'state-warning';
+                    badgeText.textContent = data.message || 'Face Not Recognized';
+                    break;
+            }
+        };
+        attWs.onclose = () => !marked && setTimeout(connect, 5000);
+    }
+
+    function captureAndSend() {
+        const video = document.getElementById('localVideo');
+        if (!video || video.readyState < 2 || !attWs || attWs.readyState !== 1) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = 320; canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -320, 0, 320, 240); ctx.restore();
+        attWs.send(JSON.stringify({ type: 'frame', frame: canvas.toDataURL('image/jpeg', 0.8).split(',')[1] }));
+    }
+
+    function startCapture(ms) {
+        if (captureTimer) clearInterval(captureTimer);
+        captureTimer = setInterval(captureAndSend, ms || 15000);
+        setTimeout(captureAndSend, 2000);
+    }
+
+    function stopCapture() { clearInterval(captureTimer); captureTimer = null; }
+
+    window.addEventListener('load', () => setTimeout(connect, 3000));
+})();
+{% endif %}
+
+// ── Face Tracking Module (Host Only) ─────────────────────────────────────────
+{% if is_host %}
+(function() {
+    let ftWs = null;
+    let ftEnabled = false;
+    let ftTimer = null;
+    const ftCanvas = document.createElement('canvas');
+
+    window.toggleFaceTracking = function() {
+        ftEnabled = !ftEnabled;
+        const btn = document.getElementById('ftToggleBtn');
+        btn.classList.toggle('active', ftEnabled);
+        if (ftEnabled) {
+            btn.style.background = '#10b981';
+            connect();
+            showNotification('Face Tracking Enabled', 'success');
+        } else {
+            btn.style.background = '';
+            stop();
+            showNotification('Face Tracking Disabled', 'info');
+        }
+    };
+
+    function connect() {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ftWs = new WebSocket(`${proto}//${window.location.host}/ws/face-tracking/${meetingCode}/`);
+        ftWs.onopen = () => { ftTimer = setInterval(captureAll, 5000); captureAll(); };
+        ftWs.onmessage = e => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'bulk_tracking_result') {
+                Object.entries(data.results).forEach(([uid, res]) => drawOverlay(uid, res));
+            }
+        };
+        ftWs.onclose = () => ftEnabled && setTimeout(connect, 5000);
+    }
+
+    function stop() {
+        clearInterval(ftTimer); ftTimer = null;
+        if (ftWs) ftWs.close();
+        document.querySelectorAll('.ft-canvas-overlay, .ft-emotion-badge').forEach(el => el.remove());
+    }
+
+    function captureAll() {
+        if (!ftWs || ftWs.readyState !== 1) return;
+        const frames = {};
+        document.querySelectorAll('.video-box').forEach(box => {
+            const uid = box.dataset.userId;
+            if (!uid || uid === currentUserId) return;
+            const video = box.querySelector('video');
+            if (!video || video.readyState < 2) return;
+            ftCanvas.width = 320; ftCanvas.height = 240;
+            ftCanvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+            frames[uid] = ftCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+        });
+        if (Object.keys(frames).length > 0) ftWs.send(JSON.stringify({ type: 'bulk_frame', frames }));
+    }
+
+    function drawOverlay(uid, res) {
+        const box = document.getElementById(`video-box-${uid}`);
+        if (!box) return;
+        let canvas = box.querySelector('.ft-canvas-overlay');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.className = 'ft-canvas-overlay';
+            box.appendChild(canvas);
+        }
+        canvas.width = box.offsetWidth; canvas.height = box.offsetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (res.face_visible && res.faces) {
+            res.faces.forEach(face => {
+                const { x, y, w, h } = face.box;
+                ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2;
+                ctx.strokeRect(x * canvas.width, y * canvas.height, w * canvas.width, h * canvas.height);
+                ctx.fillStyle = '#10b981'; ctx.font = 'bold 12px Inter';
+                ctx.fillText(face.name, x * canvas.width, y * canvas.height - 5);
+            });
+            updateEmotion(box, res.emotion_label);
+        } else {
+            updateEmotion(box, null);
+        }
+    }
+
+    function updateEmotion(box, label) {
+        let eb = box.querySelector('.ft-emotion-badge');
+        if (!label) { eb?.remove(); return; }
+        if (!eb) { eb = document.createElement('div'); eb.className = 'ft-emotion-badge'; box.appendChild(eb); }
+        eb.textContent = label;
+    }
+})();
+{% endif %}
+</script>
+</body>
+</html>

@@ -1,0 +1,1500 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .control-room-container {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        height: calc(100vh - 100px);
+        background: #f1f5f9;
+    }
+    .main-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    .video-monitor {
+        background: #000;
+        border-radius: 1.5rem;
+        overflow: hidden;
+        position: relative;
+        flex: 1;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+        border: 4px solid #fff;
+    }
+    .monitor-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .rec-indicator {
+        position: absolute;
+        top: 1.5rem;
+        left: 1.5rem;
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        background: transparent; /* Made transparent as requested */
+        padding: 0.5rem 1rem;
+        border-radius: 9999px;
+        color: white;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5); /* Added shadow for readability on transparent bg */
+    }
+    .rec-indicator.active { display: flex; animation: pulse 2s infinite; }
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    .video-feed {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    
+    /* Fullscreen HUD Controls */
+    .fullscreen-controls {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(8px);
+        padding: 0.75rem 1.5rem;
+        border-radius: 1rem;
+        display: none; /* Only visible in fullscreen */
+        align-items: center;
+        gap: 1rem;
+        z-index: 100;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    }
+    .video-monitor:fullscreen .fullscreen-controls {
+        display: flex;
+    }
+    .fs-btn {
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+    }
+    .fs-btn.active { color: #ef4444; }
+    .fs-btn-primary { background: #6366f1; }
+    
+    .action-btn {
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        background: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+    }
+
+    .controls-bar {
+        background: white;
+        padding: 1.25rem;
+        border-radius: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .btn-action {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: none;
+        cursor: pointer;
+    }
+    .btn-stream { background: #6366f1; color: white; }
+    .btn-record { background: #ef4444; color: white; }
+    .btn-record.recording { background: #991b1b; }
+    
+    .quality-select {
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        font-weight: 600;
+        outline: none;
+    }
+
+    .side-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        overflow-y: auto;
+    }
+    .panel-card {
+        background: white;
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .panel-title {
+        font-size: 0.875rem;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .chat-box {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 300px;
+    }
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    /* Publish Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 1000;
+        align-items: center; justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: white;
+        border-radius: 1.5rem;
+        width: 100%;
+        max-width: 500px;
+        padding: 2rem;
+    }
+
+    /* New Icon-based UI styles */
+    .btn-text {
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+
+    .icon-btn-round {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border: none;
+        border-radius: 50%;
+        color: #64748b;
+        cursor: pointer;
+    }
+
+    .icon-btn-style {
+        width: 16px;
+        height: 16px;
+        color: #64748b;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+
+    .dropdown-icon-group {
+        display: flex;
+        align-items: center;
+        background: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.75rem;
+        border: 1px solid #e2e8f0;
+    }
+
+    .clean-select {
+        border: none;
+        background: transparent;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #475569;
+        outline: none;
+        cursor: pointer;
+        padding-right: 0.5rem;
+        width: 100px;
+    }
+
+    #zoomSlider {
+        -webkit-appearance: none;
+        height: 4px;
+        background: #e2e8f0;
+        border-radius: 2px;
+        outline: none;
+    }
+
+    #zoomSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 12px;
+        height: 12px;
+        background: #6366f1;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="control-room-container">
+    <div class="main-panel">
+        <div class="video-monitor">
+            <div class="monitor-overlay">
+                <div id="recIndicator" class="rec-indicator">
+                    <span style="width:12px; height:12px; background:#ef4444; border-radius:50%;"></span>
+                    REC <span id="recTimer">00:00</span>
+                </div>
+            </div>
+            <img id="mainFeed" src="" class="video-feed" alt="Camera Feed" style="cursor: crosshair;" onclick="setZoomTarget(event)" oncontextmenu="captureAreaImage(event)">
+            <audio id="monitorAudio" autoplay muted></audio>
+            
+            <!-- Fullscreen HUD -->
+            <div class="fullscreen-controls">
+                <button class="fs-btn fs-btn-primary" id="fsStreamBtn" onclick="toggleStreaming()">
+                    <i data-lucide="radio"></i> <span>Live</span>
+                </button>
+                <button class="fs-btn" id="fsRecordBtn" onclick="toggleRecording()">
+                    <i data-lucide="circle"></i> <span>Record</span>
+                </button>
+                <div style="width:1px; height:24px; background:rgba(255,255,255,0.2); margin:0 0.5rem;"></div>
+                <button class="fs-btn" onclick="adjustZoom(-0.5)"><i data-lucide="minus-circle"></i></button>
+                <span id="fsZoomDisplay" style="color:white; font-weight:700; font-size:0.875rem; min-width:40px; text-align:center;">1.0x</span>
+                <button class="fs-btn" onclick="adjustZoom(0.5)"><i data-lucide="plus-circle"></i></button>
+                <button class="fs-btn" onclick="resetZoom()"><i data-lucide="refresh-cw"></i></button>
+                <div style="width:1px; height:24px; background:rgba(255,255,255,0.2); margin:0 0.5rem;"></div>
+                <button class="fs-btn" onclick="toggleFullScreen()"><i data-lucide="minimize"></i></button>
+            </div>
+        </div>
+
+        <div class="controls-bar">
+            <div style="display:flex; gap:0.75rem;">
+                <button id="streamBtn" class="btn-action btn-stream" onclick="toggleStreaming()" style="padding: 0.5rem 1rem;">
+                    <i data-lucide="radio"></i> <span class="btn-text">Live</span>
+                </button>
+                <button id="recordBtn" class="btn-action btn-record" onclick="toggleRecording()" style="padding: 0.5rem 1rem;">
+                    <i data-lucide="circle"></i> <span class="btn-text">Record</span>
+                </button>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.75rem; flex:1; justify-content:center;">
+                <!-- Audio Controls Group -->
+                <div style="display:flex; align-items:center; background:#f1f5f9; padding:0.25rem 0.4rem; border-radius:1rem; gap:0.35rem;">
+                    <!-- Combined Mic/Audio Button -->
+                    <button id="monitorBtn" class="icon-btn-round" title="Toggle IP Camera Audio" onclick="toggleMonitorAudio()" style="width:32px; height:32px; background:white;">
+                        <i data-lucide="volume-x" id="monitorIcon" style="width:16px;"></i>
+                    </button>
+
+                    <!-- Voice Graph -->
+                    <div style="width:80px; height:24px; background:#e2e8f0; border-radius:0.4rem; position:relative; overflow:hidden;" title="Live Audio Sync">
+                        <canvas id="visualizerCanvas" width="80" height="24" style="display:block;"></canvas>
+                        <div id="micLevel" style="display:none;"><div id="micLevelBar"></div></div>
+                    </div>
+                </div>
+
+                <!-- Zoom Slider Group -->
+                <div style="display:flex; align-items:center; background:#f1f5f9; padding:0.25rem 0.6rem; border-radius:1rem; gap:0.5rem;">
+                    <input type="range" id="zoomSlider" min="1" max="5" step="0.1" value="1" oninput="handleZoomSlider(this.value)" style="width:80px; accent-color:#6366f1; cursor:pointer;">
+                    <span id="zoomDisplay" style="font-weight:800; font-size:0.7rem; min-width:28px; color:#475569;">1.0x</span>
+                </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <select class="quality-select" id="qualitySelect" style="padding: 0.25rem 0.5rem; font-size:0.75rem; height:32px;">
+                    {% for q in qualities %}
+                    <option value="{{ q }}" {% if q == default_quality %}selected{% endif %}>{{ q }}</option>
+                    {% endfor %}
+                </select>
+                <button class="action-btn" title="Full Screen" onclick="toggleFullScreen()" style="width:32px; height:32px; background:#f8fafc;">
+                    <i data-lucide="maximize" style="width:16px;"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="side-panel">
+        <div class="panel-card">
+            <div class="panel-title"><i data-lucide="info"></i> Camera Info</div>
+            <div style="font-size: 0.875rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                    <span style="color:#64748b;">Name:</span>
+                    <span style="font-weight:600;">{{ camera.name }}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Source:</span>
+                    <span style="font-weight:600;">{{ camera.get_camera_type_display }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-card" style="flex: 1; display:flex; flex-direction:column;">
+            <div class="panel-title"><i data-lucide="users"></i> Live Students (<span id="studentCount">0</span>)</div>
+            <div id="studentList" style="flex:1; overflow-y:auto; color:#94a3b8; font-size:0.875rem; padding-top:1rem;">
+                <div style="text-align:center; color:#94a3b8; font-size:0.875rem; padding-top:2rem;">
+                    Waiting for students to join...
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-card chat-box">
+            <div class="panel-title"><i data-lucide="message-square"></i> Live Chat</div>
+            <div class="chat-messages" id="chatMessages">
+                <div style="text-align:center; color:#94a3b8; font-size:0.75rem;">Session chat will appear here</div>
+            </div>
+            <div style="padding-top:1rem; border-top:1px solid #f1f5f9; margin-top:auto;">
+                <form onsubmit="sendChatMessage(event)" style="display:flex; gap:0.5rem;">
+                    <input type="text" id="chatInput" placeholder="Reply to students..." style="flex:1; padding:0.5rem; border:1px solid #e2e8f0; border-radius:0.5rem; font-size:0.875rem; outline:none;">
+                    <button type="submit" style="padding:0.5rem; background:#6366f1; color:white; border:none; border-radius:0.5rem; cursor:pointer;">
+                        <i data-lucide="send" style="width:16px; height:16px;"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Publish Modal -->
+<div id="publishModal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <h2 style="font-weight:800; margin-bottom:1rem;">Publish Recording</h2>
+        <p style="color:#64748b; font-size:0.875rem; margin-bottom:1.5rem;">Your recording is ready. Edit and publish it for your students.</p>
+        
+        <!-- Video Preview and Trim -->
+        <div style="margin-bottom: 1.5rem;">
+            <video id="pubVideoPreview" controls style="width: 100%; border-radius: 0.75rem; max-height: 400px;"></video>
+            <div style="margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Trim Start (seconds)</label>
+                    <input type="number" id="pubTrimStart" class="form-control" min="0" step="0.1" value="0" style="width:100%; padding:0.75rem; border:1px solid #e2e8f0; border-radius:0.5rem;">
+                </div>
+                <div>
+                    <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Trim End (seconds, optional)</label>
+                    <input type="number" id="pubTrimEnd" class="form-control" min="0" step="0.1" placeholder="End time" style="width:100%; padding:0.75rem; border:1px solid #e2e8f0; border-radius:0.5rem;">
+                </div>
+            </div>
+            <div style="margin-top: 0.75rem; display:flex; gap: 0.75rem;">
+                <button type="button" class="btn-action" style="background:#f59e0b; color:white;" onclick="applyTrim()">
+                    <i data-lucide="scissors"></i> Apply Trim
+                </button>
+                <button type="button" class="btn-action" style="background:#3b82f6; color:white;" onclick="generateThumbnail()">
+                    <i data-lucide="image"></i> Generate Thumbnail
+                </button>
+            </div>
+        </div>
+
+        <!-- Download Option -->
+        <div style="background: #f8fafc; padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; border: 1px solid #e2e8f0;">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <div style="background:#dcfce7; color:#166534; padding:0.5rem; border-radius:0.5rem;">
+                    <i data-lucide="video"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700; font-size:0.875rem;">Recording Ready</div>
+                    <div style="font-size:0.75rem; color:#64748b;">High-quality 4K/1080p MP4</div>
+                </div>
+            </div>
+            <a id="downloadLink" href="#" download class="btn-action" style="background:#10b981; color:white; padding:0.5rem 1rem; font-size:0.875rem; text-decoration:none;">
+                <i data-lucide="download"></i> Download
+            </a>
+        </div>
+
+        <form onsubmit="finishPublish(event)">
+            <div style="margin-bottom:1.25rem;">
+                <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Lecture Title</label>
+                <input type="text" id="pubTitle" class="form-control" style="width:100%; padding:0.75rem; border:1px solid #e2e8f0; border-radius:0.5rem;" required placeholder="e.g. Physics - Laws of Motion">
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Description</label>
+                <textarea id="pubDesc" style="width:100%; padding:0.75rem; border:1px solid #e2e8f0; border-radius:0.5rem; height:100px;" placeholder="What was this lecture about?"></textarea>
+            </div>
+            <div style="display:flex; gap:1rem;">
+                <button type="button" class="btn-action" style="flex:1; background:#f1f5f9; color:#475569;" onclick="closePublish()">Save Draft</button>
+                <button type="submit" class="btn-action" style="flex:1; background:#6366f1; color:white;">Publish Now</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let isStreaming = {{ is_live|yesno:"true,false" }};
+    let isRecording = {{ is_recording|yesno:"true,false" }};
+    let recStartTime = {% if recording_start_time %}new Date("{{ recording_start_time }}"){% else %}null{% endif %};
+    let recTimerInterval = null;
+
+    // Initialize UI from server state
+    window.addEventListener('DOMContentLoaded', () => {
+        const streamBtn = document.getElementById('streamBtn');
+        const fsStreamBtn = document.getElementById('fsStreamBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const fsRecordBtn = document.getElementById('fsRecordBtn');
+        const recIndicator = document.getElementById('recIndicator');
+        const qualitySelect = document.getElementById('qualitySelect');
+
+        // Restore quality from localStorage
+        const savedQuality = localStorage.getItem(`cam_quality_${window.cameraId}`);
+        if (savedQuality) {
+            qualitySelect.value = savedQuality;
+        }
+
+        // Handle quality change for live feed
+        const updateFeedQuality = () => {
+            const quality = qualitySelect.value;
+            localStorage.setItem(`cam_quality_${window.cameraId}`, quality);
+            
+            let qParam = 'med';
+            if (quality === '4K') qParam = '4k';
+            else if (quality === '1080p') qParam = 'high';
+            else if (quality === '720p') qParam = 'med';
+            else qParam = 'low';
+            
+            const mainFeed = document.getElementById('mainFeed');
+            // Point directly at the camera service — Django's ASGI server (Daphne)
+            // buffers streaming responses so MJPEG never reaches the browser via proxy.
+            const baseUrl = "{{ camera_feed_base }}";
+            mainFeed.src = `${baseUrl}?q=${qParam}&t=${new Date().getTime()}`;
+        };
+
+        qualitySelect.addEventListener('change', () => {
+            updateFeedQuality();
+            showNotification(`Quality switched to ${qualitySelect.value}`, 'info');
+        });
+
+        // Apply initial quality
+        updateFeedQuality();
+
+        // Initialize Audio
+        initAudio();
+        initRemoteMicStatus();
+        
+        // Auto-start monitoring if IP Camera is selected
+        setTimeout(() => {
+            const micSelect = document.getElementById('micSelect');
+            if (micSelect && micSelect.value === 'camera') {
+                toggleMonitorAudio();
+            }
+        }, 1000);
+
+        // Sync zoom display and server state on load
+        const zDisp = document.getElementById('zoomDisplay');
+        const fzDisp = document.getElementById('fsZoomDisplay');
+        if (zDisp) zDisp.innerText = `${currentZoom.toFixed(1)}x`;
+        if (fzDisp) fzDisp.innerText = `${currentZoom.toFixed(1)}x`;
+
+        if (currentZoom > 1.0 || zoomX !== 0.5 || zoomY !== 0.5) {
+            updateZoomOnServer(currentZoom, zoomX, zoomY);
+        }
+
+        if (isStreaming) {
+            const txt = '<i data-lucide="square"></i> Stop Live Stream';
+            const fsTxt = '<i data-lucide="square"></i> Stop';
+            streamBtn.innerHTML = txt;
+            fsStreamBtn.innerHTML = fsTxt;
+            streamBtn.style.background = '#475569';
+            fsStreamBtn.style.background = '#475569';
+        }
+
+        if (isRecording) {
+            recordBtn.classList.add('recording');
+            fsRecordBtn.classList.add('active');
+            recordBtn.innerHTML = '<i data-lucide="square"></i> Stop Recording';
+            fsRecordBtn.innerHTML = '<i data-lucide="square"></i> Stop';
+            recIndicator.classList.add('active');
+            recTimerInterval = setInterval(updateRecTimer, 1000);
+        }
+        
+        if (window.lucide) {
+            try {
+                lucide.createIcons();
+            } catch (err) {
+                console.warn("Lucide icon error:", err.message);
+            }
+        }
+    });
+
+    function updateRecTimer() {
+        if (!recStartTime) return;
+        const now = new Date();
+        const diff = Math.floor((now - recStartTime) / 1000);
+        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+        const secs = (diff % 60).toString().padStart(2, '0');
+        document.getElementById('recTimer').innerText = `${mins}:${secs}`;
+    }
+
+    function showNotification(message, type) {
+        // Use the global showToast system from base_sidebar.html
+        if (typeof showToast === 'function') {
+            const title = type === 'success' ? 'Success' : (type === 'error' ? 'Error' : 'Notification');
+            showToast(title, message, type === 'info' ? 'info' : type);
+        } else {
+            // Fallback to alert if showToast is not available
+            alert(message);
+        }
+    }
+
+    async function toggleStreaming() {
+        const btn = document.getElementById('streamBtn');
+        const fsBtn = document.getElementById('fsStreamBtn');
+        if (!isStreaming) {
+            // Start Streaming
+            const res = await fetch(`/cameras/start-streaming/{{ camera.id }}/`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                isStreaming = true;
+                
+                // Also start audio if a mic is selected
+                if (document.getElementById('micSelect').value) {
+                    initAudioSocket();
+                }
+
+                const txt = '<i data-lucide="square"></i> Stop Live Stream';
+                const fsTxt = '<i data-lucide="square"></i> Stop';
+                btn.innerHTML = txt;
+                fsBtn.innerHTML = fsTxt;
+                btn.style.background = '#475569';
+                fsBtn.style.background = '#475569';
+                showNotification(data.message, 'success');
+            } else {
+                showNotification(data.message, 'error');
+            }
+        } else {
+            // Stop Streaming
+            const res = await fetch(`/cameras/stop-streaming/{{ camera.id }}/`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                isStreaming = false;
+                
+                // Stop audio
+                if (audioSocket) {
+                    audioSocket.close();
+                    audioSocket = null;
+                }
+
+                const txt = '<i data-lucide="radio"></i> Start Live Stream';
+                const fsTxt = '<i data-lucide="radio"></i> Live';
+                btn.innerHTML = txt;
+                fsBtn.innerHTML = fsTxt;
+                btn.style.background = '#6366f1';
+                fsBtn.style.background = '#6366f1';
+                showNotification(data.message, 'info');
+            }
+        }
+        lucide.createIcons();
+    }
+
+    function toggleRecording() {
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
+        }
+    }
+
+    let currentRecordingId = null;
+    let currentZoom = 1.0;
+    let zoomX = 0.5;
+    let zoomY = 0.5;
+
+    // Audio Variables
+    let audioStream = null;
+    let audioContext = null;
+    let audioWorklet = null;
+    let micLevelInterval = null;
+    let audioSocket = null;
+    let remoteMicStatusSocket = null;
+    let monitorSocket = null;
+    let monitorMediaSource = null;
+    let isSelfMonitoring = false;
+    let localLoopbackNode = null;
+
+    function toggleSelfListen() {
+        const btn = document.getElementById('selfListenBtn');
+        isSelfMonitoring = !isSelfMonitoring;
+        
+        if (isSelfMonitoring) {
+            btn.style.color = '#6366f1';
+            btn.style.background = '#e0e7ff';
+            if (audioContext && audioStream) {
+                connectLoopback();
+            } else {
+                showNotification('Select a microphone first to hear yourself', 'info');
+            }
+        } else {
+            btn.style.color = '#64748b';
+            btn.style.background = 'white';
+            disconnectLoopback();
+        }
+    }
+
+    function connectLoopback() {
+        if (!audioContext || !audioStream || localLoopbackNode) return;
+        try {
+            const source = audioContext.createMediaStreamSource(audioStream);
+            localLoopbackNode = audioContext.createGain();
+            localLoopbackNode.gain.value = 1.0;
+            source.connect(localLoopbackNode);
+            localLoopbackNode.connect(audioContext.destination);
+            console.log("Local loopback connected");
+        } catch (e) {
+            console.error("Failed to connect loopback:", e);
+        }
+    }
+
+    function disconnectLoopback() {
+        if (localLoopbackNode) {
+            try {
+                localLoopbackNode.disconnect();
+            } catch (e) {}
+            localLoopbackNode = null;
+        }
+    }
+
+    function toggleMonitorAudio() {
+        const audio = document.getElementById('monitorAudio');
+        const btn = document.getElementById('monitorBtn');
+        const icon = document.getElementById('monitorIcon');
+        
+        if (audio.muted) {
+            // Force a fresh connection on every toggle to ensure we get a fresh WebM header
+            if (monitorSocket) {
+                monitorSocket.onclose = null;
+                monitorSocket.close();
+                monitorSocket = null;
+            }
+            initMonitorSocket();
+            
+            audio.muted = false;
+            audio.play().catch(e => {
+                console.warn("Autoplay blocked. User interaction required.", e);
+                showNotification('Click the speaker button again to start audio', 'warning');
+            });
+            icon.setAttribute('data-lucide', 'volume-2');
+            btn.style.color = '#10b981';
+            btn.style.background = '#dcfce7';
+            showNotification('Live IP Camera Audio Active', 'success');
+        } else {
+            audio.muted = true;
+            if (monitorSocket) {
+                monitorSocket.onclose = null;
+                monitorSocket.close();
+                monitorSocket = null;
+            }
+            icon.setAttribute('data-lucide', 'volume-x');
+            btn.style.color = '#64748b';
+            btn.style.background = 'white';
+        }
+        if (window.lucide) {
+            try {
+                lucide.createIcons();
+            } catch (err) {
+                console.warn("Lucide icon error:", err.message);
+            }
+        }
+    }
+
+    // Auto-init audio on load if camera is live
+    document.addEventListener('DOMContentLoaded', () => {
+        if (isStreaming) {
+            setTimeout(() => {
+                const audio = document.getElementById('monitorAudio');
+                if (audio && audio.muted) {
+                    // We don't auto-unmute because browsers block it, 
+                    // but we ensure the socket is ready.
+                    initMonitorSocket();
+                }
+            }, 1500);
+        }
+    });
+
+    let monitorAudioContext = null;
+    let monitorSourceNode = null;
+    let monitorAnalyzer = null;
+    let isConnectingMonitor = false;
+
+    function initMonitorSocket() {
+        if (isConnectingMonitor) return;
+        if (monitorSocket && monitorSocket.readyState === WebSocket.OPEN) return;
+        
+        isConnectingMonitor = true;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/audio/{{ camera.id }}/?source=pc_monitor`;
+        
+        console.log("Connecting to Monitor WebSocket:", wsUrl);
+        monitorSocket = new WebSocket(wsUrl);
+        monitorSocket.binaryType = 'arraybuffer';
+        
+        const audio = document.getElementById('monitorAudio');
+        
+        // Only set up MediaSource and AudioContext ONCE
+        if (!audio.src || !audio.src.startsWith('blob:')) {
+            monitorMediaSource = new MediaSource();
+            audio.src = URL.createObjectURL(monitorMediaSource);
+        }
+        
+        let sourceBuffer = null;
+        let queue = [];
+
+        monitorMediaSource.addEventListener('sourceopen', () => {
+            if (sourceBuffer) return; // Already initialized
+            try {
+                sourceBuffer = monitorMediaSource.addSourceBuffer('audio/webm; codecs="opus"');
+                sourceBuffer.mode = 'sequence'; 
+                
+                // Initialize visualizer for monitor audio ONCE
+                if (!monitorAudioContext) {
+                    monitorAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    monitorSourceNode = monitorAudioContext.createMediaElementSource(audio);
+                    monitorAnalyzer = monitorAudioContext.createAnalyser();
+                    monitorAnalyzer.fftSize = 256;
+                    monitorSourceNode.connect(monitorAnalyzer);
+                    monitorAnalyzer.connect(monitorAudioContext.destination);
+                }
+                
+                const bufferLength = monitorAnalyzer.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                const canvas = document.getElementById('visualizerCanvas');
+                const canvasCtx = canvas.getContext('2d');
+
+                function drawMonitorVisualizer() {
+                    if (audio.muted || !monitorSocket || monitorSocket.readyState !== WebSocket.OPEN) {
+                        canvasCtx.fillStyle = '#f1f5f9';
+                        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                        if (audio.muted) return; // Stop loop if muted
+                    }
+                    visualizerAnimationFrame = requestAnimationFrame(drawMonitorVisualizer);
+                    monitorAnalyzer.getByteFrequencyData(dataArray);
+                    
+                    canvasCtx.fillStyle = '#f1f5f9';
+                    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    const barWidth = (canvas.width / bufferLength) * 2.5;
+                    let barHeight;
+                    let x = 0;
+                    
+                    for(let i = 0; i < bufferLength; i++) {
+                        barHeight = dataArray[i] / 3;
+                        canvasCtx.fillStyle = '#10b981'; // Green for IP Cam Mic
+                        canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                        x += barWidth + 1;
+                    }
+                }
+                drawMonitorVisualizer();
+
+                sourceBuffer.addEventListener('updateend', () => {
+                    if (queue.length > 0 && !sourceBuffer.updating && monitorMediaSource.readyState === 'open') {
+                        try {
+                            sourceBuffer.appendBuffer(queue.shift());
+                        } catch(err) {
+                            console.error("Buffer append error during updateend:", err);
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error("Failed to initialize monitor source buffer:", e);
+            }
+        });
+
+        monitorSocket.onopen = () => {
+            isConnectingMonitor = false;
+        };
+
+        monitorSocket.onmessage = (e) => {
+            if (typeof e.data === 'string') {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'mic_status') {
+                        // Handle mobile mic status if needed
+                    }
+                } catch(err) {}
+            } else {
+                // Handle binary audio chunks
+                if (sourceBuffer && !sourceBuffer.updating && monitorMediaSource.readyState === 'open') {
+                    try {
+                        sourceBuffer.appendBuffer(e.data);
+                    } catch(err) {
+                        queue.push(e.data);
+                    }
+                } else if (sourceBuffer) {
+                    queue.push(e.data);
+                    if (queue.length > 100) queue.shift(); 
+                }
+            }
+        };
+
+        monitorSocket.onerror = (err) => {
+            console.error("Monitor WebSocket error:", err);
+            isConnectingMonitor = false;
+        };
+
+        monitorSocket.onclose = () => {
+            console.log("Monitor WebSocket closed");
+            isConnectingMonitor = false;
+            if (!audio.muted) {
+                console.log("Reconnecting monitor...");
+                setTimeout(initMonitorSocket, 2000);
+            }
+        };
+    }
+
+    function initRemoteMicStatus() {
+        // Now merged into initMonitorSocket if monitoring is enabled, 
+        // but we'll call initMonitorSocket in background silently for status
+        if (!monitorSocket) initMonitorSocket();
+    }
+
+    function showMobileMicQR() {
+        const url = `${window.location.origin}/cameras/mobile-mic/{{ camera.id }}/`;
+        // In a real app, we'd show a QR code modal. For now, just show the link.
+        const win = window.open(url, '_blank');
+        if (win) win.focus();
+        showNotification('Mobile Mic page opened. Open this URL on your iPhone Safari.', 'info');
+    }
+
+    async function initAudio() {
+        // Dropdowns removed for UI simplicity. IP Camera audio is now automated.
+        return;
+    }
+
+    async function changeAudioOutput() {
+        // Output selection removed for UI simplicity.
+        return;
+    }
+
+    let visualizerAnimationFrame = null;
+
+    async function startAudioCapture() {
+        const val = document.getElementById('micSelect').value;
+        if (!val || val === 'camera' || val === 'remote') {
+            stopAudioCapture();
+            // If it's a server-side audio source, we don't need browser capture
+            return;
+        }
+
+        try {
+            if (audioStream) stopAudioCapture();
+            
+            // Enhanced constraints for Bluetooth/External mics
+            const constraints = {
+                audio: { 
+                    deviceId: { exact: val },
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000,
+                    channelCount: 1 // Voice is usually mono, better for processing
+                }
+            };
+            
+            audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // Setup audio visualization
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(audioStream);
+            const analyzer = audioContext.createAnalyser();
+            analyzer.fftSize = 256;
+            source.connect(analyzer);
+            
+            const bufferLength = analyzer.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            const canvas = document.getElementById('visualizerCanvas');
+            const canvasCtx = canvas.getContext('2d');
+            
+            function drawVisualizer() {
+                visualizerAnimationFrame = requestAnimationFrame(drawVisualizer);
+                analyzer.getByteFrequencyData(dataArray);
+                
+                canvasCtx.fillStyle = '#e2e8f0';
+                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+                
+                for(let i = 0; i < bufferLength; i++) {
+                    barHeight = dataArray[i] / 4;
+                    
+                    // Dynamic color based on connection
+                    if (audioSocket && audioSocket.readyState === WebSocket.OPEN) {
+                        canvasCtx.fillStyle = `rgb(99, 102, 241)`; // Indigo
+                    } else {
+                        canvasCtx.fillStyle = `rgb(148, 163, 184)`; // Gray
+                    }
+                    
+                    canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            }
+            drawVisualizer();
+
+            // If self-monitoring is enabled, connect to destination
+            if (isSelfMonitoring) {
+                connectLoopback();
+            }
+
+            // Connect to Audio WebSocket if streaming
+            if (isStreaming) initAudioSocket();
+            
+            showNotification('Microphone connected', 'success');
+        } catch (err) {
+            console.error('Error capturing audio:', err);
+            showNotification('Failed to access microphone', 'error');
+        }
+    }
+
+    function stopAudioCapture() {
+        disconnectLoopback();
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+        if (audioContext) {
+            audioContext.close();
+            audioContext = null;
+        }
+        if (visualizerAnimationFrame) {
+            cancelAnimationFrame(visualizerAnimationFrame);
+            visualizerAnimationFrame = null;
+        }
+        // Clear canvas
+        const canvas = document.getElementById('visualizerCanvas');
+        if (canvas) {
+            const canvasCtx = canvas.getContext('2d');
+            canvasCtx.fillStyle = '#e2e8f0';
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        if (audioSocket) {
+            audioSocket.close();
+            audioSocket = null;
+        }
+    }
+
+    function initAudioSocket() {
+        if (audioSocket) return;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        audioSocket = new WebSocket(`${protocol}//${window.location.host}/ws/audio/{{ camera.id }}/`);
+        
+        audioSocket.onopen = () => {
+            console.log('Audio WebSocket connected');
+            // We'll send audio chunks here
+            startAudioStreaming();
+        };
+    }
+
+    async function startAudioStreaming() {
+        if (!audioStream || !audioSocket) return;
+        
+        // Use a higher bitrate and larger chunks for better stability on Bluetooth
+        const options = { 
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 128000 
+        };
+        
+        const mediaRecorder = new MediaRecorder(audioStream, options);
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0 && audioSocket.readyState === WebSocket.OPEN) {
+                audioSocket.send(e.data);
+            }
+        };
+        // Increased chunk size to 500ms to prevent stream fragmentation/noise
+        mediaRecorder.start(500); 
+        window.audioRecorder = mediaRecorder;
+    }
+
+    // Load saved zoom state
+    const savedZoom = localStorage.getItem(`cam_zoom_${window.cameraId}`);
+    if (savedZoom) {
+        try {
+            const state = JSON.parse(savedZoom);
+            currentZoom = state.level || 1.0;
+            zoomX = state.x || 0.5;
+            zoomY = state.y || 0.5;
+            // We'll sync this to the server after DOM loads
+        } catch(e) {}
+    }
+
+    async function adjustZoom(delta) {
+        const newZoom = Math.max(1.0, Math.min(5.0, currentZoom + delta));
+        if (newZoom === currentZoom) return;
+        
+        // Sync slider
+        const slider = document.getElementById('zoomSlider');
+        if (slider) slider.value = newZoom;
+        
+        await updateZoomOnServer(newZoom, zoomX, zoomY);
+    }
+
+    async function handleZoomSlider(val) {
+        const newZoom = parseFloat(val);
+        if (newZoom === currentZoom) return;
+        await updateZoomOnServer(newZoom, zoomX, zoomY);
+    }
+
+    async function setZoomTarget(event) {
+        const rect = event.target.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        
+        // If currently at 1.0x, automatically zoom in to 2.0x at the clicked spot
+        const newZoom = currentZoom <= 1.0 ? 2.0 : currentZoom;
+        
+        await updateZoomOnServer(newZoom, x, y);
+    }
+
+    async function resetZoom() {
+        // Sync slider
+        const slider = document.getElementById('zoomSlider');
+        if (slider) slider.value = 1.0;
+        
+        await updateZoomOnServer(1.0, 0.5, 0.5);
+    }
+
+    async function updateZoomOnServer(level, x, y) {
+        try {
+            const res = await fetch(`/cameras/update-zoom/{{ camera.id }}/?level=${level}&x=${x}&y=${y}`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                currentZoom = data.zoom;
+                zoomX = data.x;
+                zoomY = data.y;
+                
+                // Sync slider
+                const slider = document.getElementById('zoomSlider');
+                if (slider) slider.value = currentZoom;
+                
+                const zDisp = document.getElementById('zoomDisplay');
+                const fzDisp = document.getElementById('fsZoomDisplay');
+                if (zDisp) zDisp.innerText = `${currentZoom.toFixed(1)}x`;
+                if (fzDisp) fzDisp.innerText = `${currentZoom.toFixed(1)}x`;
+                
+                // Save state
+                localStorage.setItem(`cam_zoom_${window.cameraId}`, JSON.stringify({
+                    level: currentZoom,
+                    x: zoomX,
+                    y: zoomY
+                }));
+
+                if (currentZoom > 1.0) {
+                    showNotification(`Zoom: ${currentZoom.toFixed(1)}x at ${Math.round(zoomX*100)}%, ${Math.round(zoomY*100)}%`, 'info');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to update zoom:', err);
+        }
+    }
+
+    function captureAreaImage(event) {
+        event.preventDefault();
+        const mainFeed = document.getElementById('mainFeed');
+        
+        // Create a canvas to capture the current frame
+        const canvas = document.createElement('canvas');
+        canvas.width = mainFeed.naturalWidth || mainFeed.width;
+        canvas.height = mainFeed.naturalHeight || mainFeed.height;
+        const ctx = canvas.getContext('2d');
+        
+        try {
+            // Draw the current image/frame to the canvas
+            ctx.drawImage(mainFeed, 0, 0, canvas.width, canvas.height);
+            
+            // Convert to data URL and download
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            link.download = `camera-capture-${timestamp}.jpg`;
+            link.href = dataUrl;
+            link.click();
+            
+            showNotification('Image captured successfully!', 'success');
+        } catch (err) {
+            console.error('Failed to capture image:', err);
+            showNotification('Failed to capture image. MJPEG stream may be protected.', 'error');
+        }
+    }
+
+    // Initialize UI and sync state
+    // Handled in the merged DOMContentLoaded listener above
+    
+    async function startRecording() {
+        const btn = document.getElementById('recordBtn');
+        const fsBtn = document.getElementById('fsRecordBtn');
+        
+        if (btn.disabled) return;
+        btn.disabled = true;
+        if (fsBtn) fsBtn.disabled = true;
+
+        const quality = document.getElementById('qualitySelect') ? document.getElementById('qualitySelect').value : '1080p';
+        const audioSource = 'camera'; // Default to IP Camera mic since selector was removed for simplicity
+        
+        const formData = new FormData();
+        formData.append('quality', quality);
+        formData.append('audio_source', audioSource);
+        
+        try {
+            const res = await fetch(`/cameras/start-recording/{{ camera.id }}/`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            
+            const data = await res.json();
+            if (data.status === 'success') {
+                isRecording = true;
+                recStartTime = new Date();
+                
+                btn.classList.add('recording');
+                fsBtn.classList.add('active');
+                
+                btn.innerHTML = '<i data-lucide="square"></i> Stop Recording';
+                fsBtn.innerHTML = '<i data-lucide="square"></i> Stop';
+                
+                document.getElementById('recIndicator').classList.add('active');
+                
+                recTimerInterval = setInterval(updateRecTimer, 1000);
+                showNotification(data.message, 'success');
+            } else {
+                showNotification(data.message, 'error');
+            }
+        } catch (err) {
+            console.error('Recording start error:', err);
+            showNotification('Failed to start recording. Server error.', 'error');
+        } finally {
+            btn.disabled = false;
+            fsBtn.disabled = false;
+            if (window.lucide) {
+                try {
+                    lucide.createIcons();
+                } catch (err) {
+                    console.warn("Lucide icon error:", err.message);
+                }
+            }
+        }
+    }
+
+    async function stopRecording() {
+        const btn = document.getElementById('recordBtn');
+        const fsBtn = document.getElementById('fsRecordBtn');
+        
+        if (btn.disabled) return;
+        btn.disabled = true;
+        fsBtn.disabled = true;
+
+        try {
+            const res = await fetch(`/cameras/stop-recording/{{ camera.id }}/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            
+            const data = await res.json();
+            if (data.status === 'success') {
+                isRecording = false;
+                clearInterval(recTimerInterval);
+                currentRecordingId = data.recording_id;
+                
+                // Set download link and video preview
+                const downloadLink = document.getElementById('downloadLink');
+                if (data.video_url) {
+                    downloadLink.href = data.video_url;
+                    downloadLink.style.display = 'flex';
+                    document.getElementById('pubVideoPreview').src = data.video_url;
+                } else {
+                    downloadLink.style.display = 'none';
+                }
+                
+                btn.classList.remove('recording');
+                fsBtn.classList.remove('active');
+                
+                btn.innerHTML = '<i data-lucide="circle"></i> Start Recording';
+                fsBtn.innerHTML = '<i data-lucide="circle"></i> Record';
+                
+                document.getElementById('recIndicator').classList.remove('active');
+                
+                document.getElementById('publishModal').style.display = 'flex';
+            } else {
+                // Even if backend says no active recording, reset frontend state!
+                isRecording = false;
+                clearInterval(recTimerInterval);
+                
+                btn.classList.remove('recording');
+                fsBtn.classList.remove('active');
+                
+                btn.innerHTML = '<i data-lucide="circle"></i> Start Recording';
+                fsBtn.innerHTML = '<i data-lucide="circle"></i> Record';
+                
+                document.getElementById('recIndicator').classList.remove('active');
+                
+                showNotification(data.message, 'error');
+            }
+        } catch (err) {
+            console.error('Recording stop error:', err);
+            showNotification('Failed to stop recording cleanly.', 'error');
+        } finally {
+            btn.disabled = false;
+            fsBtn.disabled = false;
+            if (window.lucide) {
+                try {
+                    lucide.createIcons();
+                } catch (err) {
+                    console.warn("Lucide icon error:", err.message);
+                }
+            }
+        }
+    }
+
+    async function applyTrim() {
+        const formData = new FormData();
+        formData.append('edit_start_time', document.getElementById('pubTrimStart').value);
+        formData.append('edit_end_time', document.getElementById('pubTrimEnd').value);
+        
+        const res = await fetch(`/cameras/update-edit/${currentRecordingId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+            // Now apply the trim
+            const trimRes = await fetch(`/cameras/apply-trim/${currentRecordingId}/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            const trimData = await trimRes.json();
+            if (trimData.status === 'success') {
+                showNotification('Video trimmed successfully!', 'success');
+                // Reload the video preview
+                const videoPreview = document.getElementById('pubVideoPreview');
+                videoPreview.src = videoPreview.src + '?t=' + new Date().getTime();
+            } else {
+                showNotification(trimData.message, 'error');
+            }
+        } else {
+            showNotification(data.message, 'error');
+        }
+    }
+    
+    async function generateThumbnail() {
+        const videoPreview = document.getElementById('pubVideoPreview');
+        const timeSec = videoPreview.currentTime || 1.0;
+        
+        const formData = new FormData();
+        formData.append('time_sec', timeSec);
+        
+        const res = await fetch(`/cameras/generate-thumbnail/${currentRecordingId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+            showNotification('Thumbnail generated!', 'success');
+        } else {
+            showNotification(data.message, 'error');
+        }
+    }
+    
+    async function finishPublish(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('recording_id', currentRecordingId);
+        formData.append('title', document.getElementById('pubTitle').value);
+        formData.append('description', document.getElementById('pubDesc').value);
+        
+        const res = await fetch('/cameras/publish-recording/', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+            showNotification(data.message, 'success');
+            document.getElementById('publishModal').style.display = 'none';
+        } else {
+            showNotification(data.message, 'error');
+        }
+    }
+
+    function takeSnapshot() {
+        showNotification('Snapshot saved!', 'success');
+    }
+
+    function toggleFullScreen() {
+        const monitor = document.querySelector('.video-monitor');
+        if (!document.fullscreenElement) {
+            if (monitor.requestFullscreen) {
+                monitor.requestFullscreen();
+            } else if (monitor.webkitRequestFullscreen) { /* Safari */
+                monitor.webkitRequestFullscreen();
+            } else if (monitor.msRequestFullscreen) { /* IE11 */
+                monitor.msRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+
+    // ── WebSocket Chat & Presence Implementation ──
+    window.cameraId = "{{ camera.id }}";
+    window.meetingCode = "CAM_" + window.cameraId;
+    window.currentUserId = "{{ user.id }}";
+    var chatWs = null;
+    var activeParticipants = new Map();
+
+    function connectChat() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/meeting/${window.meetingCode}/`;
+        
+        console.log("Connecting to Teacher Chat WebSocket:", wsUrl);
+        chatWs = new WebSocket(wsUrl);
+
+        chatWs.onopen = () => {
+            console.log("Teacher Chat connected!");
+            showNotification('Chat connected!', 'success');
+        };
+
+        chatWs.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'chat') {
+                appendChatMessage(data.username, data.message, data.user_id == currentUserId);
+            } else if (data.type === 'user_joined') {
+                handleUserJoined(data);
+            } else if (data.type === 'user_left') {
+                handleUserLeft(data);
+            } else if (data.type === 'participant_list') {
+                handleParticipantList(data.participants);
+            }
+        };
+
+        chatWs.onclose = () => {
+            console.log("Chat disconnected. Retrying...");
+            setTimeout(connectChat, 5000);
+        };
+    }
+
+    function handleUserJoined(data) {
+        if (data.user_id == currentUserId) return;
+        activeParticipants.set(data.user_id, data.username);
+        updateStudentListUI();
+    }
+
+    function handleUserLeft(data) {
+        activeParticipants.delete(data.user_id);
+        updateStudentListUI();
+    }
+
+    function handleParticipantList(participants) {
+        activeParticipants.clear();
+        participants.forEach(p => {
+            if (p.user_id != currentUserId) {
+                activeParticipants.set(p.user_id, p.username);
+            }
+        });
+        updateStudentListUI();
+    }
+
+    function updateStudentListUI() {
+        const studentCount = document.getElementById('studentCount');
+        const studentList = document.getElementById('studentList');
+        
+        if (studentCount) studentCount.textContent = activeParticipants.size;
+        
+        if (studentList) {
+            if (activeParticipants.size === 0) {
+                studentList.innerHTML = `
+                    <div style="text-align:center; color:#94a3b8; font-size:0.875rem; padding-top:2rem;">
+                        Waiting for students to join...
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            activeParticipants.forEach((username, id) => {
+                html += `
+                    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; background:#f8fafc; border-radius:0.5rem; margin-bottom:0.5rem;">
+                        <span style="width:8px; height:8px; background:#4ade80; border-radius:50%;"></span>
+                        <span style="font-weight:600;">${username}</span>
+                    </div>`;
+            });
+            studentList.innerHTML = html;
+        }
+    }
+
+    function appendChatMessage(user, text, isSelf) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+
+        // Remove placeholder if it exists
+        if (chatMessages.innerText.includes("Session chat will appear here")) {
+            chatMessages.innerHTML = '';
+        }
+
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = '0.75rem';
+        msgDiv.style.display = 'flex';
+        msgDiv.style.flexDirection = 'column';
+        msgDiv.style.alignItems = isSelf ? 'flex-end' : 'flex-start';
+
+        msgDiv.innerHTML = `
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem; font-weight: 700;">
+                ${user} ${isSelf ? '(You)' : ''}
+            </div>
+            <div style="background: ${isSelf ? '#6366f1' : '#f1f5f9'}; 
+                        color: ${isSelf ? 'white' : '#1e293b'}; 
+                        padding: 0.5rem 0.75rem; 
+                        border-radius: 0.75rem; 
+                        font-size: 0.875rem; 
+                        max-width: 85%;
+                        box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                ${text}
+            </div>
+        `;
+
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function sendChatMessage(e) {
+        if (e) e.preventDefault();
+        const input = document.getElementById('chatInput');
+        if (!input || !input.value.trim()) return;
+
+        if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+            chatWs.send(JSON.stringify({
+                'type': 'chat',
+                'message': input.value.trim(),
+                'timestamp': new Date().toISOString()
+            }));
+            input.value = '';
+        } else {
+            showNotification('Chat not connected!', 'error');
+        }
+    }
+
+    // Start chat connection
+    connectChat();
+</script>
+{% endblock %}

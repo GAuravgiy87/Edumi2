@@ -1,0 +1,74 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Edit Video - {{ video.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 font-weight-bold">Edit Video Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label class="form-label font-weight-bold">Title</label>
+                            <input type="text" name="title" class="form-control" value="{{ video.title }}" required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label font-weight-bold">Description</label>
+                            <textarea name="description" class="form-control" rows="6">{{ video.description }}</textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label font-weight-bold">Thumbnail</label>
+                            <div class="d-flex align-items-start gap-4">
+                                <div style="width: 200px; aspect-ratio: 16/9; background: #0f172a; border-radius: 8px; overflow: hidden;">
+                                    {% if video.thumbnail %}
+                                    <img id="thumbPreview" src="{{ video.thumbnail.url }}" class="w-100 h-100 object-fit-cover">
+                                    {% else %}
+                                    <div id="thumbPlaceholder" class="d-flex align-items-center justify-content-center h-100 text-white opacity-20">
+                                        <i data-lucide="image" style="width: 48px; height: 48px;"></i>
+                                    </div>
+                                    <img id="thumbPreview" class="w-100 h-100 object-fit-cover d-none">
+                                    {% endif %}
+                                </div>
+                                <div class="flex-1">
+                                    <input type="file" name="thumbnail" class="form-control mb-2" id="thumbInput" accept="image/*">
+                                    <p class="text-muted small">Upload a custom thumbnail image (PNG, JPG). Recommended size: 1280x720.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-5">
+                            <a href="{% url 'video_detail' video.id %}" class="text-decoration-none text-muted">Cancel and go back</a>
+                            <button type="submit" class="btn btn-primary px-4 py-2 font-weight-bold">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('thumbInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const preview = document.getElementById('thumbPreview');
+                const placeholder = document.getElementById('thumbPlaceholder');
+                preview.src = event.target.result;
+                preview.classList.remove('d-none');
+                if (placeholder) placeholder.classList.add('d-none');
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+{% endblock %}

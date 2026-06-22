@@ -1,0 +1,202 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Start Meeting - {{ classroom.title }}{% endblock %}
+{% block page_title %}Start Meeting{% endblock %}
+
+{% block content %}
+<style>
+    .start-meeting-container {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .start-meeting-card {
+        background: var(--bg-card, #fff);
+        border-radius: 1.25rem;
+        padding: 2.5rem;
+        border: 1px solid var(--border-color, #e2e8f0);
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .start-meeting-card h2 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text-main, #1e293b);
+        margin: 0 0 0.25rem 0;
+    }
+
+    .start-meeting-card .subtitle {
+        color: var(--text-muted, #64748b);
+        font-size: 0.9375rem;
+        margin: 0 0 2rem 0;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-main, #1e293b);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--border-color, #e2e8f0);
+        border-radius: 0.75rem;
+        font-size: 0.9375rem;
+        color: var(--text-main, #1e293b);
+        background: var(--input-bg, #fff);
+        transition: border-color 0.2s;
+        outline: none;
+    }
+
+    .form-input:focus {
+        border-color: var(--primary, #667eea);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        gap: 0.75rem;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        accent-color: var(--primary, #667eea);
+        flex-shrink: 0;
+    }
+
+    .checkbox-label span {
+        font-size: 0.9375rem;
+        color: var(--text-main, #1e293b);
+    }
+
+    .info-banner {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        padding: 1rem 1.25rem;
+        border-radius: 0.75rem;
+        margin-bottom: 2rem;
+    }
+
+    .info-banner strong {
+        color: #065f46;
+        font-weight: 700;
+        font-size: 0.9375rem;
+    }
+
+    .info-banner p {
+        margin: 0.375rem 0 0 0;
+        color: #047857;
+        font-size: 0.8125rem;
+    }
+
+    .btn-row {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .btn-start {
+        flex: 1;
+        padding: 0.9375rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 0.75rem;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .btn-start:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
+    }
+
+    .btn-cancel {
+        flex: 1;
+        padding: 0.9375rem;
+        background: var(--gray-100, #f3f4f6);
+        color: var(--text-main, #1e293b);
+        border: none;
+        border-radius: 0.75rem;
+        font-size: 1rem;
+        font-weight: 700;
+        text-align: center;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+    }
+
+    .btn-cancel:hover {
+        background: var(--gray-200, #e5e7eb);
+    }
+</style>
+
+<div class="start-meeting-container">
+    <div class="start-meeting-card">
+        <h2>Start New Meeting</h2>
+        <p class="subtitle">{{ classroom.title }}</p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label>Meeting Title</label>
+                <input type="text" name="title" value="{{ classroom.title }}"
+                       class="form-input" placeholder="Meeting title">
+            </div>
+
+            <div class="form-group">
+                <label>Duration (minutes)</label>
+                <input type="number" name="duration_minutes" value="60" min="15" max="240"
+                       class="form-input">
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="allow_screen_share" checked>
+                    <span>Allow screen sharing</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="allow_chat" checked>
+                    <span>Enable chat</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="record_meeting">
+                    <span>Record meeting</span>
+                </label>
+            </div>
+
+            <div class="info-banner">
+                <strong>All approved students will be notified</strong>
+                <p>{{ classroom.get_approved_students.count }} student(s) can join this meeting</p>
+            </div>
+
+            <div class="btn-row">
+                <button type="submit" class="btn-start">Start Meeting Now</button>
+                <a href="{% url 'classroom_detail' classroom.id %}" class="btn-cancel">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
