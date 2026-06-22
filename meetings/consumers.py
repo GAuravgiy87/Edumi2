@@ -2,10 +2,12 @@ import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import Meeting, MeetingParticipant, MeetingAttendanceLog, MeetingChat
 from cameras.models import Camera
+
+User = get_user_model()
 
 logger = logging.getLogger(__name__)
 

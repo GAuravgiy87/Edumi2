@@ -3,13 +3,15 @@ User profile views: view, edit, directory, search.
 """
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.db import models
 
 from accounts.models import UserProfile
 from meetings.models import Meeting
 from cameras.models import Camera
+
+User = get_user_model()
 
 
 @login_required

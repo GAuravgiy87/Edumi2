@@ -14,8 +14,10 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.conf import settings
+
+User = get_user_model()
 
 from livekit.api import AccessToken, VideoGrants
 from meetings.models import (

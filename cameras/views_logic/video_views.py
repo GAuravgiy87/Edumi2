@@ -4,7 +4,7 @@ import re
 import logging
 from django.shortcuts import render, redirect, get_object_or_404, reverse
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.utils import timezone
@@ -13,6 +13,8 @@ from ..models import Camera, CameraRecording, RecordingChunk
 from .utils import get_video_stream, is_admin
 
 logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 
 @login_required
@@ -216,8 +218,8 @@ def edit_recording(request, recording_id):
                 recording.edit_start_time = float(edit_start)
             if edit_end:
                 recording.edit_end_time = float(edit_end)
-        except ValueError:
-            pass
+        except ValueError as e:
+            logger.warning(f"Invalid time values: {e}")
         recording.save()
         return redirect('manage_recordings')
     

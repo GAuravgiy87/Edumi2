@@ -4,11 +4,13 @@ Grant, revoke and manage per-teacher camera permissions.
 """
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 
 from mobile_cameras.models import MobileCamera, MobileCameraPermission
 from .utils import is_admin
+
+User = get_user_model()
 
 
 @login_required

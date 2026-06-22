@@ -1,7 +1,9 @@
 from .notification_models import Notification
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+
+User = get_user_model()
 
 
 def send_ws_notification(recipient_id, data):

@@ -9,11 +9,13 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from meetings.models import Meeting, KickedParticipant
+
+User = get_user_model()
 
 
 @login_required

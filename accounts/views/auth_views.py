@@ -8,7 +8,7 @@ import uuid
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -16,6 +16,8 @@ from django.db import IntegrityError, transaction
 from django.core.files.base import ContentFile
 
 from accounts.models import UserProfile
+
+User = get_user_model()
 
 
 def login_view(request):

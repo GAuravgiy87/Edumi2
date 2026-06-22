@@ -5,12 +5,14 @@ import logging
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.http import JsonResponse, HttpResponse
 from django.db import transaction
 
 from meetings.models import Meeting, Classroom, ClassroomMembership
 from cameras.models import Camera, CameraPermission, CameraRecording, HeadCountSession
+
+User = get_user_model()
 
 logger = logging.getLogger(__name__)
 

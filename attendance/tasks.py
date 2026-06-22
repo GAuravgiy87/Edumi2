@@ -1,9 +1,11 @@
 import logging
 from celery import shared_task
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from .models import StudentFaceProfile
 from .face_service import get_face_service
+
+User = get_user_model()
 
 logger = logging.getLogger('attendance.tasks')
 

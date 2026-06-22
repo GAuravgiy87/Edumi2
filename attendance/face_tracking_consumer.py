@@ -466,8 +466,9 @@ class FaceTrackingConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _save_snapshot(self, user_id: int, emotion: str, confidence: float, face_visible: bool):
         from meetings.models import Meeting
-        from django.contrib.auth.models import User
+        from django.contrib.auth import get_user_model
         from .models import StudentEngagementSnapshot
+        User = get_user_model()
         try:
             meeting = Meeting.objects.get(meeting_code=self.meeting_code)
             student = User.objects.get(id=user_id)

@@ -13,8 +13,10 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.http import require_GET
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.conf import settings
+
+User = get_user_model()
 
 from meetings.models import Classroom, Meeting
 from attendance.models import (

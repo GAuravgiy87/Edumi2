@@ -1,8 +1,10 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 import random
 import string
+
+User = get_user_model()
 
 class Classroom(models.Model):
     """Virtual classroom that persists across multiple meeting sessions"""
