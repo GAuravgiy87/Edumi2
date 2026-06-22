@@ -7,7 +7,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
-from django.utils import timezone
 from django.db.models import Q
 from ..models import Camera, CameraRecording, RecordingChunk
 from .utils import get_video_stream, is_admin

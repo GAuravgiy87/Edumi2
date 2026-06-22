@@ -170,7 +170,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 try:
                     camera = Camera.objects.get(id=self.camera_id)
                     return camera.live_teacher == self.user or self.user.is_superuser
-                except:
+                except Exception as e:
+                    logger.warning(f"Error checking camera teacher: {e}")
                     return False
             return await get_camera_teacher()
         except Exception as e:

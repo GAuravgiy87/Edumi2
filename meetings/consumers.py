@@ -103,8 +103,8 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                  try:
                      camera = Camera.objects.get(id=camera_id)
                      is_host = (camera.live_teacher == self.user) or self.user.is_superuser
-                 except:
-                     pass
+                 except Exception as e:
+                     logger.warning(f"Error checking camera host status: {e}")
                      
                  return {
                      'id': self.user.id,

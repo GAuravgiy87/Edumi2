@@ -314,8 +314,8 @@ def stop_camera_recording(request, camera_id):
         try:
             from .models import CameraRecording
             rec = CameraRecording.objects.filter(id=recording_id).first()
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Error fetching recording: {e}")
         
         video_url = None
         if rec:
