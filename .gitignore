@@ -30,16 +30,10 @@ __pycache__/
 *.log
 logs/
 *.pot
-*.pyc
-__pycache__/
 local_settings.py
 staticfiles/
 certs/
-*.sqlite3
 media/
-.env
-.env.local
-.env.*.local
 debug_test.py
 test_all_pages.py
 test_report.md
@@ -47,12 +41,13 @@ fix_test_report.md
 generate_keys.py
 list_urls.py
 urls.txt
-*.pyc
 
 # ================================================
 # VIRTUAL ENVIRONMENT
 # ================================================
 venv/
+venv311/
+venv113/
 env/
 ENV/
 .venv/

@@ -397,7 +397,7 @@ Starts Redis check, SSL cert generation, migrations, static collection, Celery, 
 
 ```powershell
 # Windows — double-click or run from PowerShell:
-.\start_app.bat
+.\start_app.bat    # or start_app.bat
 
 # Or directly:
 powershell -ExecutionPolicy Bypass -File start_app.ps1
