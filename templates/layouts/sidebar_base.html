@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,7 +10,7 @@
     <title>{% block title %}EduMi - Educational Management System{% endblock %}</title>
     {% load static %}
     {% load compress %}
-    
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     {% compress css %}
     <link rel="stylesheet" href="{% static 'css/modern-design.css' %}">
@@ -34,13 +35,13 @@
                 overlay.classList.remove('active');
             }
         }
-        
+
         // Configure Turbo to prevent sidebar state issues
         document.addEventListener('turbo:load', resetSidebarState);
-        
+
         // Also reset on initial page load
         document.addEventListener('DOMContentLoaded', resetSidebarState);
-        
+
         document.addEventListener('turbo:frame-missing', (event) => {
             event.preventDefault();
             // Do a full page visit instead of ignoring the response
@@ -51,21 +52,22 @@
     <script src="{% static 'js/main.js' %}"></script>
     <script src="{% static 'js/eyes.js' %}"></script>
 </head>
+
 <body>
     {% if user.is_authenticated %}
-    <div class="app-container">
+    {% include 'components/topbar.html' %}
+    
+    <div class="app-container" style="padding-top: var(--topbar-height);">
         {% include 'components/sidebar.html' %}
 
         <!-- Main Content -->
         <main class="main-content">
-            {% include 'components/topbar.html' %}
-
             <!-- Content Area -->
-            
-                <div class="content-area">
-                    {% block content %}{% endblock %}
-                </div>
-            
+
+            <div class="content-area">
+                {% block content %}{% endblock %}
+            </div>
+
 
             {% include 'partials/welcome_popup.html' %}
         </main>
@@ -95,7 +97,7 @@
         }
 
         // Close mobile sidebar on window resize
-        window.addEventListener('resize', function() {
+        window.addEventListener('resize', function () {
             if (window.innerWidth > 768) {
                 closeMobileSidebar();
             }
@@ -119,7 +121,7 @@
             }
             const dropdown = document.getElementById('notificationDropdown');
             const isShowing = dropdown.classList.contains('show');
-            
+
             if (!isShowing) {
                 dropdown.classList.add('show');
                 loadRecentNotifications();
@@ -132,7 +134,7 @@
         function loadRecentNotifications() {
             const list = document.getElementById('notificationList');
             list.innerHTML = '<div class="notification-loading">Loading...</div>';
-            
+
             fetch('/notifications/recent/')
                 .then(response => response.json())
                 .then(data => {
@@ -168,7 +170,7 @@
 
         function handleNotificationClick(event, link, id) {
             if (event) event.stopPropagation();
-            
+
             // Mark as read then navigate
             fetch(`/notifications/mark-read/${id}/`, {
                 method: 'POST',
@@ -193,14 +195,14 @@
                     'X-CSRFToken': getCookie('csrftoken'),
                 }
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    loadRecentNotifications();
-                    updateNotificationCount();
-                }
-            })
-            .catch(error => console.error('Error marking all as read:', error));
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        loadRecentNotifications();
+                        updateNotificationCount();
+                    }
+                })
+                .catch(error => console.error('Error marking all as read:', error));
         }
 
         // Helper to get CSRF token
@@ -220,7 +222,7 @@
         }
 
         // Close dropdown when clicking outside
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const dropdown = document.getElementById('notificationDropdown');
             const btn = document.getElementById('notificationBtn');
             if (dropdown && !dropdown.contains(event.target) && !btn.contains(event.target)) {
@@ -261,7 +263,7 @@
             const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
             const socket = new WebSocket(wsUrl);
 
-            socket.onmessage = function(e) {
+            socket.onmessage = function (e) {
                 const data = JSON.parse(e.data);
                 console.log('Notification received:', data);
 
@@ -345,12 +347,12 @@
                 }
             }
 
-            socket.onclose = function(e) {
+            socket.onclose = function (e) {
                 console.log('Notification socket closed. Reconnecting in 3 seconds...');
                 setTimeout(connectNotificationWS, 3000);
             };
 
-            socket.onerror = function(err) {
+            socket.onerror = function (err) {
                 console.error('Notification socket error:', err);
                 socket.close();
             };
@@ -384,7 +386,7 @@
         }
 
         // Update notification count on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // Apply saved theme
             const savedTheme = localStorage.getItem('theme');
             if (savedTheme === 'dark') {
@@ -416,14 +418,66 @@
         }
     </script>
     <style>
-        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .custom-toast { background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-left: 4px solid #6366f1; display: flex; align-items: center; gap: 15px; min-width: 300px; animation: slideInRight 0.3s ease; }
-        .custom-toast.success { border-left-color: #10b981; }
-        .custom-toast.info { border-left-color: #6366f1; }
-        .custom-toast.fade-out { opacity: 0; transform: translateX(20px); transition: all 0.5s; }
-        .toast-content strong { display: block; font-size: 0.9rem; color: #1e293b; }
-        .toast-content p { font-size: 0.8rem; color: #64748b; margin: 0; }
-        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .custom-toast {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #6366f1;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 300px;
+            animation: slideInRight 0.3s ease;
+        }
+
+        .custom-toast.success {
+            border-left-color: #10b981;
+        }
+
+        .custom-toast.info {
+            border-left-color: #6366f1;
+        }
+
+        .custom-toast.fade-out {
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.5s;
+        }
+
+        .toast-content strong {
+            display: block;
+            font-size: 0.9rem;
+            color: #1e293b;
+        }
+
+        .toast-content p {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin: 0;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
     </style>
     {% endcompress %}
     {% else %}
@@ -432,4 +486,5 @@
     {% endif %}
     {% include 'components/lucide_icons.html' %}
 </body>
+
 </html>

@@ -1,32 +1,9 @@
 {% load static %}
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
-    <!-- Sidebar Header -->
-    <div class="sidebar-header">
-        <div class="sidebar-logo">
-            <img src="{% static 'logo.svg' %}" alt="EduMi">
-        </div>
-    </div>
 
-    <!-- Sidebar User -->
-    <div class="sidebar-user">
-        <img src="{% if user.userprofile %}{{ user.userprofile.get_profile_picture_url }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff{% endif %}" 
-             alt="{{ user.username }}" 
-             class="sidebar-user-avatar"
-             onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=667eea&color=fff'">
-        <div class="sidebar-user-info">
-            <div class="sidebar-user-name">{{ user.userprofile.get_display_name|default:user.username }}</div>
-            <div class="sidebar-user-role">
-                {% if user.is_superuser %}
-                    Administrator
-                {% elif user.userprofile.user_type == 'teacher' %}
-                    Teacher
-                {% elif user.userprofile.user_type == 'student' %}
-                    Student
-                {% endif %}
-            </div>
-        </div>
-    </div>
+
+
 
     <!-- Sidebar Navigation -->
     <nav class="sidebar-nav">
@@ -35,11 +12,13 @@
 
     <!-- Sidebar Footer -->
     <div class="sidebar-footer">
-        <a href="#" class="sidebar-footer-item logout" onclick="event.preventDefault();document.getElementById('logout-form-sidebar').submit();">
+        <a href="#" class="sidebar-footer-item logout"
+            onclick="event.preventDefault();document.getElementById('logout-form-sidebar').submit();">
             <span class="sidebar-nav-icon"><i data-lucide="log-out"></i></span>
             <span class="sidebar-nav-text">Logout</span>
         </a>
-        <form id="logout-form-sidebar" method="post" action="{% url 'logout' %}" style="display:none;">{% csrf_token %}</form>
+        <form id="logout-form-sidebar" method="post" action="{% url 'logout' %}" style="display:none;">{% csrf_token %}
+        </form>
     </div>
 </aside>
 
