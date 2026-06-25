@@ -1,564 +1,588 @@
 <div align="center">
-  <h1>🎓 EduMi2</h1>
-  <h3>The Complete Academic Command Center</h3>
-  
-  <p>
-    <img src="https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.14+">
-    <img src="https://img.shields.io/badge/Django-4.2%2B-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django 4.2+">
-    <img src="https://img.shields.io/badge/Daphne-ASGI-7B3F85?style=for-the-badge" alt="Daphne">
-    <img src="https://img.shields.io/badge/LiveKit-WebRTC-00C58E?style=for-the-badge" alt="LiveKit">
-    <img src="https://img.shields.io/badge/OpenCV-Computer%20Vision-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white" alt="OpenCV">
-    <img src="https://img.shields.io/badge/FFmpeg-Video%20Processing-007808?style=for-the-badge&logo=ffmpeg&logoColor=white" alt="FFmpeg">
-    <img src="https://img.shields.io/badge/Redis-Celery%20Queue-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis + Celery">
-  </p>
 
-  <p>
-    <a href="#-about-edumi2">About</a> •
-    <a href="#-what-makes-edumi2-unique">What's Unique?</a> •
-    <a href="#-technology-stack">Tech Stack</a> •
-    <a href="#-problem-solution">Problem & Solution</a> •
-    <a href="#-folder-breakdown">Folders</a> •
-    <a href="#-quick-start">Quick Start</a>
-  </p>
+# 🎓 EduMi 2
+### The Complete Academic Command Center
 
-  <br>
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Django](https://img.shields.io/badge/Django-4.2-092E20?style=for-the-badge&logo=django&logoColor=white)](https://djangoproject.com)
+[![Daphne](https://img.shields.io/badge/Daphne-ASGI%2FHTTPS-7B3F85?style=for-the-badge)](https://github.com/django/daphne)
+[![LiveKit](https://img.shields.io/badge/LiveKit-WebRTC%20SFU-00C58E?style=for-the-badge)](https://livekit.io)
+[![OpenCV](https://img.shields.io/badge/OpenCV-Computer%20Vision-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white)](https://opencv.org)
+[![FFmpeg](https://img.shields.io/badge/FFmpeg-Video%20Processing-007808?style=for-the-badge)](https://ffmpeg.org)
+[![Redis](https://img.shields.io/badge/Redis-Celery%20Queue-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![HTTPS](https://img.shields.io/badge/HTTPS-SSL%2FTLS-green?style=for-the-badge&logo=letsencrypt&logoColor=white)](https://en.wikipedia.org/wiki/HTTPS)
+
+A unified educational platform combining virtual classrooms, AI-powered attendance, real-time engagement analytics, hardware/mobile camera management, and non-destructive video editing — all served over HTTPS with end-to-end security.
+
 </div>
 
 ---
 
-## 🚀 About EduMi2
+## Table of Contents
 
-**EduMi2** is the **all-in-one academic command center** that transforms how classrooms are managed!
-It combines virtual meetings, AI-powered attendance tracking, facial recognition, engagement monitoring, video management, and live streaming into a single, cohesive platform built for educational institutions.
+- [What is EduMi 2?](#-what-is-edumi-2)
+- [Key Features](#-key-features)
+- [Technology Stack](#️-technology-stack)
+- [System Architecture](#-system-architecture)
+- [Project Structure](#-project-structure)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Environment Variables](#️-environment-variables)
+- [Running the App (HTTPS)](#-running-the-app-https)
+- [Accessing the App](#-accessing-the-app)
+- [Trusting the SSL Certificate](#-trusting-the-ssl-certificate)
+- [Production Deployment (Docker)](#-production-deployment-docker)
+- [Default Credentials & Ports](#-default-credentials--ports)
+- [Skill Badges](#-skill-badges)
 
 ---
 
-## ✨ What Makes EduMi2 Unique?
+## 🎯 What is EduMi 2?
 
-EduMi2 stands out because of these features:
+EduMi 2 replaces the patchwork of tools schools use today — video conferencing, attendance registers, surveillance software, and video editors — with a single, self-hosted platform. Everything runs over HTTPS, biometrics are encrypted at rest, and real-time features are powered by WebSockets and WebRTC.
 
-### 1. 🔄 Dual Camera System (RTSP + Mobile)
-- Use dedicated **RTSP cameras** for fixed classroom setups
-- Or use **mobile phones** via IP Webcam (Android) or DroidCam (iPhone) for flexible, wireless streaming
-- Perfect for labs, outdoor classes, or rooms without permanent camera installations
+**Problems it solves:**
 
-### 2. 🔒 Encrypted Facial Recognition
-- Student face encodings are **encrypted at rest** using Fernet symmetric encryption
-- No raw biometric data is ever stored
-- SHA-256 checksums ensure data integrity
+| Problem | EduMi 2 Solution |
+|---|---|
+| Manual roll call wastes 5–10 min per class | AI face-recognition attendance, fully automated |
+| No visibility into student attention | Real-time engagement scoring with emotion detection |
+| 5+ fragmented tools | One platform for meetings, cameras, recordings, editing |
+| Raw biometric data stored in plaintext | Fernet AES-256 encryption for all face embeddings |
+| Expensive dedicated camera hardware | Use any Android/iPhone as a live classroom camera |
+| Meetings served over plain HTTP | Full HTTPS via self-signed cert + Daphne ASGI |
 
-### 3. 📊 Real-Time Engagement Monitoring
-- Track student attention using facial emotion and gaze detection
-- Auto-generate engagement reports after each class
-- Alert teachers if engagement drops below a threshold
+---
 
-### 4. ✂️ Non-Destructive Video Editor
-- Edit recordings without touching the original files
-- Timeline-based editing with actions like trim, split, mute, rotate, add text, add audio
-- Saves edit actions as a sequence, only compiles when you export
+## ✨ Key Features
 
-### 5. 🏗️ Microservice Architecture
-- Heavy computer vision processing is offloaded to a separate `camera_service`
-- Prevents blocking the main Django app
-- Allows scaling the AI service independently
+### 🔐 HTTPS Everywhere
+- Daphne ASGI server runs with a self-signed SSL/TLS certificate
+- All cookies (`SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`) are HTTPS-only
+- One-click script installs the cert as a trusted root CA on Windows
 
-### 6. ⚡ Real-Time Everything
-- WebSocket-based notifications, messages, and updates
-- Live meeting controls (mute all, end meeting, etc.)
-- In-meeting chat and hand raising
-- Live stream viewing with <1s latency
+### 🤖 AI Attendance
+- Students register their face once via the browser (no app needed)
+- Face encodings (128-d embeddings from dlib) are **Fernet-encrypted** before storage
+- During class, the camera service continuously matches frames against stored embeddings
+- Attendance is recorded only after sustained verified presence (configurable seconds)
+
+### 📊 Engagement Analytics
+- Every few seconds, per-student emotional state and attention data is captured
+- `StudentEngagementSnapshot` records are aggregated into an `EngagementReport` after class
+- Teachers see a post-class dashboard: attention scores, emotion breakdown, trend graphs
+
+### 🎥 Dual Camera System
+- **RTSP cameras** — register hardware IP cameras by URL, stream MJPEG in-browser
+- **Mobile cameras** — use any phone running IP Webcam (Android) or DroidCam as a live feed
+- Both feed into the same AI pipeline (head counting, engagement, face recognition)
+
+### 🖥️ Virtual Classrooms (LiveKit WebRTC)
+- Persistent classrooms with student membership and teacher approval
+- Low-latency video/audio via LiveKit SFU (Selective Forwarding Unit)
+- In-meeting controls: mute all, kick participant, raise hand, live chat
+- Attendance auto-logged from join/leave events
+
+### ✂️ Non-Destructive Video Editor
+- Edit recordings without touching the original file
+- Actions (trim, mute, rotate, add text, add audio) are stored as a sequence in the DB
+- Final export applies all actions as a single FFmpeg pipeline
+
+### ⚡ Real-Time Everything
+- WebSocket notifications for meetings, messages, attendance events
+- Celery background tasks for face processing, report generation, recording
+- Redis channel layer for multi-consumer pub/sub
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer                | Technologies                                                                 |
-|----------------------|-----------------------------------------------------------------------------|
-| **Backend**          | Django 4.2+, Python 3.14+                                                  |
-| **Realtime Comms**   | Daphne (ASGI), Django Channels, LiveKit SFU (WebRTC)                       |
-| **AI/Computer Vision**| OpenCV, face_recognition, dlib                                              |
-| **Video Processing** | FFmpeg                                                                      |
-| **Database**         | SQLite (centralized in `database/`)                                         |
-| **Task Queue**       | Celery + Redis                                                              |
-| **Web Server**       | Nginx (production), Daphne (dev)                                            |
-| **Deployment**       | Docker, Docker Compose                                                      |
+| Layer | Technologies |
+|---|---|
+| Web Framework | Django 4.2, Python 3.11+ |
+| ASGI Server | Daphne 4.0 + Twisted (SSL endpoint) |
+| Real-Time | Django Channels 4.0, WebSockets |
+| Video Conferencing | LiveKit WebRTC SFU |
+| Computer Vision | OpenCV, face_recognition, dlib |
+| Video Processing | FFmpeg (subprocess) |
+| Background Tasks | Celery 5.3 + Redis |
+| Encryption | cryptography (Fernet AES-256) |
+| Database | SQLite (dev) / PostgreSQL (prod) |
+| Static Files | WhiteNoise |
+| Web Server (prod) | Nginx (reverse proxy + SSL termination) |
+| Deployment | Docker, Docker Compose |
 
 ---
 
-## 🎯 Problem & Solution
+## 🏗️ System Architecture
 
-### The Problems Schools Face Today:
-1. **⏰ Wasted Time**: Manual attendance takes 5-10 minutes per class
-2. **❓ Invisible Engagement**: No way to track if students are paying attention
-3. **🔀 Tool Chaos**: 5+ different apps for meetings, recordings, streaming
-4. **🔒 Security Risks**: Unencrypted biometric data
-5. **💸 High Costs**: Expensive dedicated camera hardware
-
-### How EduMi2 Solves Them:
-1. **🤖 AI Attendance**: 100% automated with facial recognition
-2. **👀 Engagement Analytics**: Real-time attention monitoring via CV
-3. **🏠 One Platform**: Everything in one place
-4. **🔐 Encrypted Biometrics**: Fernet symmetric encryption for face data
-5. **📱 Flexible Cameras**: Use mobile phones instead of expensive hardware!
-
----
-
-## 📁 Complete Folder Breakdown
-
-Here is a detailed breakdown of every folder in the project:
-
----
-
-### 1. `accounts/` - Identity & Access Management (IAM)
-**Purpose**: The core user authentication, profile management, messaging, and notifications system
-
-**Key Files & Directories**:
-- `models.py`: Defines `UserProfile`, `StudentPhoto`, `Conversation`, `Message`, and `Notification`
-- `messaging_models.py`: Peer-to-peer direct messaging models
-- `notification_models.py`: System-wide notification models
-- `views/`: Views for auth, dashboard, messaging, and profiles
-- `urls/`: URL routes for all account-related functionality
-- `consumers.py`: WebSocket consumers for real-time notifications
-- `admin_list_views.py`: Custom admin views
-- `context_processors.py`: Adds common template variables (timestamps, face registration status)
-- `services.py`: Helper services for account operations
-
-**How it Works**:
-- Extends Django's built-in `User` model with a one-to-one `UserProfile`
-- `UserProfile` includes fields for role (student/teacher), avatar, bio, student/teacher-specific info
-- Supports real-time messaging and notifications via Django Channels WebSockets
-- Used by every other app for authentication and access control
-
-**Tech Used**: Django ORM, Django Channels, WebSockets
-
----
-
-### 2. `attendance/` - AI Attendance & Engagement Tracking
-**Purpose**: Automated attendance tracking using facial recognition, plus real-time student engagement monitoring
-
-**Key Files & Directories**:
-- `models.py`: 
-  - `StudentFaceProfile`: Stores encrypted face embeddings (Fernet encryption)
-  - `ClassSchedule`: Defines which days classes run
-  - `AttendanceRecord`: One per student per meeting
-  - `FaceRecognitionLog`: Audit trail for every recognition attempt
-  - `AttendanceSettings`: Per-classroom attendance configuration
-  - `EngagementReport`: Auto-generated post-meeting reports
-  - `FaceResetRequest`: Student requests to re-register their face
-  - `StudentEngagementSnapshot`: Raw per-frame engagement data
-- `face_service.py`: Core facial recognition logic (128-d embeddings, similarity thresholds)
-- `encryption_service.py`: Handles Fernet encryption/decryption of biometric data
-- `engagement_service.py`: Engagement analysis logic
-- `tasks.py`: Celery tasks for attendance aggregation and report generation
-- `views/`: Views for face registration, reports, and teacher dashboards
-- `templates/attendance/`: HTML templates for attendance UI
-- `face_tracking_consumer.py`: WebSocket consumer for real-time face tracking
-- `signals.py`: Django signals for attendance events
-- `management/commands/cleanup_engagement_logs.py`: Management command to clean up old logs
-
-**How it Works**:
-1. Students register their face via the UI
-2. Their face encoding is encrypted and stored
-3. During class, video feeds are processed (by `camera_service`)
-4. Face matches are verified against encrypted embeddings
-5. Attendance is automatically recorded
-6. Engagement snapshots are collected every few seconds
-7. After class, an engagement report is auto-generated
-
-**Tech Used**: OpenCV, face_recognition, dlib, Celery, Fernet encryption
+```
+┌──────────────────────────────────────────────────────────┐
+│                      Browser / Client                    │
+│         HTTPS  ·  WebSocket (wss://)  ·  WebRTC          │
+└────────────────────────┬─────────────────────────────────┘
+                         │
+             ┌───────────▼───────────┐
+             │  Nginx : 443 (prod)   │  ← SSL termination, static files
+             │  Daphne : 8002 (dev)  │  ← HTTPS + WSS direct
+             └───────────┬───────────┘
+                         │
+          ┌──────────────▼──────────────┐
+          │       Django Main App        │
+          │   school_project/            │
+          │  ┌──────────┐ ┌──────────┐  │
+          │  │ accounts │ │meetings  │  │  ← Auth, profiles, messaging
+          │  │          │ │(LiveKit) │  │  ← Virtual classrooms
+          │  ├──────────┤ ├──────────┤  │
+          │  │attendance│ │ cameras  │  │  ← Face AI, engagement
+          │  │          │ │(RTSP)    │  │  ← Hardware camera mgmt
+          │  ├──────────┤ ├──────────┤  │
+          │  │ videos   │ │  video   │  │  ← Upload & storage
+          │  │          │ │ editing  │  │  ← Non-destructive editor
+          │  ├──────────┤ ├──────────┤  │
+          │  │  mobile  │ │ common   │  │  ← Phone cameras
+          │  │ cameras  │ │          │  │  ← Shared utilities
+          │  └──────────┘ └──────────┘  │
+          └───────┬───────────┬─────────┘
+                  │           │
+         ┌────────▼──┐   ┌────▼──────┐
+         │  SQLite /  │   │   Redis   │
+         │ PostgreSQL │   │  :6379    │
+         └────────────┘   └──────┬────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+          ┌─────────▼────────┐   ┌────────────▼──────┐
+          │  Celery Worker   │   │  Camera Service    │
+          │ (background tasks│   │  :8003 (Waitress)  │
+          │  face processing,│   │  ─ MJPEG proxy     │
+          │  report gen,     │   │  ─ Head counting   │
+          │  recording mgmt) │   │  ─ Face detection  │
+          └──────────────────┘   └───────────────────┘
+                                          │
+                               ┌──────────▼──────────┐
+                               │  LiveKit SFU : 7880  │
+                               │  WebRTC peer routing │
+                               └─────────────────────┘
+```
 
 ---
 
-### 3. `bin/` - Binary Resources
-**Purpose**: Stores miscellaneous binary files and keys
-- SSH keys (`gaurav`, `gaurav.pub`)
-- `livekit.zip`: LiveKit server archive
+## 📁 Project Structure
+
+```
+Edumi2/
+├── school_project/          # Django project root
+│   ├── settings.py          # Master configuration
+│   ├── urls.py              # Root URL routing
+│   ├── asgi.py              # ASGI entry (Daphne + Channels)
+│   ├── wsgi.py              # WSGI entry (production alt.)
+│   ├── celery.py            # Celery app init
+│   └── middleware.py        # DatabaseErrorMiddleware
+│
+├── accounts/                # Auth, profiles, messaging, notifications
+├── attendance/              # Face recognition attendance + engagement
+├── cameras/                 # RTSP hardware camera management
+├── mobile_cameras/          # Phone camera integration
+├── meetings/                # LiveKit virtual classrooms
+├── videos/                  # Video upload and storage
+├── video_editing/           # Non-destructive video editor
+├── common/                  # Shared models, utils, template tags
+│
+├── camera_service/          # AI microservice (port 8003, Waitress)
+│
+├── templates/               # All HTML templates (per-app folders)
+├── static/                  # Source static files (CSS, JS, images)
+├── staticfiles/             # Collected static files (auto-generated)
+│
+├── certs/                   # SSL certificate + private key
+│   ├── edumi.crt
+│   └── edumi.key
+│
+├── config/                  # Service configuration files
+│   ├── livekit.yaml         # LiveKit server config
+│   └── .env.example         # Environment variable template
+│
+├── nginx/                   # Nginx config (production)
+│   └── nginx.conf
+│
+├── scripts/                 # Setup and deployment scripts
+│   ├── generate_ssl_cert.py # Regenerate SSL certificates
+│   ├── trust_ssl_cert.ps1   # Install cert as trusted CA (Windows)
+│   ├── trust_ssl_cert.bat   # Double-click launcher for above
+│   ├── allow_firewall.ps1   # Open Windows firewall ports
+│   ├── allow_firewall.bat   # Launcher for above
+│   └── deploy.sh            # Linux Docker deployment
+│
+├── livekit-bin/             # LiveKit server binary (Windows)
+├── database/                # SQLite DB + media files (gitignored)
+├── logs/                    # Application logs (gitignored)
+│
+├── manage.py                # Django management CLI
+├── requirements.txt         # Python dependencies
+├── Dockerfile               # Main app container
+├── docker-compose.yml       # Full stack orchestration
+├── run_ssl_server.py        # HTTPS server launcher (Daphne + SSL)
+├── run_https.bat            # Quick HTTPS-only start (Windows)
+├── start_app.bat            # Full system start (Windows, double-click)
+├── start_app.ps1            # Full system start script (PowerShell)
+├── start.sh                 # Full system start (Linux/Docker)
+├── .env                     # Environment variables (gitignored)
+└── .gitignore
+```
 
 ---
 
-### 4. `camera_service/` - AI Processing Microservice
-**Purpose**: **Independent microservice** for heavy computer vision processing to avoid blocking the main Django app
+## 📋 Prerequisites
 
-**Key Files & Directories**:
-- `camera_service/settings.py`: Django settings configured to share the main app's database
-- `camera_api/views/streamer.py`: Manages OpenCV `VideoCapture` for stream ingestion
-- `camera_api/views/headcount_views.py`: Face detection and headcount/engagement analysis
-- `camera_api/views/mobile_views.py`: Mobile camera-specific processing
-- `camera_api/views/rtsp_views.py`: RTSP camera-specific processing
-- `requirements.txt`: Separate requirements for the microservice
-- `Dockerfile`: Containerization for the service
-- `serve.py`: WSGI server entry point
+Install these before anything else.
 
-**How it Works**:
-- Runs as a separate Django app on a different port (default 8003)
-- Receives commands from the main app via HTTP
-- Processes video streams using OpenCV and face_recognition
-- Sends results back to the main app via WebSockets or shared database
-- Prevents blocking the main ASGI event loop with CPU-intensive CV operations
+### 1. Python 3.11+
+```
+https://python.org/downloads/
+```
+Verify: `python --version`
 
-**Tech Used**: Django, OpenCV, face_recognition, dlib, WebSockets
+### 2. Redis
+**Windows** — Download and install from:
+```
+https://github.com/microsoftarchive/redis/releases
+```
+Or use WSL2: `sudo apt install redis-server`
 
----
+**Linux/Mac:**
+```bash
+sudo apt install redis-server   # Ubuntu/Debian
+brew install redis              # macOS
+```
+Verify: `redis-cli ping` → should return `PONG`
 
-### 5. `cameras/` - Hardware IP Camera Management
-**Purpose**: Register, manage, stream, and record from dedicated hardware IP cameras (RTSP)
+### 3. FFmpeg
+**Windows** — Download from https://ffmpeg.org/download.html, extract, and add `bin/` to your PATH.
 
-**Key Files & Directories**:
-- `models.py`: 
-  - `Camera`: Camera configuration (IP, port, credentials, stream path)
-  - `CameraPermission`: Grants teachers access to specific cameras
-  - `CameraRecording`: Recordings from cameras (supports chunked recording)
-  - `RecordingChunk`: Individual video chunks for large recordings
-  - `HeadCountLog`: Stores head count data from feeds
-  - `HeadCountSession`: Active head counting sessions
-- `views_logic/`: Core view logic separated for clarity
-  - `camera_views.py`: Camera management views
-  - `head_count_views.py`: Head counting views
-  - `permissions_views.py`: Permission management views
-  - `streaming_views.py`: MJPEG streaming views for browser viewing
-  - `video_views.py`: Video recording management views
-  - `utils.py`: Helper utilities
-- `recording_engine.py`: Background FFmpeg-based recording to chunks
-- `head_count_service.py`: Head counting and engagement analysis service
-- `tasks.py`: Celery tasks for recording management
-- `consumers.py`: WebSocket consumers for live camera updates
-- `urls/`: URL routes
-- `templatetags/camera_extras.py`: Custom template tags for cameras
+**Linux:**
+```bash
+sudo apt install ffmpeg
+```
+Verify: `ffmpeg -version`
 
-**How it Works**:
-1. Admins register cameras via the UI
-2. Permissions are granted to teachers
-3. Streams can be viewed in-browser via MJPEG proxying
-4. Recordings can be started/stopped (saved as chunks for large files)
-5. Feeds are passed to `camera_service` for AI processing
-6. Can optionally inject camera feeds directly into LiveKit meetings
+### 4. dlib build dependencies (for face recognition)
+**Windows** — `dlib-bin` in requirements.txt installs a pre-built wheel (no build tools needed).
 
-**Tech Used**: OpenCV, FFmpeg, Django, WebSockets
+**Linux:**
+```bash
+sudo apt install cmake build-essential libopenblas-dev liblapack-dev libx11-dev
+```
 
 ---
 
-### 6. `certs/` - Security Certificates
-**Purpose**: Stores SSL/TLS certificates for secure HTTPS connections (if present)
+## 🚀 Installation
+
+### Step 1 — Clone the repo
+```bash
+git clone <repo-url>
+cd Edumi2-my-work2
+```
+
+### Step 2 — Create and activate a virtual environment
+```powershell
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Linux / macOS
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### Step 3 — Install dependencies
+```bash
+pip install -r requirements.txt
+```
+> This installs all 52 packages including OpenCV, face_recognition, dlib, Daphne, Celery, LiveKit, etc.
+
+### Step 4 — Configure environment variables
+```bash
+cp config/.env.example .env
+```
+Then open `.env` and fill in all required values. See the [Environment Variables](#️-environment-variables) section below.
+
+### Step 5 — Run database migrations
+```bash
+python manage.py migrate
+```
+
+### Step 6 — Create a superuser (admin account)
+```bash
+python manage.py createsuperuser
+```
+
+### Step 7 — Generate SSL certificate (first time only)
+```bash
+python scripts/generate_ssl_cert.py
+```
+This creates `certs/edumi.crt` and `certs/edumi.key` — valid for 10 years, covering `localhost`, `127.0.0.1`, and `edumi.ac.in`.
+
+### Step 8 — Trust the SSL certificate (removes browser warning)
+```
+# Windows — double-click this file, approve UAC prompt
+scripts\trust_ssl_cert.bat
+```
+After this, Chrome/Edge will show the padlock as **green/secure** with no warnings.
+
+### Step 9 — Add edumi.ac.in to hosts file (optional, for named domain)
+The `start_app.ps1` does this automatically. To do it manually:
+```
+# Add this line to C:\Windows\System32\drivers\etc\hosts
+127.0.0.1    edumi.ac.in    www.edumi.ac.in
+```
 
 ---
 
-### 7. `common/` - Shared Utilities & Helpers
-**Purpose**: Reusable code shared by all apps to promote DRY (Don't Repeat Yourself) principles
+## ⚙️ Environment Variables
 
-**Key Files & Directories**:
-- `models.py`: Abstract base models like `TimeStampedModel` (adds `created_at` and `updated_at`)
-- `utils.py`: Helper functions for file handling, timezone conversion, JSON responses
-- `templatetags/common_tags.py`: Custom Django template filters and tags
-- `tests.py`: Shared tests
-- `admin.py`: Shared admin configurations
-- `apps.py`: App config
+Copy `config/.env.example` to `.env` and set all of these:
 
-**How it Works**:
-- Imported by every other app
-- Provides common utilities so code isn't duplicated
-- Doesn't depend on any specific app, avoiding circular imports
+```env
+# ── Django Core ────────────────────────────────────────────────────────────
+SECRET_KEY=your-very-long-random-secret-key-here
+DEBUG=True                          # Set to False in production
+ALLOWED_HOSTS=*                     # Restrict in production, e.g. edumi.ac.in
 
-**Tech Used**: Django Template Tags, Python utilities
+# ── HTTPS Security ─────────────────────────────────────────────────────────
+SESSION_COOKIE_SECURE=True          # Cookies sent over HTTPS only
+CSRF_COOKIE_SECURE=True             # CSRF token sent over HTTPS only
+SECURE_SSL_REDIRECT=False           # True if you have a plain-HTTP port to redirect
+CSRF_TRUSTED_ORIGINS=https://localhost:8002,https://127.0.0.1:8002,https://edumi.ac.in:8002
 
----
+# ── LiveKit WebRTC ─────────────────────────────────────────────────────────
+LIVEKIT_URL=ws://localhost:8002/livekit-proxy
+LIVEKIT_INTERNAL_URL=ws://localhost:7880
+LIVEKIT_INTERNAL_HTTP_URL=http://localhost:7880
+LIVEKIT_API_KEY=your-livekit-api-key
+LIVEKIT_API_SECRET=your-livekit-api-secret-32-chars-min
 
-### 8. `config/` - Configuration Files
-**Purpose**: Environment and service configuration files
-- `.env.example`: Example environment variables (copy to `.env` and fill in)
-- `.gitignore`: Git ignore for config files
-- `.pyre_configuration`: Pyre type checking config
-- `livekit.yaml`: LiveKit server configuration
-- `pyproject.toml`: Python project dependencies and config
-- `pyrightconfig.json`: Pyright type checking config
+# ── Redis (Celery + Channels) ──────────────────────────────────────────────
+REDIS_URL=redis://localhost:6379/0
 
----
+# ── Face Recognition & Encryption ─────────────────────────────────────────
+# Generate key: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FACE_ENCRYPTION_KEY=your-fernet-encryption-key-here
+FACE_MATCH_THRESHOLD=0.50           # 0 = identical, 1 = completely different; lower = stricter
+FACE_PRESENCE_DURATION=30           # Seconds of continuous verified presence to mark attendance
 
-### 9. `database/` - Central Data Storage
-**Purpose**: Centralized storage for database and user-generated media files
-- `db.sqlite3` (or `db/sqlite/db.sqlite3`): Main SQLite database
-- `media/`: User-generated content
-  - `face_photos/`: Student face registration photos
-  - `recordings/`: Camera and meeting recordings
-  - `videos/`: Uploaded videos
-  - `edited_videos/`: Edited video outputs
-  - `head_count_snapshots/`: Annotated head count frames
-  - `profile_pictures/`: User profile pictures
-  - `student_photos/`: Admin-only student photos
+# ── Camera Service ─────────────────────────────────────────────────────────
+CAMERA_SERVICE_URL=http://localhost:8003
 
----
+# ── Logging ────────────────────────────────────────────────────────────────
+LOG_LEVEL=INFO
+```
 
-### 10. `docs/` - Project Documentation
-**Purpose**: Complete project documentation
-- `DEPLOY.md`: Deployment guide
-- `EDUMI_COMPLETE_ANALYSIS.md`: Full system analysis
-- `PROJECT_COMPLETE_GUIDE.md`: User guide
-- `REFACTORING_COMPLETE.md`: Refactoring history
-- `systemarchitecture.md`: System architecture diagrams and explanation
-- `EduMi2_System_Analysis.xlsx`: System analysis spreadsheet
+**Generate a SECRET_KEY:**
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+**Generate a FACE_ENCRYPTION_KEY:**
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
 
 ---
 
-### 11. `livekit-bin/` - LiveKit Server Executable
-**Purpose**: Stores the LiveKit WebRTC SFU (Selective Forwarding Unit) server binary
-- `livekit-server.exe`: LiveKit server for Windows
-- `LICENSE`: LiveKit license
+## 🔒 Running the App (HTTPS)
 
-**Tech Used**: LiveKit WebRTC SFU
+### Option A — Full System Start (Recommended)
+Starts Redis check, SSL cert generation, migrations, static collection, Celery, Camera Service, and the Daphne HTTPS server all at once.
 
----
+```powershell
+# Windows — double-click or run from PowerShell:
+.\start_app.bat
 
-### 12. `meetings/` - Virtual Classroom Orchestration
-**Purpose**: Scheduling, managing, and running LiveKit-powered virtual meetings
+# Or directly:
+powershell -ExecutionPolicy Bypass -File start_app.ps1
+```
 
-**Key Files & Directories**:
-- `models.py`:
-  - `Classroom`: Persistent virtual classroom with membership
-  - `ClassroomMembership`: Tracks student approval status
-  - `Meeting`: Individual meeting session
-  - `MeetingParticipant`: Per-participant info
-  - `MeetingAttendanceLog`: Detailed join/leave logs
-  - `MeetingChat`: In-meeting chat messages
-  - `MeetingSummary`: Auto-generated meeting summaries
-  - `KickedParticipant`: Tracks kicked/banned users
-- `views/`:
-  - `classroom_views.py`: Classroom management
-  - `meeting_views.py`: Meeting join/start/end
-  - `meeting_controls.py`: Host controls (mute all, end meeting, etc.)
-  - `attendance_history_views.py`: Attendance history
-- `urls/`: URL routes
-- `templates/meetings/`: Meeting UI templates
-- `livekit_proxy.py` / `livekit_http_proxy.py`: Secure API wrappers for LiveKit
-- `services.py`: Meeting-related services
-- `tasks.py`: Celery tasks for meeting management
-- `consumers.py`: WebSocket consumers for real-time meeting updates
-- `apps.py`: App config
+What it does, step by step:
+1. Checks/adds `edumi.ac.in` → `127.0.0.1` in the Windows hosts file (auto UAC)
+2. Generates SSL cert if missing
+3. Checks Redis is running (starts it if not)
+4. Starts LiveKit SFU server
+5. Runs `manage.py migrate`
+6. Runs `manage.py collectstatic`
+7. Starts Celery worker (threads mode, background)
+8. Starts Camera Service on port 8003 (background)
+9. Starts Daphne HTTPS server on port 8002 (foreground)
 
-**How it Works**:
-1. Teachers create a persistent `Classroom`
-2. Students request to join and are approved
-3. Teachers start a `Meeting` in the classroom
-4. LiveKit JWT tokens are generated for participants
-5. Participants join the LiveKit room via the UI
-6. Host controls (mute all, end meeting) are sent via LiveKit APIs
-7. Attendance is tracked via join/leave events
-8. Meetings can be recorded (if enabled)
+### Option B — Quick HTTPS-Only Start
+Use when Redis, Celery, and LiveKit are already running (e.g., after a code change).
 
-**Tech Used**: LiveKit WebRTC, Django Channels, WebSockets
+```powershell
+.\run_https.bat
+```
+Or directly:
+```bash
+venv\Scripts\python.exe run_ssl_server.py
+```
 
----
+### Option C — Manual Start (advanced)
+```powershell
+# Terminal 1 — Redis (if not running as a service)
+redis-server
 
-### 13. `mobile_cameras/` - Wireless Mobile Camera Integration
-**Purpose**: Use smartphones as wireless IP cameras via IP Webcam (Android) or DroidCam (iPhone)
+# Terminal 2 — Celery worker
+venv\Scripts\celery.exe -A school_project worker -l info -P threads
 
-**Key Files & Directories**:
-- `models.py`:
-  - `MobileCamera`: Mobile camera configuration (IP, port, type, credentials)
-  - `MobileCameraPermission`: Grants teachers access to specific mobile cameras
-- `views/`:
-  - `camera_views.py`: Mobile camera management
-  - `headcount_views.py`: Head counting from mobile feeds
-  - `permission_views.py`: Permission management
-  - `utils.py`: Network reachability validation
-- `urls/`: URL routes
-- `templates/mobile_cameras/`: UI templates
-- `apps.py`: App config
+# Terminal 3 — Camera service
+venv\Scripts\python.exe camera_service/serve.py
 
-**How it Works**:
-1. Teacher installs IP Webcam/DroidCam on their phone
-2. Connects phone to the same network as the server
-3. Registers the phone as a `MobileCamera` in EduMi2
-4. Streams are accessed just like RTSP cameras
-5. Supports AI processing, recording, and streaming
+# Terminal 4 — LiveKit
+livekit-bin\livekit-server.exe --config config\livekit.yaml
 
-**Tech Used**: Django, network validation
+# Terminal 5 — Django HTTPS (Daphne)
+venv\Scripts\python.exe run_ssl_server.py
+```
+
+### Linux / Docker
+```bash
+# Quick start (no Docker)
+chmod +x start.sh
+./start.sh
+
+# Docker Compose (full stack)
+bash scripts/deploy.sh
+# or:
+docker-compose up --build
+```
 
 ---
 
-### 14. `nginx/` - Web Server & Reverse Proxy
-**Purpose**: Nginx configuration for production deployment
-- `nginx.conf`: Nginx server config (reverse proxy, static/media serving, SSL termination)
+## 🌐 Accessing the App
 
-**Tech Used**: Nginx
+Once running, open your browser:
 
----
+| URL | Purpose |
+|---|---|
+| `https://127.0.0.1:8002` | Main app (IP direct) |
+| `https://localhost:8002` | Main app (localhost) |
+| `https://edumi.ac.in:8002` | Main app (named domain, after hosts entry) |
+| `https://127.0.0.1:8002/admin/` | Django admin panel |
 
-### 15. `school_project/` - Django Project Root
-**Purpose**: The core Django project configuration and entry point
-
-**Key Files & Directories**:
-- `settings.py`: **Master config file** (database, security, LiveKit, Celery, etc.)
-- `urls.py`: Master URL config (includes all app URLs)
-- `asgi.py`: ASGI entry point for Daphne/Channels
-- `wsgi.py`: WSGI entry point (for compatibility)
-- `celery.py`: Celery app initialization
-- `middleware.py`: Custom middleware (e.g., `DatabaseErrorMiddleware` for SQLite lock handling)
-- `__init__.py`: Makes it a Python package
-- `apps.py`: App config
-
-**Tech Used**: Django, ASGI, Celery
+**First visit:** Chrome/Edge will show "Your connection is not private" if the cert isn't trusted yet. Either:
+- Click **Advanced → Proceed to 127.0.0.1 (unsafe)** to bypass once
+- Or run `scripts\trust_ssl_cert.bat` to trust the cert permanently (recommended)
 
 ---
 
-### 16. `scripts/` - Utility & Deployment Scripts
-**Purpose**: Helper scripts for setup and deployment
-- `allow_firewall.bat`: Windows batch script to allow firewall rules
-- `allow_firewall.ps1`: Windows PowerShell script to allow firewall rules
-- `deploy.sh`: Linux deployment script
+## 🔑 Trusting the SSL Certificate
+
+The self-signed cert causes `NET::ERR_CERT_AUTHORITY_INVALID` in browsers. To eliminate this permanently:
+
+**Windows (installs cert to Trusted Root CA for all users):**
+```
+# Double-click:
+scripts\trust_ssl_cert.bat
+
+# Or from PowerShell (as Administrator):
+powershell -ExecutionPolicy Bypass -File scripts\trust_ssl_cert.ps1
+```
+Approve the UAC prompt, then **fully restart Chrome** (`chrome://restart`).
+
+**Linux / macOS:**
+```bash
+# Ubuntu/Debian
+sudo cp certs/edumi.crt /usr/local/share/ca-certificates/edumi.crt
+sudo update-ca-certificates
+
+# macOS
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain certs/edumi.crt
+```
+
+After trusting, the padlock in the address bar will show as **secure (green)**.
 
 ---
 
-### 17. `staticfiles/` - Static Assets (Production)
-**Purpose**: Collects and serves static files (CSS, JS, images) in production (populated via `collectstatic`)
+## 🐳 Production Deployment (Docker)
+
+The Docker Compose stack includes: Nginx (SSL + reverse proxy), Django (Daphne), Camera Service, Celery Worker, Redis, LiveKit.
+
+```bash
+# Copy and configure environment
+cp config/.env.example .env
+# Edit .env — set DEBUG=False, proper SECRET_KEY, LiveKit keys, etc.
+
+# Build and start everything
+docker-compose up --build -d
+
+# View logs
+docker-compose logs -f
+
+# Run migrations inside container
+docker-compose exec web python manage.py migrate
+
+# Create superuser
+docker-compose exec web python manage.py createsuperuser
+```
+
+The Nginx container handles SSL termination on port 443. Django runs on port 8002 internally (not exposed publicly). Nginx proxies `/ws/` and `/livekit-proxy/` as WebSocket upgrades.
 
 ---
 
-### 18. `templates/` - HTML Templates
-**Purpose**: All Django HTML templates for the entire application
+## 🔢 Default Credentials & Ports
 
-**Key Directories**:
-- `accounts/`: Auth, profile, admin, messaging, dashboard templates
-- `attendance/`: Attendance and engagement UI
-- `cameras/`: Camera management, streaming, recording UI
-- `meetings/`: Virtual meeting UI
-- `mobile_cameras/`: Mobile camera UI
-- `video_editing/`: Video editor UI
-- `videos/`: Video management UI
-- `components/`: Reusable UI components (navbar, sidebar, etc.)
-- `layouts/`: Base HTML layouts
-- `partials/`: Reusable HTML partials
+| Service | Port | Notes |
+|---|---|---|
+| Django (HTTPS/Daphne) | **8002** | Main app — use `https://` |
+| Camera Service (Waitress) | **8003** | AI microservice — HTTP only, internal |
+| LiveKit SFU | **7880** | WebRTC server — internal |
+| Redis | **6379** | Channel layer + Celery broker |
+| Nginx (production) | **443** | Reverse proxy |
 
-**Tech Used**: Django Template Language (DTL), HTML, CSS, JavaScript
+**Default admin:** Created during `python manage.py createsuperuser` — no default credentials are hardcoded.
+
+**Firewall:** Run `scripts\allow_firewall.bat` to open ports 8002 and 8003 in Windows Firewall for LAN access.
 
 ---
 
-### 19. `video_editing/` - In-Platform Video Editor
-**Purpose**: Non-destructive timeline-based video editor for recorded and uploaded videos
+## 🏅 Skill Badges
 
-**Key Files & Directories**:
-- `models.py`:
-  - `VideoEditSession`: Tracks an editing session
-  - `VideoEditAction`: Individual edit steps (trim, mute, rotate, add text, etc.)
-- `views_logic/`:
-  - `core_views.py`: Main editor views
-  - `action_views.py`: API for adding/removing/edit actions
-  - `download_view.py`: Download edited videos
-  - `utils.py`: **Core engine** that converts edit actions to FFmpeg commands
-- `views.py`: Main views
-- `urls.py`: URL routes
-- `templates/video_editing/`: Editor UI templates
-- `apps.py`: App config
-- `tests.py`: Tests
+Technologies used in this project:
 
-**How it Works**:
-1. User selects a video to edit
-2. Creates a `VideoEditSession`
-3. Adds edit actions (trim, split, mute, etc.) which are stored as `VideoEditAction` records
-4. UI previews the edits client-side
-5. When user clicks "Save & Process", the backend executes all actions using FFmpeg
-6. Original file is never modified; edits are applied to a copy
-7. Edited video is saved and available for download
+### Backend
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-092E20?style=flat-square&logo=django&logoColor=white)
+![Celery](https://img.shields.io/badge/Celery-37814A?style=flat-square&logo=celery&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
 
-**Tech Used**: FFmpeg, Django, subprocess
+### Real-Time & Networking
+![WebSockets](https://img.shields.io/badge/WebSockets-black?style=flat-square&logo=socketdotio&logoColor=white)
+![WebRTC](https://img.shields.io/badge/WebRTC-333333?style=flat-square&logo=webrtc&logoColor=white)
+![LiveKit](https://img.shields.io/badge/LiveKit-00C58E?style=flat-square)
+![Daphne](https://img.shields.io/badge/Daphne_ASGI-7B3F85?style=flat-square)
 
----
+### Security
+![HTTPS](https://img.shields.io/badge/HTTPS-SSL/TLS-green?style=flat-square&logo=letsencrypt)
+![Fernet](https://img.shields.io/badge/Fernet-AES--256-blue?style=flat-square&logo=gnupg)
+![CSRF](https://img.shields.io/badge/CSRF-Protected-orange?style=flat-square)
 
-### 20. `videos/` - Video Management & Uploads
-**Purpose**: Store, manage, and serve video recordings and uploaded content
+### AI & Computer Vision
+![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?style=flat-square&logo=opencv&logoColor=white)
+![dlib](https://img.shields.io/badge/dlib-face--recognition-lightgrey?style=flat-square)
+![NumPy](https://img.shields.io/badge/NumPy-013243?style=flat-square&logo=numpy&logoColor=white)
 
-**Key Files & Directories**:
-- `models.py`: Video model
-- `views.py`: Video views
-- `urls.py`: URL routes
-- `tasks.py`: Celery tasks for video processing
-- `apps.py`: App config
-- `admin.py`: Admin config
-- `tests.py`: Tests
+### Video & Media
+![FFmpeg](https://img.shields.io/badge/FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white)
+![RTSP](https://img.shields.io/badge/RTSP-streaming-blue?style=flat-square)
+![MJPEG](https://img.shields.io/badge/MJPEG-proxy-blue?style=flat-square)
 
-**Tech Used**: Django, file system storage
-
----
-
-### Root Files
-- `manage.py`: Django management script
-- `requirements.txt`: Python dependencies
-- `start_app.ps1`: Windows startup script
-- `Dockerfile`: Docker container config for main app
-- `docker-compose.yml`: Docker Compose config for full stack
-- `.gitignore`: Git ignore rules
-- `.dockerignore`: Docker ignore rules
-- `README.md`: This file!
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-1. Python 3.14+
-2. Redis server (running on port 6379)
-3. FFmpeg (installed and in your PATH)
-4. LiveKit server (optional for development, but required for meetings)
-
-### Installation Steps
-
-1. **Clone the repository**
-2. **Set up environment variables**
-   - Copy `config/.env.example` to `.env` in the root
-   - Fill in all required secrets (especially `SECRET_KEY`, `LIVEKIT_*`, and `FACE_ENCRYPTION_KEY`)
-3. **Install Python dependencies**
-   ```powershell
-   pip install -r requirements.txt
-   ```
-4. **Set up database**
-   ```powershell
-   python manage.py migrate
-   ```
-5. **Create a superuser (optional but recommended)**
-   ```powershell
-   python manage.py createsuperuser
-   ```
-6. **Start the application**
-   - **Windows**: Run `start_app.ps1`
-   - **Linux**: Run `./scripts/deploy.sh`
-   - Or manually:
-     ```powershell
-     # Start Redis (if not already running)
-     # Start LiveKit (optional for dev)
-     # Start Django
-     python manage.py runserver
-     # Start Daphne (ASGI) for WebSockets
-     daphne school_project.asgi:application
-     # Start Celery worker
-     celery -A school_project worker --loglevel=info
-     ```
-
-### Default Ports
-- Main Django app: `8000`
-- Daphne ASGI: `8001`
-- LiveKit Proxy: `8002`
-- Camera Service: `8003`
-- LiveKit SFU: `7880`
-
----
-
-## 🔧 Environment Variables
-
-The app requires these environment variables (set in `.env`):
-- `SECRET_KEY`: Django's secret key (generate one with `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`)
-- `DEBUG`: `True` for development, `False` for production
-- `LIVEKIT_URL`: LiveKit WebSocket URL (for clients)
-- `LIVEKIT_INTERNAL_URL`: LiveKit internal WebSocket URL
-- `LIVEKIT_INTERNAL_HTTP_URL`: LiveKit internal HTTP URL
-- `LIVEKIT_API_KEY`: LiveKit API key
-- `LIVEKIT_API_SECRET`: LiveKit API secret (must be 32+ characters)
-- `REDIS_URL`: Redis URL for Celery and Channels (e.g., `redis://localhost:6379/0`)
-- `FACE_ENCRYPTION_KEY`: Fernet key for biometrics (generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`)
-- `FACE_MATCH_THRESHOLD`: Face similarity threshold (0-1, lower = stricter)
-- `FACE_PRESENCE_DURATION`: Seconds of verified presence needed to mark attendance
-
----
+### Infrastructure
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Nginx](https://img.shields.io/badge/Nginx-009639?style=flat-square&logo=nginx&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=flat-square&logo=postgresql&logoColor=white)
 
 ---
 
 <div align="center">
-  <p>Built with ❤️ for better classrooms!</p>
+  <sub>Built for better classrooms. Run <code>start_app.bat</code> and go.</sub>
 </div>

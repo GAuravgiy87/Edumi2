@@ -26,7 +26,7 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
         if qs:
             target += f"?{qs}"
 
-        logger.info(f"LiveKit proxy → {target}")
+        logger.info(f"LiveKit proxy -> {target}")
 
         try:
             self._lk_ws = await websockets.connect(
@@ -63,7 +63,7 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
             elif text_data is not None:
                 await self._lk_ws.send(text_data)
         except Exception as e:
-            logger.warning(f"Proxy → LiveKit send error: {e}")
+            logger.warning(f"Proxy -> LiveKit send error: {e}")
             await self.close()
 
     async def _lk_to_browser(self):
@@ -75,6 +75,6 @@ class LiveKitProxyConsumer(AsyncWebsocketConsumer):
                 else:
                     await self.send(text_data=msg)
         except Exception as e:
-            logger.warning(f"LiveKit → proxy ended: {e}")
+            logger.warning(f"LiveKit -> proxy ended: {e}")
         finally:
             await self.close()

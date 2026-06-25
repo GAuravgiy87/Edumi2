@@ -6,6 +6,7 @@ endpoint strings via the `endpoints` parameter. We pass an ssl: endpoint
 with relative paths to avoid Windows drive-letter colon conflicts.
 
 Usage:  python run_ssl_server.py
+  OR:   venv\Scripts\python.exe run_ssl_server.py
 """
 
 import os

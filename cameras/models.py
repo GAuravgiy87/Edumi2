@@ -1,4 +1,9 @@
 from django.db import models
+from django.contrib.auth import get_user_model
+import logging
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 class Camera(models.Model):
     CAMERA_TYPE_CHOICES = (

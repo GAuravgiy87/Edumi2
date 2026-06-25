@@ -17,6 +17,7 @@ $SSL_CERT       = Join-Path $BASE_DIR "certs\edumi.crt"
 $SSL_KEY        = Join-Path $BASE_DIR "certs\edumi.key"
 $HOSTS_FILE     = "$env:windir\System32\drivers\etc\hosts"
 $DOMAIN         = "edumi.ac.in"
+$PYTHON         = Join-Path $BASE_DIR "venv\Scripts\python.exe"
 
 Set-Location $BASE_DIR
 
@@ -97,7 +98,7 @@ Write-Host "[2/9] Checking SSL certificate..." -ForegroundColor Yellow
 
 if (-not (Test-Path $SSL_CERT) -or -not (Test-Path $SSL_KEY)) {
     Write-Host "      Generating self-signed SSL certificate for $DOMAIN ..." -ForegroundColor Yellow
-    python (Join-Path $BASE_DIR "scripts\generate_ssl_cert.py")
+    & $PYTHON (Join-Path $BASE_DIR "scripts\generate_ssl_cert.py")
     if (-not (Test-Path $SSL_CERT)) {
         Write-Host "      [FAIL] Certificate generation failed!" -ForegroundColor Red
     } else {
@@ -149,14 +150,14 @@ Start-Sleep -Seconds 3
 # STEP 5: DATABASE MIGRATIONS
 # =======================================================
 Write-Host "[5/9] Running database migrations..." -ForegroundColor Yellow
-python manage.py migrate
+& $PYTHON manage.py migrate
 
 
 # =======================================================
 # STEP 6: COLLECT STATIC FILES (required for WhiteNoise)
 # =======================================================
 Write-Host "[6/9] Collecting static files..." -ForegroundColor Yellow
-python manage.py collectstatic --noinput --clear 2>$null
+& $PYTHON manage.py collectstatic --noinput --clear 2>$null
 Write-Host "      [OK] Static files collected" -ForegroundColor Green
 
 
@@ -165,7 +166,7 @@ Write-Host "      [OK] Static files collected" -ForegroundColor Green
 # =======================================================
 Write-Host "[7/9] Starting Celery worker..." -ForegroundColor Yellow
 
-Start-Process "celery" `
+Start-Process (Join-Path $BASE_DIR "venv\Scripts\celery.exe") `
     -ArgumentList "-A school_project worker -l info -P threads" `
     -WorkingDirectory $BASE_DIR `
     -WindowStyle Minimized
@@ -178,7 +179,7 @@ Start-Sleep -Seconds 2
 # =======================================================
 Write-Host "[8/9] Starting Camera Service..." -ForegroundColor Yellow
 
-Start-Process "python" `
+Start-Process $PYTHON `
     -ArgumentList "camera_service/serve.py" `
     -WorkingDirectory $BASE_DIR `
     -WindowStyle Minimized
@@ -187,7 +188,7 @@ Start-Sleep -Seconds 2
 
 
 # =======================================================
-# STEP 8: DJANGO HTTPS SERVER (Daphne + SSL)
+# STEP 9: DJANGO HTTPS SERVER (Daphne + SSL)
 # =======================================================
 Write-Host "[9/9] Starting Django HTTPS Server (Daphne + SSL)..." -ForegroundColor Yellow
 Write-Host ""
@@ -198,6 +199,7 @@ Write-Host "======================================================" -ForegroundC
 Write-Host ""
 Write-Host "  App:     https://$DOMAIN`:8002"            -ForegroundColor Cyan
 Write-Host "           https://localhost:8002"            -ForegroundColor Cyan
+Write-Host "           https://127.0.0.1:8002"           -ForegroundColor Cyan
 Write-Host "  Admin:   https://$DOMAIN`:8002/admin/"      -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  NOTE: Browser will warn about the self-signed cert."  -ForegroundColor Yellow
@@ -207,4 +209,4 @@ Write-Host "  Press Ctrl+C to stop the server."                     -ForegroundC
 Write-Host ""
 
 # Launch Daphne with SSL via Python launcher (Daphne CLI has no --ssl flags)
-python run_ssl_server.py
+& $PYTHON run_ssl_server.py

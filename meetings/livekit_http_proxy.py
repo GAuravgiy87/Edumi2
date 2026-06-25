@@ -22,7 +22,7 @@ def livekit_http_proxy(request, lk_path):
     if request.META.get("QUERY_STRING"):
         target += f"?{request.META['QUERY_STRING']}"
 
-    logger.info(f"LiveKit HTTP proxy → {target}")
+    logger.info(f"LiveKit HTTP proxy -> {target}")
 
     try:
         # Forward the request

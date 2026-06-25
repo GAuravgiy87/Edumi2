@@ -365,43 +365,74 @@
 
     <!-- Controls -->
     <div class="meet-controls">
-        <button class="control-button" id="micBtn" onclick="toggleMic()" title="Microphone">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        </button>
-        <button class="control-button" id="camBtn" onclick="toggleCamera()" title="Camera">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-        </button>
 
-        <div class="more-options-container">
-            <button class="control-button" id="moreBtn" onclick="toggleMoreOptions()" title="More Options">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+        <!-- Mic -->
+        <div class="control-btn-wrap">
+            <button class="control-button" id="micBtn" onclick="toggleMic()" title="Microphone">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             </button>
+            <span class="control-btn-label" id="micLabel">Mute</span>
+        </div>
+
+        <!-- Camera -->
+        <div class="control-btn-wrap">
+            <button class="control-button" id="camBtn" onclick="toggleCamera()" title="Camera">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            </button>
+            <span class="control-btn-label" id="camLabel">Camera</span>
+        </div>
+
+        <div class="control-divider"></div>
+
+        <!-- More Options -->
+        <div class="more-options-container">
+            <!-- Popup menu — shown above the button -->
             <div class="more-options-menu" id="moreOptionsMenu">
+
                 <button class="menu-item" id="screenBtn" onclick="toggleScreenShare(); toggleMoreOptions();">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     <span>Share Screen</span>
                 </button>
+
                 {% if is_host %}
                 <button class="menu-item" id="switchCamBtn" onclick="toggleCameraModal(); toggleMoreOptions();">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                     <span>Switch Camera</span>
                 </button>
                 {% endif %}
+
+                <div class="menu-separator"></div>
+
                 <button class="menu-item" id="peopleBtn" onclick="openSidebar('people'); toggleMoreOptions();">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>Participants</span>
                 </button>
+
                 <button class="menu-item" id="chatBtn" onclick="openSidebar('chat'); toggleMoreOptions();">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     <span>Chat</span>
-                    <span class="notification-badge" id="chatBadge" style="display:none; margin-left:auto;">0</span>
+                    <span class="notification-badge" id="chatBadge" style="display:none; position:relative; top:auto; right:auto; margin-left:auto;">0</span>
                 </button>
+
             </div>
+
+            <!-- The ⋮ trigger button -->
+            <button class="control-button" id="moreBtn" onclick="toggleMoreOptions()" title="More options">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>
+            </button>
+            <span class="more-btn-label">More</span>
         </div>
 
-        <button class="control-button danger" onclick="leaveMeeting()" title="Leave call">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-        </button>
+        <div class="control-divider"></div>
+
+        <!-- Leave -->
+        <div class="control-btn-wrap">
+            <button class="control-button danger" onclick="leaveMeeting()" title="Leave call">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </button>
+            <span class="control-btn-label">Leave</span>
+        </div>
+
     </div>
 </div>
 
@@ -686,19 +717,25 @@ async function init() {
 }
 
 function updateControlButtons() {
-    const micBtn = document.getElementById('micBtn');
-    const camBtn = document.getElementById('camBtn');
-    
+    const micBtn   = document.getElementById('micBtn');
+    const camBtn   = document.getElementById('camBtn');
+    const micLabel = document.getElementById('micLabel');
+    const camLabel = document.getElementById('camLabel');
+
     micBtn.classList.toggle('off', !isMicOn);
     camBtn.classList.toggle('off', !isCameraOn);
-    
+
     const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
     const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
     const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
     const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
-    
+
     micBtn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
     camBtn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
+
+    // Update labels
+    if (micLabel) micLabel.textContent = isMicOn ? 'Mute' : 'Unmute';
+    if (camLabel) camLabel.textContent = isCameraOn ? 'Camera' : 'Start video';
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
@@ -1165,11 +1202,13 @@ async function toggleMic() {
     try {
         isMicOn = !isMicOn;
         await room.localParticipant.setMicrophoneEnabled(isMicOn);
-        const btn = document.getElementById('micBtn');
+        const btn   = document.getElementById('micBtn');
+        const label = document.getElementById('micLabel');
         btn.classList.toggle('off', !isMicOn);
         const micOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
         const micOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
         btn.innerHTML = isMicOn ? micOnIcon : micOffIcon;
+        if (label) label.textContent = isMicOn ? 'Mute' : 'Unmute';
     } catch (e) {
         console.error('Mic toggle error:', e);
         isMicOn = !isMicOn; // Revert state
@@ -1186,7 +1225,7 @@ async function toggleMic() {
 async function toggleCamera() {
     try {
         isCameraOn = !isCameraOn;
-        
+
         // Handle IP camera source
         if (currentVideoSource === 'ip' && !isCameraOn) {
             await stopIpCameraStream();
@@ -1194,11 +1233,13 @@ async function toggleCamera() {
             await room.localParticipant.setCameraEnabled(isCameraOn);
         }
 
-        const btn = document.getElementById('camBtn');
+        const btn   = document.getElementById('camBtn');
+        const label = document.getElementById('camLabel');
         btn.classList.toggle('off', !isCameraOn);
         const camOnIcon  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
         const camOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/></svg>';
         btn.innerHTML = isCameraOn ? camOnIcon : camOffIcon;
+        if (label) label.textContent = isCameraOn ? 'Camera' : 'Start video';
 
         // Update UI
         const localBox = document.getElementById(`video-box-${room.localParticipant.identity}`);
@@ -1672,15 +1713,19 @@ function toggleSidebar() {
 // ── More Options ──────────────────────────────────────────────────────────────
 function toggleMoreOptions() {
     const menu = document.getElementById('moreOptionsMenu');
-    menu.classList.toggle('show');
+    const btn  = document.getElementById('moreBtn');
+    menu.classList.toggle('open');
+    btn.classList.toggle('active', menu.classList.contains('open'));
 }
 
 // Close menu when clicking outside
 document.addEventListener('click', function(e) {
     const container = document.querySelector('.more-options-container');
     const menu = document.getElementById('moreOptionsMenu');
+    const btn  = document.getElementById('moreBtn');
     if (menu && container && !container.contains(e.target)) {
-        menu.classList.remove('show');
+        menu.classList.remove('open');
+        if (btn) btn.classList.remove('active');
     }
 });
 

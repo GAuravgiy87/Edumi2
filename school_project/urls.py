@@ -10,11 +10,6 @@ from cameras.views_logic.camera_views import camera_feed
 # Override admin logout to redirect to login page
 admin.site.logout_template = None
 
-# Debug camera feed
-from django.http import HttpResponse
-def test_camera_feed(request, camera_id):
-    return HttpResponse(f"Camera {camera_id} feed route hit!", status=200)
-
 urlpatterns = [
     path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico', permanent=True)),
     path('admin/logout/', auth_views.LogoutView.as_view(next_page='/'), name='admin-logout'),
