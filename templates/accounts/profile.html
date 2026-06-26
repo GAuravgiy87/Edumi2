@@ -23,18 +23,6 @@
     </div>
   </div>
 
-  {% if messages %}
-  <div class="messages-container">
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">
-      <i
-        data-lucide="{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}alert-circle{% else %}info{% endif %}"></i>
-      {{ message }}
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
   {% if is_own_profile %}
   <form id="profileForm" method="post" enctype="multipart/form-data" action="">
     {% csrf_token %}
@@ -1083,31 +1071,11 @@
     }
   });
 
-  // Initialize Lucide icons & auto-dismiss alerts
+  // Initialize Lucide icons
   document.addEventListener('DOMContentLoaded', () => {
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
     }
-
-    // Auto-dismiss Django alerts after 4 seconds
-    const alerts = document.querySelectorAll('.messages-container .alert');
-    alerts.forEach(alert => {
-      setTimeout(() => {
-        alert.style.transition = 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), padding 0.6s cubic-bezier(0.4, 0, 0.2, 1), margin 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
-        alert.style.opacity = '0';
-        alert.style.transform = 'translateY(-12px)';
-        alert.style.maxHeight = '0';
-        alert.style.paddingTop = '0';
-        alert.style.paddingBottom = '0';
-        alert.style.marginTop = '0';
-        alert.style.marginBottom = '0';
-        alert.style.overflow = 'hidden';
-        alert.style.border = 'none';
-        setTimeout(() => {
-          alert.remove();
-        }, 600);
-      }, 4000);
-    });
   });
 </script>
 

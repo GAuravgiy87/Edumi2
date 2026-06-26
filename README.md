@@ -280,8 +280,9 @@ sudo apt install cmake build-essential libopenblas-dev liblapack-dev libx11-dev
 
 ### Step 1 — Clone the repo
 ```bash
-git clone <repo-url>
-cd Edumi2-my-work2
+# From tarunkumar-sys
+git clone -b new_edumi https://github.com/GAuravgiy87/Edumi2.git  
+cd Edumi2
 ```
 
 ### Step 2 — Create and activate a virtual environment

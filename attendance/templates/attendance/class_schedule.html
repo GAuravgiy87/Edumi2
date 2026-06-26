@@ -49,16 +49,6 @@
         <h2>Class Schedule · {{ classroom.title }}</h2>
         <p>Select the days this class is held. Attendance will only be recorded on these days.</p>
 
-        {% if messages %}
-            {% for message in messages %}
-            <div style="padding:10px 16px; border-radius:10px; margin-bottom:16px;
-                background:{% if 'error' in message.tags %}rgba(239,68,68,.12){% else %}rgba(16,185,129,.12){% endif %};
-                color:{% if 'error' in message.tags %}#ef4444{% else %}#10b981{% endif %}; font-weight:600;">
-                {{ message }}
-            </div>
-            {% endfor %}
-        {% endif %}
-
         <form method="post">
             {% csrf_token %}
             {% for day_num, day_name in all_days %}

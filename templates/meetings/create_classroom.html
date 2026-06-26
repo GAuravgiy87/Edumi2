@@ -11,14 +11,6 @@
         <h2 style="color: #2c3e50; margin-bottom: 10px;">🏫 Create New Classroom</h2>
         <p style="color: #7f8c8d; margin-bottom: 30px;">Set up a virtual classroom for your students</p>
         
-        {% if messages %}
-            {% for message in messages %}
-                <div style="padding: 15px; margin-bottom: 20px; border-radius: 5px; background: {% if message.tags == 'error' %}#fee{% else %}#efe{% endif %}; border-left: 4px solid {% if message.tags == 'error' %}#e74c3c{% else %}#2ecc71{% endif %};">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-        
         <form method="post">
             {% csrf_token %}
             

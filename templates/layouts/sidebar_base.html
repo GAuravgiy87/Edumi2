@@ -66,6 +66,17 @@
             <!-- Content Area -->
 
             <div class="content-area">
+                {% if messages %}
+                <div class="messages-container" style="max-width: 100%; margin: 0 auto 20px; padding: 0;">
+                    {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+                        <i data-lucide="{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}alert-circle{% else %}info{% endif %}"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
                 {% block content %}{% endblock %}
             </div>
 

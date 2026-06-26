@@ -34,6 +34,7 @@
   --p-warning: #f59e0b;
   --p-warning-light: #fef3c7;
   --p-info: #3b82f6;
+  --p-info-light: #e0f2fe;
 
   /* Radii & Shadows */
   --radius-sm: 8px;
@@ -72,6 +73,7 @@ body.dark-mode {
   --p-success-light: rgba(16, 185, 129, 0.15);
   --p-danger-light: rgba(239, 68, 68, 0.15);
   --p-warning-light: rgba(245, 158, 11, 0.15);
+  --p-info-light: rgba(59, 130, 246, 0.15);
 }
 
 /* Main reset / Page Container */
@@ -192,10 +194,23 @@ body.dark-mode {
   border-color: rgba(16, 185, 129, 0.2);
 }
 
-.alert-error {
+.alert-error,
+.alert-danger {
   background: var(--p-danger-light);
   color: var(--p-danger);
   border-color: rgba(239, 68, 68, 0.2);
+}
+
+.alert-warning {
+  background: var(--p-warning-light);
+  color: var(--p-warning);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.alert-info {
+  background: var(--p-info-light);
+  color: var(--p-info);
+  border-color: rgba(59, 130, 246, 0.2);
 }
 
 /* VIEW & EDIT TOGGLE FIELDS */

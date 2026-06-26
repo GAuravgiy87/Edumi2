@@ -96,3 +96,35 @@ if (!document.getElementById('edumi-notification-styles')) {
     `;
     document.head.appendChild(style);
 }
+
+// Auto-dismiss Django alerts system-wide
+function initAlertDismissal() {
+    const alerts = document.querySelectorAll('.messages-container .alert');
+    alerts.forEach(alert => {
+        if (alert.dataset.dismissed) return;
+        alert.dataset.dismissed = "true";
+
+        setTimeout(() => {
+            alert.style.transition = 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), padding 0.6s cubic-bezier(0.4, 0, 0.2, 1), margin 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+            alert.style.opacity = '0';
+            alert.style.transform = 'translateY(-12px)';
+            alert.style.maxHeight = '0';
+            alert.style.paddingTop = '0';
+            alert.style.paddingBottom = '0';
+            alert.style.marginTop = '0';
+            alert.style.marginBottom = '0';
+            alert.style.overflow = 'hidden';
+            alert.style.border = 'none';
+            setTimeout(() => {
+                alert.remove();
+            }, 600);
+        }, 6000); // Dismiss after 6 seconds as requested
+    });
+}
+
+// Register event listeners for both classic load and Turbo framework loads
+document.addEventListener('DOMContentLoaded', initAlertDismissal);
+if (typeof document.addEventListener === 'function') {
+    document.addEventListener('turbo:load', initAlertDismissal);
+}
+

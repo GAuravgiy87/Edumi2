@@ -69,15 +69,6 @@ input[type="range"] { flex:1; accent-color:#667eea; }
         <h2>Attendance Settings · {{ classroom.title }}</h2>
         <p>Configure how face recognition attendance works for this classroom.</p>
 
-        {% if messages %}
-            {% for message in messages %}
-            <div style="padding:10px 16px; border-radius:10px; margin-bottom:16px;
-                background:rgba(16,185,129,.12); color:#10b981; font-weight:600;">
-                {{ message }}
-            </div>
-            {% endfor %}
-        {% endif %}
-
         <form method="post">
             {% csrf_token %}
 
