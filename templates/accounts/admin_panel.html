@@ -1,4 +1,4 @@
-{% extends 'base_sidebar.html' %}
+{% extends 'layouts/sidebar_base.html' %}
 {% load static %}
 
 {% block page_title %}Admin Panel{% endblock %}
@@ -140,9 +140,9 @@
 
     <!-- Tabbed Content -->
     <div class="admin-tabs">
-        <button class="tab-btn active" onclick="switchTab('users')"><i data-lucide="users"></i> Users</button>
-        <button class="tab-btn" onclick="switchTab('meetings')"><i data-lucide="video"></i> Meetings</button>
-        <button class="tab-btn" onclick="switchTab('cameras')"><i data-lucide="camera"></i> Cameras</button>
+        <button class="tab-btn active" onclick="switchTab(event, 'users')"><i data-lucide="users"></i> Users</button>
+        <button class="tab-btn" onclick="switchTab(event, 'meetings')"><i data-lucide="video"></i> Meetings</button>
+        <button class="tab-btn" onclick="switchTab(event, 'cameras')"><i data-lucide="camera"></i> Cameras</button>
     </div>
 
     <div id="tab-users" class="tab-content">
@@ -256,12 +256,14 @@
 </div>
 
 <script>
-    function switchTab(tabId) {
+    function switchTab(event, tabId) {
         document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         
         document.getElementById('tab-' + tabId).style.display = 'block';
-        event.currentTarget.classList.add('active');
+        if (event && event.currentTarget) {
+            event.currentTarget.classList.add('active');
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
