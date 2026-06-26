@@ -1,451 +1,659 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}User Profile{% endblock %}
+{% block page_title %}{{ profile_user.username }}'s Profile{% endblock %}
+{% block title %}{{ profile.get_display_name }} — EduMi{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/profile.css' %}?v={{ timestamp }}">
-<style>
-    .profile-banner {
-        background-image: url('{{ banner_url|default:"/static/img/academic_profile_banner.png" }}');
-    }
-    .info-icon.face-registered {
-        background: #dcfce7;
-        color: #166534;
-    }
-    .info-icon.face-not-registered {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v=4">
 {% endblock %}
 
 {% block content %}
-<div class="profile-container">
-    {% if messages %}
+<div class="profile-page">
+
+  {% if messages %}
+  <div style="max-width:1140px;margin:16px auto;padding:0 20px;">
+    {% for message in messages %}
     <div class="alert-success">
-        {% for message in messages %}
-        <p>{{ message }}</p>
-        {% endfor %}
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      {{ message }}
     </div>
-    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
 
-    {% if is_own_profile %}
-    <form method="POST" enctype="multipart/form-data" id="profileForm">
-        {% csrf_token %}
-    {% endif %}
+  {% if is_own_profile %}
+  <form method="POST" enctype="multipart/form-data" id="profileForm">
+  {% csrf_token %}
+  {% endif %}
 
-    <!-- Hero Section -->
-    <div class="profile-hero">
-        <div class="profile-banner"></div>
-        <div class="profile-hero-content">
-            <div class="profile-avatar-wrap">
-                <img src="{{ profile.get_profile_picture_url }}" alt="{{ profile_user.username }}" id="avatarPreview" class="profile-avatar-img">
-                {% if is_own_profile %}
-                <button type="button" class="avatar-edit-btn" onclick="openAvatarModal()" title="Change Profile Picture">
-                    <i data-lucide="camera"></i>
-                </button>
-                <input type="file" id="profile_picture" name="profile_picture" accept="image/*" style="display: none;">
-                <input type="hidden" id="avatar_choice" name="avatar_choice" value="">
-                {% endif %}
-            </div>
-            
-            <div class="profile-identity">
-                <div class="profile-name-row">
-                    {% if is_own_profile %}
-                    <input type="text" name="display_name" value="{{ profile.display_name|default:'' }}" placeholder="Set Display Name" class="editable-input" style="font-size: 1.5rem; font-weight: 800; max-width: 400px;">
-                    {% else %}
-                    <h1>{{ profile.get_display_name }}</h1>
-                    {% endif %}
-                </div>
-                <div class="profile-handle">@{{ profile_user.username }}</div>
-                
-                <div class="profile-badges">
-                    <span class="p-badge p-badge-role">
-                        <i data-lucide="{% if profile.user_type == 'teacher' %}graduation-cap{% else %}book-open{% endif %}"></i>
-                        {{ profile.get_user_type_display }}
-                    </span>
-                    {% if profile_user.is_superuser %}
-                    <span class="p-badge p-badge-admin">
-                        <i data-lucide="shield-check"></i>
-                        Administrator
-                    </span>
-                    {% endif %}
-                    {% if profile.user_type == 'student' and face_registered %}
-                    <span class="p-badge p-badge-verified" title="Face Identity Verified">
-                        <i data-lucide="user-check"></i>
-                        Verified Identity
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-
-            {% if is_own_profile %}
-            <div class="profile-hero-actions">
-                <button type="submit" class="btn-primary" id="saveProfileBtn">
-                    <i data-lucide="save"></i>
-                    Save Profile
-                </button>
-            </div>
-            {% endif %}
-        </div>
+  <!-- ── HERO / COVER ───────────────────── -->
+  <div class="profile-hero">
+    <div class="profile-cover">
+      <div class="profile-cover-dots"></div>
     </div>
 
-    <!-- Main Content Grid -->
-    <div class="profile-grid">
-        
-        <!-- Left Sidebar: Basic Info -->
-        <div class="profile-sidebar-left">
-            <div class="profile-card">
-                <h2 class="card-title"><i data-lucide="user"></i> Personal Info</h2>
-                <div class="info-list">
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="user"></i></div>
-                        <div class="info-content">
-                            <div class="label">Full Name</div>
-                            {% if is_own_profile %}
-                            <div style="display:flex; gap: 0.5rem;">
-                                <input type="text" name="first_name" value="{{ user.first_name }}" placeholder="First" class="editable-input" style="padding: 0.25rem 0.5rem;">
-                                <input type="text" name="last_name" value="{{ user.last_name }}" placeholder="Last" class="editable-input" style="padding: 0.25rem 0.5rem;">
-                            </div>
-                            {% else %}
-                            <div class="value">{{ user.get_full_name|default:"Not provided" }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="mail"></i></div>
-                        <div class="info-content">
-                            <div class="label">Email Address</div>
-                            {% if is_own_profile %}
-                            <input type="email" name="email" value="{{ user.email }}" class="editable-input">
-                            {% else %}
-                            <div class="value">{{ user.email }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="phone"></i></div>
-                        <div class="info-content">
-                            <div class="label">Phone Number</div>
-                            {% if is_own_profile %}
-                            <input type="tel" name="phone" value="{{ profile.phone }}" class="editable-input">
-                            {% else %}
-                            <div class="value">{{ profile.phone|default:"Not set" }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="profile-hero-content">
+      <!-- Avatar -->
+      <div class="profile-avatar-wrap">
+        <img src="{{ profile.get_profile_picture_url }}"
+             alt="{{ profile_user.username }}"
+             id="avatarPreview"
+             class="profile-avatar-img"
+             onerror="this.src='https://ui-avatars.com/api/?name={{ profile_user.username }}&background=667eea&color=fff&size=200'">
+        {% if is_own_profile %}
+        <button type="button" class="avatar-edit-btn" onclick="openAvatarModal()" title="Change photo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+          </svg>
+        </button>
+        <input type="file" id="profile_picture" name="profile_picture" accept="image/*" style="display:none;">
+        <input type="hidden" id="avatar_choice" name="avatar_choice" value="">
+        {% endif %}
+      </div>
 
-            <div class="profile-card">
-                <h2 class="card-title"><i data-lucide="calendar"></i> Dates</h2>
-                <div class="info-list">
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="cake"></i></div>
-                        <div class="info-content">
-                            <div class="label">Birthday</div>
-                            {% if is_own_profile %}
-                            <input type="date" name="date_of_birth" value="{{ profile.date_of_birth|date:'Y-m-d' }}" class="editable-input">
-                            {% else %}
-                            <div class="value">{{ profile.date_of_birth|date:"M d, Y"|default:"Not set" }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="clock"></i></div>
-                        <div class="info-content">
-                            <div class="label">Member Since</div>
-                            <div class="value">{{ profile_user.date_joined|date:"F Y" }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      <!-- Identity -->
+      <div class="profile-identity">
+        <div class="profile-name-row">
+          {% if is_own_profile %}
+          <input type="text" name="display_name"
+                 value="{{ profile.display_name|default:'' }}"
+                 placeholder="Your display name"
+                 class="editable-input name-input"
+                 id="displayNameInput">
+          {% else %}
+          <h1>{{ profile.get_display_name }}</h1>
+          {% endif %}
         </div>
+        <div class="profile-handle">@{{ profile_user.username }}</div>
+        <div class="profile-badges">
+          <span class="p-badge p-badge-role">
+            <i data-lucide="{% if profile.user_type == 'teacher' %}graduation-cap{% else %}book-open{% endif %}"></i>
+            {{ profile.get_user_type_display }}
+          </span>
+          {% if profile_user.is_superuser %}
+          <span class="p-badge p-badge-admin">
+            <i data-lucide="shield-check"></i> Administrator
+          </span>
+          {% endif %}
+          {% if profile.user_type == 'student' and face_registered %}
+          <span class="p-badge p-badge-verified">
+            <i data-lucide="user-check"></i> Verified Identity
+          </span>
+          {% endif %}
+        </div>
+      </div>
 
-        <!-- Center Column: Bio & Identity -->
-        <div class="profile-main-content">
-            <!-- Academic Card -->
-            {% if profile.user_type == 'student' or profile.user_type == 'teacher' %}
-            <div class="profile-card academic-card">
-                <h2 class="card-title">
-                    <i data-lucide="{% if profile.user_type == 'teacher' %}briefcase{% else %}id-card{% endif %}"></i>
-                    {% if profile.user_type == 'teacher' %}Professional{% else %}Academic{% endif %} Identity
-                </h2>
-                <div class="info-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                    {% if profile.user_type == 'student' %}
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="hash"></i></div>
-                        <div class="info-content">
-                            <div class="label">Roll Number</div>
-                            {% if is_own_profile %}
-                            <input type="text" name="roll_number" value="{{ profile.roll_number }}" class="editable-input">
-                            {% else %}
-                            <div class="value">{{ profile.roll_number|default:"N/A" }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="layers"></i></div>
-                        <div class="info-content">
-                            <div class="label">Branch / Department</div>
-                            {% if is_own_profile %}
-                            <input type="text" name="branch" value="{{ profile.branch }}" class="editable-input">
-                            {% else %}
-                            <div class="value">{{ profile.branch|default:"N/A" }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="building"></i></div>
-                        <div class="info-content">
-                            <div class="label">Department</div>
-                            {% if is_own_profile %}
-                            <input type="text" name="department" value="{{ profile.department }}" class="editable-input">
-                            {% else %}
-                            <div class="value">{{ profile.department|default:"N/A" }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
+      <!-- Hero Actions -->
+      <div class="profile-hero-actions">
+        {% if is_own_profile %}
+        <button type="submit" class="btn-primary" id="saveProfileBtn">
+          <i data-lucide="save"></i> Save Changes
+        </button>
+        {% else %}
+        <a href="{% url 'start_conversation' profile_user.username %}" class="btn-message">
+          <i data-lucide="message-circle"></i> Message
+        </a>
+        <a href="{% url 'profile_view' request.user.username %}" class="btn-secondary">
+          <i data-lucide="user"></i> My Profile
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div><!-- /profile-hero -->
 
-            <!-- Bio -->
-            <div class="profile-card">
-                <h2 class="card-title"><i data-lucide="text-quote"></i> Professional Bio</h2>
+  <!-- ── TWO-COLUMN LAYOUT ──────────────── -->
+  <div class="profile-layout" style="margin-top:24px;">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="profile-sidebar-col">
+
+      <!-- Personal Info Card -->
+      <div class="profile-card">
+        <div class="card-header">
+          <h2 class="card-title"><i data-lucide="user"></i> Personal Info</h2>
+        </div>
+        <div class="card-body">
+          <div class="info-list">
+
+            <div class="info-item">
+              <div class="info-icon"><i data-lucide="user"></i></div>
+              <div class="info-content">
+                <div class="label">Full Name</div>
                 {% if is_own_profile %}
-                <textarea name="bio" rows="4" placeholder="Share your academic background or interests..." class="editable-textarea">{{ profile.bio }}</textarea>
+                <div style="display:flex;gap:6px;">
+                  <input type="text" name="first_name" value="{{ profile_user.first_name }}" placeholder="First" class="editable-input" style="flex:1;">
+                  <input type="text" name="last_name" value="{{ profile_user.last_name }}" placeholder="Last" class="editable-input" style="flex:1;">
+                </div>
                 {% else %}
-                <p class="profile-bio">{{ profile.bio|default:"No bio available." }}</p>
+                <div class="value">{{ profile_user.get_full_name|default:"Not provided" }}</div>
                 {% endif %}
+              </div>
             </div>
 
-            <!-- Social Links -->
-            <div class="profile-card">
-                <h2 class="card-title"><i data-lucide="link"></i> Digital Presence</h2>
-                <div class="info-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="linkedin" class="icon-linkedin"></i></div>
-                        <div class="info-content">
-                            <div class="label">LinkedIn</div>
-                            {% if is_own_profile %}
-                            <input type="text" name="linkedin" value="{{ profile.linkedin }}" placeholder="Profile URL" class="editable-input">
-                            {% else %}
-                            <div class="value">
-                                {% if profile.linkedin %}<a href="{{ profile.linkedin }}" target="_blank">Connect</a>{% else %}Not set{% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-icon"><i data-lucide="globe"></i></div>
-                        <div class="info-content">
-                            <div class="label">Portfolio / Web</div>
-                            {% if is_own_profile %}
-                            <input type="text" name="website" value="{{ profile.website }}" placeholder="https://..." class="editable-input">
-                            {% else %}
-                            <div class="value">
-                                {% if profile.website %}<a href="{{ profile.website }}" target="_blank">Visit Site</a>{% else %}Not set{% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+            <div class="info-item">
+              <div class="info-icon"><i data-lucide="mail"></i></div>
+              <div class="info-content">
+                <div class="label">Email</div>
+                {% if is_own_profile %}
+                <input type="email" name="email" value="{{ profile_user.email }}" class="editable-input">
+                {% else %}
+                <div class="value">{{ profile_user.email|default:"—" }}</div>
+                {% endif %}
+              </div>
             </div>
+
+            <div class="info-item">
+              <div class="info-icon"><i data-lucide="phone"></i></div>
+              <div class="info-content">
+                <div class="label">Phone</div>
+                {% if is_own_profile %}
+                <input type="tel" name="phone" value="{{ profile.phone|default:'' }}" class="editable-input" placeholder="+1 (555) 000-0000">
+                {% else %}
+                <div class="value">{{ profile.phone|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-icon"><i data-lucide="calendar"></i></div>
+              <div class="info-content">
+                <div class="label">Date of Birth</div>
+                {% if is_own_profile %}
+                <input type="date" name="date_of_birth" value="{{ profile.date_of_birth|date:'Y-m-d' }}" class="editable-input">
+                {% else %}
+                <div class="value">{{ profile.date_of_birth|date:"M d, Y"|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-icon"><i data-lucide="map-pin"></i></div>
+              <div class="info-content">
+                <div class="label">Address</div>
+                {% if is_own_profile %}
+                <input type="text" name="address" value="{{ profile.address|default:'' }}" class="editable-input" placeholder="City, Country">
+                {% else %}
+                <div class="value">{{ profile.address|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-icon"><i data-lucide="clock"></i></div>
+              <div class="info-content">
+                <div class="label">Member Since</div>
+                <div class="value">{{ profile_user.date_joined|date:"F Y" }}</div>
+              </div>
+            </div>
+
+          </div>
         </div>
+      </div><!-- /personal info -->
 
-        <!-- Right Sidebar: Stats & Security -->
-        <div class="profile-sidebar-right">
-            <!-- Progress Section -->
-            {% if is_own_profile %}
-            <div class="profile-card">
-                <h2 class="card-title"><i data-lucide="activity"></i> Profile Health</h2>
-                <div style="text-align: center; padding: 1rem 0;">
-                    <div style="font-size: 3rem; font-weight: 800; color: var(--p-primary);">{{ completion }}%</div>
-                    <div style="width: 100%; height: 8px; background: var(--p-primary-light); border-radius: 4px; margin: 1rem 0; overflow: hidden;">
-                        <div style="width: {{ completion }}%; height: 100%; background: var(--p-primary); border-radius: 4px;" data-completion="{{ completion }}"></div>
-                    </div>
-                    <p style="font-size: 0.8125rem; color: var(--p-text-muted);">
-                        {% if completion < 100 %}Complete your profile to stand out!{% else %}Your profile is fully optimized!{% endif %}
-                    </p>
-                </div>
+      <!-- Profile Completion (own profile only) -->
+      {% if is_own_profile %}
+      <div class="profile-card">
+        <div class="card-header">
+          <h2 class="card-title"><i data-lucide="activity"></i> Profile Strength</h2>
+        </div>
+        <div class="card-body">
+          <div class="completion-wrap">
+            <div class="completion-ring-wrap">
+              <svg width="90" height="90" viewBox="0 0 90 90">
+                <circle class="ring-bg" cx="45" cy="45" r="37"/>
+                <circle class="ring-fill" cx="45" cy="45" r="37"
+                        stroke-dasharray="{{ completion|default:0 }} 232.5"
+                        id="completionRing"/>
+              </svg>
+              <div class="completion-num">{{ completion }}%</div>
+            </div>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" style="width:{{ completion }}%"></div>
+            </div>
+            <p class="completion-label">
+              {% if completion == 100 %}
+              <strong>✓ Fully complete!</strong>
+              {% elif completion >= 70 %}
+              Almost there — keep filling in details
+              {% else %}
+              Complete your profile to stand out
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Stats Card -->
+      <div class="profile-card">
+        <div class="card-header">
+          <h2 class="card-title"><i data-lucide="bar-chart-2"></i> Activity</h2>
+        </div>
+        <div class="card-body">
+          <div class="stats-grid">
+            {% if profile_user.is_superuser %}
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.total_users|default:0 }}</span>
+              <span class="stat-label">Users</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.total_meetings|default:0 }}</span>
+              <span class="stat-label">Meetings</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.live_meetings|default:0 }}</span>
+              <span class="stat-label">Live Now</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.total_cameras|default:0 }}</span>
+              <span class="stat-label">Cameras</span>
+            </div>
+            {% elif profile.user_type == 'teacher' %}
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.total_meetings|default:0 }}</span>
+              <span class="stat-label">Hosted</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.live_meetings|default:0 }}</span>
+              <span class="stat-label">Live</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.completed_meetings|default:0 }}</span>
+              <span class="stat-label">Completed</span>
+            </div>
+            {% else %}
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.meetings_attended|default:0 }}</span>
+              <span class="stat-label">Meetings</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value">{{ stats.enrolled_courses|default:0 }}</span>
+              <span class="stat-label">Classes</span>
             </div>
             {% endif %}
+          </div>
+        </div>
+      </div>
 
-            <!-- Stats -->
-            <div class="profile-card">
-                <h2 class="card-title"><i data-lucide="bar-chart-3"></i> Insights</h2>
-                <div class="stats-grid">
-                    {% if profile.user_type == 'student' %}
-                    <div class="stat-box">
-                        <div class="stat-value">{{ stats.meetings_attended|default:0 }}</div>
-                        <div class="stat-label">Meetings</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value">{{ stats.enrolled_courses|default:0 }}</div>
-                        <div class="stat-label">Classes</div>
-                    </div>
-                    {% else %}
-                    <div class="stat-box">
-                        <div class="stat-value">{{ stats.total_meetings|default:0 }}</div>
-                        <div class="stat-label">Hosted</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value">{{ stats.live_meetings|default:0 }}</div>
-                        <div class="stat-label">Live</div>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
+    </aside><!-- /left sidebar -->
 
-            <!-- Security Check (Students Only) -->
+    <!-- MAIN CONTENT COLUMN -->
+    <main class="profile-main-col">
+
+      <!-- Bio Card -->
+      <div class="profile-card">
+        <div class="card-header">
+          <h2 class="card-title"><i data-lucide="align-left"></i> About</h2>
+        </div>
+        <div class="card-body">
+          {% if is_own_profile %}
+          <textarea name="bio" rows="4" class="editable-textarea"
+                    placeholder="Write a short professional bio — your background, interests, goals…">{{ profile.bio|default:'' }}</textarea>
+          {% else %}
+          {% if profile.bio %}
+          <p class="profile-bio">{{ profile.bio }}</p>
+          {% else %}
+          <p class="bio-empty">No bio yet.</p>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Academic / Professional Identity -->
+      {% if profile.user_type == 'student' or profile.user_type == 'teacher' %}
+      <div class="profile-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <i data-lucide="{% if profile.user_type == 'teacher' %}briefcase{% else %}book-open{% endif %}"></i>
+            {% if profile.user_type == 'teacher' %}Professional Details{% else %}Academic Details{% endif %}
+          </h2>
+        </div>
+        <div class="card-body">
+          <div class="info-grid-2">
             {% if profile.user_type == 'student' %}
-            <div class="profile-card">
-                <h2 class="card-title"><i data-lucide="lock"></i> Trust & Security</h2>
-                <div class="info-list">
-                    <div class="info-item">
-                        <div class="info-icon {% if face_registered %}face-registered{% else %}face-not-registered{% endif %}">
-                            <i data-lucide="{% if face_registered %}shield-check{% else %}shield-alert{% endif %}"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="label">Facial ID Status</div>
-                            <div class="value">{% if face_registered %}Registered{% else %}Not Set{% endif %}</div>
-                        </div>
-                    </div>
-                    {% if is_own_profile and not face_registered %}
-                    <a href="{% url 'face_setup' %}" class="btn-primary" style="margin-top: 1rem; width: 100%; justify-content: center; background: #166534;">
-                        <i data-lucide="camera"></i> Set Up Face ID
-                    </a>
-                    {% endif %}
-                </div>
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="hash"></i></div>
+              <div class="info-content">
+                <div class="label">Roll Number</div>
+                {% if is_own_profile %}
+                <input type="text" name="roll_number" value="{{ profile.roll_number|default:'' }}" class="editable-input" placeholder="e.g. CS-2024-01">
+                {% else %}
+                <div class="value">{{ profile.roll_number|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="layers"></i></div>
+              <div class="info-content">
+                <div class="label">Branch / Dept</div>
+                {% if is_own_profile %}
+                <input type="text" name="branch" value="{{ profile.branch|default:'' }}" class="editable-input" placeholder="e.g. Computer Science">
+                {% else %}
+                <div class="value">{{ profile.branch|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="layers"></i></div>
+              <div class="info-content">
+                <div class="label">Grade / Year</div>
+                {% if is_own_profile %}
+                <input type="text" name="grade" value="{{ profile.grade|default:'' }}" class="editable-input" placeholder="e.g. 3rd Year">
+                {% else %}
+                <div class="value">{{ profile.grade|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="calendar-check"></i></div>
+              <div class="info-content">
+                <div class="label">Enrollment Date</div>
+                {% if is_own_profile %}
+                <input type="date" name="enrollment_date" value="{{ profile.enrollment_date|date:'Y-m-d' }}" class="editable-input">
+                {% else %}
+                <div class="value">{{ profile.enrollment_date|date:"M Y"|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+            {% else %}
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="badge"></i></div>
+              <div class="info-content">
+                <div class="label">Employee ID</div>
+                {% if is_own_profile %}
+                <input type="text" name="employee_id" value="{{ profile.employee_id|default:'' }}" class="editable-input" placeholder="EMP-001">
+                {% else %}
+                <div class="value">{{ profile.employee_id|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="building-2"></i></div>
+              <div class="info-content">
+                <div class="label">Department</div>
+                {% if is_own_profile %}
+                <input type="text" name="department" value="{{ profile.department|default:'' }}" class="editable-input" placeholder="e.g. Mathematics">
+                {% else %}
+                <div class="value">{{ profile.department|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="award"></i></div>
+              <div class="info-content">
+                <div class="label">Specialization</div>
+                {% if is_own_profile %}
+                <input type="text" name="specialization" value="{{ profile.specialization|default:'' }}" class="editable-input" placeholder="e.g. Calculus, Algebra">
+                {% else %}
+                <div class="value">{{ profile.specialization|default:"—" }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
+              <div class="info-icon"><i data-lucide="calendar-check"></i></div>
+              <div class="info-content">
+                <div class="label">Joined On</div>
+                {% if is_own_profile %}
+                <input type="date" name="join_date" value="{{ profile.join_date|date:'Y-m-d' }}" class="editable-input">
+                {% else %}
+                <div class="value">{{ profile.join_date|date:"M Y"|default:"—" }}</div>
+                {% endif %}
+              </div>
             </div>
             {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Social / Digital Presence -->
+      <div class="profile-card">
+        <div class="card-header">
+          <h2 class="card-title"><i data-lucide="link-2"></i> Digital Presence</h2>
+        </div>
+        <div class="card-body">
+          {% if is_own_profile %}
+          <div class="info-grid-2">
+            <div class="info-item" style="border:none;padding:0;">
+              <div class="info-icon"><i data-lucide="linkedin"></i></div>
+              <div class="info-content">
+                <div class="label">LinkedIn</div>
+                <input type="url" name="linkedin" value="{{ profile.linkedin|default:'' }}" class="editable-input" placeholder="https://linkedin.com/in/…">
+              </div>
+            </div>
+            <div class="info-item" style="border:none;padding:0;">
+              <div class="info-icon"><i data-lucide="twitter"></i></div>
+              <div class="info-content">
+                <div class="label">Twitter / X</div>
+                <input type="url" name="twitter" value="{{ profile.twitter|default:'' }}" class="editable-input" placeholder="https://twitter.com/…">
+              </div>
+            </div>
+            <div class="info-item" style="border:none;padding:0;">
+              <div class="info-icon"><i data-lucide="globe"></i></div>
+              <div class="info-content">
+                <div class="label">Website</div>
+                <input type="url" name="website" value="{{ profile.website|default:'' }}" class="editable-input" placeholder="https://yoursite.com">
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="social-links-row">
+            {% if profile.linkedin %}
+            <a href="{{ profile.linkedin }}" target="_blank" rel="noopener" class="social-link-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+              LinkedIn
+            </a>
+            {% endif %}
+            {% if profile.twitter %}
+            <a href="{{ profile.twitter }}" target="_blank" rel="noopener" class="social-link-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              Twitter / X
+            </a>
+            {% endif %}
+            {% if profile.website %}
+            <a href="{{ profile.website }}" target="_blank" rel="noopener" class="social-link-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              Website
+            </a>
+            {% endif %}
+            {% if not profile.linkedin and not profile.twitter and not profile.website %}
+            <span class="bio-empty">No links added yet.</span>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Trust & Security (students only) -->
+      {% if profile.user_type == 'student' %}
+      <div class="profile-card">
+        <div class="card-header">
+          <h2 class="card-title"><i data-lucide="shield"></i> Trust & Security</h2>
+        </div>
+        <div class="card-body">
+          <div class="info-list">
+            <div class="info-item">
+              <div class="info-icon {% if face_registered %}face-registered{% else %}face-not-registered{% endif %}">
+                <i data-lucide="{% if face_registered %}shield-check{% else %}shield-alert{% endif %}"></i>
+              </div>
+              <div class="info-content">
+                <div class="label">Facial Identity</div>
+                <div class="value">
+                  {% if face_registered %}
+                  <span style="color:#10b981;font-weight:600;">✓ Registered & Active</span>
+                  {% else %}
+                  <span style="color:#ef4444;font-weight:600;">Not registered</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+          {% if is_own_profile and not face_registered %}
+          <a href="{% url 'face_setup' %}" class="btn-primary" style="margin-top:12px;display:inline-flex;background:#065f46;">
+            <i data-lucide="camera"></i> Set Up Face ID
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+    </main><!-- /main col -->
+
+  </div><!-- /profile-layout -->
+
+  {% if is_own_profile %}
+  </form>
+  {% endif %}
+
+  <!-- ── AVATAR MODAL ──────────────────── -->
+  {% if is_own_profile %}
+  <div id="avatarModal" class="avatar-modal" role="dialog" aria-modal="true" aria-label="Change profile photo">
+    <div class="avatar-modal-content">
+      <div class="avatar-modal-header">
+        <h2>Change Profile Photo</h2>
+        <button type="button" class="modal-close" onclick="closeAvatarModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-tab-nav">
+        <button type="button" class="modal-tab-btn active" id="tab-presets" onclick="switchAvatarTab('presets')">Presets</button>
+        <button type="button" class="modal-tab-btn"         id="tab-upload"  onclick="switchAvatarTab('upload')">Upload Photo</button>
+      </div>
+      <div class="modal-tab-body">
+
+        <div id="avatarTab-presets">
+          <p style="font-size:.8125rem;color:var(--p-text-muted);margin-bottom:14px;">Pick a generated avatar as your profile picture.</p>
+          <div class="avatar-grid" id="avatarGrid"></div>
         </div>
 
-    </div>
-
-    {% if is_own_profile %}
-    </form>
-    
-    <!-- Avatar Modal -->
-    <div id="avatarModal" class="avatar-modal">
-        <div class="avatar-modal-content" style="max-width: 800px;">
-            <div class="avatar-modal-header">
-                <h2>Choose Identity</h2>
-                <button type="button" class="modal-close" onclick="closeAvatarModal()">&times;</button>
-            </div>
-            
-            <div style="display:flex; border-bottom: 1px solid var(--p-border); padding: 0 1.5rem;">
-                <button type="button" class="modal-tab-btn active" id="tab-presets" onclick="switchAvatarTab('presets')">Presets</button>
-                <button type="button" class="modal-tab-btn" id="tab-emoji" onclick="switchAvatarTab('emoji')">Emoji Creator</button>
-                <button type="button" class="modal-tab-btn" id="tab-upload" onclick="switchAvatarTab('upload')">Upload</button>
-            </div>
-
-            <div class="avatar-modal-body" style="padding: 2rem;">
-                <div id="avatarTab-presets">
-                    <div class="avatar-grid">
-                        {% for i in "1234567890"|make_list %}
-                        <div class="avatar-option" onclick="selectAvatar('https://api.dicebear.com/7.x/avataaars/svg?seed=seed{{ i }}&backgroundColor=b6e3f4')">
-                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=seed{{ i }}&backgroundColor=b6e3f4" alt="Avatar">
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div id="avatarTab-emoji" style="display:none;">
-                    <div style="display:flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
-                        <canvas id="emojiCanvas" width="240" height="240" style="border-radius: 50%; border: 4px solid var(--p-primary); box-shadow: var(--p-shadow-lg);"></canvas>
-                        <div style="flex: 1; min-width: 300px;">
-                            <!-- Emoji Controls simplified for brevity in this redesign -->
-                            <p style="color: var(--p-text-muted); font-size: 0.875rem; margin-bottom: 1rem;">Use the creator to build a unique academic avatar.</p>
-                            <button type="button" onclick="saveEmojiAvatar()" class="btn-primary">Set as Profile Picture</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="avatarTab-upload" style="display:none; text-align: center;">
-                    <div style="padding: 3rem; border: 2px dashed var(--p-border); border-radius: 1rem;">
-                        <i data-lucide="upload-cloud" style="width: 48px; height: 48px; color: var(--p-primary); margin-bottom: 1rem;"></i>
-                        <p>Drag and drop or browse to upload</p>
-                        <button type="button" class="btn-primary" onclick="document.getElementById('profile_picture').click()" style="margin-top: 1rem;">Choose File</button>
-                    </div>
-                </div>
-            </div>
+        <div id="avatarTab-upload" style="display:none;">
+          <div class="upload-drop-zone" onclick="document.getElementById('profile_picture').click()" id="dropZone">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
+            </svg>
+            <p>Click to upload or drag &amp; drop</p>
+            <small>JPG, PNG or GIF — max 5 MB</small>
+          </div>
+          <div id="uploadPreviewWrap" style="display:none;text-align:center;margin-top:16px;">
+            <img id="uploadPreviewImg" style="max-width:140px;max-height:140px;border-radius:50%;border:3px solid var(--p-primary);object-fit:cover;" alt="Preview">
+            <p style="font-size:.8125rem;color:var(--p-text-muted);margin-top:8px;" id="uploadFileName"></p>
+          </div>
         </div>
+
+      </div>
     </div>
-    {% endif %}
-</div>
+  </div>
+  {% endif %}
+
+</div><!-- /profile-page -->
 
 <script>
-// Logic to handle Lucide icons and Form State
-document.addEventListener('DOMContentLoaded', function() {
-    lucide.createIcons();
-    
-    // Fix CSS issues with Django template variables by setting values via JS
-    var completionDiv = document.querySelector('[data-completion]');
-    if (completionDiv) {
-        var completion = completionDiv.getAttribute('data-completion');
-        completionDiv.style.width = completion + '%';
-    }
-    
-    const form = document.getElementById('profileForm');
-    if (form) {
-        const inputs = form.querySelectorAll('input, textarea');
-        const saveBtn = document.getElementById('saveProfileBtn');
-        
-        inputs.forEach(input => {
-            input.addEventListener('input', () => {
-                saveBtn.classList.add('has-changes');
-                window.onbeforeunload = () => "You have unsaved changes.";
-            });
-        });
+// ── Init Lucide icons ───────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 
-        form.onsubmit = () => {
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<span class="loading-spinner"></span> Saving...';
-            window.onbeforeunload = null;
-        };
-    }
+  // ── Form change detection ────────────────────────────────
+  const form = document.getElementById('profileForm');
+  const saveBtn = document.getElementById('saveProfileBtn');
+  if (form && saveBtn) {
+    form.querySelectorAll('input, textarea').forEach(el => {
+      el.addEventListener('input', () => {
+        saveBtn.classList.add('has-changes');
+        window.onbeforeunload = () => 'You have unsaved changes.';
+      });
+    });
+    form.addEventListener('submit', () => {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="loading-spinner"></span> Saving…';
+      window.onbeforeunload = null;
+    });
+  }
+
+  // ── Build avatar preset grid ─────────────────────────────
+  const grid = document.getElementById('avatarGrid');
+  if (grid) {
+    const seeds = ['Aurora','Bella','Charlie','Diana','Echo','Felix','Grace','Hiro','Iris','Juno',
+                   'Kai','Luna','Mars','Nova','Oscar','Pearl','Quinn','Rex','Sage','Titan'];
+    seeds.forEach(seed => {
+      const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc`;
+      const div = document.createElement('div');
+      div.className = 'avatar-option';
+      div.innerHTML = `<img src="${url}" alt="${seed}" loading="lazy">`;
+      div.onclick = () => selectAvatar(url, div);
+      grid.appendChild(div);
+    });
+  }
+
+  // ── Drag & drop on upload zone ───────────────────────────
+  const dropZone = document.getElementById('dropZone');
+  if (dropZone) {
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--p-primary)'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.style.borderColor = '';
+      const file = e.dataTransfer.files[0];
+      if (file) handleFilePreview(file);
+    });
+  }
 });
 
+// ── Avatar modal helpers ────────────────────────────────────
 function openAvatarModal() {
-    document.getElementById('avatarModal').style.display = 'flex';
+  const m = document.getElementById('avatarModal');
+  m.classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
 function closeAvatarModal() {
-    document.getElementById('avatarModal').style.display = 'none';
+  const m = document.getElementById('avatarModal');
+  m.classList.remove('open');
+  document.body.style.overflow = '';
 }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeAvatarModal();
+});
+
+document.getElementById('avatarModal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('avatarModal')) closeAvatarModal();
+});
 
 function switchAvatarTab(tab) {
-    ['presets', 'emoji', 'upload'].forEach(t => {
-        document.getElementById('avatarTab-' + t).style.display = t === tab ? 'block' : 'none';
-        document.getElementById('tab-' + t).classList.toggle('active', t === tab);
-    });
+  ['presets','upload'].forEach(t => {
+    document.getElementById('avatarTab-' + t).style.display = t === tab ? 'block' : 'none';
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
 }
 
-function selectAvatar(url) {
-    document.getElementById('avatarPreview').src = url;
-    document.getElementById('avatar_choice').value = url;
-    document.getElementById('saveProfileBtn').classList.add('has-changes');
-    closeAvatarModal();
+function selectAvatar(url, el) {
+  document.getElementById('avatarPreview').src = url;
+  document.getElementById('avatar_choice').value = url;
+  document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('saveProfileBtn')?.classList.add('has-changes');
+  setTimeout(closeAvatarModal, 400);
 }
 
-function previewAvatar(input) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            document.getElementById('avatarPreview').src = e.target.result;
-            document.getElementById('avatar_choice').value = '';
-            document.getElementById('saveProfileBtn').classList.add('has-changes');
-            closeAvatarModal();
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
+function handleFilePreview(file) {
+  if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+  if (file.size > 5 * 1024 * 1024) { alert('File too large. Max 5 MB.'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('avatarPreview').src = e.target.result;
+    const wrap = document.getElementById('uploadPreviewWrap');
+    document.getElementById('uploadPreviewImg').src = e.target.result;
+    document.getElementById('uploadFileName').textContent = file.name;
+    wrap.style.display = 'block';
+    document.getElementById('avatar_choice').value = '';
+    document.getElementById('saveProfileBtn')?.classList.add('has-changes');
+    setTimeout(closeAvatarModal, 600);
+  };
+  reader.readAsDataURL(file);
 }
 
-document.getElementById('profile_picture').onchange = function() { previewAvatar(this); };
+// Listen for file input change
+document.getElementById('profile_picture')?.addEventListener('change', function() {
+  if (this.files && this.files[0]) handleFilePreview(this.files[0]);
+});
 </script>
 {% endblock %}

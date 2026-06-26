@@ -2,406 +2,440 @@
 {% load static %}
 
 {% block page_title %}Messages{% endblock %}
-
-{% block title %}Inbox - EduMi{% endblock %}
+{% block title %}Inbox — EduMi{% endblock %}
 
 {% block content %}
 <style>
-.inbox-container {
-    max-width: 100%;
-    margin: 0;
-    height: calc(100vh - 60px);
-    display: flex;
-    background: #fff;
-    overflow: hidden;
+/* ── Inbox Layout ─────────────────────────────────── */
+.inbox-shell {
+  display: flex;
+  height: calc(100vh - var(--topbar-height, 60px));
+  background: var(--bg-main, #f4f5f7);
+  overflow: hidden;
 }
 
+/* ── Conversation Sidebar ─────────────────────────── */
 .inbox-sidebar {
-    width: 340px;
-    border-right: 1px solid #e0e0e0;
-    display: flex;
-    flex-direction: column;
-    background: #f9fafb;
+  width: 340px;
+  min-width: 280px;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card, #fff);
+  border-right: 1px solid var(--border-color, #e5e7eb);
+  flex-shrink: 0;
 }
 
-.inbox-header {
-    padding: 16px;
-    background: #667eea;
-    color: white;
+.inbox-top {
+  padding: 18px 16px 12px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-card, #fff);
 }
 
-.inbox-header h1 {
-    font-size: 20px;
-    font-weight: 700;
-    margin: 0 0 4px 0;
+.inbox-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
-.inbox-header p {
-    margin: 0;
-    opacity: 0.9;
-    font-size: 13px;
+.inbox-top h1 {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--text-main, #111827);
+  margin: 0;
 }
 
-.search-box {
-    padding: 12px;
-    background: white;
-    border-bottom: 1px solid #e0e0e0;
+.inbox-count-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--hover-bg, #f3f4f6);
+  color: var(--text-muted, #6b7280);
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.search-wrap {
+  position: relative;
+}
+
+.search-wrap svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  stroke: var(--text-muted, #6b7280);
+  pointer-events: none;
 }
 
 .search-input {
-    width: 100%;
-    padding: 10px 12px 10px 36px;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    font-size: 13px;
-    transition: all 0.2s;
-    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>') no-repeat 10px center;
+  width: 100%;
+  padding: 9px 12px 9px 34px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  font-size: 0.875rem;
+  background: var(--hover-bg, #f3f4f6);
+  color: var(--text-main, #111827);
+  outline: none;
+  transition: all 0.2s;
 }
 
 .search-input:focus {
-    outline: none;
-    border-color: #667eea;
+  background: var(--bg-card, #fff);
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
 }
 
-.conversations-list {
-    flex: 1;
-    overflow-y: auto;
+.inbox-list {
+  flex: 1;
+  overflow-y: auto;
 }
 
-.conversation-item {
-    padding: 12px;
-    border-bottom: 1px solid #e0e0e0;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-    color: inherit;
-    background: white;
+.inbox-list::-webkit-scrollbar { width: 4px; }
+.inbox-list::-webkit-scrollbar-track { background: transparent; }
+.inbox-list::-webkit-scrollbar-thumb { background: var(--border-color, #e5e7eb); border-radius: 99px; }
+
+/* ── Conversation Item ─────────────────────────────── */
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+  cursor: pointer;
+  position: relative;
 }
 
-.conversation-item:hover {
-    background: #f3f4f6;
+.conv-item:hover { background: var(--hover-bg, #f3f4f6); }
+
+.conv-item.unread-item { background: rgba(102,126,234,0.04); }
+
+.conv-avatar {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
 }
 
-.conversation-item.active {
-    background: #ede9fe;
-    border-left: 3px solid #667eea;
+.conv-avatar img {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 2px solid var(--border-color, #e5e7eb);
 }
 
-.avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    overflow: hidden;
-    position: relative;
+.online-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 11px;
+  height: 11px;
+  background: #10b981;
+  border: 2px solid var(--bg-card, #fff);
+  border-radius: 50%;
 }
 
-.avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.conv-body { flex: 1; min-width: 0; }
+
+.conv-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main, #111827);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.avatar.online::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 10px;
-    height: 10px;
-    background: #10b981;
-    border: 2px solid white;
-    border-radius: 50%;
+.conv-preview {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.conversation-info {
-    flex: 1;
-    min-width: 0;
+.conv-preview.unread-text {
+  color: var(--text-main, #111827);
+  font-weight: 600;
 }
 
-.conversation-name {
-    font-weight: 600;
-    font-size: 14px;
-    color: #111827;
-    margin-bottom: 3px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+.conv-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
-.conversation-preview {
-    font-size: 12px;
-    color: #6b7280;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.conv-time {
+  font-size: 0.6875rem;
+  color: var(--text-muted, #9ca3af);
 }
 
-.conversation-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
+.unread-pill {
+  background: #667eea;
+  color: white;
+  border-radius: 99px;
+  padding: 1px 7px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  min-width: 18px;
+  text-align: center;
 }
 
-.conversation-time {
-    font-size: 11px;
-    color: #9ca3af;
+/* ── Search Results Panel ─────────────────────────── */
+.search-results-panel {
+  background: var(--bg-card, #fff);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
 
-.unread-badge {
-    background: #667eea;
-    color: white;
-    border-radius: 10px;
-    padding: 2px 6px;
-    font-size: 10px;
-    font-weight: 600;
-    min-width: 18px;
-    text-align: center;
+.search-section-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #6b7280);
+  padding: 10px 16px 6px;
 }
 
-.search-results {
-    background: white;
-    border-bottom: 1px solid #e0e0e0;
-    max-height: 350px;
-    overflow-y: auto;
+.search-user-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--hover-bg, #f3f4f6);
+  transition: background 0.15s;
 }
 
-.search-result-item {
-    padding: 10px 12px;
-    border-bottom: 1px solid #f3f4f6;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.search-user-item:hover { background: var(--hover-bg, #f3f4f6); }
+.search-user-item:last-child { border-bottom: none; }
+
+.search-user-item img {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
-.search-result-item:last-child {
-    border-bottom: none;
+.search-user-info { flex: 1; min-width: 0; }
+
+.search-user-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main, #111827);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.search-actions {
-    display: flex;
-    gap: 6px;
+.search-user-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7280);
 }
 
-.btn-sm {
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 12px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.2s;
-    border: none;
-    cursor: pointer;
+.search-action-btns { display: flex; gap: 6px; }
+
+.btn-xs {
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  transition: all 0.15s;
+  white-space: nowrap;
 }
 
-.btn-primary {
-    background: #667eea;
-    color: white;
+.btn-xs-primary { background: #667eea; color: white; }
+.btn-xs-primary:hover { background: #5568d3; color: white; }
+.btn-xs-ghost { background: var(--hover-bg, #f3f4f6); color: var(--text-main, #374151); border: 1px solid var(--border-color, #e5e7eb); }
+.btn-xs-ghost:hover { background: var(--border-color, #e5e7eb); }
+
+/* ── Empty States ─────────────────────────────────── */
+.empty-conversations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
 }
 
-.btn-primary:hover {
-    background: #5568d3;
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--hover-bg, #f3f4f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
 }
 
-.btn-secondary {
-    background: #f3f4f6;
-    color: #374151;
+.empty-icon svg {
+  width: 28px;
+  height: 28px;
+  stroke: var(--text-muted, #9ca3af);
 }
 
-.btn-secondary:hover {
-    background: #e5e7eb;
+.empty-title { font-size: 0.9375rem; font-weight: 700; color: var(--text-main, #374151); margin-bottom: 4px; }
+.empty-sub   { font-size: 0.8125rem; color: var(--text-muted, #6b7280); }
+
+/* ── Main Welcome Panel ───────────────────────────── */
+.inbox-welcome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-main, #f9fafb);
 }
 
-.empty-state {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 16px;
-    text-align: center;
-    color: #9ca3af;
+.welcome-card {
+  text-align: center;
+  padding: 40px;
+  max-width: 340px;
 }
 
-.empty-state-icon {
-    font-size: 60px;
-    margin-bottom: 12px;
-    opacity: 0.4;
+.welcome-illo {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(102,126,234,0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
 }
 
-.empty-state h3 {
-    color: #6b7280;
-    font-size: 16px;
-    margin-bottom: 6px;
+.welcome-illo svg {
+  width: 44px;
+  height: 44px;
+  stroke: #667eea;
 }
 
-.empty-state p {
-    color: #9ca3af;
-    font-size: 13px;
-}
+.welcome-card h2 { font-size: 1.125rem; font-weight: 700; color: var(--text-main, #111827); margin-bottom: 8px; }
+.welcome-card p  { font-size: 0.875rem; color: var(--text-muted, #6b7280); line-height: 1.6; }
 
-.inbox-main {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f8f9fa;
-}
-
-.select-conversation {
-    text-align: center;
-    color: #9ca3af;
-}
-
-.select-conversation-icon {
-    font-size: 80px;
-    margin-bottom: 16px;
-    opacity: 0.3;
-}
-
-.select-conversation h2 {
-    color: #6b7280;
-    font-size: 20px;
-    margin-bottom: 6px;
-}
-
-.select-conversation p {
-    color: #9ca3af;
-    font-size: 14px;
-}
-
-/* Scrollbar styling */
-.conversations-list::-webkit-scrollbar,
-.search-results::-webkit-scrollbar {
-    width: 6px;
-}
-
-.conversations-list::-webkit-scrollbar-track,
-.search-results::-webkit-scrollbar-track {
-    background: #f3f4f6;
-}
-
-.conversations-list::-webkit-scrollbar-thumb,
-.search-results::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 3px;
-}
-
-.conversations-list::-webkit-scrollbar-thumb:hover,
-.search-results::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
+@media (max-width: 640px) {
+  .inbox-sidebar { width: 100%; max-width: 100%; }
+  .inbox-welcome { display: none; }
 }
 </style>
 
-<div class="inbox-container">
-    <!-- Sidebar -->
-    <div class="inbox-sidebar">
-        <!-- Header -->
-        <div class="inbox-header">
-            <h1>💬 Messages</h1>
-            <p>{{ conversations.count }} conversation{{ conversations.count|pluralize }}</p>
-        </div>
-        
-        <!-- Search -->
-        <div class="search-box">
-            <form action="{% url 'inbox' %}" method="GET">
-                <input type="text" name="q" value="{{ search_query }}" 
-                       class="search-input" placeholder="Search people...">
-            </form>
-        </div>
-        
-        <!-- Search Results -->
-        {% if search_query %}
-            <div class="search-results">
-                {% if search_results %}
-                    {% for user_result in search_results %}
-                        <div class="search-result-item">
-                        <div class="avatar">
-                            <img src="{{ user_result.userprofile.get_profile_picture_url }}" alt="{{ user_result.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ user_result.username }}&background=667eea&color=fff'">
-                        </div>
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 600; font-size: 13px; color: #111827;">
-                                {{ user_result.userprofile.display_name|default:user_result.get_full_name|default:user_result.username }}
-                            </div>
-                            <div style="font-size: 11px; color: #6b7280;">
-                                @{{ user_result.username }}
-                                {% if user_result.userprofile.user_type == 'teacher' %}👨‍🏫{% else %}👨‍🎓{% endif %}
-                            </div>
-                        </div>
-                            <div class="search-actions">
-                                <a href="{% url 'profile_view' user_result.username %}" class="btn-sm btn-secondary">Profile</a>
-                                <a href="{% url 'start_conversation' user_result.username %}" class="btn-sm btn-primary">Message</a>
-                            </div>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <div style="padding: 20px; text-align: center; color: #9ca3af;">
-                        <p>No users found</p>
-                    </div>
-                {% endif %}
-            </div>
-        {% endif %}
-        
-        <!-- Conversations -->
-        <div class="conversations-list">
-            {% if conversations %}
-                {% for conv in conversations %}
-                    <a href="{% url 'conversation_detail' conv.id %}" class="conversation-item">
-                        <div class="avatar {% if conv.other_user.is_active %}online{% endif %}">
-                            <img src="{{ conv.other_user.userprofile.get_profile_picture_url }}" alt="{{ conv.other_user.username }}" onerror="this.src='https://ui-avatars.com/api/?name={{ conv.other_user.username }}&background=667eea&color=fff'">
-                        </div>
-                        <div class="conversation-info">
-                            <div class="conversation-name">
-                                {{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}
-                                {% if conv.other_user.userprofile.user_type == 'teacher' %}
-                                    <span style="font-size: 12px;">👨‍🏫</span>
-                                {% else %}
-                                    <span style="font-size: 12px;">👨‍🎓</span>
-                                {% endif %}
-                            </div>
-                            <div class="conversation-preview">
-                                {% if conv.last_msg %}
-                                    {% if conv.last_msg.sender == user %}<strong>You:</strong> {% endif %}
-                                    {% if conv.last_msg.image %}📷 Photo
-                                    {% elif conv.last_msg.file %}📎 File
-                                    {% else %}{{ conv.last_msg.content|truncatewords:8 }}
-                                    {% endif %}
-                                {% else %}
-                                    <em>No messages yet</em>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="conversation-meta">
-                            {% if conv.last_msg %}
-                                <div class="conversation-time">{{ conv.last_msg.created_at|timesince|slice:":10" }}</div>
-                            {% endif %}
-                            {% if conv.unread_count > 0 %}
-                                <div class="unread-badge">{{ conv.unread_count }}</div>
-                            {% endif %}
-                        </div>
-                    </a>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <div class="empty-state-icon">💬</div>
-                    <h3>No conversations yet</h3>
-                    <p>Search for someone to start chatting</p>
-                </div>
-            {% endif %}
-        </div>
+<div class="inbox-shell">
+
+  <!-- ── Sidebar ── -->
+  <div class="inbox-sidebar">
+    <div class="inbox-top">
+      <div class="inbox-top-row">
+        <h1>Messages</h1>
+        <span class="inbox-count-badge">{{ conversations.count }} chat{{ conversations.count|pluralize }}</span>
+      </div>
+      <form action="{% url 'inbox' %}" method="GET" class="search-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ search_query }}" class="search-input" placeholder="Search people…" autocomplete="off">
+      </form>
     </div>
-    
-    <!-- Main Area -->
-    <div class="inbox-main">
-        <div class="select-conversation">
-            <div class="select-conversation-icon">💬</div>
-            <h2>Select a conversation</h2>
-            <p>Choose a conversation from the sidebar to start messaging</p>
+
+    <!-- Search Results -->
+    {% if search_query %}
+    <div class="search-results-panel">
+      {% if search_results %}
+      <div class="search-section-label">People</div>
+      {% for u in search_results %}
+      <div class="search-user-item">
+        <img src="{{ u.userprofile.get_profile_picture_url }}" alt="{{ u.username }}"
+             onerror="this.src='https://ui-avatars.com/api/?name={{ u.username }}&background=667eea&color=fff'">
+        <div class="search-user-info">
+          <div class="search-user-name">{{ u.userprofile.display_name|default:u.get_full_name|default:u.username }}</div>
+          <div class="search-user-meta">@{{ u.username }} · {% if u.userprofile.user_type == 'teacher' %}Teacher{% else %}Student{% endif %}</div>
         </div>
+        <div class="search-action-btns">
+          <a href="{% url 'profile_view' u.username %}" class="btn-xs btn-xs-ghost">Profile</a>
+          <a href="{% url 'start_conversation' u.username %}" class="btn-xs btn-xs-primary">Chat</a>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-conversations" style="padding:28px;">
+        <div class="empty-title">No users found</div>
+        <div class="empty-sub">Try a different name or username</div>
+      </div>
+      {% endif %}
     </div>
+    {% endif %}
+
+    <!-- Conversation List -->
+    <div class="inbox-list">
+      {% if conversations %}
+      {% for conv in conversations %}
+      <a href="{% url 'conversation_detail' conv.id %}" class="conv-item {% if conv.unread_count > 0 %}unread-item{% endif %}">
+        <div class="conv-avatar">
+          <img src="{{ conv.other_user.userprofile.get_profile_picture_url }}"
+               alt="{{ conv.other_user.username }}"
+               onerror="this.src='https://ui-avatars.com/api/?name={{ conv.other_user.username }}&background=667eea&color=fff'">
+          {% if conv.other_user.is_active %}<span class="online-dot"></span>{% endif %}
+        </div>
+        <div class="conv-body">
+          <div class="conv-name">
+            {{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}
+            <span style="font-size:0.75rem;">{% if conv.other_user.userprofile.user_type == 'teacher' %}👨‍🏫{% else %}👨‍🎓{% endif %}</span>
+          </div>
+          <div class="conv-preview {% if conv.unread_count > 0 %}unread-text{% endif %}">
+            {% if conv.last_msg %}
+              {% if conv.last_msg.sender == user %}You: {% endif %}
+              {% if conv.last_msg.image %}📷 Photo
+              {% elif conv.last_msg.file %}📎 File
+              {% else %}{{ conv.last_msg.content|truncatewords:8 }}{% endif %}
+            {% else %}<em>Start the conversation</em>{% endif %}
+          </div>
+        </div>
+        <div class="conv-meta">
+          {% if conv.last_msg %}
+          <span class="conv-time">{{ conv.last_msg.created_at|timesince|slice:":8" }}</span>
+          {% endif %}
+          {% if conv.unread_count > 0 %}
+          <span class="unread-pill">{{ conv.unread_count }}</span>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+      {% else %}
+      <div class="empty-conversations">
+        <div class="empty-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"/></svg>
+        </div>
+        <div class="empty-title">No conversations yet</div>
+        <div class="empty-sub">Search for someone above to start chatting</div>
+      </div>
+      {% endif %}
+    </div>
+  </div><!-- /sidebar -->
+
+  <!-- ── Main welcome panel ── -->
+  <div class="inbox-welcome">
+    <div class="welcome-card">
+      <div class="welcome-illo">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"/></svg>
+      </div>
+      <h2>Your Messages</h2>
+      <p>Select a conversation from the sidebar, or search for someone to start a new chat.</p>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
