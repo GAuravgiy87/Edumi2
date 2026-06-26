@@ -1,21 +1,34 @@
 {% extends 'base_sidebar.html' %}
 {% load static %}
 
-{% block page_title %}{{ profile_user.username }}'s Profile{% endblock %}
-{% block title %}{{ profile.get_display_name }} — EduMi{% endblock %}
+{% block title %}{{ profile_user.get_full_name|default:profile_user.username }} - Profile{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/profile.css' %}?v=4">
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
 <div class="profile-page">
+  <!-- Edit Mode Banner (sticky) -->
+  <div class="edit-mode-banner" id="editBanner">
+    <span><i data-lucide="pencil"></i> Editing your profile — unsaved changes will be lost if you leave</span>
+    <div style="display:flex; gap:10px;">
+      <button type="submit" form="profileForm" class="btn-banner-save">
+        <i data-lucide="save"></i> Save Changes
+      </button>
+      <button type="button" onclick="exitEditMode(true)" class="btn-banner-cancel">
+        <i data-lucide="x"></i> Discard
+      </button>
+    </div>
+  </div>
 
   {% if messages %}
-  <div style="max-width:1140px;margin:16px auto;padding:0 20px;">
+  <div class="messages-container">
     {% for message in messages %}
-    <div class="alert-success">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    <div class="alert alert-{{ message.tags }}">
+      <i
+        data-lucide="{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}alert-circle{% else %}info{% endif %}"></i>
       {{ message }}
     </div>
     {% endfor %}
@@ -23,637 +36,1079 @@
   {% endif %}
 
   {% if is_own_profile %}
-  <form method="POST" enctype="multipart/form-data" id="profileForm">
-  {% csrf_token %}
-  {% endif %}
+  <form id="profileForm" method="post" enctype="multipart/form-data" action="">
+    {% csrf_token %}
+    {% endif %}
 
-  <!-- ── HERO / COVER ───────────────────── -->
-  <div class="profile-hero">
-    <div class="profile-cover">
-      <div class="profile-cover-dots"></div>
-    </div>
+    <div class="profile-container">
 
-    <div class="profile-hero-content">
-      <!-- Avatar -->
-      <div class="profile-avatar-wrap">
-        <img src="{{ profile.get_profile_picture_url }}"
-             alt="{{ profile_user.username }}"
-             id="avatarPreview"
-             class="profile-avatar-img"
-             onerror="this.src='https://ui-avatars.com/api/?name={{ profile_user.username }}&background=667eea&color=fff&size=200'">
-        {% if is_own_profile %}
-        <button type="button" class="avatar-edit-btn" onclick="openAvatarModal()" title="Change photo">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
-          </svg>
-        </button>
-        <input type="file" id="profile_picture" name="profile_picture" accept="image/*" style="display:none;">
-        <input type="hidden" id="avatar_choice" name="avatar_choice" value="">
-        {% endif %}
-      </div>
-
-      <!-- Identity -->
-      <div class="profile-identity">
-        <div class="profile-name-row">
-          {% if is_own_profile %}
-          <input type="text" name="display_name"
-                 value="{{ profile.display_name|default:'' }}"
-                 placeholder="Your display name"
-                 class="editable-input name-input"
-                 id="displayNameInput">
+      <!-- Hero Card with Cover -->
+      <div class="profile-hero-card">
+        <!-- Cover Photo -->
+        <div class="profile-cover">
+          {% if profile.cover_photo %}
+          <img src="{{ profile.cover_photo.url }}" alt="Cover" class="profile-cover-img" id="coverPreview">
+          {% elif profile.user_type == 'student' %}
+          <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80" alt="Cover"
+            class="profile-cover-img" id="coverPreview">
           {% else %}
-          <h1>{{ profile.get_display_name }}</h1>
+          <img src="https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=1200&q=80" alt="Cover"
+            class="profile-cover-img" id="coverPreview">
           {% endif %}
-        </div>
-        <div class="profile-handle">@{{ profile_user.username }}</div>
-        <div class="profile-badges">
-          <span class="p-badge p-badge-role">
-            <i data-lucide="{% if profile.user_type == 'teacher' %}graduation-cap{% else %}book-open{% endif %}"></i>
-            {{ profile.get_user_type_display }}
-          </span>
-          {% if profile_user.is_superuser %}
-          <span class="p-badge p-badge-admin">
-            <i data-lucide="shield-check"></i> Administrator
-          </span>
-          {% endif %}
-          {% if profile.user_type == 'student' and face_registered %}
-          <span class="p-badge p-badge-verified">
-            <i data-lucide="user-check"></i> Verified Identity
-          </span>
-          {% endif %}
-        </div>
-      </div>
 
-      <!-- Hero Actions -->
-      <div class="profile-hero-actions">
-        {% if is_own_profile %}
-        <button type="submit" class="btn-primary" id="saveProfileBtn">
-          <i data-lucide="save"></i> Save Changes
-        </button>
-        {% else %}
-        <a href="{% url 'start_conversation' profile_user.username %}" class="btn-message">
-          <i data-lucide="message-circle"></i> Message
-        </a>
-        <a href="{% url 'profile_view' request.user.username %}" class="btn-secondary">
-          <i data-lucide="user"></i> My Profile
-        </a>
-        {% endif %}
-      </div>
-    </div>
-  </div><!-- /profile-hero -->
-
-  <!-- ── TWO-COLUMN LAYOUT ──────────────── -->
-  <div class="profile-layout" style="margin-top:24px;">
-
-    <!-- LEFT SIDEBAR -->
-    <aside class="profile-sidebar-col">
-
-      <!-- Personal Info Card -->
-      <div class="profile-card">
-        <div class="card-header">
-          <h2 class="card-title"><i data-lucide="user"></i> Personal Info</h2>
-        </div>
-        <div class="card-body">
-          <div class="info-list">
-
-            <div class="info-item">
-              <div class="info-icon"><i data-lucide="user"></i></div>
-              <div class="info-content">
-                <div class="label">Full Name</div>
-                {% if is_own_profile %}
-                <div style="display:flex;gap:6px;">
-                  <input type="text" name="first_name" value="{{ profile_user.first_name }}" placeholder="First" class="editable-input" style="flex:1;">
-                  <input type="text" name="last_name" value="{{ profile_user.last_name }}" placeholder="Last" class="editable-input" style="flex:1;">
-                </div>
-                {% else %}
-                <div class="value">{{ profile_user.get_full_name|default:"Not provided" }}</div>
-                {% endif %}
-              </div>
-            </div>
-
-            <div class="info-item">
-              <div class="info-icon"><i data-lucide="mail"></i></div>
-              <div class="info-content">
-                <div class="label">Email</div>
-                {% if is_own_profile %}
-                <input type="email" name="email" value="{{ profile_user.email }}" class="editable-input">
-                {% else %}
-                <div class="value">{{ profile_user.email|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-
-            <div class="info-item">
-              <div class="info-icon"><i data-lucide="phone"></i></div>
-              <div class="info-content">
-                <div class="label">Phone</div>
-                {% if is_own_profile %}
-                <input type="tel" name="phone" value="{{ profile.phone|default:'' }}" class="editable-input" placeholder="+1 (555) 000-0000">
-                {% else %}
-                <div class="value">{{ profile.phone|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-
-            <div class="info-item">
-              <div class="info-icon"><i data-lucide="calendar"></i></div>
-              <div class="info-content">
-                <div class="label">Date of Birth</div>
-                {% if is_own_profile %}
-                <input type="date" name="date_of_birth" value="{{ profile.date_of_birth|date:'Y-m-d' }}" class="editable-input">
-                {% else %}
-                <div class="value">{{ profile.date_of_birth|date:"M d, Y"|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-
-            <div class="info-item">
-              <div class="info-icon"><i data-lucide="map-pin"></i></div>
-              <div class="info-content">
-                <div class="label">Address</div>
-                {% if is_own_profile %}
-                <input type="text" name="address" value="{{ profile.address|default:'' }}" class="editable-input" placeholder="City, Country">
-                {% else %}
-                <div class="value">{{ profile.address|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-
-            <div class="info-item">
-              <div class="info-icon"><i data-lucide="clock"></i></div>
-              <div class="info-content">
-                <div class="label">Member Since</div>
-                <div class="value">{{ profile_user.date_joined|date:"F Y" }}</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div><!-- /personal info -->
-
-      <!-- Profile Completion (own profile only) -->
-      {% if is_own_profile %}
-      <div class="profile-card">
-        <div class="card-header">
-          <h2 class="card-title"><i data-lucide="activity"></i> Profile Strength</h2>
-        </div>
-        <div class="card-body">
-          <div class="completion-wrap">
-            <div class="completion-ring-wrap">
-              <svg width="90" height="90" viewBox="0 0 90 90">
-                <circle class="ring-bg" cx="45" cy="45" r="37"/>
-                <circle class="ring-fill" cx="45" cy="45" r="37"
-                        stroke-dasharray="{{ completion|default:0 }} 232.5"
-                        id="completionRing"/>
-              </svg>
-              <div class="completion-num">{{ completion }}%</div>
-            </div>
-            <div class="progress-bar-wrap">
-              <div class="progress-bar-fill" style="width:{{ completion }}%"></div>
-            </div>
-            <p class="completion-label">
-              {% if completion == 100 %}
-              <strong>✓ Fully complete!</strong>
-              {% elif completion >= 70 %}
-              Almost there — keep filling in details
-              {% else %}
-              Complete your profile to stand out
-              {% endif %}
-            </p>
-          </div>
-        </div>
-      </div>
-      {% endif %}
-
-      <!-- Stats Card -->
-      <div class="profile-card">
-        <div class="card-header">
-          <h2 class="card-title"><i data-lucide="bar-chart-2"></i> Activity</h2>
-        </div>
-        <div class="card-body">
-          <div class="stats-grid">
-            {% if profile_user.is_superuser %}
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.total_users|default:0 }}</span>
-              <span class="stat-label">Users</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.total_meetings|default:0 }}</span>
-              <span class="stat-label">Meetings</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.live_meetings|default:0 }}</span>
-              <span class="stat-label">Live Now</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.total_cameras|default:0 }}</span>
-              <span class="stat-label">Cameras</span>
-            </div>
-            {% elif profile.user_type == 'teacher' %}
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.total_meetings|default:0 }}</span>
-              <span class="stat-label">Hosted</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.live_meetings|default:0 }}</span>
-              <span class="stat-label">Live</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.completed_meetings|default:0 }}</span>
-              <span class="stat-label">Completed</span>
-            </div>
+          <!-- Hero Actions -->
+          <div class="profile-hero-actions">
+            {% if is_own_profile %}
+            <button type="button" id="btn-edit-profile" class="btn-edit-profile-trigger" onclick="enterEditMode()">
+              <i data-lucide="pencil"></i> Edit Profile
+            </button>
             {% else %}
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.meetings_attended|default:0 }}</span>
-              <span class="stat-label">Meetings</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value">{{ stats.enrolled_courses|default:0 }}</span>
-              <span class="stat-label">Classes</span>
-            </div>
+            <a href="{% url 'start_conversation' profile_user.username %}" class="btn-primary">
+              <i data-lucide="send"></i> Direct Message
+            </a>
             {% endif %}
+            <button type="button" class="btn-icon-share" onclick="shareProfile()" title="Share profile">
+              <i data-lucide="share-2"></i>
+            </button>
           </div>
-        </div>
-      </div>
 
-    </aside><!-- /left sidebar -->
-
-    <!-- MAIN CONTENT COLUMN -->
-    <main class="profile-main-col">
-
-      <!-- Bio Card -->
-      <div class="profile-card">
-        <div class="card-header">
-          <h2 class="card-title"><i data-lucide="align-left"></i> About</h2>
-        </div>
-        <div class="card-body">
           {% if is_own_profile %}
-          <textarea name="bio" rows="4" class="editable-textarea"
-                    placeholder="Write a short professional bio — your background, interests, goals…">{{ profile.bio|default:'' }}</textarea>
-          {% else %}
-          {% if profile.bio %}
-          <p class="profile-bio">{{ profile.bio }}</p>
-          {% else %}
-          <p class="bio-empty">No bio yet.</p>
-          {% endif %}
+          <input type="file" name="cover_photo" id="cover_choice" accept="image/*" style="display:none"
+            onchange="previewCover(this)">
+          <button type="button" class="cover-edit-btn edit-field"
+            onclick="document.getElementById('cover_choice').click()">
+            <i data-lucide="camera"></i> Change Banner
+          </button>
           {% endif %}
         </div>
-      </div>
 
-      <!-- Academic / Professional Identity -->
-      {% if profile.user_type == 'student' or profile.user_type == 'teacher' %}
-      <div class="profile-card">
-        <div class="card-header">
-          <h2 class="card-title">
-            <i data-lucide="{% if profile.user_type == 'teacher' %}briefcase{% else %}book-open{% endif %}"></i>
-            {% if profile.user_type == 'teacher' %}Professional Details{% else %}Academic Details{% endif %}
-          </h2>
-        </div>
-        <div class="card-body">
-          <div class="info-grid-2">
+        <!-- Hero Content Area -->
+        <div class="profile-hero-content">
+          <!-- Avatar (overlapping cover) -->
+          <div class="profile-avatar-wrap">
+            {% if profile.profile_picture %}
+            <img src="{{ profile.profile_picture.url }}" alt="Avatar" class="profile-avatar-img" id="avatarPreview">
+            {% elif profile.avatar_url %}
+            <img src="{{ profile.avatar_url }}" alt="Avatar" class="profile-avatar-img" id="avatarPreview">
+            {% else %}
+            <img
+              src="https://ui-avatars.com/api/?name={{ profile_user.get_full_name|urlencode }}&size=200&background=667eea&color=fff&bold=true"
+              alt="Avatar" class="profile-avatar-img" id="avatarPreview">
+            {% endif %}
+
             {% if profile.user_type == 'student' %}
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="hash"></i></div>
-              <div class="info-content">
-                <div class="label">Roll Number</div>
-                {% if is_own_profile %}
-                <input type="text" name="roll_number" value="{{ profile.roll_number|default:'' }}" class="editable-input" placeholder="e.g. CS-2024-01">
-                {% else %}
-                <div class="value">{{ profile.roll_number|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="layers"></i></div>
-              <div class="info-content">
-                <div class="label">Branch / Dept</div>
-                {% if is_own_profile %}
-                <input type="text" name="branch" value="{{ profile.branch|default:'' }}" class="editable-input" placeholder="e.g. Computer Science">
-                {% else %}
-                <div class="value">{{ profile.branch|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="layers"></i></div>
-              <div class="info-content">
-                <div class="label">Grade / Year</div>
-                {% if is_own_profile %}
-                <input type="text" name="grade" value="{{ profile.grade|default:'' }}" class="editable-input" placeholder="e.g. 3rd Year">
-                {% else %}
-                <div class="value">{{ profile.grade|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="calendar-check"></i></div>
-              <div class="info-content">
-                <div class="label">Enrollment Date</div>
-                {% if is_own_profile %}
-                <input type="date" name="enrollment_date" value="{{ profile.enrollment_date|date:'Y-m-d' }}" class="editable-input">
-                {% else %}
-                <div class="value">{{ profile.enrollment_date|date:"M Y"|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-            {% else %}
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="badge"></i></div>
-              <div class="info-content">
-                <div class="label">Employee ID</div>
-                {% if is_own_profile %}
-                <input type="text" name="employee_id" value="{{ profile.employee_id|default:'' }}" class="editable-input" placeholder="EMP-001">
-                {% else %}
-                <div class="value">{{ profile.employee_id|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="building-2"></i></div>
-              <div class="info-content">
-                <div class="label">Department</div>
-                {% if is_own_profile %}
-                <input type="text" name="department" value="{{ profile.department|default:'' }}" class="editable-input" placeholder="e.g. Mathematics">
-                {% else %}
-                <div class="value">{{ profile.department|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="award"></i></div>
-              <div class="info-content">
-                <div class="label">Specialization</div>
-                {% if is_own_profile %}
-                <input type="text" name="specialization" value="{{ profile.specialization|default:'' }}" class="editable-input" placeholder="e.g. Calculus, Algebra">
-                {% else %}
-                <div class="value">{{ profile.specialization|default:"—" }}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="info-item" style="background:var(--p-hover);border-radius:10px;border:none;padding:14px;">
-              <div class="info-icon"><i data-lucide="calendar-check"></i></div>
-              <div class="info-content">
-                <div class="label">Joined On</div>
-                {% if is_own_profile %}
-                <input type="date" name="join_date" value="{{ profile.join_date|date:'Y-m-d' }}" class="editable-input">
-                {% else %}
-                <div class="value">{{ profile.join_date|date:"M Y"|default:"—" }}</div>
-                {% endif %}
-              </div>
+            {% if face_registered %}
+            <div class="avatar-verified-badge" title="Verified Identity">
+              <i data-lucide="badge-check"></i>
             </div>
             {% endif %}
+            {% else %}
+            <div class="avatar-status-dot online" title="Online Status"></div>
+            {% endif %}
+
+            {% if is_own_profile %}
+            <input type="file" name="avatar" id="avatar_choice" accept="image/*" style="display:none"
+              onchange="previewAvatar(this)">
+            <button type="button" class="avatar-edit-btn edit-field"
+              onclick="document.getElementById('avatar_choice').click()">
+              <i data-lucide="camera"></i>
+            </button>
+            {% endif %}
           </div>
+
+          <!-- Identity (name, role, headline) -->
+          <div class="profile-identity">
+            <div class="profile-name-row">
+              <h1 class="view-field">{{ profile_user.get_full_name|default:profile_user.username }}</h1>
+
+              {% if is_own_profile %}
+              <div class="edit-field name-edit-row" style="display:none;">
+                <div class="input-group">
+                  <input type="text" name="first_name" value="{{ profile_user.first_name|default:'' }}"
+                    class="editable-input name-input" placeholder="First Name">
+                </div>
+                <div class="input-group">
+                  <input type="text" name="last_name" value="{{ profile_user.last_name|default:'' }}"
+                    class="editable-input name-input" placeholder="Last Name">
+                </div>
+                <div class="input-group">
+                  <input type="text" name="display_name" value="{{ profile.display_name|default:'' }}"
+                    class="editable-input name-input" placeholder="Display Name (Optional)">
+                </div>
+              </div>
+              {% endif %}
+
+              <div class="role-badges-wrap">
+                {% if profile.user_type == 'student' %}
+                <span class="p-badge p-badge-student">{{ profile.grade|default:"Student"|upper }}</span>
+                {% elif profile.user_type == 'teacher' %}
+                <span class="p-badge p-badge-teacher">TEACHER</span>
+                {% endif %}
+
+                {% if profile_user.is_superuser %}
+                <span class="p-badge p-badge-admin">
+                  <i data-lucide="shield-check"></i> ADMINISTRATOR
+                </span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="profile-subheadline">
+              <i data-lucide="graduation-cap"></i>
+              <span class="view-field">
+                {% if profile.headline %}
+                {{ profile.headline }}
+                {% elif profile.user_type == 'student' %}
+                {{ profile.branch|default:"Student" }}
+                {% else %}
+                {{ profile.specialization|default:profile.department|default:"Faculty" }}
+                {% endif %}
+              </span>
+              {% if is_own_profile %}
+              <input type="text" name="headline" value="{{ profile.headline|default:'' }}"
+                class="editable-input headline-input edit-field" style="display:none"
+                placeholder="Headline (e.g. B.Tech Computer Science & AI)">
+              {% endif %}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {% if profile.user_type == 'teacher' %}
+      <!-- Teacher Info Strip -->
+      <div class="teacher-info-strip">
+        <div class="teacher-info-col">
+          <div class="strip-label">EMPLOYEE ID</div>
+          <div class="strip-value view-field">{{ profile.employee_id|default:"—" }}</div>
+          {% if is_own_profile %}
+          <input type="text" name="employee_id" value="{{ profile.employee_id|default:'' }}"
+            class="editable-input edit-field" style="display:none" placeholder="ED-88294-M">
+          {% endif %}
+        </div>
+        <div class="teacher-info-col">
+          <div class="strip-label">DEPARTMENT</div>
+          <div class="strip-value view-field">{{ profile.department|default:"—" }}</div>
+          {% if is_own_profile %}
+          <input type="text" name="department" value="{{ profile.department|default:'' }}"
+            class="editable-input edit-field" style="display:none" placeholder="Social Sciences">
+          {% endif %}
+        </div>
+        <div class="teacher-info-col">
+          <div class="strip-label">SPECIALIZATION</div>
+          <div class="strip-value view-field">{{ profile.specialization|default:"—" }}</div>
+          {% if is_own_profile %}
+          <input type="text" name="specialization" value="{{ profile.specialization|default:'' }}"
+            class="editable-input edit-field" style="display:none" placeholder="AI Governance">
+          {% endif %}
         </div>
       </div>
       {% endif %}
 
-      <!-- Social / Digital Presence -->
-      <div class="profile-card">
-        <div class="card-header">
-          <h2 class="card-title"><i data-lucide="link-2"></i> Digital Presence</h2>
-        </div>
-        <div class="card-body">
-          {% if is_own_profile %}
-          <div class="info-grid-2">
-            <div class="info-item" style="border:none;padding:0;">
-              <div class="info-icon"><i data-lucide="linkedin"></i></div>
-              <div class="info-content">
-                <div class="label">LinkedIn</div>
-                <input type="url" name="linkedin" value="{{ profile.linkedin|default:'' }}" class="editable-input" placeholder="https://linkedin.com/in/…">
-              </div>
-            </div>
-            <div class="info-item" style="border:none;padding:0;">
-              <div class="info-icon"><i data-lucide="twitter"></i></div>
-              <div class="info-content">
-                <div class="label">Twitter / X</div>
-                <input type="url" name="twitter" value="{{ profile.twitter|default:'' }}" class="editable-input" placeholder="https://twitter.com/…">
-              </div>
-            </div>
-            <div class="info-item" style="border:none;padding:0;">
-              <div class="info-icon"><i data-lucide="globe"></i></div>
-              <div class="info-content">
-                <div class="label">Website</div>
-                <input type="url" name="website" value="{{ profile.website|default:'' }}" class="editable-input" placeholder="https://yoursite.com">
-              </div>
-            </div>
-          </div>
-          {% else %}
-          <div class="social-links-row">
-            {% if profile.linkedin %}
-            <a href="{{ profile.linkedin }}" target="_blank" rel="noopener" class="social-link-btn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
-              LinkedIn
-            </a>
-            {% endif %}
-            {% if profile.twitter %}
-            <a href="{{ profile.twitter }}" target="_blank" rel="noopener" class="social-link-btn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-              Twitter / X
-            </a>
-            {% endif %}
-            {% if profile.website %}
-            <a href="{{ profile.website }}" target="_blank" rel="noopener" class="social-link-btn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              Website
-            </a>
-            {% endif %}
-            {% if not profile.linkedin and not profile.twitter and not profile.website %}
-            <span class="bio-empty">No links added yet.</span>
-            {% endif %}
-          </div>
-          {% endif %}
-        </div>
-      </div>
+      <!-- Main Layout Grid -->
+      <div
+        class="{% if profile.user_type == 'student' %}profile-layout-student{% else %}profile-layout-teacher{% endif %}">
 
-      <!-- Trust & Security (students only) -->
-      {% if profile.user_type == 'student' %}
-      <div class="profile-card">
-        <div class="card-header">
-          <h2 class="card-title"><i data-lucide="shield"></i> Trust & Security</h2>
-        </div>
-        <div class="card-body">
-          <div class="info-list">
-            <div class="info-item">
-              <div class="info-icon {% if face_registered %}face-registered{% else %}face-not-registered{% endif %}">
-                <i data-lucide="{% if face_registered %}shield-check{% else %}shield-alert{% endif %}"></i>
+        {% if profile.user_type == 'student' %}
+        <!-- STUDENT LEFT SIDEBAR -->
+        <aside class="profile-sidebar-left">
+          <!-- Profile Strength / EduKarma Card -->
+          <div class="profile-card card-strength">
+            <div class="card-header">
+              <h2 class="card-title">Profile Strength</h2>
+            </div>
+            <div class="card-body strength-body">
+              <div class="edukarma-ring-wrap">
+                <svg width="120" height="120" viewBox="0 0 110 110">
+                  <defs>
+                    <linearGradient id="karmaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#818cf8" />
+                      <stop offset="100%" stop-color="#4f46e5" />
+                    </linearGradient>
+                  </defs>
+                  <circle class="ring-bg" cx="55" cy="55" r="46" />
+                  <circle class="ring-fill" cx="55" cy="55" r="46"
+                    stroke-dasharray="{{ completion_dash|default:0 }} 289" id="completionRing" />
+                </svg>
+                <div class="edukarma-inner">
+                  <span class="edukarma-num">{{ edukarma_score|default:0 }}</span>
+                  <span class="edukarma-label">EDUKARMA</span>
+                </div>
               </div>
-              <div class="info-content">
-                <div class="label">Facial Identity</div>
-                <div class="value">
-                  {% if face_registered %}
-                  <span style="color:#10b981;font-weight:600;">✓ Registered & Active</span>
+              <p class="edukarma-tagline">
+                {% if completion >= 80 %}
+                Top 5% of active learners this month. Keep it up!
+                {% elif completion >= 50 %}
+                You're making great progress!
+                {% else %}
+                Complete your profile to boost your score
+                {% endif %}
+              </p>
+            </div>
+          </div>
+
+          <!-- Verified Identity Card -->
+          <div class="profile-card card-verified">
+            <div class="card-header header-verified">
+              <h2 class="card-title">
+                <i data-lucide="shield-check" class="icon-verified"></i> Verified Identity
+              </h2>
+              {% if face_registered %}
+              <span class="verified-header-check"><i data-lucide="check-circle-2"></i></span>
+              {% endif %}
+            </div>
+            <div class="card-body verified-body">
+              <div class="verified-row">
+                <span class="verified-label">Face ID Registration</span>
+                <span class="verified-badge {% if face_registered %}badge-enabled{% else %}badge-disabled{% endif %}">
+                  {% if face_registered %}ENABLED{% else %}NOT SET{% endif %}
+                </span>
+              </div>
+              <div class="verified-row">
+                <span class="verified-label">Auth Method</span>
+                <span class="verified-value">{% if face_registered %}Bio-Metric{% else %}Password Only{% endif %}</span>
+              </div>
+              {% if is_own_profile and not face_registered %}
+              <a href="{% url 'face_setup' %}" class="btn-setup-face">
+                <i data-lucide="camera"></i> Set Up Face ID
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </aside>
+
+        <!-- STUDENT MAIN COLUMN -->
+        <main class="profile-main">
+          <!-- Stats Row -->
+          <div class="stats-row-grid">
+            <div class="stat-item-card">
+              <div class="stat-card-icon-wrap">
+                <i data-lucide="users"></i>
+              </div>
+              <div class="stat-card-text">
+                <span class="stat-num">{{ stats.meetings_attended|default:0 }}</span>
+                <span class="stat-label">MEETINGS ATTENDED</span>
+              </div>
+            </div>
+            <div class="stat-item-card">
+              <div class="stat-card-icon-wrap">
+                <i data-lucide="book-open"></i>
+              </div>
+              <div class="stat-card-text">
+                <span class="stat-num">{{ stats.enrolled_courses|default:0 }}</span>
+                <span class="stat-label">CLASSES ENROLLED</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Academic Info Cards Grid -->
+          <div class="academic-details-grid">
+            <div class="academic-field-card">
+              <div class="field-label">ROLL NUMBER</div>
+              <div class="field-value view-field">{{ profile.roll_number|default:"—" }}</div>
+              {% if is_own_profile %}
+              <input type="text" name="roll_number" value="{{ profile.roll_number|default:'' }}"
+                class="editable-input edit-field" placeholder="ED-2024-XXXX" style="display:none">
+              {% endif %}
+            </div>
+            <div class="academic-field-card">
+              <div class="field-label">CURRENT BRANCH</div>
+              <div class="field-value view-field">{{ profile.branch|default:"—" }}</div>
+              {% if is_own_profile %}
+              <input type="text" name="branch" value="{{ profile.branch|default:'' }}" class="editable-input edit-field"
+                placeholder="Engineering" style="display:none">
+              {% endif %}
+            </div>
+            <div class="academic-field-card">
+              <div class="field-label">CURRENT GRADE</div>
+              <div class="field-value view-field">{{ profile.grade|default:"—" }}</div>
+              {% if is_own_profile %}
+              <input type="text" name="grade" value="{{ profile.grade|default:'' }}" class="editable-input edit-field"
+                placeholder="Sophomore / Year 3" style="display:none">
+              {% endif %}
+            </div>
+            <div class="academic-field-card">
+              <div class="field-label">CURRENT CGPA</div>
+              <div class="field-value view-field">{% if profile.cgpa %}{{ profile.cgpa }} <span class="cgpa-scale">/
+                  10</span>{% else %}—{% endif %}
+              </div>
+              {% if is_own_profile %}
+              <input type="text" name="cgpa" value="{{ profile.cgpa|default:'' }}" class="editable-input edit-field"
+                placeholder="9.4" style="display:none">
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Social Links -->
+          <div class="social-links-container">
+            <div class="social-links-pills">
+              {% if profile.linkedin or is_own_profile %}
+              <div class="social-pill-wrapper">
+                <a href="{% if profile.linkedin %}{{ profile.linkedin }}{% else %}javascript:void(0){% endif %}"
+                  target="_blank" class="social-pill-link {% if not profile.linkedin %}disabled-social-link{% endif %}">
+                  <i data-lucide="linkedin"></i> LinkedIn
+                </a>
+                {% if is_own_profile %}
+                <div class="edit-field social-input-wrap" style="display:none;">
+                  <label class="info-label">LinkedIn URL</label>
+                  <input type="url" name="linkedin" value="{{ profile.linkedin|default:'' }}" class="editable-input"
+                    placeholder="https://linkedin.com/in/yourprofile">
+                </div>
+                {% endif %}
+              </div>
+              {% endif %}
+
+              {% if profile.github or is_own_profile %}
+              <div class="social-pill-wrapper">
+                <a href="{% if profile.github %}{{ profile.github }}{% else %}javascript:void(0){% endif %}"
+                  target="_blank" class="social-pill-link {% if not profile.github %}disabled-social-link{% endif %}">
+                  <i data-lucide="github"></i> GitHub
+                </a>
+                {% if is_own_profile %}
+                <div class="edit-field social-input-wrap" style="display:none;">
+                  <label class="info-label">GitHub URL</label>
+                  <input type="url" name="github" value="{{ profile.github|default:'' }}" class="editable-input"
+                    placeholder="https://github.com/yourusername">
+                </div>
+                {% endif %}
+              </div>
+              {% endif %}
+
+              {% if profile.website or is_own_profile %}
+              <div class="social-pill-wrapper">
+                <a href="{% if profile.website %}{{ profile.website }}{% else %}javascript:void(0){% endif %}"
+                  target="_blank" class="social-pill-link {% if not profile.website %}disabled-social-link{% endif %}">
+                  <i data-lucide="globe"></i> Portfolio
+                </a>
+                {% if is_own_profile %}
+                <div class="edit-field social-input-wrap" style="display:none;">
+                  <label class="info-label">Portfolio URL</label>
+                  <input type="url" name="website" value="{{ profile.website|default:'' }}" class="editable-input"
+                    placeholder="https://yourportfolio.com">
+                </div>
+                {% endif %}
+              </div>
+              {% endif %}
+
+              {% if profile.twitter or is_own_profile %}
+              <div class="social-pill-wrapper">
+                <a href="{% if profile.twitter %}{{ profile.twitter }}{% else %}javascript:void(0){% endif %}"
+                  target="_blank" class="social-pill-link {% if not profile.twitter %}disabled-social-link{% endif %}">
+                  <i data-lucide="twitter"></i> X / Twitter
+                </a>
+                {% if is_own_profile %}
+                <div class="edit-field social-input-wrap" style="display:none;">
+                  <label class="info-label">Twitter/X URL</label>
+                  <input type="url" name="twitter" value="{{ profile.twitter|default:'' }}" class="editable-input"
+                    placeholder="https://twitter.com/yourhandle">
+                </div>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Academic Journey -->
+          <div class="profile-card card-journey">
+            <div class="card-header header-journey">
+              <h2 class="card-title"><i data-lucide="award"></i> Academic Journey</h2>
+            </div>
+            <div class="card-body">
+              <!-- View Mode Timeline -->
+              <div class="journey-timeline view-field">
+                {% for ach in achievements %}
+                <div class="timeline-item">
+                  <div class="timeline-icon timeline-icon-{{ ach.icon_type|default:'award' }}">
+                    <i data-lucide="{{ ach.icon_type|default:'award' }}"></i>
+                  </div>
+                  <div class="timeline-content">
+                    <div class="timeline-header">
+                      <span class="timeline-title">{{ ach.title }}</span>
+                      <span class="timeline-date {% if 'PRESENT' in ach.date_str|upper %}active-date{% endif %}">{{ ach.date_str }}</span>
+                    </div>
+                    <div class="timeline-desc">{{ ach.description }}</div>
+                  </div>
+                </div>
+                {% empty %}
+                <div class="timeline-empty-state"
+                  style="text-align: center; padding: 20px; color: var(--p-text-light);">
+                  No achievements added yet. Click "Edit Profile" to add.
+                </div>
+                {% endfor %}
+              </div>
+
+              <!-- Edit Mode Form List -->
+              <div class="edit-field achievements-edit-container" style="display:none;">
+                <div class="achievements-edit-list" id="achievementsList">
+                  {% for ach in achievements %}
+                  <div class="achievement-edit-item" id="ach-item-{{ ach.id }}">
+                    <input type="hidden" name="achievement_id[]" value="{{ ach.id }}">
+
+                    <div class="ach-edit-header">
+                      <span class="ach-number-label">Achievement #{{ forloop.counter }}</span>
+                      <button type="button" class="btn-delete-ach" onclick="deleteAchievement('ach-item-{{ ach.id }}')"
+                        title="Delete achievement">
+                        <i data-lucide="trash-2"></i> Delete
+                      </button>
+                    </div>
+
+                    <div class="ach-edit-fields-grid">
+                      <div class="input-group">
+                        <label class="info-label">Title / Role</label>
+                        <input type="text" name="achievement_title[]" value="{{ ach.title }}" class="editable-input"
+                          placeholder="e.g. Dean's List Award" required>
+                      </div>
+                      <div class="input-group">
+                        <label class="info-label">Date Range</label>
+                        <input type="text" name="achievement_date_str[]" value="{{ ach.date_str }}"
+                          class="editable-input" placeholder="e.g. DEC 2023 or JUN 2023 – PRESENT">
+                      </div>
+                    </div>
+
+                    <div class="ach-edit-fields-grid" style="margin-top: 12px;">
+                      <div class="input-group" style="flex: 2;">
+                        <label class="info-label">Description</label>
+                        <textarea name="achievement_description[]" rows="2" class="editable-textarea"
+                          placeholder="Describe your achievement, responsibilities or impact...">{{ ach.description }}</textarea>
+                      </div>
+                      <div class="input-group" style="flex: 1;">
+                        <label class="info-label">Icon Type</label>
+                        <div class="custom-select-container">
+                          <div class="custom-select-trigger" onclick="toggleCustomSelect(this)">
+                            <div class="selected-option-content">
+                              <i data-lucide="{{ ach.icon_type|default:'award' }}"></i>
+                              <span>
+                                {% if ach.icon_type == 'award' %}Award (Honor / Ribbon)
+                                {% elif ach.icon_type == 'trophy' %}Trophy (Competition)
+                                {% elif ach.icon_type == 'rocket' %}Project (Rocket)
+                                {% elif ach.icon_type == 'code' %}Code (Project / Hackathon)
+                                {% elif ach.icon_type == 'briefcase' %}Briefcase (Internship / Job)
+                                {% elif ach.icon_type == 'book' %}Book (Academic / Study)
+                                {% elif ach.icon_type == 'heart' %}Heart (Volunteer / Social)
+                                {% elif ach.icon_type == 'globe' %}Globe (Publication / Web)
+                                {% else %}Award (Honor / Ribbon)
+                                {% endif %}
+                              </span>
+                            </div>
+                            <i data-lucide="chevron-down" class="select-chevron"></i>
+                          </div>
+                          <div class="custom-select-options">
+                            <div class="custom-select-option {% if ach.icon_type == 'award' or not ach.icon_type %}selected{% endif %}" data-value="award" onclick="selectCustomOption(this, 'award')">
+                              <i data-lucide="award"></i><span>Award (Honor / Ribbon)</span>
+                            </div>
+                            <div class="custom-select-option {% if ach.icon_type == 'trophy' %}selected{% endif %}" data-value="trophy" onclick="selectCustomOption(this, 'trophy')">
+                              <i data-lucide="trophy"></i><span>Trophy (Competition)</span>
+                            </div>
+                            <div class="custom-select-option {% if ach.icon_type == 'rocket' %}selected{% endif %}" data-value="rocket" onclick="selectCustomOption(this, 'rocket')">
+                              <i data-lucide="rocket"></i><span>Project (Rocket)</span>
+                            </div>
+                            <div class="custom-select-option {% if ach.icon_type == 'code' %}selected{% endif %}" data-value="code" onclick="selectCustomOption(this, 'code')">
+                              <i data-lucide="code"></i><span>Code (Project / Hackathon)</span>
+                            </div>
+                            <div class="custom-select-option {% if ach.icon_type == 'briefcase' %}selected{% endif %}" data-value="briefcase" onclick="selectCustomOption(this, 'briefcase')">
+                              <i data-lucide="briefcase"></i><span>Briefcase (Internship / Job)</span>
+                            </div>
+                            <div class="custom-select-option {% if ach.icon_type == 'book' %}selected{% endif %}" data-value="book" onclick="selectCustomOption(this, 'book')">
+                              <i data-lucide="book"></i><span>Book (Academic / Study)</span>
+                            </div>
+                            <div class="custom-select-option {% if ach.icon_type == 'heart' %}selected{% endif %}" data-value="heart" onclick="selectCustomOption(this, 'heart')">
+                              <i data-lucide="heart"></i><span>Heart (Volunteer / Social)</span>
+                            </div>
+                            <div class="custom-select-option {% if ach.icon_type == 'globe' %}selected{% endif %}" data-value="globe" onclick="selectCustomOption(this, 'globe')">
+                              <i data-lucide="globe"></i><span>Globe (Publication / Web)</span>
+                            </div>
+                          </div>
+                          <input type="hidden" name="achievement_icon_type[]" value="{{ ach.icon_type|default:'award' }}">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+
+                <button type="button" class="btn-add-achievement" onclick="addAchievementField()">
+                  <i data-lucide="plus-circle"></i> Add New Achievement
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {% else %}
+        <!-- TEACHER MAIN COLUMN -->
+        <main class="profile-main">
+          <!-- Activity Performance Section -->
+          <div class="performance-section-wrap">
+            <div class="section-label">
+              <i data-lucide="bar-chart-2"></i>
+              {% if profile_user.is_superuser %}
+              ADMINISTRATIVE METRICS
+              {% else %}
+              ACTIVITY PERFORMANCE
+              {% endif %}
+            </div>
+
+            <div class="activity-stats-grid">
+              {% if profile_user.is_superuser %}
+              <!-- Admin Stats -->
+              <div class="activity-stat-card">
+                <div class="activity-stat-icon-wrap icon-users">
+                  <i data-lucide="users"></i>
+                </div>
+                <div class="activity-stat-num">{{ stats.total_users|default:0 }}</div>
+                <div class="activity-stat-label">TOTAL USERS</div>
+              </div>
+
+              <div class="activity-stat-card activity-stat-live">
+                <div class="live-dot-badge">
+                  <span class="live-dot"></span> LIVE
+                </div>
+                <div class="activity-stat-icon-wrap icon-live">
+                  <i data-lucide="radio"></i>
+                </div>
+                <div class="activity-stat-num">{{ stats.live_meetings|default:0 }}</div>
+                <div class="activity-stat-label">ACTIVE MEETINGS</div>
+              </div>
+
+              <div class="activity-stat-card activity-stat-completed">
+                <div class="activity-stat-icon-wrap icon-cameras">
+                  <i data-lucide="monitor"></i>
+                </div>
+                <div class="activity-stat-num">{{ stats.total_cameras|default:0 }}</div>
+                <div class="activity-stat-label">CONNECTED CAMERAS</div>
+              </div>
+              {% else %}
+              <!-- Teacher Stats -->
+              <div class="activity-stat-card">
+                <div class="activity-stat-icon-wrap icon-meetings">
+                  <i data-lucide="monitor"></i>
+                </div>
+                <div class="activity-stat-num">{{ stats.total_meetings|default:0 }}</div>
+                <div class="activity-stat-label">MEETINGS HOSTED</div>
+              </div>
+
+              <div class="activity-stat-card activity-stat-live">
+                <div class="live-dot-badge">
+                  <span class="live-dot"></span> LIVE
+                </div>
+                <div class="activity-stat-icon-wrap icon-live">
+                  <i data-lucide="radio"></i>
+                </div>
+                <div class="activity-stat-num">{{ stats.live_meetings|default:0 }}</div>
+                <div class="activity-stat-label">LIVE NOW</div>
+              </div>
+
+              <div class="activity-stat-card activity-stat-completed">
+                <div class="activity-stat-icon-wrap icon-completed">
+                  <i data-lucide="check-circle-2"></i>
+                </div>
+                <div class="activity-stat-num">{{ stats.completed_meetings|default:0 }}</div>
+                <div class="activity-stat-label">COMPLETED SESSIONS</div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Professional Summary -->
+          <div class="profile-card card-summary">
+            <div class="card-header">
+              <h2 class="card-title">
+                <i data-lucide="users-2"></i> Professional Summary
+              </h2>
+            </div>
+            <div class="card-body">
+              <div class="view-field">
+                {% if profile.bio %}
+                <p class="profile-bio">{{ profile.bio|linebreaksbr }}</p>
+                {% else %}
+                <p class="bio-empty">No professional summary added yet.</p>
+                {% endif %}
+              </div>
+              {% if is_own_profile %}
+              <textarea name="bio" rows="6" class="editable-textarea edit-field" style="display:none"
+                placeholder="Write a professional summary — your experience, research focus, teaching philosophy…">{{ profile.bio|default:'' }}</textarea>
+              {% endif %}
+
+              <!-- Expertise Tags -->
+              <div class="expertise-tags-wrap">
+                <div class="view-field tags-container">
+                  {% if subjects_list %}
+                  <div class="expertise-tags">
+                    {% for tag in subjects_list %}
+                    <span class="expertise-tag">{{ tag }}</span>
+                    {% endfor %}
+                  </div>
                   {% else %}
-                  <span style="color:#ef4444;font-weight:600;">Not registered</span>
+                  <span class="no-tags-placeholder">No tags added yet.</span>
+                  {% endif %}
+                </div>
+
+                {% if is_own_profile %}
+                <div class="edit-field tags-input-wrap" style="display:none; margin-top:12px;">
+                  <label class="info-label">Expertise Tags (space separated, e.g. AI-Ethics Digital-Governance
+                    Social-Psychology)</label>
+                  <input type="text" name="subjects" value="{{ profile.subjects|default:'' }}" class="editable-input"
+                    placeholder="AI-Ethics Digital-Governance Social-Psychology">
+                </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- TEACHER RIGHT SIDEBAR -->
+        <aside class="profile-sidebar-right">
+          <!-- Contact Information -->
+          <div class="profile-card card-contact">
+            <div class="card-body">
+              <div class="contact-card-title">CONTACT INFORMATION</div>
+
+              <div class="contact-row">
+                <div class="contact-icon">
+                  <i data-lucide="mail"></i>
+                </div>
+                <div class="contact-text-wrap">
+                  <div class="contact-sublabel">OFFICIAL EMAIL</div>
+                  <div class="contact-value view-field">{{ profile_user.email|default:"—" }}</div>
+                  {% if is_own_profile %}
+                  <input type="email" name="email" value="{{ profile_user.email }}" class="editable-input edit-field"
+                    style="display:none">
                   {% endif %}
                 </div>
               </div>
+
+              <div class="contact-row">
+                <div class="contact-icon">
+                  <i data-lucide="phone"></i>
+                </div>
+                <div class="contact-text-wrap">
+                  <div class="contact-sublabel">DIRECT PHONE</div>
+                  <div class="contact-value view-field">{{ profile.contact_number|default:"—" }}</div>
+                  {% if is_own_profile %}
+                  <input type="tel" name="contact_number" value="{{ profile.contact_number|default:'' }}"
+                    class="editable-input edit-field" style="display:none" placeholder="+1 (555) 0192-8834">
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="contact-row">
+                <div class="contact-icon">
+                  <i data-lucide="map-pin"></i>
+                </div>
+                <div class="contact-text-wrap">
+                  <div class="contact-sublabel">OFFICE ADDRESS</div>
+                  <div class="contact-value view-field">{{ profile.address|default:"—" }}</div>
+                  {% if is_own_profile %}
+                  <input type="text" name="address" value="{{ profile.address|default:'' }}"
+                    class="editable-input edit-field" style="display:none"
+                    placeholder="Admin Wing 4, Level 9, North Campus, London">
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if not is_own_profile %}
+              <a href="{% url 'start_conversation' profile_user.username %}" class="btn-direct-message">
+                <i data-lucide="send"></i> Direct Message
+              </a>
+              {% endif %}
             </div>
           </div>
-          {% if is_own_profile and not face_registered %}
-          <a href="{% url 'face_setup' %}" class="btn-primary" style="margin-top:12px;display:inline-flex;background:#065f46;">
-            <i data-lucide="camera"></i> Set Up Face ID
-          </a>
-          {% endif %}
-        </div>
+
+          <!-- Availability -->
+          <div class="profile-card card-availability">
+            <div class="card-body">
+              <div class="contact-card-title">AVAILABILITY</div>
+              <div class="availability-list">
+                <div class="avail-row">
+                  <span class="avail-day">Mon – Thu</span>
+                  <span class="avail-time view-field">{{ profile.availability_weekday|default:"—" }}</span>
+                  {% if is_own_profile %}
+                  <input type="text" name="availability_weekday" value="{{ profile.availability_weekday|default:'' }}"
+                    class="editable-input edit-field" style="display:none">
+                  {% endif %}
+                </div>
+                <div class="avail-row">
+                  <span class="avail-day">Friday</span>
+                  <span class="avail-time view-field">{{ profile.availability_friday|default:"—" }}</span>
+                  {% if is_own_profile %}
+                  <input type="text" name="availability_friday" value="{{ profile.availability_friday|default:'' }}"
+                    class="editable-input edit-field" style="display:none">
+                  {% endif %}
+                </div>
+                <div class="avail-row">
+                  <span class="avail-day">Weekend</span>
+                  <span class="avail-badge-closed">CLOSED</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+        {% endif %}
+
       </div>
-      {% endif %}
+    </div> <!-- .profile-container -->
 
-    </main><!-- /main col -->
-
-  </div><!-- /profile-layout -->
-
-  {% if is_own_profile %}
+    {% if is_own_profile %}
   </form>
   {% endif %}
+</div>
 
-  <!-- ── AVATAR MODAL ──────────────────── -->
-  {% if is_own_profile %}
-  <div id="avatarModal" class="avatar-modal" role="dialog" aria-modal="true" aria-label="Change profile photo">
-    <div class="avatar-modal-content">
-      <div class="avatar-modal-header">
-        <h2>Change Profile Photo</h2>
-        <button type="button" class="modal-close" onclick="closeAvatarModal()" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-tab-nav">
-        <button type="button" class="modal-tab-btn active" id="tab-presets" onclick="switchAvatarTab('presets')">Presets</button>
-        <button type="button" class="modal-tab-btn"         id="tab-upload"  onclick="switchAvatarTab('upload')">Upload Photo</button>
-      </div>
-      <div class="modal-tab-body">
-
-        <div id="avatarTab-presets">
-          <p style="font-size:.8125rem;color:var(--p-text-muted);margin-bottom:14px;">Pick a generated avatar as your profile picture.</p>
-          <div class="avatar-grid" id="avatarGrid"></div>
-        </div>
-
-        <div id="avatarTab-upload" style="display:none;">
-          <div class="upload-drop-zone" onclick="document.getElementById('profile_picture').click()" id="dropZone">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
-            </svg>
-            <p>Click to upload or drag &amp; drop</p>
-            <small>JPG, PNG or GIF — max 5 MB</small>
-          </div>
-          <div id="uploadPreviewWrap" style="display:none;text-align:center;margin-top:16px;">
-            <img id="uploadPreviewImg" style="max-width:140px;max-height:140px;border-radius:50%;border:3px solid var(--p-primary);object-fit:cover;" alt="Preview">
-            <p style="font-size:.8125rem;color:var(--p-text-muted);margin-top:8px;" id="uploadFileName"></p>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-  {% endif %}
-
-</div><!-- /profile-page -->
 
 <script>
-// ── Init Lucide icons ───────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  // Edit Mode State
+  let isDirty = false;
 
-  // ── Form change detection ────────────────────────────────
-  const form = document.getElementById('profileForm');
-  const saveBtn = document.getElementById('saveProfileBtn');
-  if (form && saveBtn) {
-    form.querySelectorAll('input, textarea').forEach(el => {
+  // Enter Edit Mode
+  function enterEditMode() {
+    // Snapshot current values for cancel-restore
+    document.querySelectorAll('.editable-input, .editable-textarea, .custom-select-container input[type="hidden"]').forEach(el => {
+      el.dataset.snap = el.value;
+    });
+
+    const avatarEl = document.getElementById('avatarPreview');
+    if (avatarEl) avatarEl.dataset.snapSrc = avatarEl.src;
+
+    const coverEl = document.getElementById('coverPreview');
+    if (coverEl) coverEl.dataset.snapSrc = coverEl.src;
+
+    document.querySelector('.profile-page').classList.add('edit-mode');
+    document.getElementById('btn-edit-profile').style.display = 'none';
+
+    // Mark dirty on any change
+    document.querySelectorAll('.editable-input, .editable-textarea').forEach(el => {
       el.addEventListener('input', () => {
-        saveBtn.classList.add('has-changes');
-        window.onbeforeunload = () => 'You have unsaved changes.';
+        if (!isDirty) {
+          isDirty = true;
+          window.onbeforeunload = () => 'You have unsaved changes.';
+        }
       });
     });
+  }
+
+  // Exit Edit Mode
+  function exitEditMode(discard = false) {
+    if (discard) {
+      // Restore all fields
+      document.querySelectorAll('.editable-input, .editable-textarea, .custom-select-container input[type="hidden"]').forEach(el => {
+        if (el.dataset.snap !== undefined) {
+          el.value = el.dataset.snap;
+          // Sync custom selects on discard
+          if (el.name === 'achievement_icon_type[]') {
+            const container = el.closest('.custom-select-container');
+            if (container) {
+              const val = el.value;
+              const option = container.querySelector(`.custom-select-option[data-value="${val}"]`);
+              if (option) {
+                container.querySelectorAll('.custom-select-option').forEach(opt => {
+                  opt.classList.remove('selected');
+                });
+                option.classList.add('selected');
+                
+                const optionText = option.querySelector('span').innerText;
+                const triggerContent = container.querySelector('.selected-option-content');
+                if (triggerContent) {
+                  triggerContent.innerHTML = `<i data-lucide="${val}"></i> <span>${optionText}</span>`;
+                }
+              }
+            }
+          }
+        }
+      });
+      // Restore avatar
+      const avatarEl = document.getElementById('avatarPreview');
+      if (avatarEl?.dataset.snapSrc) {
+        avatarEl.src = avatarEl.dataset.snapSrc;
+        const ac = document.getElementById('avatar_choice');
+        if (ac) ac.value = '';
+      }
+      // Restore cover photo
+      const coverEl = document.getElementById('coverPreview');
+      if (coverEl?.dataset.snapSrc) {
+        coverEl.src = coverEl.dataset.snapSrc;
+        const cc = document.getElementById('cover_choice');
+        if (cc) cc.value = '';
+      }
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+      isDirty = false;
+      window.onbeforeunload = null;
+    }
+
+    document.querySelector('.profile-page').classList.remove('edit-mode');
+
+    const editBtn = document.getElementById('btn-edit-profile');
+    if (editBtn) {
+      editBtn.style.display = 'inline-flex';
+    }
+  }
+
+  // Avatar Preview
+  function previewAvatar(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        document.getElementById('avatarPreview').src = e.target.result;
+        if (!isDirty) {
+          isDirty = true;
+          window.onbeforeunload = () => 'You have unsaved changes.';
+        }
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  // Cover Photo Preview
+  function previewCover(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        document.getElementById('coverPreview').src = e.target.result;
+        if (!isDirty) {
+          isDirty = true;
+          window.onbeforeunload = () => 'You have unsaved changes.';
+        }
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  // Share Profile
+  function shareProfile() {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({
+        title: document.title,
+        url: url
+      });
+    } else {
+      navigator.clipboard.writeText(url);
+      alert('Profile link copied to clipboard!');
+    }
+  }
+
+  // Prevent accidental navigation
+  window.addEventListener('beforeunload', e => {
+    if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // Clean submit
+  const form = document.getElementById('profileForm');
+  if (form) {
     form.addEventListener('submit', () => {
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<span class="loading-spinner"></span> Saving…';
+      isDirty = false;
       window.onbeforeunload = null;
     });
   }
 
-  // ── Build avatar preset grid ─────────────────────────────
-  const grid = document.getElementById('avatarGrid');
-  if (grid) {
-    const seeds = ['Aurora','Bella','Charlie','Diana','Echo','Felix','Grace','Hiro','Iris','Juno',
-                   'Kai','Luna','Mars','Nova','Oscar','Pearl','Quinn','Rex','Sage','Titan'];
-    seeds.forEach(seed => {
-      const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc`;
-      const div = document.createElement('div');
-      div.className = 'avatar-option';
-      div.innerHTML = `<img src="${url}" alt="${seed}" loading="lazy">`;
-      div.onclick = () => selectAvatar(url, div);
-      grid.appendChild(div);
-    });
-  }
-
-  // ── Drag & drop on upload zone ───────────────────────────
-  const dropZone = document.getElementById('dropZone');
-  if (dropZone) {
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--p-primary)'; });
-    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
-    dropZone.addEventListener('drop', e => {
-      e.preventDefault();
-      dropZone.style.borderColor = '';
-      const file = e.dataTransfer.files[0];
-      if (file) handleFilePreview(file);
-    });
-  }
-});
-
-// ── Avatar modal helpers ────────────────────────────────────
-function openAvatarModal() {
-  const m = document.getElementById('avatarModal');
-  m.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeAvatarModal() {
-  const m = document.getElementById('avatarModal');
-  m.classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeAvatarModal();
-});
-
-document.getElementById('avatarModal')?.addEventListener('click', e => {
-  if (e.target === document.getElementById('avatarModal')) closeAvatarModal();
-});
-
-function switchAvatarTab(tab) {
-  ['presets','upload'].forEach(t => {
-    document.getElementById('avatarTab-' + t).style.display = t === tab ? 'block' : 'none';
-    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  // Keyboard shortcut: Escape = discard
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.querySelector('.profile-page')?.classList.contains('edit-mode')) {
+      if (isDirty) {
+        if (confirm('Discard unsaved changes?')) exitEditMode(true);
+      } else {
+        exitEditMode(false);
+      }
+    }
   });
-}
 
-function selectAvatar(url, el) {
-  document.getElementById('avatarPreview').src = url;
-  document.getElementById('avatar_choice').value = url;
-  document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-  document.getElementById('saveProfileBtn')?.classList.add('has-changes');
-  setTimeout(closeAvatarModal, 400);
-}
+  // Delete achievement item from UI
+  function deleteAchievement(itemId) {
+    const el = document.getElementById(itemId);
+    if (el) {
+      if (confirm("Are you sure you want to remove this achievement?")) {
+        el.remove();
+        if (!isDirty) {
+          isDirty = true;
+          window.onbeforeunload = () => 'You have unsaved changes.';
+        }
+      }
+    }
+  }
 
-function handleFilePreview(file) {
-  if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
-  if (file.size > 5 * 1024 * 1024) { alert('File too large. Max 5 MB.'); return; }
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('avatarPreview').src = e.target.result;
-    const wrap = document.getElementById('uploadPreviewWrap');
-    document.getElementById('uploadPreviewImg').src = e.target.result;
-    document.getElementById('uploadFileName').textContent = file.name;
-    wrap.style.display = 'block';
-    document.getElementById('avatar_choice').value = '';
-    document.getElementById('saveProfileBtn')?.classList.add('has-changes');
-    setTimeout(closeAvatarModal, 600);
-  };
-  reader.readAsDataURL(file);
-}
+  // Add blank achievement field block
+  let newAchCounter = 0;
+  function addAchievementField() {
+    newAchCounter++;
+    const container = document.getElementById('achievementsList');
+    if (!container) return;
 
-// Listen for file input change
-document.getElementById('profile_picture')?.addEventListener('change', function() {
-  if (this.files && this.files[0]) handleFilePreview(this.files[0]);
-});
+    const itemHtml = `
+    <div class="achievement-edit-item new-item" id="ach-item-new-\${newAchCounter}">
+      <input type="hidden" name="achievement_id[]" value="">
+      
+      <div class="ach-edit-header">
+        <span class="ach-number-label">New Achievement</span>
+        <button type="button" class="btn-delete-ach" onclick="deleteAchievement('ach-item-new-\${newAchCounter}')" title="Delete achievement">
+          <i data-lucide="trash-2"></i> Delete
+        </button>
+      </div>
+
+      <div class="ach-edit-fields-grid">
+        <div class="input-group">
+          <label class="info-label">Title / Role</label>
+          <input type="text" name="achievement_title[]" value="" class="editable-input" placeholder="e.g. Lead AI Developer" required>
+        </div>
+        <div class="input-group">
+          <label class="info-label">Date Range</label>
+          <input type="text" name="achievement_date_str[]" value="" class="editable-input" placeholder="e.g. JUN 2023 – PRESENT">
+        </div>
+      </div>
+
+      <div class="ach-edit-fields-grid" style="margin-top: 12px;">
+        <div class="input-group" style="flex: 2;">
+          <label class="info-label">Description</label>
+          <textarea name="achievement_description[]" rows="2" class="editable-textarea" placeholder="Describe your achievement, responsibilities or impact..."></textarea>
+        </div>
+        <div class="input-group" style="flex: 1;">
+          <label class="info-label">Icon Type</label>
+          <div class="custom-select-container">
+            <div class="custom-select-trigger" onclick="toggleCustomSelect(this)">
+              <div class="selected-option-content">
+                <i data-lucide="award"></i>
+                <span>Award (Honor / Ribbon)</span>
+              </div>
+              <i data-lucide="chevron-down" class="select-chevron"></i>
+            </div>
+            <div class="custom-select-options">
+              <div class="custom-select-option selected" data-value="award" onclick="selectCustomOption(this, 'award')">
+                <i data-lucide="award"></i><span>Award (Honor / Ribbon)</span>
+              </div>
+              <div class="custom-select-option" data-value="trophy" onclick="selectCustomOption(this, 'trophy')">
+                <i data-lucide="trophy"></i><span>Trophy (Competition)</span>
+              </div>
+              <div class="custom-select-option" data-value="rocket" onclick="selectCustomOption(this, 'rocket')">
+                <i data-lucide="rocket"></i><span>Project (Rocket)</span>
+              </div>
+              <div class="custom-select-option" data-value="code" onclick="selectCustomOption(this, 'code')">
+                <i data-lucide="code"></i><span>Code (Project / Hackathon)</span>
+              </div>
+              <div class="custom-select-option" data-value="briefcase" onclick="selectCustomOption(this, 'briefcase')">
+                <i data-lucide="briefcase"></i><span>Briefcase (Internship / Job)</span>
+              </div>
+              <div class="custom-select-option" data-value="book" onclick="selectCustomOption(this, 'book')">
+                <i data-lucide="book"></i><span>Book (Academic / Study)</span>
+              </div>
+              <div class="custom-select-option" data-value="heart" onclick="selectCustomOption(this, 'heart')">
+                <i data-lucide="heart"></i><span>Heart (Volunteer / Social)</span>
+              </div>
+              <div class="custom-select-option" data-value="globe" onclick="selectCustomOption(this, 'globe')">
+                <i data-lucide="globe"></i><span>Globe (Publication / Web)</span>
+              </div>
+            </div>
+            <input type="hidden" name="achievement_icon_type[]" value="award">
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = itemHtml.trim();
+    const child = tempDiv.firstChild;
+    container.appendChild(child);
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+
+    if (!isDirty) {
+      isDirty = true;
+      window.onbeforeunload = () => 'You have unsaved changes.';
+    }
+  }
+
+  // Toggle Custom Select Dropdown
+  function toggleCustomSelect(trigger) {
+    const container = trigger.closest('.custom-select-container');
+    if (!container) return;
+    
+    // Close other dropdowns
+    document.querySelectorAll('.custom-select-container.open').forEach(el => {
+      if (el !== container) {
+        el.classList.remove('open');
+      }
+    });
+    
+    container.classList.toggle('open');
+  }
+
+  // Handle Custom Select Option Selection
+  function selectCustomOption(option, val) {
+    const container = option.closest('.custom-select-container');
+    if (!container) return;
+
+    const trigger = container.querySelector('.custom-select-trigger');
+    const hiddenInput = container.querySelector('input[type="hidden"]');
+    
+    // Update input value
+    if (hiddenInput) {
+      hiddenInput.value = val;
+    }
+
+    // Update selected visual state in menu
+    container.querySelectorAll('.custom-select-option').forEach(opt => {
+      opt.classList.remove('selected');
+    });
+    option.classList.add('selected');
+
+    // Update trigger UI
+    const optionText = option.querySelector('span').innerText;
+    const triggerContent = trigger.querySelector('.selected-option-content');
+    if (triggerContent) {
+      triggerContent.innerHTML = `<i data-lucide="${val}"></i> <span>${optionText}</span>`;
+    }
+
+    // Initialize the newly added icon
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+
+    // Mark page as dirty since a selection change happened
+    if (!isDirty) {
+      isDirty = true;
+      window.onbeforeunload = () => 'You have unsaved changes.';
+    }
+
+    // Close dropdown
+    container.classList.remove('open');
+  }
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.custom-select-container')) {
+      document.querySelectorAll('.custom-select-container.open').forEach(el => {
+        el.classList.remove('open');
+      });
+    }
+  });
+
+  // Initialize Lucide icons & auto-dismiss alerts
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+
+    // Auto-dismiss Django alerts after 4 seconds
+    const alerts = document.querySelectorAll('.messages-container .alert');
+    alerts.forEach(alert => {
+      setTimeout(() => {
+        alert.style.transition = 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), padding 0.6s cubic-bezier(0.4, 0, 0.2, 1), margin 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+        alert.style.opacity = '0';
+        alert.style.transform = 'translateY(-12px)';
+        alert.style.maxHeight = '0';
+        alert.style.paddingTop = '0';
+        alert.style.paddingBottom = '0';
+        alert.style.marginTop = '0';
+        alert.style.marginBottom = '0';
+        alert.style.overflow = 'hidden';
+        alert.style.border = 'none';
+        setTimeout(() => {
+          alert.remove();
+        }, 600);
+      }, 4000);
+    });
+  });
 </script>
+
 {% endblock %}

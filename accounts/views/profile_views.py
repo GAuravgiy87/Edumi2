@@ -43,14 +43,24 @@ def profile_view(request, username=None):
             profile.bio = request.POST.get('bio', '').strip()
             profile.phone = request.POST.get('phone', '').strip()
             profile.address = request.POST.get('address', '').strip()
+            profile.headline = request.POST.get('headline', '').strip()
+            profile.subjects = request.POST.get('subjects', '').strip()
+            profile.github = request.POST.get('github', '').strip()
+            profile.contact_number = request.POST.get('contact_number', '').strip()
 
             avatar_choice = request.POST.get('avatar_choice', '').strip()
-            if request.FILES.get('profile_picture'):
+            if request.FILES.get('avatar'):
+                profile.profile_picture = request.FILES['avatar']
+                profile.avatar_url = None
+            elif request.FILES.get('profile_picture'):
                 profile.profile_picture = request.FILES['profile_picture']
                 profile.avatar_url = None
             elif avatar_choice:
                 profile.avatar_url = avatar_choice
                 profile.profile_picture = None
+
+            if request.FILES.get('cover_photo'):
+                profile.cover_photo = request.FILES['cover_photo']
 
             dob = request.POST.get('date_of_birth', '').strip()
             profile.date_of_birth = dob if dob else None
@@ -60,6 +70,9 @@ def profile_view(request, username=None):
 
             if profile.user_type == 'student':
                 profile.student_id = request.POST.get('student_id', '').strip()
+                profile.roll_number = request.POST.get('roll_number', '').strip()
+                profile.branch = request.POST.get('branch', '').strip()
+                profile.cgpa = request.POST.get('cgpa', '').strip()
                 profile.grade = request.POST.get('grade', '').strip()
                 enrollment = request.POST.get('enrollment_date', '').strip()
                 profile.enrollment_date = enrollment if enrollment else None
@@ -67,10 +80,55 @@ def profile_view(request, username=None):
                 profile.employee_id = request.POST.get('employee_id', '').strip()
                 profile.department = request.POST.get('department', '').strip()
                 profile.specialization = request.POST.get('specialization', '').strip()
+                profile.availability_weekday = request.POST.get('availability_weekday', '').strip()
+                profile.availability_friday = request.POST.get('availability_friday', '').strip()
                 join = request.POST.get('join_date', '').strip()
                 profile.join_date = join if join else None
 
             profile.save()
+
+            # Save achievements if submitted
+            achievement_ids = request.POST.getlist('achievement_id[]')
+            achievement_titles = request.POST.getlist('achievement_title[]')
+            achievement_dates = request.POST.getlist('achievement_date_str[]')
+            achievement_descriptions = request.POST.getlist('achievement_description[]')
+            achievement_icons = request.POST.getlist('achievement_icon_type[]')
+
+            submitted_ids = []
+            from accounts.models import UserAchievement
+            for i in range(len(achievement_titles)):
+                title = achievement_titles[i].strip()
+                if not title:
+                    continue
+
+                ach_id = achievement_ids[i].strip() if i < len(achievement_ids) else ""
+                date_str = achievement_dates[i].strip() if i < len(achievement_dates) else ""
+                description = achievement_descriptions[i].strip() if i < len(achievement_descriptions) else ""
+                icon_type = achievement_icons[i].strip() if i < len(achievement_icons) else "award"
+
+                if ach_id:
+                    try:
+                        ach = UserAchievement.objects.get(id=ach_id, profile=profile)
+                        ach.title = title
+                        ach.date_str = date_str
+                        ach.description = description
+                        ach.icon_type = icon_type
+                        ach.save()
+                        submitted_ids.append(ach.id)
+                    except UserAchievement.DoesNotExist:
+                        pass
+                else:
+                    ach = UserAchievement.objects.create(
+                        profile=profile,
+                        title=title,
+                        date_str=date_str,
+                        description=description,
+                        icon_type=icon_type
+                    )
+                    submitted_ids.append(ach.id)
+
+            profile.achievements.exclude(id__in=submitted_ids).delete()
+
             messages.success(request, 'Profile updated successfully!')
             return redirect('profile_view', username=request.user.username)
         except Exception as e:
@@ -89,6 +147,19 @@ def profile_view(request, username=None):
         if profile.address: completion += 10
         if profile.profile_picture or profile.avatar_url: completion += 15
 
+    completion_dash = int(completion * 2.89)
+
+    # Correct target user's face registered status
+    face_registered = False
+    try:
+        from attendance.models import StudentFaceProfile
+        face_registered = StudentFaceProfile.objects.filter(
+            student=profile_user,
+            is_active=True
+        ).exists()
+    except Exception:
+        pass
+
     stats = {}
     if profile_user.is_superuser:
         stats['total_users'] = User.objects.count()
@@ -100,9 +171,29 @@ def profile_view(request, username=None):
         stats['live_meetings'] = Meeting.objects.filter(teacher=profile_user, status='live', classroom__isnull=True).count()
         stats['completed_meetings'] = Meeting.objects.filter(teacher=profile_user, status='ended', classroom__isnull=True).count()
     elif profile and profile.user_type == 'student':
-        stats['enrolled_courses'] = 6
-        stats['completed_assignments'] = 15
+        from meetings.models import ClassroomMembership
+        stats['enrolled_courses'] = ClassroomMembership.objects.filter(
+            student=profile_user,
+            status='approved'
+        ).count()
         stats['meetings_attended'] = profile_user.meetingparticipant_set.count()
+
+    # Calculate dynamic EduKarma score for students
+    edukarma_score = 0
+    if profile and profile.user_type == 'student':
+        meetings_count = stats.get('meetings_attended', 0)
+        edukarma_score = (completion * 5) + (meetings_count * 50)
+        if face_registered:
+            edukarma_score += 200
+
+    subjects_list = []
+    if profile and profile.subjects:
+        if ',' in profile.subjects:
+            subjects_list = [s.strip() for s in profile.subjects.split(',') if s.strip()]
+        else:
+            subjects_list = [s.strip() for s in profile.subjects.split() if s.strip()]
+
+    achievements = profile.achievements.all() if profile else []
 
     return render(request, 'accounts/profile.html', {
         'profile_user': profile_user,
@@ -110,6 +201,11 @@ def profile_view(request, username=None):
         'is_own_profile': is_own_profile,
         'stats': stats,
         'completion': completion,
+        'completion_dash': completion_dash,
+        'edukarma_score': edukarma_score,
+        'face_registered': face_registered,
+        'subjects_list': subjects_list,
+        'achievements': achievements,
     })
 
 

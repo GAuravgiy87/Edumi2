@@ -20,6 +20,13 @@ class UserProfile(models.Model):
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
     avatar_url = models.CharField(max_length=500, blank=True, null=True)
     display_name = models.CharField(max_length=100, blank=True, null=True)
+    cover_photo = models.ImageField(upload_to='cover_photos/', blank=True, null=True)
+    headline = models.CharField(max_length=255, blank=True, null=True)
+    cgpa = models.CharField(max_length=10, blank=True, null=True)
+    subjects = models.TextField(blank=True, null=True)
+    github = models.URLField(blank=True, null=True)
+    availability_weekday = models.CharField(max_length=100, blank=True, null=True, default="09:00 – 17:00")
+    availability_friday = models.CharField(max_length=100, blank=True, null=True, default="10:00 – 14:00")
     
     # Student Specific
     student_id = models.CharField(max_length=20, blank=True, null=True, db_index=True, verbose_name="Roll Number")
@@ -77,6 +84,21 @@ class StudentPhoto(models.Model):
 
     def __str__(self):
         return f"{self.student.username} — {self.uploaded_at:%Y-%m-%d}"
+
+
+class UserAchievement(models.Model):
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='achievements')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    date_str = models.CharField(max_length=100, blank=True, null=True)
+    icon_type = models.CharField(max_length=50, default='award')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.profile.user.username} - {self.title}"
 
 
 # Import messaging models
