@@ -52,11 +52,53 @@ def conversation_detail(request, conversation_id):
         return redirect('inbox')
     conversation.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
     other_user = conversation.get_other_user(request.user)
-    messages_list = conversation.messages.all().select_related('sender')
-    return render(request, 'accounts/conversation.html', {
+    messages_list = list(conversation.messages.all().select_related('sender').order_by('created_at'))
+
+    from datetime import date, timedelta
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    prev_date = None
+    for msg in messages_list:
+        msg_date = msg.created_at.date()
+        if msg_date != prev_date:
+            msg.show_date_separator = True
+            if msg_date == today:
+                msg.date_label = 'Today'
+            elif msg_date == yesterday:
+                msg.date_label = 'Yesterday'
+            else:
+                msg.date_label = msg.created_at.strftime('%B %d, %Y')
+            prev_date = msg_date
+        else:
+            msg.show_date_separator = False
+
+    # Fetch data for sidebar
+    search_query = request.GET.get('q', '').strip()
+    conversations = request.user.conversations.all().prefetch_related(
+        'participants', 'participants__userprofile', 'messages'
+    )
+    for conv in conversations:
+        conv.other_user = conv.get_other_user(request.user)
+        conv.last_msg = conv.get_last_message()
+        conv.unread_count = conv.messages.filter(is_read=False).exclude(sender=request.user).count()
+
+    search_results = []
+    if search_query:
+        search_results = User.objects.filter(
+            models.Q(username__icontains=search_query) |
+            models.Q(first_name__icontains=search_query) |
+            models.Q(last_name__icontains=search_query) |
+            models.Q(email__icontains=search_query) |
+            models.Q(userprofile__display_name__icontains=search_query)
+        ).exclude(id=request.user.id).select_related('userprofile').distinct()[:10]
+
+    return render(request, 'accounts/inbox.html', {
         'conversation': conversation,
         'other_user': other_user,
         'messages': messages_list,
+        'conversations': conversations,
+        'search_query': search_query,
+        'search_results': search_results,
     })
 
 
