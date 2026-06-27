@@ -346,7 +346,7 @@
     const port = window.location.port;
     const camBase = (!port || port === '80' || port === '443')
         ? window.location.protocol + '//' + window.location.hostname
-        : window.location.protocol + '//' + window.location.hostname + ':8003';
+        : 'http://' + window.location.hostname + ':8003';
 
     document.querySelectorAll('.mobile-feed-img').forEach(function(img) {
         const cameraId = img.getAttribute('data-camera-id');

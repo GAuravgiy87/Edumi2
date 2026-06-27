@@ -303,18 +303,16 @@
     (function initFeed() {
         const host = window.location.hostname;
         const port = window.location.port;
-        const scheme = window.location.protocol;
-
         // In Docker (nginx), camera service is on the same host/port via proxy.
-        // In dev, camera service runs on port 8003.
+        // In dev, camera service runs on port 8003 over plain HTTP.
         // We detect Docker by checking if we're on port 80/443 or no port (default).
         let feedBase;
         if (!port || port === '80' || port === '443') {
             // Behind nginx — camera service is proxied at /cameras/
-            feedBase = `${scheme}//${host}`;
+            feedBase = `${window.location.protocol}//${host}`;
         } else {
-            // Dev mode — camera service on port 8003
-            feedBase = `${scheme}//${host}:8003`;
+            // Dev mode — camera service is HTTP on port 8003.
+            feedBase = `http://${host}:8003`;
         }
 
         const feedUrl = `${feedBase}/cameras/${window.cameraId}/feed/?q=4k`;

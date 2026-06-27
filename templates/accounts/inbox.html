@@ -1504,7 +1504,7 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
     <div class="messages-list-wrapper">
       {% if conversations %}
         {% for conv in conversations %}
-        <a href="{% url 'conversation_detail' conv.id %}" class="conversation-item {% if conversation and conv.id == conversation.id %}active-conv{% endif %} {% if conv.unread_count > 0 %}unread-conv{% endif %}">
+        <a href="{% url 'conversation_detail' conv.id %}" class="conversation-item {% if conversation and conv.id == conversation.id %}active-conv{% endif %} {% if conv.unread_count > 0 %}unread-conv{% endif %}" data-participants="{{ conv.participants.count }}">
           <div class="avatar-container">
             <img src="{{ conv.other_user.userprofile.get_profile_picture_url }}"
                  alt="{{ conv.other_user.username }}"
@@ -1726,32 +1726,43 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
   }
 
   /* ── Interactive Category Filtering ── */
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.sidebar-tab').forEach(tab => {
-      tab.addEventListener('click', function() {
-        document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-        this.classList.add('active');
+  function handleSidebarTabClick() {
+    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
 
-        const filter = this.getAttribute('data-tab');
-        const items = document.querySelectorAll('.conversation-item');
-        
-        items.forEach(item => {
-          if (filter === 'all') {
-            item.style.display = 'flex';
-          } else if (filter === 'unread') {
-            const badge = item.querySelector('.unread-count-pill');
-            if (badge && parseInt(badge.textContent.trim()) > 0) {
-              item.style.display = 'flex';
-            } else {
-              item.style.display = 'none';
-            }
-          } else if (filter === 'groups') {
-            item.style.display = 'none';
-          }
-        });
-      });
+    const filter = this.getAttribute('data-tab');
+    const items = document.querySelectorAll('.conversation-item');
+
+    items.forEach(item => {
+      if (filter === 'all') {
+        item.style.display = 'flex';
+      } else if (filter === 'unread') {
+        const badge = item.querySelector('.unread-count-pill');
+        if (badge && parseInt(badge.textContent.trim()) > 0) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      } else if (filter === 'groups') {
+        const participants = parseInt(item.dataset.participants || '0', 10);
+        if (participants > 2) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      }
     });
-  });
+  }
+
+  function initSidebarTabs() {
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+      tab.removeEventListener('click', handleSidebarTabClick);
+      tab.addEventListener('click', handleSidebarTabClick);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initSidebarTabs);
+  document.addEventListener('turbo:load', initSidebarTabs);
 
   document.addEventListener('turbo:load', enableMessagesLayout);
   
@@ -1762,10 +1773,14 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
   }
 
   /* ── Active Conversation Handling ── */
-  const msgInput = document.getElementById('msgInput');
-  const messageForm = document.getElementById('messageForm');
-  
-  if (msgInput && messageForm) {
+  function initMessageComposer() {
+    if (document.body.dataset.messageComposerInitialized === 'true') return;
+    const msgInput = document.getElementById('msgInput');
+    const messageForm = document.getElementById('messageForm');
+    if (!msgInput || !messageForm) return;
+
+    document.body.dataset.messageComposerInitialized = 'true';
+
     /* ── Emoji Selection ── */
     const ALL_EMOJIS = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😚','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','💩','🤡','👻','👽','🤖','👋','🤚','🖐️','✋','🤝','🙌','👏','👍','👎','✊','💪','🙏','✍️','👌','🤌','✌️','🤞','🤟','🤘','👈','👉','👆','👇','☝️','👐','🤲','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','💕','💞','💓','💗','💖','💘','💝','💯','💢','💥','💫','💦','💨','🎉','🎊','🎈','🎁','🏆','🥇','⭐','🌟','✨','🔥','💎','🚀','🌈','🎵','🎶','🎮','🏠','🌍','🌙','☀️','⛅','🌊','🌺','🌸','🌹','🍎','🍕','🍔','🎂','🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐯','🦁','🐮','🐷','🐸','🐙'];
 
@@ -1886,6 +1901,9 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
       .finally(() => updateSendBtn());
     });
   }
+
+  document.addEventListener('turbo:load', initMessageComposer);
+  document.addEventListener('DOMContentLoaded', initMessageComposer);
 
   function updateSendBtn() {
     const ta = document.getElementById('msgInput');
@@ -2030,7 +2048,7 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
     const d = e.detail;
     const activeConvId = "{{ conversation.id|default:'none' }}";
     if (activeConvId !== 'none' && d.conversation_id == activeConvId) {
-      appendMessage({ isSent: false, content: d.message, time: null });
+      appendMessage({ isSent: false, content: d.message, time: d.created_at || null });
     }
   });
 </script>

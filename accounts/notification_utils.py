@@ -17,18 +17,22 @@ def send_ws_notification(recipient_id, data):
         }
     )
 
-def notify_new_message(sender, recipient, conversation_id, content="New message received"):
+def notify_new_message(sender, recipient, conversation_id, content="New message received", created_at=None):
     """Send notification when a new message is sent"""
     if sender != recipient:  # Don't notify yourself
         Notification.create_message_notification(recipient, sender, conversation_id)
         
-        # Broadcast via WebSocket
-        send_ws_notification(recipient.id, {
+        payload = {
             "type": "new_message",
             "sender": sender.username,
             "conversation_id": conversation_id,
             "message": content
-        })
+        }
+        if created_at is not None:
+            payload["created_at"] = created_at
+
+        # Broadcast via WebSocket
+        send_ws_notification(recipient.id, payload)
 
 
 def notify_meeting_scheduled(meeting, classroom=None):

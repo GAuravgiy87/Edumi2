@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.db import models
+from django.utils import timezone
 
 from accounts.messaging_models import Conversation, Message
 
@@ -140,8 +141,15 @@ def send_message(request, conversation_id):
 
     from accounts.notification_utils import notify_new_message
     other_user = conversation.get_other_user(request.user)
+    local_created_at = timezone.localtime(message.created_at)
     if other_user:
-        notify_new_message(request.user, other_user, conversation_id, content=content)
+        notify_new_message(
+            request.user,
+            other_user,
+            conversation_id,
+            content=content,
+            created_at=local_created_at.strftime('%I:%M %p')
+        )
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({
@@ -151,6 +159,6 @@ def send_message(request, conversation_id):
             'image_url': message.image.url if message.image else None,
             'file_url': message.file.url if message.file else None,
             'sender': message.sender.username,
-            'created_at': message.created_at.strftime('%I:%M %p'),
+            'created_at': local_created_at.strftime('%I:%M %p'),
         })
     return redirect('conversation_detail', conversation_id=conversation_id)
