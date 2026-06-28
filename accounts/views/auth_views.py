@@ -40,7 +40,7 @@ def login_view(request):
             login(request, user)
             if user.is_superuser:
                 if not hasattr(user, 'userprofile'):
-                    UserProfile.objects.create(user=user, user_type='teacher', display_name=f"Admin {user.username}")
+                    UserProfile.objects.create(user=user, user_type='admin', display_name=f"Admin {user.username}")
                 if not user.is_staff:
                     user.is_staff = True
                     user.save()

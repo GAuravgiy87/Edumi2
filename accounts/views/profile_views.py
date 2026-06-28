@@ -25,14 +25,14 @@ def profile_view(request, username=None):
     try:
         profile = profile_user.userprofile
     except UserProfile.DoesNotExist:
-        profile = UserProfile.objects.create(user=profile_user, user_type='teacher') if profile_user.is_superuser else None
+        profile = UserProfile.objects.create(user=profile_user, user_type='admin') if profile_user.is_superuser else None
 
     is_own_profile = request.user == profile_user
 
     if is_own_profile and request.method == 'POST':
         try:
             if not profile:
-                profile = UserProfile.objects.create(user=request.user, user_type='teacher')
+                profile = UserProfile.objects.create(user=request.user, user_type='admin' if request.user.is_superuser else 'teacher')
 
             request.user.first_name = request.POST.get('first_name', '').strip()
             request.user.last_name = request.POST.get('last_name', '').strip()

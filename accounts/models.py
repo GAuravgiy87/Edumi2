@@ -7,6 +7,7 @@ class UserProfile(models.Model):
     USER_TYPE_CHOICES = (
         ('student', 'Student'),
         ('teacher', 'Teacher'),
+        ('admin', 'Admin'),
     )
     
     user = models.OneToOneField(User, on_delete=models.CASCADE)
