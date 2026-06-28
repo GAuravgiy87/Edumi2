@@ -333,8 +333,11 @@ def meeting_attendance(request, meeting_code):
             'total_fmt': f"{accumulated_secs // 60}m {accumulated_secs % 60}s" if accumulated_secs else '—',
         })
 
+    live_count = sum(1 for p in participants if p.is_active)
+
     return render(request, 'meetings/attendance_report.html', {
         'meeting': meeting, 'participants': participants, 'participant_data': participant_data,
+        'live_count': live_count,
     })
 
 

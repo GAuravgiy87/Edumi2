@@ -34,6 +34,15 @@
 </head>
 
 <body>
+    <script>
+        // Apply theme immediately to body before any parsing to prevent FOUC
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+            }
+        })();
+    </script>
     {% include 'components/navbar.html' %}
 
     {% if messages %}

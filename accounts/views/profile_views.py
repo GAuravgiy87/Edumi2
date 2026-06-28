@@ -41,12 +41,13 @@ def profile_view(request, username=None):
 
             profile.display_name = request.POST.get('display_name', '').strip()
             profile.bio = request.POST.get('bio', '').strip()
-            profile.phone = request.POST.get('phone', '').strip()
+            phone_val = (request.POST.get('phone') or request.POST.get('contact_number') or '').strip()
+            profile.phone = phone_val
+            profile.contact_number = phone_val
             profile.address = request.POST.get('address', '').strip()
             profile.headline = request.POST.get('headline', '').strip()
             profile.subjects = request.POST.get('subjects', '').strip()
             profile.github = request.POST.get('github', '').strip()
-            profile.contact_number = request.POST.get('contact_number', '').strip()
 
             avatar_choice = request.POST.get('avatar_choice', '').strip()
             if request.FILES.get('avatar'):
@@ -223,10 +224,11 @@ def edit_profile(request):
         request.user.email = request.POST.get('email', '')
         request.user.save()
 
-        profile.display_name = request.POST.get('display_name', '')
-        profile.bio = request.POST.get('bio', '')
-        profile.phone = request.POST.get('phone', '')
-        profile.address = request.POST.get('address', '')
+        profile.display_name = request.POST.get('display_name', '').strip()
+        profile.bio = request.POST.get('bio', '').strip()
+        profile.phone = request.POST.get('phone', '').strip()
+        profile.contact_number = request.POST.get('phone', '').strip()  # Sync contact_number with phone
+        profile.address = request.POST.get('address', '').strip()
 
         if request.FILES.get('profile_picture'):
             profile.profile_picture = request.FILES['profile_picture']
@@ -235,14 +237,16 @@ def edit_profile(request):
         if dob:
             profile.date_of_birth = dob
 
-        profile.linkedin = request.POST.get('linkedin', '')
-        profile.twitter = request.POST.get('twitter', '')
-        profile.website = request.POST.get('website', '')
+        profile.linkedin = request.POST.get('linkedin', '').strip()
+        profile.twitter = request.POST.get('twitter', '').strip()
+        profile.website = request.POST.get('website', '').strip()
 
         if profile.user_type == 'student':
-            profile.student_id = request.POST.get('student_id', '')
-            profile.grade = request.POST.get('grade', '')
-            enrollment = request.POST.get('enrollment_date')
+            profile.student_id = request.POST.get('student_id', '').strip()
+            profile.roll_number = request.POST.get('student_id', '').strip()  # Sync roll_number with student_id
+            profile.branch = request.POST.get('branch', '').strip()  # Save branch
+            profile.grade = request.POST.get('grade', '').strip()
+            enrollment = request.POST.get('enrollment_date', '').strip()
             if enrollment:
                 profile.enrollment_date = enrollment
         elif profile.user_type == 'teacher':

@@ -1,4 +1,8 @@
 /* Modern Sidebar Navigation */
+html {
+    scrollbar-gutter: stable;
+}
+
 :root {
     --sidebar-width: 260px;
     --topbar-height: 60px;
@@ -35,7 +39,6 @@ body {
     height: calc(100vh - var(--topbar-height));
     display: flex;
     flex-direction: column;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 1000;
     overflow-y: auto;
     overflow-x: hidden;
@@ -99,13 +102,13 @@ body {
     color: var(--text-muted);
     font-size: 14px;
     font-weight: 500;
-    transition: all 0.2s;
     position: relative;
 }
 
 .sidebar-nav-item:hover {
     background: var(--hover-bg);
     color: var(--text-main);
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .sidebar-nav-item.active {
@@ -172,7 +175,7 @@ body {
     color: var(--text-muted);
     font-size: 14px;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .sidebar-footer-item:hover {
@@ -192,7 +195,6 @@ body {
 .main-content {
     flex: 1;
     margin-left: var(--sidebar-width);
-    transition: margin-left 0.3s ease;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -601,6 +603,7 @@ body {
 
     .sidebar {
         transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .sidebar.mobile-open {
@@ -706,29 +709,5 @@ body {
     }
 }
 
-/* Smooth transitions for all screen sizes */
-@media (prefers-reduced-motion: no-preference) {
-
-    .sidebar,
-    .main-content,
-    .sidebar-overlay {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-}
-
-/* Animations */
-@keyframes slideIn {
-    from {
-        transform: translateX(-20px);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-.sidebar-nav-item {
-    animation: slideIn 0.3s ease;
-}
+/* Media queries handle standard transitions */
+

@@ -9,7 +9,6 @@
         <h1>Live Monitoring System</h1>
         <div class="monitor-actions">
             <span id="scan-status" class="scan-status">Scanning 0 cameras...</span>
-            <a href="{% url 'admin_dashboard' %}" class="btn-back">← Admin Dashboard</a>
         </div>
     </div>
 
@@ -35,29 +34,27 @@
             </div>
         </div>
         {% empty %}
-        <div class="no-data">
-            <p>No active cameras found. Please check Admin Dashboard.</p>
+        <div class="no-data" style="text-align: center; padding: 4rem 2rem; background: var(--bg-card); border-radius: 20px; border: 1px dashed var(--border-color); grid-column: 1 / -1;">
+            <i data-lucide="camera-off" style="width: 64px; height: 64px; color: var(--text-muted); opacity: 0.5; margin-bottom: 1rem; display: inline-block;"></i>
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">No Cameras Found</h3>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">There are no active cameras to monitor right now. Please add one from the Camera Fleet.</p>
+            <a href="{% url 'admin_dashboard' %}" class="btn-primary" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 8px;">
+                <i data-lucide="camera" style="width: 18px; height: 18px;"></i>
+                Go to Camera Fleet
+            </a>
         </div>
         {% endfor %}
     </div>
 </div>
 
 <style>
-    :root {
-        --monitor-bg: #0f172a;
-        --card-bg: #1e293b;
-        --accent-blue: #38bdf8;
-        --accent-green: #4ade80;
-        --accent-red: #f87171;
-    }
-
     .monitor-container {
         max-width: 100%;
         margin: 0;
         padding: 2rem;
-        background: var(--monitor-bg);
+        background: var(--bg-main);
         min-height: 100vh;
-        color: #f8fafc;
+        color: var(--text-main);
     }
 
     .monitor-header {
@@ -65,11 +62,11 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 2rem;
-        background: rgba(30, 41, 59, 0.7);
+        background: var(--bg-card);
         padding: 1.5rem 2rem;
         border-radius: 16px;
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow);
     }
 
     .monitor-header h1 {
@@ -77,7 +74,7 @@
         font-size: 1.75rem;
         font-weight: 800;
         letter-spacing: -0.025em;
-        background: linear-gradient(to right, #38bdf8, #818cf8);
+        background: linear-gradient(to right, var(--primary), var(--info));
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -92,18 +89,18 @@
     }
 
     .monitor-card {
-        background: var(--card-bg);
+        background: var(--bg-card);
         border-radius: 20px;
         overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-lg);
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .monitor-card:hover {
         transform: scale(1.02);
-        border-color: var(--accent-blue);
-        box-shadow: 0 0 30px rgba(56, 189, 248, 0.2);
+        border-color: var(--primary);
+        box-shadow: 0 0 30px rgba(102, 126, 234, 0.2);
     }
 
     .card-header {
@@ -111,14 +108,15 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: rgba(15, 23, 42, 0.5);
+        background: var(--gray-50);
+        border-bottom: 1px solid var(--border-color);
     }
 
     .card-header h3 {
         margin: 0;
         font-size: 1rem;
         font-weight: 600;
-        color: #e2e8f0;
+        color: var(--gray-900);
     }
 
     .badge {
@@ -130,8 +128,8 @@
         letter-spacing: 0.05em;
     }
 
-    .badge.online { background: #065f46; color: #34d399; border: 1px solid #059669; }
-    .badge.offline { background: #7f1d1d; color: #f87171; border: 1px solid #b91c1c; }
+    .badge.online { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge.offline { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
 
     .feed-container {
         position: relative;
@@ -148,20 +146,21 @@
     .overlay {
         position: absolute;
         inset: 0;
-        background: rgba(15, 23, 42, 0.9);
+        background: rgba(0, 0, 0, 0.8);
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         gap: 1rem;
         z-index: 10;
+        color: white;
     }
 
     .spinner {
         width: 48px;
         height: 48px;
-        border: 3px solid rgba(56, 189, 248, 0.1);
-        border-top-color: var(--accent-blue);
+        border: 3px solid rgba(255, 255, 255, 0.2);
+        border-top-color: var(--primary);
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
@@ -173,33 +172,33 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: rgba(15, 23, 42, 0.3);
+        background: var(--gray-50);
+        border-top: 1px solid var(--border-color);
     }
 
     .ip-info {
         font-size: 0.8rem;
-        color: #94a3b8;
-        font-family: 'JetBrains Mono', monospace;
+        color: var(--gray-500);
+        font-family: monospace;
     }
 
     .btn-expand {
-        color: var(--accent-blue);
+        color: var(--primary);
         text-decoration: none;
         font-weight: 600;
         font-size: 0.875rem;
         transition: color 0.2s;
     }
 
-    .btn-expand:hover { color: #7dd3fc; }
+    .btn-expand:hover { color: var(--primary-dark); }
 
-    .btn-back {
-        background: var(--accent-blue);
-        color: var(--monitor-bg);
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 700;
+
+    
+    .scan-status {
+        color: var(--text-muted);
         font-size: 0.875rem;
+        font-weight: 500;
+        margin-right: 1rem;
     }
 </style>
 

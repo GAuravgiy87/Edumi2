@@ -26,7 +26,7 @@
                     <span class="sidebar-nav-icon"><i data-lucide="video"></i></span>
                     <span class="sidebar-nav-text">Meeting Logs</span>
                 </a>
-                <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'admin_dashboard' or '/admin/cameras/' in request.path or '/cameras/dashboard/' in request.path or '/cameras/' in request.path %}active{% endif %}">
+                <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'admin_dashboard' or '/admin/cameras/' in request.path or '/cameras/dashboard/' in request.path %}active{% endif %}">
                     <span class="sidebar-nav-icon"><i data-lucide="camera"></i></span>
                     <span class="sidebar-nav-text">Camera Fleet</span>
                 </a>

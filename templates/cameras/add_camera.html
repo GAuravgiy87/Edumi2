@@ -1,263 +1,152 @@
-{% extends 'layouts/sidebar_base.html' %}
-{% load static %}
-
-{% block page_title %}Add Camera{% endblock %}
-
-{% block content %}
-<div class="add-camera-container">
-    <div class="form-card-large">
-        <h2>Add New Camera</h2>
-        <p class="subtitle">Enter camera details - Stream path will be auto-detected</p>
-        
-        {% if error %}
-        <div class="alert alert-warning">
-            {{ error }}
+<!-- ================= CAMERA MODAL ================= -->
+<div id="cameraModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Camera</h2>
+            <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
-        {% endif %}
-        
-        <form method="post">
+
+        <form id="cameraForm" onsubmit="saveCamera(event)">
             {% csrf_token %}
-            
+            <input type="hidden" id="cameraId" name="camera_id">
+
             <div class="form-group">
                 <label>Camera Name</label>
-                <input type="text" name="name" required placeholder="e.g., Front Door Camera">
+                <input type="text" id="camName" name="name" class="form-control" required>
             </div>
-            
-            <div class="form-row">
+
+            <div class="form-group">
+                <label>Camera Type</label>
+                <select id="camType" name="camera_type" class="form-control" onchange="handleTypeChange()">
+                    <option value="rtsp">RTSP Camera</option>
+                    <option value="ip_webcam">IP Webcam</option>
+                    <option value="droidcam">DroidCam</option>
+                </select>
+            </div>
+
+            <div class="grid-2">
                 <div class="form-group">
                     <label>IP Address</label>
-                    <input type="text" name="ip_address" required placeholder="10.7.16.48">
+                    <input type="text" id="camIp" name="ip_address" class="form-control" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Port</label>
-                    <input type="number" name="port" value="554" required placeholder="554">
+                    <input type="number" id="camPort" name="port" class="form-control" value="554">
                 </div>
             </div>
-            
-            <div class="form-row">
+
+            <div id="rtspAuth" class="grid-2">
                 <div class="form-group">
-                    <label>Username (Optional)</label>
-                    <input type="text" name="username" placeholder="Camera username">
+                    <label>Username</label>
+                    <input type="text" id="camUser" name="username" class="form-control">
                 </div>
-                
+
                 <div class="form-group">
-                    <label>Password (Optional)</label>
-                    <input type="password" name="password" placeholder="Camera password">
+                    <label>Password</label>
+                    <input type="password" id="camPass" name="password" class="form-control">
                 </div>
             </div>
-            
-            <div class="info-box">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-                <div>
-                    <strong>Auto-Detection Enabled</strong>
-                    <p>The system will automatically test common RTSP paths (/live, /stream, /h264, etc.) to find the correct one for your camera.</p>
-                </div>
-            </div>
-            
-            <div class="form-actions">
-                <button type="submit" class="btn-submit">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; vertical-align: middle;">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Add Camera & Auto-Detect Path
-                </button>
-                <a href="{% url 'admin_dashboard' %}" class="btn-cancel">Cancel</a>
-            </div>
+
+            <button type="submit" class="btn-save">Save Camera</button>
         </form>
     </div>
 </div>
 
+<!-- ================= MODAL STYLES ================= -->
 <style>
-.add-camera-container {
-    max-width: 700px;
-    margin: 2rem auto;
-    padding: 1rem;
-}
-
-.form-card-large {
-    background: #ffffff;
-    padding: 2.5rem;
-    border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e9ecef;
-}
-
-.form-card-large h2 {
-    font-size: 1.75rem;
-    color: #212529;
-    margin-bottom: 0.5rem;
-    font-weight: 700;
-}
-
-.form-card-large .subtitle {
-    color: #6c757d;
-    margin-bottom: 2rem;
-    font-size: 0.95rem;
-}
-
-.alert {
-    padding: 1rem 1.25rem;
-    border-radius: 10px;
-    margin-bottom: 1.5rem;
-}
-
-.alert-warning {
-    background: #fff3cd;
-    border: 1px solid #ffc107;
-    color: #856404;
-}
-
-/* Form Inputs */
-.form-group {
-    margin-bottom: 1.25rem;
-}
-
-.form-group label {
-    display: block;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 0.875rem 1rem;
-    border: 2px solid #e5e7eb;
-    border-radius: 10px;
-    font-size: 1rem;
-    transition: all 0.2s;
-    background: #fafafa;
-    box-sizing: border-box;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: #667eea;
-    background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-group input::placeholder {
-    color: #9ca3af;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.form-group small {
-    display: block;
-    color: #6c757d;
-    font-size: 0.8rem;
-    margin-top: 0.3rem;
-}
-
-/* Info Box */
-.info-box {
-    display: flex;
-    gap: 1rem;
-    padding: 1.25rem;
-    background: linear-gradient(135deg, #e7f3ff, #f0f9ff);
-    border: 1px solid #b3d9ff;
-    border-radius: 12px;
-    margin: 1.5rem 0;
-}
-
-.info-box svg {
-    flex-shrink: 0;
-    color: #0066cc;
-    margin-top: 0.125rem;
-}
-
-.info-box strong {
-    display: block;
-    color: #004080;
-    margin-bottom: 0.25rem;
-    font-weight: 600;
-}
-
-.info-box p {
-    color: #004080;
-    font-size: 0.9rem;
-    margin: 0;
-    line-height: 1.5;
-}
-
-/* Buttons */
-.form-actions {
-    display: flex;
-    gap: 1rem;
-    margin-top: 2rem;
-}
-
-.btn-submit {
-    flex: 2;
-    padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.btn-submit:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-cancel {
-    flex: 1;
-    padding: 1rem 1.5rem;
-    background: #f3f4f6;
-    color: #4b5563;
-    border: 2px solid #e5e7eb;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-    text-align: center;
-    text-decoration: none;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.btn-cancel:hover {
-    background: #e5e7eb;
-    border-color: #d1d5db;
-}
-
-/* Responsive */
-@media (max-width: 640px) {
-    .form-card-large {
-        padding: 1.5rem;
+    .close-btn {
+        border: none;
+        background: none;
+        font-size: 1.25rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: color 0.2s;
     }
-    
-    .form-row {
-        grid-template-columns: 1fr;
+
+    .close-btn:hover {
+        color: var(--text-main);
     }
-    
-    .form-actions {
-        flex-direction: column;
+
+    /* Grid */
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
     }
-    
-    .btn-submit, .btn-cancel {
-        flex: 1;
-        width: 100%;
+
+    @media (max-width: 480px) {
+        .grid-2 {
+            grid-template-columns: 1fr;
+        }
     }
-}
 </style>
-{% endblock %}
+
+<!-- ================= MODAL SCRIPT ================= -->
+<script>
+    function openAddModal() {
+        document.getElementById('cameraForm').reset();
+        document.getElementById('cameraId').value = '';
+        document.getElementById('modalTitle').innerText = 'Add Camera';
+        handleTypeChange();
+        document.getElementById('cameraModal').classList.add('show');
+        if (typeof disableScroll === 'function') disableScroll();
+    }
+
+    function closeModal() {
+        document.getElementById('cameraModal').classList.remove('show');
+        if (typeof enableScroll === 'function') enableScroll();
+    }
+
+    function handleTypeChange() {
+        const type = document.getElementById('camType').value;
+        const portInput = document.getElementById('camPort');
+        const rtspAuth = document.getElementById('rtspAuth');
+
+        if (type === 'rtsp') {
+            rtspAuth.style.display = 'grid';
+            portInput.value = 554;
+        } else if (type === 'ip_webcam') {
+            rtspAuth.style.display = 'none';
+            portInput.value = 8080;
+        } else {
+            rtspAuth.style.display = 'none';
+            portInput.value = 4747;
+        }
+    }
+
+    async function openEditModal(id) {
+        const res = await fetch(`/cameras/edit-camera/${id}/`);
+        const data = await res.json();
+        
+        document.getElementById('modalTitle').innerText = 'Edit Camera';
+        document.getElementById('cameraId').value = data.id;
+        document.getElementById('camName').value = data.name;
+        document.getElementById('camType').value = data.camera_type;
+        document.getElementById('camIp').value = data.ip_address;
+        document.getElementById('camPort').value = data.port;
+        document.getElementById('camUser').value = data.username;
+        document.getElementById('camPass').value = data.password;
+        
+        handleTypeChange();
+        document.getElementById('cameraModal').classList.add('show');
+        if (typeof disableScroll === 'function') disableScroll();
+    }
+
+    async function saveCamera(e) {
+        e.preventDefault();
+
+        const cameraForm = document.getElementById('cameraForm');
+        const formData = new FormData(cameraForm);
+        const id = formData.get('camera_id');
+        const url = id ? `/cameras/edit-camera/${id}/` : `/cameras/add-camera/`;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+
+        if (res.ok) window.location.reload();
+    }
+</script>

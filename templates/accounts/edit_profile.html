@@ -96,19 +96,26 @@
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="student_id">Student ID</label>
-                    <input type="text" id="student_id" name="student_id" value="{{ profile.student_id }}">
+                    <label for="student_id">Student ID / Roll Number</label>
+                    <input type="text" id="student_id" name="student_id" value="{{ profile.student_id|default:profile.roll_number|default:'' }}" placeholder="e.g., ED-2024-XXXX">
                 </div>
                 
+                <div class="form-group">
+                    <label for="branch">Branch / Department</label>
+                    <input type="text" id="branch" name="branch" value="{{ profile.branch|default:'' }}" placeholder="e.g., Computer Science">
+                </div>
+            </div>
+            
+            <div class="form-row">
                 <div class="form-group">
                     <label for="grade">Grade</label>
                     <input type="text" id="grade" name="grade" value="{{ profile.grade }}" placeholder="e.g., 10th Grade">
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="enrollment_date">Enrollment Date</label>
-                <input type="date" id="enrollment_date" name="enrollment_date" value="{{ profile.enrollment_date|date:'Y-m-d' }}">
+                
+                <div class="form-group">
+                    <label for="enrollment_date">Enrollment Date</label>
+                    <input type="date" id="enrollment_date" name="enrollment_date" value="{{ profile.enrollment_date|date:'Y-m-d' }}">
+                </div>
             </div>
             
             {% elif profile.user_type == 'teacher' %}

@@ -27,12 +27,33 @@ def _get_client_ip(request):
     return request.META.get('REMOTE_ADDR')
 
 
+def sync_profile_details(u_profile):
+    modified = False
+    if not u_profile.roll_number and u_profile.student_id:
+        u_profile.roll_number = u_profile.student_id
+        modified = True
+    elif not u_profile.student_id and u_profile.roll_number:
+        u_profile.student_id = u_profile.roll_number
+        modified = True
+
+    if not u_profile.contact_number and u_profile.phone:
+        u_profile.contact_number = u_profile.phone
+        modified = True
+    elif not u_profile.phone and u_profile.contact_number:
+        u_profile.phone = u_profile.contact_number
+        modified = True
+
+    if modified:
+        u_profile.save()
+    return u_profile
+
+
 @login_required
 def face_setup(request):
     """Landing page for face registration — upload / camera capture tabs."""
     profile = getattr(request.user, 'face_profile', None)
-    u_profile = request.user.userprofile
-    info_complete = all([u_profile.roll_number, u_profile.branch, u_profile.contact_number])
+    u_profile = sync_profile_details(request.user.userprofile)
+    info_complete = all([u_profile.roll_number, u_profile.branch])
     return render(request, 'attendance/face_setup.html', {
         'has_profile': profile is not None and profile.is_active,
         'profile': profile, 'u_profile': u_profile,
@@ -57,18 +78,20 @@ def upload_face_photo(request):
         messages.error(request, f"Face detection failed: {result['message']}")
         return redirect('face_setup')
 
-    u_profile = request.user.userprofile
+    u_profile = sync_profile_details(request.user.userprofile)
     roll = request.POST.get('roll_number') or u_profile.roll_number
     branch = request.POST.get('branch') or u_profile.branch
     contact = request.POST.get('contact_number') or u_profile.contact_number
 
-    if not all([roll, branch, contact]):
-        messages.error(request, 'Student details (Roll, Branch, Contact) are missing. Please complete your profile.')
+    if not all([roll, branch]):
+        messages.error(request, 'Student details (Roll, Branch) are missing. Please complete your profile.')
         return redirect('face_setup')
 
     u_profile.roll_number = roll
     u_profile.branch = branch
-    u_profile.contact_number = contact
+    if contact:
+        u_profile.contact_number = contact
+        u_profile.phone = contact
     u_profile.save()
 
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
@@ -93,14 +116,14 @@ def capture_face_photo(request):
     try:
         body = json.loads(request.body)
         b64 = body.get('frame_b64', '')
-        u_profile = request.user.userprofile
+        u_profile = sync_profile_details(request.user.userprofile)
         roll = body.get('roll_number') or u_profile.roll_number
         branch = body.get('branch') or u_profile.branch
         contact = body.get('contact_number') or u_profile.contact_number
 
         if not b64:
             return JsonResponse({'status': 'error', 'message': 'No frame data received.'}, status=400)
-        if not all([roll, branch, contact]):
+        if not all([roll, branch]):
             return JsonResponse({'status': 'error', 'message': 'Student details are missing. Please complete your profile first.'}, status=400)
         if ',' in b64:
             b64 = b64.split(',', 1)[1]
@@ -115,7 +138,9 @@ def capture_face_photo(request):
 
     u_profile.roll_number = roll
     u_profile.branch = branch
-    u_profile.contact_number = contact
+    if contact:
+        u_profile.contact_number = contact
+        u_profile.phone = contact
     u_profile.save()
 
     encrypted, checksum = svc.prepare_for_storage(result['embedding'])
@@ -183,12 +208,14 @@ def update_profile_info(request):
         roll = body.get('roll_number', '')
         branch = body.get('branch', '')
         contact = body.get('contact_number', '')
-        if not all([roll, branch, contact]):
-            return JsonResponse({'status': 'error', 'message': 'All fields are required.'}, status=400)
+        if not all([roll, branch]):
+            return JsonResponse({'status': 'error', 'message': 'Roll Number and Branch are required.'}, status=400)
         profile = request.user.userprofile
         profile.roll_number = roll
         profile.branch = branch
-        profile.contact_number = contact
+        if contact:
+            profile.contact_number = contact
+            profile.phone = contact
         profile.save()
         return JsonResponse({'status': 'success', 'message': 'Profile updated successfully.'})
     except Exception as e:

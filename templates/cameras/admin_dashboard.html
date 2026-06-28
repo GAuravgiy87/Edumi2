@@ -78,47 +78,62 @@
     .modal {
         display: none;
         position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 9999;
         align-items: center;
         justify-content: center;
+        padding: 1rem;
+        overflow: hidden; /* Prevent middle scrollbar */
     }
     .modal.show { display: flex; }
     .modal-content {
-        background: white;
-        border-radius: 1rem;
+        background: var(--bg-card);
+        color: var(--text-main);
         width: 100%;
-        max-width: 500px;
+        max-width: 520px;
+        max-height: calc(100vh - 2rem);
         padding: 2rem;
-        position: relative;
+        border-radius: 14px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--border-color);
+        overflow-y: auto; /* Scroll ONLY inside modal content */
+        display: flex;
+        flex-direction: column;
     }
     .modal-header {
-        margin-bottom: 1.5rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        margin-bottom: 1.5rem;
     }
+    .modal-header h2 { color: var(--text-main); margin: 0; }
     .form-group { margin-bottom: 1.25rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #1e293b; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-main); font-size: 0.9rem; }
     .form-control {
         width: 100%;
-        padding: 0.625rem;
-        border: 1px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border-color);
         border-radius: 0.5rem;
         outline: none;
+        background: var(--bg-body);
+        color: var(--text-main);
+        transition: all 0.2s;
+        box-sizing: border-box;
     }
-    .form-control:focus { border-color: #6366f1; ring: 2px solid #6366f1; }
+    .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); background: var(--bg-card); }
     .btn-save {
         width: 100%;
         padding: 0.75rem;
-        background: #6366f1;
+        background: var(--primary);
         color: white;
         border: none;
         border-radius: 0.5rem;
         font-weight: 600;
         cursor: pointer;
+        transition: all 0.2s;
     }
+    .btn-save:hover { opacity: 0.9; }
     .three-dots {
         position: relative;
         display: inline-block;
@@ -236,50 +251,8 @@
     </div>
 </div>
 
-<!-- Add/Edit Modal -->
-<div id="cameraModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="modalTitle" style="font-weight: 700;">Add Camera</h2>
-            <button class="action-btn" onclick="closeModal()" style="border:none;">✕</button>
-        </div>
-        <form id="cameraForm" onsubmit="saveCamera(event)">
-            {% csrf_token %}
-            <input type="hidden" id="cameraId" name="camera_id">
-            <div class="form-group">
-                <label>Camera Name</label>
-                <input type="text" id="camName" name="name" class="form-control" required placeholder="Room 101">
-            </div>
-            <div class="form-group">
-                <label>Camera Type</label>
-                <select id="camType" name="camera_type" class="form-control" onchange="handleTypeChange()">
-                    <option value="rtsp">RTSP Camera</option>
-                    <option value="ip_webcam">IP Webcam (Android)</option>
-                    <option value="droidcam">DroidCam (iPhone)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>IP Address</label>
-                <input type="text" id="camIp" name="ip_address" class="form-control" required placeholder="192.168.1.100">
-            </div>
-            <div class="form-group">
-                <label>Port</label>
-                <input type="number" id="camPort" name="port" class="form-control" value="554">
-            </div>
-            <div id="rtspAuth" class="form-group">
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="camUser" name="username" class="form-control">
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="camPass" name="password" class="form-control">
-                </div>
-            </div>
-            <button type="submit" class="btn-save">Process & Save Camera</button>
-        </form>
-    </div>
-</div>
+<!-- Add/Edit Modal (Included from partial) -->
+{% include 'cameras/add_camera.html' %}
 
 <!-- Assign Teacher Modal -->
 <div id="assignModal" class="modal">
@@ -320,68 +293,17 @@
         document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
     });
 
-    function handleTypeChange() {
-        const type = document.getElementById('camType').value;
-        const portInput = document.getElementById('camPort');
-        const rtspAuth = document.getElementById('rtspAuth');
-        
-        if(type === 'rtsp') {
-            portInput.value = 554;
-            rtspAuth.style.display = 'block';
-        } else if(type === 'ip_webcam') {
-            portInput.value = 8080;
-            rtspAuth.style.display = 'none';
-        } else if(type === 'droidcam') {
-            portInput.value = 4747;
-            rtspAuth.style.display = 'none';
+    // Modal background scroll and click-outside logic
+    function disableScroll() { document.body.style.overflow = 'hidden'; }
+    function enableScroll() { document.body.style.overflow = ''; }
+
+    window.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            closeModal();
+            closeAssignModal();
         }
-    }
+    });
 
-    function openAddModal() {
-        document.getElementById('modalTitle').innerText = 'Add Camera';
-        document.getElementById('cameraForm').reset();
-        document.getElementById('cameraId').value = '';
-        handleTypeChange();
-        document.getElementById('cameraModal').classList.add('show');
-    }
-
-    function closeModal() {
-        document.getElementById('cameraModal').classList.remove('show');
-    }
-
-    async function openEditModal(id) {
-        const res = await fetch(`/cameras/edit-camera/${id}/`);
-        const data = await res.json();
-        
-        document.getElementById('modalTitle').innerText = 'Edit Camera';
-        document.getElementById('cameraId').value = data.id;
-        document.getElementById('camName').value = data.name;
-        document.getElementById('camType').value = data.camera_type;
-        document.getElementById('camIp').value = data.ip_address;
-        document.getElementById('camPort').value = data.port;
-        document.getElementById('camUser').value = data.username;
-        document.getElementById('camPass').value = data.password;
-        
-        handleTypeChange();
-        document.getElementById('cameraModal').classList.add('show');
-    }
-
-    async function saveCamera(e) {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const id = formData.get('camera_id');
-        const url = id ? `/cameras/edit-camera/${id}/` : '/cameras/add-camera/';
-        
-        const res = await fetch(url, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        });
-        
-        if(res.ok) {
-            window.location.reload();
-        }
-    }
 
     async function openAssignModal(id) {
         const res = await fetch(`/cameras/edit-camera/${id}/`);
@@ -397,10 +319,12 @@
         });
         
         document.getElementById('assignModal').classList.add('show');
+        disableScroll();
     }
 
     function closeAssignModal() {
         document.getElementById('assignModal').classList.remove('show');
+        enableScroll();
     }
 
     async function saveAssignment(e) {
@@ -430,53 +354,5 @@
     }
 </script>
 
-<style>
-.btn-delete {
-    background: #dc3545;
-    color: white;
-}
 
-.btn-delete:hover {
-    background: #c82333;
-    transform: translateY(-1px);
-}
-
-.camera-permissions-info {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e9ecef;
-}
-
-.permissions-count {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #6c757d;
-    font-size: 0.875rem;
-}
-
-.permissions-count svg {
-    width: 16px;
-    height: 16px;
-    stroke: var(--primary);
-}
-
-.no-cameras {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 3rem;
-    background: #ffffff;
-    border-radius: 12px;
-    color: #6c757d;
-    border: 1px solid #e9ecef;
-}
-
-.test-result {
-    margin-top: 10px;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 6px;
-    font-size: 0.85rem;
-}
-</style>
 {% endblock %}

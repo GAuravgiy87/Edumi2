@@ -18,12 +18,23 @@
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
-    {% block extra_css %}{% endblock %}
     {% endcompress %}
+    {% block extra_css %}{% endblock %}
 
     <!-- Hotwired Turbo for seamless navigation (no full page reloads) -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.5/dist/turbo.es2017-esm.js"></script>
     <script>
+        // Apply theme immediately to document root to avoid light-mode flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark-mode');
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.body.classList.add('dark-mode');
+                });
+            }
+        })();
+
         // Function to ensure sidebar stays in consistent state
         function resetSidebarState() {
             const sidebar = document.getElementById('sidebar');
@@ -35,7 +46,66 @@
             if (overlay) {
                 overlay.classList.remove('active');
             }
+            document.body.style.overflow = '';
         }
+
+        // Apply theme and sync states of permanent elements before Turbo renders new body
+        document.addEventListener('turbo:before-render', (event) => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                event.detail.newBody.classList.add('dark-mode');
+            }
+
+            // Sync active state and badges of navigation items to the permanent sidebar
+            const currentSidebar = document.getElementById('sidebar');
+            const newSidebar = event.detail.newBody.querySelector('#sidebar');
+            if (currentSidebar && newSidebar) {
+                const currentItems = currentSidebar.querySelectorAll('.sidebar-nav-item');
+                const newActiveItem = newSidebar.querySelector('.sidebar-nav-item.active');
+
+                // Clear active states on all items first
+                currentItems.forEach(item => item.classList.remove('active'));
+
+                // Apply active state to the matching item
+                if (newActiveItem) {
+                    const activeHref = newActiveItem.getAttribute('href');
+                    const match = Array.from(currentItems).find(item => item.getAttribute('href') === activeHref);
+                    if (match) {
+                        match.classList.add('active');
+                    }
+                }
+
+                // Sync all badges by index map (since their text/state is dependent on list order)
+                const newItems = newSidebar.querySelectorAll('.sidebar-nav-item');
+                currentItems.forEach((item, idx) => {
+                    const newItem = newItems[idx];
+                    if (newItem) {
+                        const curBadge = item.querySelector('.sidebar-nav-badge');
+                        const newBadge = newItem.querySelector('.sidebar-nav-badge');
+                        if (curBadge && newBadge) {
+                            curBadge.textContent = newBadge.textContent;
+                            curBadge.style.display = newBadge.style.display;
+                        } else if (curBadge && !newBadge) {
+                            curBadge.remove();
+                        } else if (!curBadge && newBadge) {
+                            item.appendChild(newBadge.cloneNode(true));
+                        }
+                    }
+                });
+            }
+
+            // Sync topbar notifications badge
+            const currentTopbar = document.getElementById('topbar');
+            const newTopbar = event.detail.newBody.querySelector('#topbar');
+            if (currentTopbar && newTopbar) {
+                const curBadge = currentTopbar.querySelector('#notificationBadge');
+                const newBadge = newTopbar.querySelector('#notificationBadge');
+                if (curBadge && newBadge) {
+                    curBadge.textContent = newBadge.textContent;
+                    curBadge.style.display = newBadge.style.display;
+                }
+            }
+        });
 
         // Configure Turbo to prevent sidebar state issues
         document.addEventListener('turbo:load', resetSidebarState);
@@ -55,12 +125,20 @@
 </head>
 
 <body>
+    <script>
+        // Apply theme immediately to body before any parsing to prevent FOUC
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+            }
+        })();
+    </script>
     {% if user.is_authenticated %}
     {% include 'components/topbar.html' %}
+    {% include 'components/sidebar.html' %}
     
     <div class="app-container" style="padding-top: var(--topbar-height);">
-        {% include 'components/sidebar.html' %}
-
         <!-- Main Content -->
         <main class="main-content">
             <!-- Content Area -->
@@ -274,6 +352,7 @@
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
             const socket = new WebSocket(wsUrl);
+            window.notificationSocket = socket;
 
             socket.onmessage = function (e) {
                 const data = JSON.parse(e.data);
@@ -397,22 +476,43 @@
             return container;
         }
 
-        // Update notification count on page load
-        document.addEventListener('DOMContentLoaded', function () {
-            // Apply saved theme
+        // Combined App Initialization for both DomContentLoaded and Turbo Loads
+        function initializeApp() {
+            // Apply saved theme class and icons
             const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark') {
+            const isDark = savedTheme === 'dark';
+            if (isDark) {
                 document.body.classList.add('dark-mode');
-                updateThemeIcons(true);
+                document.documentElement.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+                document.documentElement.classList.remove('dark-mode');
             }
+            updateThemeIcons(isDark);
 
+            // Update Notification Count
             updateNotificationCount();
-            connectNotificationWS();
-        });
+
+            // Prevent duplicate WebSocket connections on Turbo navigation
+            if (!window.notificationSocket || 
+                (window.notificationSocket.readyState !== WebSocket.OPEN && 
+                 window.notificationSocket.readyState !== WebSocket.CONNECTING)) {
+                connectNotificationWS();
+            }
+        }
+
+        // Register initialization
+        document.addEventListener('DOMContentLoaded', initializeApp);
+        document.addEventListener('turbo:load', initializeApp);
 
         // Theme Toggle Logic
         function toggleTheme() {
             const isDark = document.body.classList.toggle('dark-mode');
+            if (isDark) {
+                document.documentElement.classList.add('dark-mode');
+            } else {
+                document.documentElement.classList.remove('dark-mode');
+            }
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             updateThemeIcons(isDark);
         }
@@ -420,6 +520,7 @@
         function updateThemeIcons(isDark) {
             const sunIcon = document.getElementById('sunIcon');
             const moonIcon = document.getElementById('moonIcon');
+            if (!sunIcon || !moonIcon) return;
             if (isDark) {
                 sunIcon.style.display = 'block';
                 moonIcon.style.display = 'none';
