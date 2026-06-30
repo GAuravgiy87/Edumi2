@@ -266,174 +266,21 @@ body.dark-mode .messages-shell {
   box-shadow: 0 4px 10px rgba(102, 126, 234, 0.25);
 }
 
-/* Search results panel overlay inside sidebar */
-.search-results-overlay {
-  position: absolute;
-  top: 154px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--msg-bg-card);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-}
-
-.search-results-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 20px;
-  background: var(--msg-hover-bg);
-  border-bottom: 1px solid var(--msg-border);
-}
-
-.search-results-header span {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--msg-text-muted);
-}
-
-.close-results-btn {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--msg-accent);
-  text-decoration: none;
-}
-
-.close-results-btn:hover {
-  text-decoration: underline;
-}
-
-.search-results-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
-}
-
 /* Custom scrollbars */
-.search-results-list::-webkit-scrollbar,
 .messages-list-wrapper::-webkit-scrollbar,
 .messages-chat-history::-webkit-scrollbar {
   width: 6px;
 }
-.search-results-list::-webkit-scrollbar-track,
 .messages-list-wrapper::-webkit-scrollbar-track,
 .messages-chat-history::-webkit-scrollbar-track {
   background: transparent;
 }
-.search-results-list::-webkit-scrollbar-thumb,
 .messages-list-wrapper::-webkit-scrollbar-thumb,
 .messages-chat-history::-webkit-scrollbar-thumb {
   background: var(--msg-border);
   border-radius: 99px;
 }
 
-.search-result-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  margin-bottom: 6px;
-  background: var(--msg-bg-card);
-  border: 1px solid transparent;
-  transition: all 0.2s;
-}
-
-.search-result-card:hover {
-  background: var(--msg-hover-bg);
-  border-color: var(--msg-border);
-}
-
-.result-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--msg-border);
-}
-
-.result-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.result-name {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--msg-text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.result-meta {
-  font-size: 0.75rem;
-  color: var(--msg-text-muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.role-badge {
-  font-size: 0.65rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.role-badge.teacher {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
-}
-
-.role-badge.student {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-}
-
-.btn-chat-action {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 6px 12px;
-  background: var(--msg-accent);
-  color: white;
-  border-radius: 8px;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-
-.btn-chat-action:hover {
-  background: var(--msg-accent-hover);
-  color: white;
-}
-
-.search-empty-state {
-  text-align: center;
-  padding: 40px 16px;
-}
-
-.search-empty-icon {
-  font-size: 2rem;
-  margin-bottom: 12px;
-}
-
-.search-empty-text {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--msg-text-main);
-  margin-bottom: 4px;
-}
-
-.search-empty-sub {
-  font-size: 0.78rem;
-  color: var(--msg-text-muted);
-}
 
 /* Conversation list wrapper */
 .messages-list-wrapper {
@@ -1444,17 +1291,15 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
       
       <!-- Search Box -->
       <div class="search-row">
-        <form action="{% if conversation %}{% url 'conversation_detail' conversation.id %}{% else %}{% url 'inbox' %}{% endif %}" method="GET" class="search-form-container">
+        <div class="search-form-container">
           <div class="search-input-pill">
             <svg class="search-pill-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" name="q" value="{{ search_query }}" class="search-field" placeholder="Search conversations…" autocomplete="off">
-            {% if search_query %}
-              <a href="{% if conversation %}{% url 'conversation_detail' conversation.id %}{% else %}{% url 'inbox' %}{% endif %}" class="clear-search-btn" title="Clear search">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
-              </a>
-            {% endif %}
+            <input type="text" class="search-field" placeholder="Search conversations…" autocomplete="off">
+            <button type="button" class="clear-search-btn" title="Clear search" style="display: none;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+            </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
     
@@ -1465,46 +1310,11 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
       <button class="sidebar-tab" data-tab="groups">Groups</button>
     </div>
     
-    <!-- Search Results Panel -->
-    {% if search_query %}
-    <div class="search-results-overlay">
-      <div class="search-results-header">
-        <span>Search Results</span>
-        <a href="{% if conversation %}{% url 'conversation_detail' conversation.id %}{% else %}{% url 'inbox' %}{% endif %}" class="close-results-btn">Back to chats</a>
-      </div>
-      <div class="search-results-list">
-        {% if search_results %}
-          {% for u in search_results %}
-          <div class="search-result-card">
-            <img class="result-avatar" src="{{ u.userprofile.get_profile_picture_url }}" alt="{{ u.username }}"
-                 onerror="this.src='https://ui-avatars.com/api/?name={{ u.username }}&background=667eea&color=fff'">
-            <div class="result-info">
-              <div class="result-name">{{ u.userprofile.display_name|default:u.get_full_name|default:u.username }}</div>
-              <div class="result-meta">
-                @{{ u.username }} · <span class="role-badge {% if u.userprofile.user_type == 'teacher' %}teacher{% else %}student{% endif %}">{% if u.userprofile.user_type == 'teacher' %}Teacher{% else %}Student{% endif %}</span>
-              </div>
-            </div>
-            <div class="result-actions">
-              <a href="{% url 'start_conversation' u.username %}" class="btn-chat-action">Chat</a>
-            </div>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="search-empty-state">
-            <div class="search-empty-icon">🔍</div>
-            <p class="search-empty-text">No users found</p>
-            <span class="search-empty-sub">Try a different name or username</span>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
-
     <!-- Conversation List -->
     <div class="messages-list-wrapper">
       {% if conversations %}
         {% for conv in conversations %}
-        <a href="{% url 'conversation_detail' conv.id %}" class="conversation-item {% if conversation and conv.id == conversation.id %}active-conv{% endif %} {% if conv.unread_count > 0 %}unread-conv{% endif %}" data-participants="{{ conv.participants.count }}">
+        <a href="{% url 'conversation_detail' conv.id %}" class="conversation-item {% if conversation and conv.id == conversation.id %}active-conv{% endif %} {% if conv.unread_count > 0 %}unread-conv{% endif %}" data-participants="{{ conv.participants.count }}" data-username="{{ conv.other_user.username|lower|default:'' }}" data-display-name="{{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username|lower|default:'' }}" data-display-name-raw="{{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}">
           <div class="avatar-container">
             <img src="{{ conv.other_user.userprofile.get_profile_picture_url }}"
                  alt="{{ conv.other_user.username }}"
@@ -1523,7 +1333,7 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
                 {{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}
               </span>
               {% if conv.last_msg %}
-                <span class="last-message-time">{{ conv.last_msg.created_at|timesince|slice:":8" }}</span>
+                <span class="last-message-time">{{ conv.formatted_time }}</span>
               {% endif %}
             </div>
             
@@ -1547,12 +1357,8 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
         </a>
         {% endfor %}
       {% else %}
-        <div class="sidebar-empty-state">
-          <div class="sidebar-empty-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"/></svg>
-          </div>
-          <h3>No conversations yet</h3>
-          <p>Search for a user in the box above to start chatting!</p>
+        <div style="text-align: center; color: var(--msg-text-muted); font-size: 0.85rem; padding: 40px 20px;">
+          No chats or messages found
         </div>
       {% endif %}
     </div>
@@ -1725,33 +1531,116 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
     }
   }
 
-  /* ── Interactive Category Filtering ── */
-  function handleSidebarTabClick() {
-    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-    this.classList.add('active');
+  /* ── Interactive Category & Search Filtering ── */
+  function escapeHTML(str) {
+    return str.replace(/[&<>'"]/g, 
+      tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[tag] || tag)
+    );
+  }
 
-    const filter = this.getAttribute('data-tab');
+  function highlightText(text, query) {
+    if (!query) return escapeHTML(text);
+    const escapedQuery = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    const parts = text.split(regex);
+    return parts.map(part => {
+      if (part.toLowerCase() === query.toLowerCase()) {
+        return `<span style="color: #25D366; font-weight: 700;">${escapeHTML(part)}</span>`;
+      }
+      return escapeHTML(part);
+    }).join('');
+  }
+
+  function applyFilters() {
+    const activeTab = document.querySelector('.sidebar-tab.active');
+    const tabFilter = activeTab ? activeTab.getAttribute('data-tab') : 'all';
+    
+    const searchField = document.querySelector('.search-field');
+    const query = searchField ? searchField.value.trim().toLowerCase() : '';
+    
     const items = document.querySelectorAll('.conversation-item');
+    let visibleCount = 0;
 
     items.forEach(item => {
-      if (filter === 'all') {
-        item.style.display = 'flex';
-      } else if (filter === 'unread') {
+      // 1. Check tab match
+      let matchesTab = false;
+      if (tabFilter === 'all') {
+        matchesTab = true;
+      } else if (tabFilter === 'unread') {
         const badge = item.querySelector('.unread-count-pill');
-        if (badge && parseInt(badge.textContent.trim()) > 0) {
-          item.style.display = 'flex';
-        } else {
-          item.style.display = 'none';
-        }
-      } else if (filter === 'groups') {
+        matchesTab = (badge && parseInt(badge.textContent.trim()) > 0);
+      } else if (tabFilter === 'groups') {
         const participants = parseInt(item.dataset.participants || '0', 10);
-        if (participants > 2) {
-          item.style.display = 'flex';
-        } else {
-          item.style.display = 'none';
+        matchesTab = (participants > 2);
+      }
+
+      // 2. Check search match
+      let matchesSearch = true;
+      if (query) {
+        const displayName = (item.getAttribute('data-display-name') || '').toLowerCase();
+        const username = (item.getAttribute('data-username') || '').toLowerCase();
+        matchesSearch = displayName.includes(query) || username.includes(query);
+      }
+
+      // Show/hide based on both
+      if (matchesTab && matchesSearch) {
+        item.style.display = 'flex';
+        visibleCount++;
+        
+        // Highlight matching text in display name
+        const displayNameRaw = item.getAttribute('data-display-name-raw') || '';
+        const nameSpan = item.querySelector('.other-username');
+        if (nameSpan) {
+          if (query) {
+            nameSpan.innerHTML = highlightText(displayNameRaw, query);
+          } else {
+            nameSpan.textContent = displayNameRaw;
+          }
+        }
+      } else {
+        item.style.display = 'none';
+        
+        // Reset display name highlight when hidden
+        const displayNameRaw = item.getAttribute('data-display-name-raw') || '';
+        const nameSpan = item.querySelector('.other-username');
+        if (nameSpan) {
+          nameSpan.textContent = displayNameRaw;
         }
       }
     });
+
+    const listWrapper = document.querySelector('.messages-list-wrapper');
+    if (listWrapper) {
+      let searchNoResults = document.getElementById('searchNoResultsState');
+      
+      if (visibleCount === 0 && items.length > 0) {
+        if (!searchNoResults) {
+          searchNoResults = document.createElement('div');
+          searchNoResults.id = 'searchNoResultsState';
+          searchNoResults.setAttribute('style', 'text-align: center; color: var(--msg-text-muted); font-size: 0.85rem; padding: 40px 20px;');
+          searchNoResults.textContent = 'No chats or messages found';
+          listWrapper.appendChild(searchNoResults);
+        } else {
+          searchNoResults.style.display = 'block';
+        }
+      } else {
+        if (searchNoResults) {
+          searchNoResults.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  function handleSidebarTabClick() {
+    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    applyFilters();
   }
 
   function initSidebarTabs() {
@@ -1761,13 +1650,50 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
     });
   }
 
-  document.addEventListener('DOMContentLoaded', initSidebarTabs);
-  document.addEventListener('turbo:load', initSidebarTabs);
+  function initSearchFilter() {
+    const searchField = document.querySelector('.search-field');
+    const clearBtn = document.querySelector('.clear-search-btn');
+    if (!searchField) return;
+
+    searchField.addEventListener('input', () => {
+      if (clearBtn) {
+        clearBtn.style.display = searchField.value.trim().length > 0 ? 'flex' : 'none';
+      }
+      applyFilters();
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        searchField.value = '';
+        clearBtn.style.display = 'none';
+        applyFilters();
+        searchField.focus();
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.style.display = searchField.value.trim().length > 0 ? 'flex' : 'none';
+    }
+    applyFilters();
+  }
+
+  function initInboxFeatures() {
+    const sidebar = document.querySelector('.messages-sidebar');
+    if (!sidebar || sidebar.dataset.inboxFeaturesInitialized === 'true') return;
+    sidebar.dataset.inboxFeaturesInitialized = 'true';
+
+    initSidebarTabs();
+    initSearchFilter();
+  }
+
+  document.addEventListener('DOMContentLoaded', initInboxFeatures);
+  document.addEventListener('turbo:load', initInboxFeatures);
 
   document.addEventListener('turbo:load', enableMessagesLayout);
   
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     enableMessagesLayout();
+    initInboxFeatures();
   } else {
     document.addEventListener('DOMContentLoaded', enableMessagesLayout);
   }

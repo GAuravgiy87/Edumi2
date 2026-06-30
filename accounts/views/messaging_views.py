@@ -15,6 +15,43 @@ from accounts.messaging_models import Conversation, Message
 User = get_user_model()
 
 
+def format_conversation_timestamp(dt):
+    if not dt:
+        return ""
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    try:
+        local_dt = timezone.localtime(dt)
+        now = timezone.localtime(timezone.now())
+    except ValueError:
+        local_dt = dt
+        from datetime import datetime
+        now = datetime.now()
+        
+    diff = now - local_dt
+    seconds = int(diff.total_seconds())
+    
+    if seconds < 60:
+        return "now"
+        
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+        
+    hours = minutes // 60
+    if hours < 24:
+        if local_dt.date() == now.date():
+            return f"{hours}h"
+            
+    if local_dt.date() == (now.date() - timedelta(days=1)):
+        return "yesterday"
+        
+    if local_dt.year == now.year:
+        return local_dt.strftime("%b %d")
+    return local_dt.strftime("%d/%m/%Y")
+
+
 @login_required
 def inbox(request):
     """View all conversations with optional user search."""
@@ -26,6 +63,8 @@ def inbox(request):
         conv.other_user = conv.get_other_user(request.user)
         conv.last_msg = conv.get_last_message()
         conv.unread_count = conv.messages.filter(is_read=False).exclude(sender=request.user).count()
+        if conv.last_msg:
+            conv.formatted_time = format_conversation_timestamp(conv.last_msg.created_at)
 
     search_results = []
     if search_query:
@@ -82,6 +121,8 @@ def conversation_detail(request, conversation_id):
         conv.other_user = conv.get_other_user(request.user)
         conv.last_msg = conv.get_last_message()
         conv.unread_count = conv.messages.filter(is_read=False).exclude(sender=request.user).count()
+        if conv.last_msg:
+            conv.formatted_time = format_conversation_timestamp(conv.last_msg.created_at)
 
     search_results = []
     if search_query:
