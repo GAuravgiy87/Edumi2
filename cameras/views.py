@@ -5,7 +5,7 @@
 #
 # Sub-files (cameras/views_logic/):
 #   utils.py            — is_admin, can_view_camera, get_video_stream, test_rtsp_paths
-#   camera_views.py     — admin_dashboard, add/edit/delete camera, feed, test, live_monitor
+#   camera_views.py     — admin_dashboard, add/edit/delete camera, feed, test
 #   video_views.py      — stream_video, upload, recordings, watch, playlist, teacher_profile
 #   streaming_views.py  — mobile_mic, teacher dashboard, control room, streaming start/stop
 #   permissions_views.py — admin_content_manager, delete_recording/meeting, grant/revoke/manage
@@ -22,7 +22,7 @@ from cameras.views_logic import (
     edit_recording,
     # camera management
     admin_dashboard, add_camera, edit_camera, delete_camera,
-    camera_feed, test_camera, live_monitor, test_feed_page,
+    camera_feed, test_camera, test_feed_page,
     # streaming & control
     mobile_mic, teacher_camera_dashboard, teacher_control_room, update_zoom,
     start_streaming, stop_streaming, live_participants,

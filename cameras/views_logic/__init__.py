@@ -20,7 +20,6 @@ from .camera_views import (
     delete_camera,
     camera_feed,
     test_camera,
-    live_monitor,
     test_feed_page,
 )
 from .streaming_views import (
@@ -87,7 +86,6 @@ __all__ = [
     'delete_camera',
     'camera_feed',
     'test_camera',
-    'live_monitor',
     'test_feed_page',
     # Streaming
     'mobile_mic',

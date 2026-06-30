@@ -11,5 +11,4 @@ urlpatterns = [
     path('<int:camera_id>/feed/', views.camera_feed_proxy, name='camera_feed_proxy'),
     path('test-camera/<int:camera_id>/', views.test_camera, name='test_camera'),
     path('test-feed/', views.test_feed_page, name='test_feed_page'),
-    path('live-monitor/', views.live_monitor, name='live_monitor'),
 ]

@@ -1,10 +1,8 @@
 
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
-
-logger = logging.getLogger(__name__)
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth import get_user_model
 from ..models import Camera, CameraPermission
 from .utils import is_admin, test_rtsp_paths
@@ -163,35 +161,55 @@ def delete_camera(request, camera_id):
 @login_required
 def camera_feed(request, camera_id):
     """
-    Gateway to the dedicated Camera Service.
-    Redirects the browser directly to the camera service MJPEG feed URL.
-    This is necessary because Daphne (ASGI) buffers StreamingHttpResponse,
-    preventing MJPEG frames from reaching the browser in real-time.
+    HTTPS-safe MJPEG proxy for the Camera Service.
+
+    The Camera Service (Waitress) only speaks plain HTTP on port 8003 — it cannot
+    serve TLS. When the main app is on HTTPS, any direct browser redirect to
+    http://host:8003 triggers a Mixed-Content block.
+
+    Solution: proxy the MJPEG stream through Django (server → server is fine over
+    plain HTTP on localhost) and stream it back to the browser over the existing
+    HTTPS connection. The browser never touches port 8003 directly.
     """
+    import requests as req_lib
     from django.conf import settings
-    from django.http import HttpResponseRedirect
-    from urllib.parse import urlparse
     from .utils import can_view_camera
 
     camera = get_object_or_404(Camera, id=camera_id)
 
-    # Check permission
     if not can_view_camera(request.user, camera):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
-    # Build a browser-reachable URL to the camera service.
-    # Use the same host the browser used to reach us, but swap the port to 8003.
     internal_url = getattr(settings, 'CAMERA_SERVICE_URL', 'http://localhost:8003')
-    parsed = urlparse(internal_url)
-    service_port = parsed.port or 8003
-    request_host = request.get_host().split(':')[0]  # e.g. 'localhost' or '10.7.11.141'
-
     query_params = request.GET.urlencode()
-    feed_url = f'http://{request_host}:{service_port}/cameras/{camera_id}/feed/'
+    feed_url = f'{internal_url}/cameras/{camera_id}/feed/'
     if query_params:
         feed_url += f'?{query_params}'
 
-    return HttpResponseRedirect(feed_url)
+    try:
+        upstream = req_lib.get(feed_url, stream=True, timeout=10)
+        content_type = upstream.headers.get('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
+
+        def stream():
+            try:
+                for chunk in upstream.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            except Exception:
+                pass
+            finally:
+                upstream.close()
+
+        response = StreamingHttpResponse(stream(), content_type=content_type)
+        response['Cache-Control'] = 'no-cache, no-store'
+        response['X-Accel-Buffering'] = 'no'
+        return response
+
+    except req_lib.exceptions.ConnectionError:
+        return JsonResponse({'error': 'Camera service offline'}, status=503)
+    except Exception as e:
+        logger.error(f"camera_feed proxy error for camera {camera_id}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
@@ -230,55 +248,6 @@ def test_camera(request, camera_id):
             'status': 'error',
             'message': f'Error: {str(e)}'
         })
-
-
-@login_required
-def live_monitor(request):
-    """View to see all live camera feeds in a grid"""
-    import requests
-    from mobile_cameras.models import MobileCamera, MobileCameraPermission
-    if not request.user.is_authenticated:
-        return redirect('login')
-
-    # Filter RTSP cameras based on user permissions
-    if is_admin(request.user):
-        cameras = Camera.objects.all()
-        mobile_cameras = MobileCamera.objects.all()
-    elif hasattr(request.user, 'userprofile'):
-        if request.user.userprofile.user_type == 'teacher':
-            # Teachers see all cameras they have permission for, even if offline
-            camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
-            cameras = Camera.objects.filter(id__in=camera_ids)
-
-            mobile_camera_ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
-            mobile_cameras = MobileCamera.objects.filter(id__in=mobile_camera_ids)
-        elif request.user.userprofile.user_type == 'student':
-            # Students see all active cameras
-            cameras = Camera.objects.filter(is_active=True)
-            mobile_cameras = MobileCamera.objects.filter(is_active=True)
-        else:
-            cameras = Camera.objects.none()
-            mobile_cameras = MobileCamera.objects.none()
-    else:
-        cameras = Camera.objects.none()
-        mobile_cameras = MobileCamera.objects.none()
-
-    # Check if camera service is running
-    camera_service_running = False
-    try:
-        from django.conf import settings
-        internal_url = getattr(settings, 'CAMERA_SERVICE_URL', 'http://localhost:8003')
-        response = requests.get(f'{internal_url}/cameras/', timeout=2)
-        camera_service_running = response.status_code == 200
-    except Exception as e:
-        logger.warning(f"Camera service is offline: {e}")
-
-    context = {
-        'cameras': cameras,
-        'mobile_cameras': mobile_cameras,
-        'camera_service_running': camera_service_running,
-    }
-    return render(request, 'cameras/live_monitor.html', context)
 
 
 @login_required

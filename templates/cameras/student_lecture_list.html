@@ -11,10 +11,6 @@
         margin: 0 auto;
     }
     .search-bar-section {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         margin-bottom: 2.5rem;
         display: flex;
         gap: 1rem;
@@ -28,11 +24,18 @@
     }
     .search-input {
         width: 100%;
-        padding: 0.75rem 1rem 0.75rem 3rem;
+        padding: 0.875rem 1rem 0.875rem 3rem;
         border: 1px solid #e2e8f0;
         border-radius: 0.75rem;
         outline: none;
         font-size: 1rem;
+        background: white;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
     .search-icon {
         position: absolute;
@@ -42,11 +45,20 @@
         color: #94a3b8;
     }
     .filter-select {
-        padding: 0.75rem 1rem;
+        padding: 0.875rem 1rem;
         border: 1px solid #e2e8f0;
         border-radius: 0.75rem;
         outline: none;
         min-width: 200px;
+        background: white;
+        font-size: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .filter-select:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
     
     .section-title {
@@ -72,7 +84,7 @@
     
     .lecture-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
         gap: 1.5rem;
         margin-bottom: 3rem;
     }

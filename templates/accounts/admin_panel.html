@@ -11,7 +11,7 @@
     .admin-header h1 { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0; }
     
     /* Service Health */
-    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1rem; margin-bottom: 2rem; }
     .health-card { background: white; border-radius: 1rem; padding: 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
     .indicator { width: 10px; height: 10px; border-radius: 50%; position: relative; }
     .indicator.online { background: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); }
@@ -39,7 +39,7 @@
     .tab-btn i { width: 18px; height: 18px; }
 
     /* Stats Row */
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
     .stat-mini-card { background: white; padding: 1.5rem; border-radius: 1rem; border: 1px solid #e2e8f0; text-align: center; }
     .stat-mini-card .val { font-size: 1.75rem; font-weight: 800; color: #4f46e5; }
     .stat-mini-card .lab { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
@@ -173,9 +173,15 @@
                             </div>
                         </td>
                         <td>
+                            {% if user.is_superuser %}
+                            <span class="badge badge-admin">Admin</span>
+                            {% elif user.userprofile %}
                             <span class="badge badge-{{ user.userprofile.user_type }}">
                                 {{ user.userprofile.get_user_type_display }}
                             </span>
+                            {% else %}
+                            <span class="badge badge-admin">Admin</span>
+                            {% endif %}
                         </td>
                         <td>{{ user.date_joined|date:"M d, Y" }}</td>
                         <td><span style="color: #10b981;">● Active</span></td>

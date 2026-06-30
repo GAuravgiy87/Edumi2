@@ -31,6 +31,9 @@ urlpatterns = [
 handler404 = 'accounts.views.error_404'
 handler500 = 'accounts.views.error_500'
 
+# Static and media files are served by WhiteNoise middleware (always on,
+# regardless of DEBUG). Do NOT add Django's debug static handler here —
+# it bypasses WhiteNoise, uses the wrong directory, and breaks MIME types
+# on Windows.
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -38,10 +38,6 @@
                     <span class="sidebar-nav-icon"><i data-lucide="library"></i></span>
                     <span class="sidebar-nav-text">Recordings Library</span>
                 </a>
-                <a href="{% url 'live_monitor' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'live_monitor' or '/live-monitor/' in request.path %}active{% endif %}">
-                    <span class="sidebar-nav-icon"><i data-lucide="monitor"></i></span>
-                    <span class="sidebar-nav-text">Live Monitor</span>
-                </a>
             </div>
         {% endif %}
     {% elif user.userprofile.user_type == 'teacher' %}

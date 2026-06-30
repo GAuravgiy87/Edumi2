@@ -88,41 +88,21 @@ if render_url:
     if render_url not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(render_url)
 
-# Always add these defaults for local development
+# ── Auto-detect LAN IP at startup ────────────────────────────────────────────
+import socket as _socket
+_lan_ips = {'127.0.0.1', 'localhost'}
+try:
+    _s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+    _s.connect(('8.8.8.8', 80))
+    _lan_ips.add(_s.getsockname()[0])
+    _s.close()
+except Exception:
+    pass
+# Also include fixed known IPs
+_lan_ips.update({'10.7.11.141'})
+
+# Build CSRF trusted origins from every detected IP
 DEFAULT_CSRF_ORIGINS = [
-    'http://localhost',
-    'http://localhost:8002',
-    'http://localhost:8003',
-    'http://localhost:8080',
-    'https://localhost',
-    'https://localhost:8002',
-    'https://localhost:8003',
-    'https://localhost:8080',
-    'http://127.0.0.1',
-    'http://127.0.0.1:8002',
-    'http://127.0.0.1:8003',
-    'http://127.0.0.1:8080',
-    'https://127.0.0.1',
-    'https://127.0.0.1:8002',
-    'https://127.0.0.1:8003',
-    'https://127.0.0.1:8080',
-    'http://10.7.11.141',
-    'http://10.7.11.141:8002',
-    'http://10.7.11.141:8003',
-    'http://10.7.11.141:8080',
-    'https://10.7.11.141',
-    'https://10.7.11.141:8002',
-    'https://10.7.11.141:8003',
-    'https://10.7.11.141:8080',
-    'http://192.168.1.100',
-    'http://192.168.1.100:8002',
-    'http://192.168.1.100:8003',
-    'http://192.168.1.100:8080',
-    'https://192.168.1.100',
-    'https://192.168.1.100:8002',
-    'https://192.168.1.100:8003',
-    'https://192.168.1.100:8080',
-    # Self-signed SSL local domain
     'https://edumi.ac.in',
     'https://edumi.ac.in:8002',
     'https://www.edumi.ac.in',
@@ -130,6 +110,29 @@ DEFAULT_CSRF_ORIGINS = [
     'http://edumi.ac.in',
     'http://edumi.ac.in:8002',
 ]
+for _ip in _lan_ips:
+    for _scheme in ('http', 'https'):
+        for _port in ('', ':8002', ':8003', ':8080'):
+            DEFAULT_CSRF_ORIGINS.append(f'{_scheme}://{_ip}{_port}')
+
+# Also ensure ALLOWED_HOSTS includes every detected IP
+for _ip in _lan_ips:
+    if _ip not in ALLOWED_HOSTS and '*' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_ip)
+
+# Add machine hostname so http://HOSTNAME:8002 also works
+try:
+    _hostname = _socket.gethostname()
+    if _hostname and _hostname not in ALLOWED_HOSTS and '*' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_hostname)
+    for _scheme in ('http', 'https'):
+        for _port in ('', ':8002', ':8003'):
+            _origin = f'{_scheme}://{_hostname}{_port}'
+            if _origin not in DEFAULT_CSRF_ORIGINS:
+                DEFAULT_CSRF_ORIGINS.append(_origin)
+except Exception:
+    pass
+
 for origin in DEFAULT_CSRF_ORIGINS:
     if origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(origin)
@@ -303,6 +306,7 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
+# ── Static files ──────────────────────────────────────────────────────────────
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
@@ -313,12 +317,32 @@ STATICFILES_FINDERS = [
     'compressor.finders.CompressorFinder',
 ]
 
-# Use WhiteNoise to serve static files with compression and caching
+# Ensure CSS/JS MIME types are registered correctly on Windows.
+# Windows registry often lacks these, causing "Refused to apply style" errors.
+import mimetypes
+mimetypes.add_type('text/css',               '.css')
+mimetypes.add_type('application/javascript',  '.js')
+mimetypes.add_type('text/javascript',         '.js')
+mimetypes.add_type('image/svg+xml',           '.svg')
+mimetypes.add_type('application/json',        '.json')
+mimetypes.add_type('font/woff',               '.woff')
+mimetypes.add_type('font/woff2',              '.woff2')
+mimetypes.add_type('image/x-icon',            '.ico')
+
+# WhiteNoise serves static files directly from STATIC_ROOT with correct
+# Content-Type headers, cache headers, and gzip compression.
+# ManifestStaticFilesStorage adds hash-based cache busting.
 try:
-    import whitenoise
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+    import whitenoise as _wn
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    # Tell WhiteNoise to also serve from STATIC_ROOT when DEBUG=True
+    # (prevents Django's debug static handler from intercepting first)
+    WHITENOISE_ROOT = BASE_DIR / 'staticfiles'
+    WHITENOISE_AUTOREFRESH = DEBUG          # In dev, re-read files on every request
+    WHITENOISE_USE_FINDERS = DEBUG          # In dev, also find files from STATICFILES_DIRS
+    WHITENOISE_MAX_AGE = 0 if DEBUG else 31536000
 except ImportError:
-    pass
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 COMPRESS_ENABLED = False
 COMPRESS_URL = '/static/'
 COMPRESS_STORAGE = 'compressor.storage.CompressorFileStorage'

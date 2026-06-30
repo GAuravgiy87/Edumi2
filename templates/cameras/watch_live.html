@@ -301,26 +301,15 @@
 
     // ── Initialize Direct Feed ──
     (function initFeed() {
-        const host = window.location.hostname;
-        const port = window.location.port;
-        // In Docker (nginx), camera service is on the same host/port via proxy.
-        // In dev, camera service runs on port 8003 over plain HTTP.
-        // We detect Docker by checking if we're on port 80/443 or no port (default).
-        let feedBase;
-        if (!port || port === '80' || port === '443') {
-            // Behind nginx — camera service is proxied at /cameras/
-            feedBase = `${window.location.protocol}//${host}`;
-        } else {
-            // Dev mode — camera service is HTTP on port 8003.
-            feedBase = `http://${host}:8003`;
-        }
-
-        const feedUrl = `${feedBase}/cameras/${window.cameraId}/feed/?q=4k`;
+        // Use same-origin URL — Django proxies /cameras/<id>/feed/ through HTTPS.
+        // Never point the browser directly at port 8003 (plain HTTP) as that
+        // causes a Mixed-Content block when the main app is on HTTPS.
+        const feedUrl = `/cameras/${window.cameraId}/feed/?q=4k`;
 
         const img = document.getElementById('mainFeed');
         if (img) {
             img.src = feedUrl;
-            console.log("Attempting direct feed connection:", feedUrl);
+            console.log("Attempting direct feed connection:", window.location.protocol + '//' + window.location.host + feedUrl);
 
             img.onerror = function() {
                 console.error("Feed connection failed. Retrying in 3 seconds...");

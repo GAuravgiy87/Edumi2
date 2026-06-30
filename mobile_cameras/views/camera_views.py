@@ -1,6 +1,6 @@
 """
 mobile_cameras/views/camera_views.py
-CRUD views: dashboard, add, delete, feed, view, live monitor, test.
+CRUD views: dashboard, add, delete, feed, view, test.
 """
 import logging
 
@@ -68,14 +68,50 @@ def delete_mobile_camera(request, mobile_camera_id):
 
 
 def mobile_camera_feed(request, mobile_camera_id):
-    """Gateway — redirect to dedicated Camera Service on port 8003."""
+    """
+    HTTPS-safe MJPEG proxy for the Camera Service (mobile cameras).
+
+    Proxies the stream from the internal HTTP Camera Service through Django
+    so the browser always fetches it over the existing HTTPS connection,
+    avoiding Mixed-Content blocks.
+    """
+    import requests as req_lib
+    from django.conf import settings
+
     mobile_camera = get_object_or_404(MobileCamera, id=mobile_camera_id)
     if not can_view_mobile_camera(request.user, mobile_camera):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
-    # In Docker, nginx handles routing. In dev, we use port 8003.
-    url = f"http://{request.get_host().split(':')[0]}:8003/mobile-cameras/{mobile_camera_id}/feed/"
-    return redirect(url)
+    internal_url = getattr(settings, 'CAMERA_SERVICE_URL', 'http://localhost:8003')
+    query_params = request.GET.urlencode()
+    feed_url = f'{internal_url}/mobile-cameras/{mobile_camera_id}/feed/'
+    if query_params:
+        feed_url += f'?{query_params}'
+
+    try:
+        upstream = req_lib.get(feed_url, stream=True, timeout=10)
+        content_type = upstream.headers.get('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
+
+        def stream():
+            try:
+                for chunk in upstream.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            except Exception:
+                pass
+            finally:
+                upstream.close()
+
+        response = StreamingHttpResponse(stream(), content_type=content_type)
+        response['Cache-Control'] = 'no-cache, no-store'
+        response['X-Accel-Buffering'] = 'no'
+        return response
+
+    except req_lib.exceptions.ConnectionError:
+        return JsonResponse({'error': 'Camera service offline'}, status=503)
+    except Exception as e:
+        logger.error(f"mobile_camera_feed proxy error for camera {mobile_camera_id}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
@@ -85,25 +121,6 @@ def view_mobile_camera(request, mobile_camera_id):
     if not can_view_mobile_camera(request.user, mobile_camera):
         return redirect('login')
     return render(request, 'mobile_cameras/view_camera.html', {'mobile_camera': mobile_camera})
-
-
-@login_required
-def live_monitor(request):
-    """View all mobile cameras in a permission-filtered grid."""
-    if is_admin(request.user):
-        mobile_cameras = MobileCamera.objects.all()
-    elif hasattr(request.user, 'userprofile'):
-        utype = request.user.userprofile.user_type
-        if utype == 'teacher':
-            ids = MobileCameraPermission.objects.filter(teacher=request.user).values_list('mobile_camera_id', flat=True)
-            mobile_cameras = MobileCamera.objects.filter(id__in=ids)
-        elif utype == 'student':
-            mobile_cameras = MobileCamera.objects.filter(is_active=True)
-        else:
-            mobile_cameras = MobileCamera.objects.none()
-    else:
-        mobile_cameras = MobileCamera.objects.none()
-    return render(request, 'mobile_cameras/live_monitor.html', {'mobile_cameras': mobile_cameras})
 
 
 @login_required

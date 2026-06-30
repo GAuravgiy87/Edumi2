@@ -52,7 +52,7 @@
     .btn-action-primary:hover { background: #4f46e5; transform: translateY(-3px) scale(1.02); box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.4); }
 
     /* Stats Grid */
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-bottom: 3rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 2rem; margin-bottom: 3rem; }
     .stat-card { 
         background: white; 
         border-radius: 1.5rem; 
@@ -94,7 +94,7 @@
     .card-title i { color: #6366f1; }
     
     /* Control Center Grid */
-    .control-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.25rem; }
+    .control-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 1.25rem; }
     .control-item { 
         padding: 1.75rem; 
         border-radius: 1.25rem; 
@@ -204,11 +204,6 @@
                     <i data-lucide="video"></i>
                     <span>Session Hub</span>
                     <p>Start, stop, and schedule live academic meetings.</p>
-                </a>
-                <a href="{% url 'live_monitor' %}" class="control-item">
-                    <i data-lucide="activity"></i>
-                    <span>AI Proctors</span>
-                    <p>Monitor student engagement and identity in real-time.</p>
                 </a>
                 <a href="{% url 'inbox' %}" class="control-item">
                     <i data-lucide="message-circle"></i>
