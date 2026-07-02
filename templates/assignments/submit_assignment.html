@@ -57,7 +57,7 @@
         </div>
         {% endif %}
 
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" data-turbo="false">
             {% csrf_token %}
             
             <div class="form-group">
@@ -66,9 +66,20 @@
                     <i data-lucide="upload-cloud" style="width: 48px; height: 48px; color: #94a3b8; margin-bottom: 0.75rem;"></i>
                     <p style="color: #475569; margin: 0 0 0.5rem 0;">Drag and drop your submission files here or click to browse</p>
                     <p style="color: #94a3b8; font-size: 0.875rem; margin: 0;">Supports images, PDFs, Word documents, ZIP files, and more</p>
-                    <input type="file" name="submission_files" id="submission_files" multiple style="display: none;">
+                    <input type="file" name="submission_files" id="submission_files" multiple webkitdirectory accept="*" style="display: none;">
                     <button type="button" onclick="document.getElementById('submission_files').click()" class="btn-secondary" style="padding: 0.5rem 1.25rem; margin-top: 1rem;">Choose Files</button>
                 </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="submission_links">Add Links (URLs)</label>
+                <div id="submission-links-container">
+                    <div class="link-input" style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center;">
+                        <input type="text" name="submission_link_text[]" class="form-control" placeholder="Link text (e.g., Google Drive File)" style="flex: 1;">
+                        <input type="url" name="submission_link_url[]" class="form-control" placeholder="https://example.com" style="flex: 2;">
+                    </div>
+                </div>
+                <button type="button" onclick="addSubmissionLinkInput()" class="btn-secondary" style="padding: 0.5rem 1.25rem; margin-top: 0.5rem;">+ Add Another Link</button>
             </div>
             
             <div class="btn-group">
@@ -80,4 +91,24 @@
         </form>
     </div>
 </div>
+
+<script>
+function addSubmissionLinkInput() {
+    const container = document.getElementById('submission-links-container');
+    const newLink = document.createElement('div');
+    newLink.className = 'link-input';
+    newLink.style.cssText = 'display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center;';
+    newLink.innerHTML = `
+        <input type="text" name="submission_link_text[]" class="form-control" placeholder="Link text (e.g., Google Drive File)" style="flex: 1;">
+        <input type="url" name="submission_link_url[]" class="form-control" placeholder="https://example.com" style="flex: 2;">
+        <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.5rem;">
+            <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+        </button>
+    `;
+    container.appendChild(newLink);
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+</script>
 {% endblock %}

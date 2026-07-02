@@ -39,7 +39,7 @@
         <h1 class="form-title">Create New Assignment</h1>
         <p class="form-subtitle">Create an assignment for your students in {{ classroom.title }}</p>
 
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" data-turbo="false">
             {% csrf_token %}
             
             <div class="form-group">
@@ -78,9 +78,20 @@
                 <div class="file-upload-area">
                     <i data-lucide="upload-cloud" style="width: 48px; height: 48px; color: #94a3b8; margin-bottom: 0.75rem;"></i>
                     <p style="color: #475569; margin: 0 0 0.5rem 0;">Drag and drop files here or click to browse</p>
-                    <input type="file" name="question_files" id="question_files" multiple style="display: none;">
+                    <input type="file" name="question_files" id="question_files" multiple webkitdirectory accept="*" style="display: none;">
                     <button type="button" onclick="document.getElementById('question_files').click()" class="btn-secondary" style="padding: 0.5rem 1.25rem; margin-top: 0.5rem;">Choose Files</button>
                 </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="question_links">Add Links (URLs)</label>
+                <div id="links-container">
+                    <div class="link-input" style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center;">
+                        <input type="text" name="link_text[]" class="form-control" placeholder="Link text (e.g., Google Drive File)" style="flex: 1;">
+                        <input type="url" name="link_url[]" class="form-control" placeholder="https://example.com" style="flex: 2;">
+                    </div>
+                </div>
+                <button type="button" onclick="addLinkInput()" class="btn-secondary" style="padding: 0.5rem 1.25rem; margin-top: 0.5rem;">+ Add Another Link</button>
             </div>
             
             <div class="btn-group">
@@ -91,4 +102,24 @@
         </form>
     </div>
 </div>
+
+<script>
+function addLinkInput() {
+    const container = document.getElementById('links-container');
+    const newLink = document.createElement('div');
+    newLink.className = 'link-input';
+    newLink.style.cssText = 'display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center;';
+    newLink.innerHTML = `
+        <input type="text" name="link_text[]" class="form-control" placeholder="Link text (e.g., Google Drive File)" style="flex: 1;">
+        <input type="url" name="link_url[]" class="form-control" placeholder="https://example.com" style="flex: 2;">
+        <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.5rem;">
+            <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+        </button>
+    `;
+    container.appendChild(newLink);
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+</script>
 {% endblock %}

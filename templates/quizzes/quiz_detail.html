@@ -1,0 +1,171 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block page_title %}{{ quiz.title }}{% endblock %}
+
+{% block content %}
+<style>
+    .detail-container { max-width: 1200px; margin: 0 auto; padding: 2rem; font-family: 'Inter', sans-serif; }
+    
+    .quiz-header { 
+        background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); 
+        border-radius: 1.5rem; 
+        padding: 3rem; 
+        color: white; 
+        margin-bottom: 2rem; 
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+    }
+    
+    .quiz-header h1 { font-size: 2.5rem; font-weight: 800; margin: 0; }
+    .quiz-meta { display: flex; gap: 1.5rem; margin-top: 1rem; flex-wrap: wrap; }
+    .meta-item { display: flex; align-items: center; gap: 0.5rem; color: rgba(255,255,255,0.8); }
+    
+    .btn-primary { background: white; color: #7c3aed; border: none; padding: 0.875rem 2rem; border-radius: 1rem; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+    .btn-primary:hover { background: #f5f3ff; transform: translateY(-2px); }
+    .btn-secondary { background: rgba(255,255,255,0.15); color: white; border: none; padding: 0.875rem 2rem; border-radius: 1rem; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+    
+    .content-card { background: white; border-radius: 1.5rem; padding: 2.5rem; border: 1px solid #e2e8f0; margin-bottom: 1.5rem; }
+    .section-title { font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0 0 1.5rem 0; }
+    
+    .question-preview { background: #fafafa; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.5rem; margin-bottom: 1rem; }
+    .question-number { font-weight: 700; color: #7c3aed; margin-bottom: 0.5rem; }
+    
+    .submission-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; padding: 1rem; border-bottom: 1px solid #f1f5f9; align-items: center; }
+    .submission-row:last-child { border-bottom: none; }
+    .student-name { font-weight: 600; color: #0f172a; }
+    .status-badge { padding: 0.35rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+    .status-submitted { background: #dbeafe; color: #1e40af; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-missing { background: #fee2e2; color: #991b1b; }
+</style>
+
+<div class="detail-container">
+    <a href="{% url 'classroom_quizzes' classroom.id %}" style="color: #7c3aed; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 2rem;">
+        <i data-lucide="arrow-left"></i> Back to Quizzes
+    </a>
+
+    <div class="quiz-header">
+        <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1.5rem;">
+            <div>
+                <span style="font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem;">{{ classroom.title }}</span>
+                <h1>{{ quiz.title }}</h1>
+                {% if quiz.description %}
+                <p style="margin-top: 0.75rem; color: rgba(255,255,255,0.8); font-size: 1.125rem;">{{ quiz.description }}</p>
+                {% endif %}
+                <div class="quiz-meta">
+                    {% if quiz.due_date %}
+                    <span class="meta-item"><i data-lucide="calendar"></i> Due: {{ quiz.due_date|date:"M d, Y" }} at {{ quiz.due_date|time:"g:i A" }}</span>
+                    {% endif %}
+                    {% if quiz.time_limit %}
+                    <span class="meta-item"><i data-lucide="clock"></i> {{ quiz.time_limit }} minutes</span>
+                    {% endif %}
+                    <span class="meta-item"><i data-lucide="award"></i> {{ quiz.total_marks }} points</span>
+                    <span class="meta-item"><i data-lucide="help-circle"></i> {{ quiz.questions.count }} questions</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                {% if is_teacher %}
+                <a href="{% url 'edit_quiz' quiz.id %}" class="btn-secondary">
+                    <i data-lucide="edit-2"></i> Edit Quiz
+                </a>
+                {% endif %}
+                {% if is_student and not student_submission and quiz.status == 'published' %}
+                <a href="{% url 'take_quiz' quiz.id %}" class="btn-primary">
+                    <i data-lucide="play"></i> Take Quiz
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if is_teacher or is_student %}
+    <div class="content-card">
+        <h2 class="section-title">Questions</h2>
+        {% for question in quiz.questions.all %}
+        <div class="question-preview">
+            <div class="question-number">Q{{ forloop.counter }} ({{ question.marks }} pts)</div>
+            <p style="color: #0f172a; font-weight: 600; margin: 0;">{{ question.question_text }}</p>
+            {% if question.question_type == 'mcq' %}
+            <div style="margin-top: 1rem;">
+                {% for choice in question.choices.all %}
+                <div style="padding: 0.5rem 0; color: {% if is_teacher and choice.is_correct %}#166534{% else %}#475569{% endif %};">
+                    {% if is_teacher and choice.is_correct %}<i data-lucide="check-circle" style="display: inline; width: 16px; height: 16px; margin-right: 0.5rem;"></i>{% endif %}
+                    {{ choice.choice_text }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <p style="color: #64748b;">No questions added yet.</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if is_teacher %}
+    <div class="content-card">
+        <h2 class="section-title">Submissions</h2>
+        <div style="background: #fafafa; border-radius: 1rem; overflow: hidden;">
+            <div class="submission-row" style="background: #f1f5f9; font-weight: 700; color: #0f172a;">
+                <div>Student</div>
+                <div>Status</div>
+                <div>Score</div>
+                <div>Action</div>
+            </div>
+            {% for submission_data in submissions %}
+            <div class="submission-row">
+                <div class="student-name">{{ submission_data.student.username }}</div>
+                <div>
+                    <span class="status-badge status-{{ submission_data.status }}">
+                        {{ submission_data.status|capfirst }}
+                    </span>
+                </div>
+                <div>
+                    {% if submission_data.submission %}
+                        {% if submission_data.submission.marks_obtained is not None %}
+                            {{ submission_data.submission.marks_obtained }} / {{ quiz.total_marks }}
+                        {% else %}
+                            Not graded
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+                <div>
+                    {% if submission_data.submission %}
+                        {% if submission_data.submission.marks_obtained is None %}
+                        <a href="{% url 'evaluate_quiz_submission' submission_data.submission.id %}" style="color: #7c3aed; text-decoration: none; font-weight: 600;">
+                            Grade
+                        </a>
+                        {% else %}
+                        <span style="color: #64748b;">Graded</span>
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if is_student and student_submission %}
+    <div class="content-card">
+        <h2 class="section-title">Your Submission</h2>
+        <p style="color: #475569; margin-bottom: 1rem;">Submitted on: {{ student_submission.submitted_at|date:"M d, Y" }} at {{ student_submission.submitted_at|time:"g:i A" }}</p>
+        {% if student_submission.marks_obtained is not None %}
+        <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); padding: 2rem; border-radius: 1rem; text-align: center;">
+            <p style="font-size: 3rem; font-weight: 800; color: #166534; margin: 0;">{{ student_submission.marks_obtained }} / {{ quiz.total_marks }}</p>
+            <p style="color: #166534; margin-top: 0.5rem; font-weight: 600;">Your Score</p>
+            {% if student_submission.feedback %}
+            <p style="color: #166534; margin-top: 1rem;">{{ student_submission.feedback }}</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <p style="color: #64748b;">Waiting for teacher to grade your submission.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

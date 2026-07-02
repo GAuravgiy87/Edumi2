@@ -1,0 +1,116 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block page_title %}Quizzes - {{ classroom.title }}{% endblock %}
+
+{% block content %}
+<style>
+    .quizzes-container { max-width: 1400px; margin: 0 auto; padding: 2rem; font-family: 'Inter', sans-serif; }
+    
+    .page-header { 
+        background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); 
+        border-radius: 1.5rem; 
+        padding: 3rem; 
+        color: white; 
+        margin-bottom: 2rem; 
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+    }
+    
+    .page-header h1 { font-size: 2.5rem; font-weight: 800; margin: 0; }
+    .page-header p { margin-top: 0.75rem; color: rgba(255,255,255,0.8); font-size: 1.125rem; }
+    
+    .btn-primary { 
+        background: white; color: #7c3aed; padding: 0.875rem 1.75rem; border-radius: 1rem; 
+        font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; 
+        transition: all 0.2s; border: none;
+    }
+    .btn-primary:hover { background: #f5f3ff; transform: translateY(-2px); }
+    
+    .quizzes-grid { display: flex; flex-direction: column; gap: 1.25rem; }
+    
+    .quiz-card { 
+        background: white; border: 1px solid #e2e8f0; border-radius: 1.25rem; 
+        padding: 1.75rem; transition: all 0.2s;
+    }
+    .quiz-card:hover { border-color: #8b5cf6; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+    
+    .quiz-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
+    .quiz-title { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin: 0; }
+    .quiz-status { 
+        padding: 0.35rem 0.875rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 700; 
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .status-draft { background: #fef3c7; color: #92400e; }
+    .status-published { background: #dcfce7; color: #166534; }
+    .status-archived { background: #f1f5f9; color: #64748b; }
+    
+    .quiz-meta { display: flex; gap: 1.5rem; color: #64748b; font-size: 0.875rem; flex-wrap: wrap; }
+    .meta-item { display: flex; align-items: center; gap: 0.5rem; }
+    
+    .quiz-footer { margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; border-top: 1px solid #f1f5f9; }
+    .quiz-description { color: #475569; margin: 0.75rem 0; }
+    
+    .btn-view { padding: 0.625rem 1.25rem; border-radius: 0.75rem; font-weight: 600; background: #f1f5f9; color: #0f172a; text-decoration: none; transition: all 0.2s; }
+    .btn-view:hover { background: #e2e8f0; }
+</style>
+
+<div class="quizzes-container">
+    <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem;">{{ classroom.title }}</span>
+                <h1>Quizzes</h1>
+                <p>Create and manage quizzes for your students</p>
+            </div>
+            {% if is_teacher %}
+            <a href="{% url 'create_quiz' classroom.id %}" class="btn-primary">
+                <i data-lucide="plus-circle"></i> Create Quiz
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if quizzes %}
+    <div class="quizzes-grid">
+        {% for quiz in quizzes %}
+        <div class="quiz-card">
+            <div class="quiz-header">
+                <h2 class="quiz-title">{{ quiz.title }}</h2>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <span class="quiz-status status-{{ quiz.status }}">{{ quiz.status }}</span>
+                </div>
+            </div>
+            {% if quiz.description %}
+            <p class="quiz-description">{{ quiz.description|truncatewords:30 }}</p>
+            {% endif %}
+            <div class="quiz-meta">
+                {% if quiz.due_date %}
+                <span class="meta-item"><i data-lucide="calendar"></i> Due: {{ quiz.due_date|date:"M d, Y" }} at {{ quiz.due_date|time:"g:i A" }}</span>
+                {% endif %}
+                {% if quiz.time_limit %}
+                <span class="meta-item"><i data-lucide="clock"></i> {{ quiz.time_limit }} minutes</span>
+                {% endif %}
+                <span class="meta-item"><i data-lucide="award"></i> {{ quiz.total_marks }} points</span>
+                <span class="meta-item"><i data-lucide="help-circle"></i> {{ quiz.questions.count }} questions</span>
+                {% if is_teacher %}
+                <span class="meta-item"><i data-lucide="file-text"></i> {{ quiz.submissions.count }} submissions</span>
+                {% endif %}
+            </div>
+            <div class="quiz-footer">
+                <div></div>
+                <a href="{% url 'quiz_detail' quiz.id %}" class="btn-view">
+                    View Details
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="background: white; border-radius: 1.5rem; padding: 4rem; text-align: center;">
+        <i data-lucide="clipboard-list" style="width: 64px; height: 64px; color: #94a3b8; margin-bottom: 1rem;"></i>
+        <h3 style="color: #0f172a; font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">No quizzes yet</h3>
+        <p style="color: #64748b;">{% if is_teacher %}Create your first quiz to get started!{% else %}Check back later for quizzes.{% endif %}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

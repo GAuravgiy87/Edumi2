@@ -11,7 +11,7 @@
         <h2 style="color: #2c3e50; margin-bottom: 10px;">🏫 Create New Classroom</h2>
         <p style="color: #7f8c8d; margin-bottom: 30px;">Set up a virtual classroom for your students</p>
         
-        <form method="post">
+        <form method="post" data-turbo="false">
             {% csrf_token %}
             
             <div style="margin-bottom: 20px;">
@@ -20,7 +20,8 @@
                        style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px; text-transform: uppercase;"
                        placeholder="e.g., MATH101, BIO2024"
                        pattern="[A-Za-z0-9]+" 
-                       title="Only letters and numbers allowed">
+                       title="Only letters and numbers allowed"
+                       value="{{ form_data.class_code|default:'' }}">
                 <small style="color: #7f8c8d; display: block; margin-top: 5px;">Students will use this code to find your classroom</small>
             </div>
             
@@ -28,7 +29,8 @@
                 <label style="display: block; margin-bottom: 5px; color: #2c3e50; font-weight: 500;">Classroom Title *</label>
                 <input type="text" name="title" required 
                        style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px;"
-                       placeholder="e.g., Advanced Mathematics - Spring 2024">
+                       placeholder="e.g., Advanced Mathematics - Spring 2024"
+                       value="{{ form_data.title|default:'' }}">
             </div>
             
             <div style="margin-bottom: 20px;">
@@ -43,7 +45,7 @@
                 <label style="display: block; margin-bottom: 5px; color: #2c3e50; font-weight: 500;">Description (Optional)</label>
                 <textarea name="description" rows="3"
                           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px; resize: vertical;"
-                          placeholder="Brief description of the classroom"></textarea>
+                          placeholder="Brief description of the classroom">{{ form_data.description|default:'' }}</textarea>
             </div>
             
             <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">

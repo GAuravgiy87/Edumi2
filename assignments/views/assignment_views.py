@@ -98,13 +98,24 @@ def create_assignment(request, classroom_id):
         files = request.FILES.getlist('question_files')
         for file in files:
             filename = file.name
-            file_type = os.path.splitext(filename)[1].lower()
             AssignmentQuestionFile.objects.create(
                 assignment=assignment,
                 file=file,
                 filename=filename,
-                file_type=file_type
+                file_type='file'
             )
+        
+        # Handle links
+        link_texts = request.POST.getlist('link_text[]')
+        link_urls = request.POST.getlist('link_url[]')
+        for text, url in zip(link_texts, link_urls):
+            if text.strip() and url.strip():
+                AssignmentQuestionFile.objects.create(
+                    assignment=assignment,
+                    filename=text.strip(),
+                    link_url=url.strip(),
+                    file_type='link'
+                )
         
         # If user clicked "Publish"
         if request.POST.get('action') == 'publish':
@@ -159,13 +170,24 @@ def edit_assignment(request, assignment_id):
         files = request.FILES.getlist('question_files')
         for file in files:
             filename = file.name
-            file_type = os.path.splitext(filename)[1].lower()
             AssignmentQuestionFile.objects.create(
                 assignment=assignment,
                 file=file,
                 filename=filename,
-                file_type=file_type
+                file_type='file'
             )
+        
+        # Handle links
+        link_texts = request.POST.getlist('link_text[]')
+        link_urls = request.POST.getlist('link_url[]')
+        for text, url in zip(link_texts, link_urls):
+            if text.strip() and url.strip():
+                AssignmentQuestionFile.objects.create(
+                    assignment=assignment,
+                    filename=text.strip(),
+                    link_url=url.strip(),
+                    file_type='link'
+                )
         
         messages.success(request, f'Assignment "{assignment.title}" updated successfully!')
         return redirect('classroom_assignments', classroom_id=assignment.classroom.id)
@@ -267,13 +289,24 @@ def submit_assignment(request, assignment_id):
         files = request.FILES.getlist('submission_files')
         for file in files:
             filename = file.name
-            file_type = os.path.splitext(filename)[1].lower()
             AssignmentSubmissionFile.objects.create(
                 submission=submission,
                 file=file,
                 filename=filename,
-                file_type=file_type
+                file_type='file'
             )
+        
+        # Handle links
+        link_texts = request.POST.getlist('submission_link_text[]')
+        link_urls = request.POST.getlist('submission_link_url[]')
+        for text, url in zip(link_texts, link_urls):
+            if text.strip() and url.strip():
+                AssignmentSubmissionFile.objects.create(
+                    submission=submission,
+                    filename=text.strip(),
+                    link_url=url.strip(),
+                    file_type='link'
+                )
         
         messages.success(request, 'Assignment submitted successfully!')
         return redirect('assignment_detail', assignment_id=assignment_id)

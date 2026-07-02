@@ -246,7 +246,7 @@ def main():
                 "Submit form"
             ],
             "expected_result": "New classroom is created successfully",
-            "status": "To Be Tested",
+            "status": "Working",
             "notes": ""
         },
         {
@@ -430,6 +430,242 @@ def main():
                 "Send message"
             ],
             "expected_result": "Chat message is sent and visible to all participants",
+            "status": "To Be Tested",
+            "notes": ""
+        },
+        
+        # ==================== ASSIGNMENTS ====================
+        {
+            "module": "Assignments",
+            "submodule": "Classroom Assignments",
+            "feature": "View Classrooms with Quizzes Button",
+            "description": "Verify classroom detail page has Quizzes button alongside Assignments",
+            "test_steps": [
+                "Log in as a teacher/student",
+                "Navigate to classroom detail page"
+            ],
+            "expected_result": "Quizzes button is visible next to Assignments button",
+            "status": "Working",
+            "notes": ""
+        },
+        {
+            "module": "Assignments",
+            "submodule": "Assignments Management",
+            "feature": "Create Assignment",
+            "description": "Verify teacher can create a new assignment with files/folders/links",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to classroom assignments page",
+                "Click Create Assignment",
+                "Fill out assignment details (title, description, due date)",
+                "Add file attachments/folder uploads/link attachments",
+                "Submit form"
+            ],
+            "expected_result": "Assignment is created successfully with all attachments",
+            "status": "Working",
+            "notes": "AssignmentQuestionFile model updated to support link_url and file_type fields"
+        },
+        {
+            "module": "Assignments",
+            "submodule": "Assignments Management",
+            "feature": "View Assignments List",
+            "description": "Verify teacher/student can view list of assignments for a classroom",
+            "test_steps": [
+                "Log in as a teacher/student",
+                "Navigate to classroom assignments page"
+            ],
+            "expected_result": "All assignments are listed with details",
+            "status": "To Be Tested",
+            "notes": ""
+        },
+        {
+            "module": "Assignments",
+            "submodule": "Assignments Management",
+            "feature": "Submit Assignment",
+            "description": "Verify student can submit an assignment with files/folders/links",
+            "test_steps": [
+                "Log in as a student",
+                "Navigate to an assignment's detail page",
+                "Add file/folder/link attachments",
+                "Submit assignment"
+            ],
+            "expected_result": "Assignment submission is saved successfully with all attachments",
+            "status": "Working",
+            "notes": "AssignmentSubmissionFile model updated to support link_url and file_type fields"
+        },
+        {
+            "module": "Assignments",
+            "submodule": "Assignments Management",
+            "feature": "View Assignment Details",
+            "description": "Verify teacher/student can view full assignment details",
+            "test_steps": [
+                "Log in as a teacher/student",
+                "Navigate to an assignment's detail page"
+            ],
+            "expected_result": "Full assignment details and attachments are displayed",
+            "status": "To Be Tested",
+            "notes": ""
+        },
+        
+        # ==================== QUIZZES ====================
+        {
+            "module": "Quizzes",
+            "submodule": "Quizzes Management",
+            "feature": "View Classroom Quizzes List",
+            "description": "Verify teacher/student can view list of quizzes for a classroom (students see only published)",
+            "test_steps": [
+                "Log in as a teacher/student",
+                "Navigate to classroom quizzes page"
+            ],
+            "expected_result": "Quizzes are listed; students see only published, teachers see all",
+            "status": "Working",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quizzes Management",
+            "feature": "Create Quiz",
+            "description": "Verify teacher can create a new quiz (saved as draft)",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to classroom quizzes page",
+                "Click Create Quiz",
+                "Fill out quiz details (title, description, due date, total marks)",
+                "Save as draft"
+            ],
+            "expected_result": "Quiz is created successfully in draft status",
+            "status": "Working",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quizzes Management",
+            "feature": "Edit Quiz & Add Questions",
+            "description": "Verify teacher can edit quiz details and add/delete questions",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to edit quiz page",
+                "Update quiz details",
+                "Click Add Question",
+                "Fill out question details (type: MCQ/Text, question text, marks)",
+                "Add choices for MCQ with correct answer",
+                "Save question"
+            ],
+            "expected_result": "Quiz details are updated; question is added/removed successfully",
+            "status": "Working",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quizzes Management",
+            "feature": "Save Quiz as Draft",
+            "description": "Verify teacher can save changes to quiz without publishing",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to edit quiz page",
+                "Make changes",
+                "Click Save Changes"
+            ],
+            "expected_result": "Changes are saved; quiz remains in current status; stays on edit page",
+            "status": "Working",
+            "notes": "edit_quiz view updated to redirect back to edit page on save"
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quizzes Management",
+            "feature": "Publish Quiz",
+            "description": "Verify teacher can publish a draft quiz",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to edit quiz page (draft quiz)",
+                "Click Publish Quiz"
+            ],
+            "expected_result": "Quiz status changes to published; students can now see/take it",
+            "status": "Working",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quizzes Management",
+            "feature": "Archive Quiz",
+            "description": "Verify teacher can archive a published quiz",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to edit quiz page (published quiz)",
+                "Click Archive Quiz"
+            ],
+            "expected_result": "Quiz status changes to archived",
+            "status": "To Be Tested",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quiz Taking",
+            "feature": "View Quiz Details (Student)",
+            "description": "Verify student can view published quiz details and questions before taking",
+            "test_steps": [
+                "Log in as a student",
+                "Navigate to a published quiz's detail page"
+            ],
+            "expected_result": "Quiz details and questions are visible (correct answers hidden)",
+            "status": "Working",
+            "notes": "Fixed: added is_student to quiz_detail view, added missing endif in template"
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quiz Taking",
+            "feature": "Take Quiz",
+            "description": "Verify student can take and submit a quiz",
+            "test_steps": [
+                "Log in as a student",
+                "Navigate to a published quiz's detail page",
+                "Click Take Quiz",
+                "Answer all questions",
+                "Submit quiz"
+            ],
+            "expected_result": "Quiz submission is saved successfully",
+            "status": "Working",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quiz Evaluation",
+            "feature": "View Quiz Submissions (Teacher)",
+            "description": "Verify teacher can view all student submissions for a quiz",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to a quiz's detail page"
+            ],
+            "expected_result": "All student submissions are listed",
+            "status": "To Be Tested",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quiz Evaluation",
+            "feature": "Evaluate Quiz Submission",
+            "description": "Verify teacher can evaluate (grade) a student's quiz submission",
+            "test_steps": [
+                "Log in as a teacher",
+                "Navigate to a student's quiz submission page",
+                "Assign marks per question",
+                "Add feedback",
+                "Save evaluation"
+            ],
+            "expected_result": "Quiz evaluation is saved, student can see results",
+            "status": "To Be Tested",
+            "notes": ""
+        },
+        {
+            "module": "Quizzes",
+            "submodule": "Quiz Taking",
+            "feature": "View Quiz Results (Student)",
+            "description": "Verify student can view their quiz results after evaluation",
+            "test_steps": [
+                "Log in as a student",
+                "Navigate to a quiz's detail page (submitted and evaluated)"
+            ],
+            "expected_result": "Student sees their marks, feedback, and answers",
             "status": "To Be Tested",
             "notes": ""
         },

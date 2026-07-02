@@ -37,7 +37,13 @@ def create_classroom(request):
 
         if Classroom.objects.filter(class_code=class_code).exists():
             messages.error(request, 'Class code already exists. Please choose a different one.')
-            return render(request, 'meetings/create_classroom.html')
+            # Store form data in session for repopulation
+            request.session['classroom_form_data'] = {
+                'class_code': class_code,
+                'title': title,
+                'description': description
+            }
+            return redirect('create_classroom')
 
         classroom = Classroom.objects.create(
             class_code=class_code,
@@ -46,10 +52,17 @@ def create_classroom(request):
             teacher=request.user,
             description=description
         )
+        # Clear any stored form data
+        if 'classroom_form_data' in request.session:
+            del request.session['classroom_form_data']
         messages.success(request, f'Classroom "{title}" created successfully! Share code: {class_code}')
         return redirect('teacher_classrooms')
 
-    return render(request, 'meetings/create_classroom.html')
+    # Retrieve stored form data if available
+    form_data = request.session.get('classroom_form_data', {})
+    if 'classroom_form_data' in request.session:
+        del request.session['classroom_form_data']
+    return render(request, 'meetings/create_classroom.html', {'form_data': form_data})
 
 
 @login_required
@@ -88,11 +101,14 @@ def join_classroom_request(request):
             classroom = Classroom.objects.get(class_code=class_code, is_active=True)
         except Classroom.DoesNotExist:
             messages.error(request, 'Invalid class code')
-            return render(request, 'meetings/join_classroom.html')
+            # Store form data in session
+            request.session['join_classroom_form_data'] = {'class_code': class_code}
+            return redirect('join_classroom_request')
 
         if not check_password(password, classroom.password):
             messages.error(request, 'Incorrect password')
-            return render(request, 'meetings/join_classroom.html')
+            request.session['join_classroom_form_data'] = {'class_code': class_code}
+            return redirect('join_classroom_request')
 
         existing_membership = ClassroomMembership.objects.filter(
             classroom=classroom, student=request.user
@@ -116,7 +132,11 @@ def join_classroom_request(request):
         messages.success(request, f'Join request submitted for "{classroom.title}". Waiting for teacher approval.')
         return redirect('student_classrooms')
 
-    return render(request, 'meetings/join_classroom.html')
+    # Retrieve stored form data if available
+    form_data = request.session.get('join_classroom_form_data', {})
+    if 'join_classroom_form_data' in request.session:
+        del request.session['join_classroom_form_data']
+    return render(request, 'meetings/join_classroom.html', {'form_data': form_data})
 
 
 @login_required

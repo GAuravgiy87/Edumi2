@@ -1,0 +1,82 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block page_title %}Create Quiz{% endblock %}
+
+{% block content %}
+<style>
+    .create-container { max-width: 900px; margin: 0 auto; padding: 2rem; font-family: 'Inter', sans-serif; }
+    
+    .form-card { background: white; border-radius: 1.5rem; padding: 2.5rem; border: 1px solid #e2e8f0; }
+    .form-title { font-size: 1.875rem; font-weight: 800; color: #0f172a; margin: 0 0 0.5rem 0; }
+    .form-subtitle { color: #64748b; margin-bottom: 2rem; }
+    
+    .form-group { margin-bottom: 1.5rem; }
+    .form-group label { display: block; font-weight: 600; color: #0f172a; margin-bottom: 0.5rem; font-size: 0.9375rem; }
+    .form-control { width: 100%; padding: 0.875rem 1rem; border: 1px solid #cbd5e1; border-radius: 0.875rem; font-size: 1rem; transition: all 0.2s; }
+    .form-control:focus { border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1); outline: none; }
+    textarea.form-control { min-height: 120px; resize: vertical; }
+    
+    .date-time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    
+    .btn-primary { background: #7c3aed; color: white; border: none; padding: 0.875rem 2rem; border-radius: 1rem; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+    .btn-primary:hover { background: #6d28d9; transform: translateY(-2px); }
+    .btn-secondary { background: #f1f5f9; color: #0f172a; border: none; padding: 0.875rem 2rem; border-radius: 1rem; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    
+    .btn-group { display: flex; gap: 1rem; margin-top: 2rem; }
+</style>
+
+<div class="create-container">
+    <a href="{% url 'classroom_quizzes' classroom.id %}" style="color: #7c3aed; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 2rem;">
+        <i data-lucide="arrow-left"></i> Back to Quizzes
+    </a>
+
+    <div class="form-card">
+        <h1 class="form-title">Create New Quiz</h1>
+        <p class="form-subtitle">Create a quiz for your students in {{ classroom.title }}</p>
+
+        <form method="post" data-turbo="false">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="title">Quiz Title</label>
+                <input type="text" name="title" id="title" class="form-control" required placeholder="e.g., Midterm Quiz">
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea name="description" id="description" class="form-control" placeholder="Brief description of the quiz"></textarea>
+            </div>
+            
+            <div class="date-time-grid">
+                <div class="form-group">
+                    <label for="due_date">Due Date (Optional)</label>
+                    <input type="date" name="due_date" id="due_date" class="form-control" value="{{ default_due_date }}">
+                </div>
+                <div class="form-group">
+                    <label for="due_time">Due Time (Optional)</label>
+                    <input type="time" name="due_time" id="due_time" class="form-control" value="{{ default_due_time }}">
+                </div>
+            </div>
+            
+            <div class="date-time-grid">
+                <div class="form-group">
+                    <label for="total_marks">Total Points</label>
+                    <input type="number" name="total_marks" id="total_marks" class="form-control" value="100" min="1">
+                </div>
+                <div class="form-group">
+                    <label for="time_limit">Time Limit (minutes, Optional)</label>
+                    <input type="number" name="time_limit" id="time_limit" class="form-control" min="1" placeholder="e.g., 30">
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <a href="{% url 'classroom_quizzes' classroom.id %}" class="btn-secondary">Cancel</a>
+                <button type="submit" name="action" value="draft" class="btn-secondary" style="background: #ede9fe; color: #5b21b6;">Save as Draft</button>
+                <button type="submit" name="action" value="publish" class="btn-primary">Create & Add Questions</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

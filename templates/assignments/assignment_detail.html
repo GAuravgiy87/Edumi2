@@ -105,15 +105,23 @@
                 
                 {% if assignment.question_files.all %}
                 <div>
-                    <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">Attached Files</h3>
+                    <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">Attached Files & Links</h3>
                     <div class="file-list">
                         {% for file in assignment.question_files.all %}
                         <div class="file-item">
                             <div class="file-info">
+                                {% if file.file_type == 'link' %}
+                                <i data-lucide="link-2"></i>
+                                {% else %}
                                 <i data-lucide="file"></i>
+                                {% endif %}
                                 <span>{{ file.filename }}</span>
                             </div>
+                            {% if file.file_type == 'link' %}
+                            <a href="{{ file.link_url }}" class="file-download" target="_blank">Open Link</a>
+                            {% else %}
                             <a href="{{ file.file.url }}" class="file-download" download>Download</a>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -139,15 +147,23 @@
                         
                         {% if student_submission.files.all %}
                         <div>
-                            <h4 style="font-size: 0.9375rem; font-weight: 600; color: #0f172a; margin-bottom: 0.75rem;">Submitted Files</h4>
+                            <h4 style="font-size: 0.9375rem; font-weight: 600; color: #0f172a; margin-bottom: 0.75rem;">Submitted Files & Links</h4>
                             <div class="file-list">
                                 {% for file in student_submission.files.all %}
                                 <div class="file-item">
                                     <div class="file-info">
+                                        {% if file.file_type == 'link' %}
+                                        <i data-lucide="link-2"></i>
+                                        {% else %}
                                         <i data-lucide="file"></i>
+                                        {% endif %}
                                         <span>{{ file.filename }}</span>
                                     </div>
+                                    {% if file.file_type == 'link' %}
+                                    <a href="{{ file.link_url }}" class="file-download" target="_blank">Open Link</a>
+                                    {% else %}
                                     <a href="{{ file.file.url }}" class="file-download" download>Download</a>
+                                    {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>

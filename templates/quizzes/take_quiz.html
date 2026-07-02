@@ -1,0 +1,77 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block page_title %}Take Quiz - {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<style>
+    .quiz-container { max-width: 900px; margin: 0 auto; padding: 2rem; font-family: 'Inter', sans-serif; }
+    
+    .quiz-card { background: white; border-radius: 1.5rem; padding: 2.5rem; border: 1px solid #e2e8f0; }
+    .quiz-title { font-size: 1.875rem; font-weight: 800; color: #0f172a; margin: 0 0 1rem 0; }
+    
+    .question-card { background: #fafafa; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.75rem; margin-bottom: 1.5rem; }
+    .question-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
+    .question-number { font-weight: 800; color: #7c3aed; font-size: 1.125rem; }
+    .question-marks { background: #ede9fe; color: #7c3aed; padding: 0.35rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 700; }
+    
+    .question-text { color: #0f172a; font-weight: 600; font-size: 1.125rem; margin-bottom: 1.5rem; }
+    
+    .choice-option { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.2s; }
+    .choice-option:hover { border-color: #8b5cf6; background: #f5f3ff; }
+    .choice-option.selected { border-color: #7c3aed; background: #ede9fe; }
+    .choice-input { width: 20px; height: 20px; cursor: pointer; }
+    
+    .text-answer { width: 100%; min-height: 120px; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 0.75rem; font-size: 1rem; resize: vertical; }
+    .text-answer:focus { border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1); outline: none; }
+    
+    .btn-primary { background: #7c3aed; color: white; border: none; padding: 1rem 2.5rem; border-radius: 1rem; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+    .btn-primary:hover { background: #6d28d9; transform: translateY(-2px); }
+    
+    .btn-group { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+</style>
+
+<div class="quiz-container">
+    <a href="{% url 'quiz_detail' quiz.id %}" style="color: #7c3aed; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 2rem;">
+        <i data-lucide="arrow-left"></i> Back to Quiz
+    </a>
+
+    <div class="quiz-card">
+        <h1 class="quiz-title">{{ quiz.title }}</h1>
+        {% if quiz.description %}
+        <p style="color: #64748b; margin-bottom: 2rem;">{{ quiz.description }}</p>
+        {% endif %}
+
+        <form method="post" data-turbo="false">
+            {% csrf_token %}
+            
+            {% for question in questions %}
+            <div class="question-card">
+                <div class="question-header">
+                    <span class="question-number">Question {{ forloop.counter }}</span>
+                    <span class="question-marks">{{ question.marks }} pts</span>
+                </div>
+                <p class="question-text">{{ question.question_text }}</p>
+                
+                {% if question.question_type == 'mcq' %}
+                    {% for choice in question.choices.all %}
+                    <label class="choice-option" onclick="this.querySelector('input').checked = true; this.parentElement.querySelectorAll('.choice-option').forEach(el => el.classList.remove('selected')); this.classList.add('selected');">
+                        <input type="radio" name="question_{{ question.id }}" value="{{ choice.id }}" class="choice-input">
+                        <span>{{ choice.choice_text }}</span>
+                    </label>
+                    {% endfor %}
+                {% elif question.question_type == 'text' %}
+                <textarea name="question_{{ question.id }}" class="text-answer" placeholder="Enter your answer here"></textarea>
+                {% endif %}
+            </div>
+            {% endfor %}
+            
+            <div class="btn-group">
+                <button type="submit" class="btn-primary" onclick="return confirm('Are you sure you want to submit? You cannot change your answers after submission.')">
+                    <i data-lucide="send"></i> Submit Quiz
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
