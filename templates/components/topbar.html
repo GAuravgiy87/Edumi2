@@ -2,12 +2,12 @@
 <!-- Top Bar -->
 <div class="topbar" id="topbar" data-turbo-permanent>
     <div class="topbar-left">
+        <button class="mobile-menu-btn" onclick="openMobileSidebar()">
+            <i data-lucide="menu" class="icon" style="width: 24px; height: 24px;"></i>
+        </button>
         <a href="/" class="topbar-logo" style="display: flex; align-items: center; text-decoration: none;">
             <img src="{% static 'logo.svg' %}" alt="EduMi" style="height: 32px;">
         </a>
-        <button class="mobile-menu-btn" onclick="openMobileSidebar()" style="margin-left: 10px;">
-            <i data-lucide="menu" class="icon" style="width: 24px; height: 24px;"></i>
-        </button>
     </div>
     <div class="topbar-right">
         <div class="topbar-search">
