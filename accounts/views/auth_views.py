@@ -33,9 +33,22 @@ def login_view(request):
         return redirect('home')
 
     if request.method == 'POST':
-        username = request.POST.get('username')
+        username_or_email = request.POST.get('username')
         password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
+        
+        # Try to authenticate with username first
+        user = authenticate(request, username=username_or_email, password=password)
+        
+        # If that fails, try to find user by email
+        if user is None:
+            try:
+                user_qs = User.objects.filter(email=username_or_email)
+                if user_qs.count() == 1:
+                    user_obj = user_qs.first()
+                    user = authenticate(request, username=user_obj.username, password=password)
+            except Exception:
+                pass
+        
         if user is not None:
             login(request, user)
             if user.is_superuser:

@@ -1,4 +1,4 @@
-# EduMi 2 - Technical Documentation & Architecture Guide
+# EduMi 2 - Technical Documentation & Architecture Guide-------------------------------------------------------
 
 Welcome to the EduMi 2 technical documentation. This guide is designed to onboard new developers by providing a comprehensive, top-down view of the system architecture. It explains **what** technologies are used, **how** they are integrated, and **why** they were chosen.
 

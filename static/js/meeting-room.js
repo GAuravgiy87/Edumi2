@@ -368,9 +368,3 @@ window.addEventListener('load', () => {
     init().catch(e => { console.error('[Init] fatal:', e); showErrorBoundary('Failed to initialize meeting room. Please refresh.', true); });
 });
 window.addEventListener('beforeunload', () => { SFUClient.leave(); ws?.close(); });
-
-window.addEventListener('load', () => {
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-    init().catch(e => { console.error('[Init] fatal:', e); showErrorBoundary('Failed to initialize meeting room. Please refresh.', true); });
-});
-window.addEventListener('beforeunload', () => { SFUClient.leave(); ws?.close(); });

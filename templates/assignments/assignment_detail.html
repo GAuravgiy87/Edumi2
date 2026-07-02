@@ -1,0 +1,238 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block page_title %}{{ assignment.title }}{% endblock %}
+
+{% block content %}
+<style>
+    .detail-container { max-width: 1400px; margin: 0 auto; padding: 2rem; font-family: 'Inter', sans-serif; }
+    
+    .page-header { 
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); 
+        border-radius: 1.5rem; 
+        padding: 2.5rem; 
+        color: white; 
+        margin-bottom: 2rem; 
+    }
+    
+    .page-header h1 { font-size: 2.25rem; font-weight: 800; margin: 0 0 0.75rem 0; }
+    .meta-row { display: flex; gap: 1.5rem; align-items: center; }
+    .meta-item { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: rgba(255,255,255,0.85); }
+    
+    .grid-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+    {% if is_teacher %}.grid-layout { grid-template-columns: 1fr 1fr; }{% endif %}
+    
+    .section-card { background: white; border-radius: 1.5rem; padding: 2rem; border: 1px solid #e2e8f0; }
+    .section-title { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin: 0 0 1.5rem 0; display: flex; align-items: center; gap: 0.75rem; }
+    
+    .file-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+    .file-item { 
+        display: flex; align-items: center; justify-content: space-between; 
+        padding: 0.875rem; background: #f8fafc; border-radius: 0.875rem; 
+    }
+    .file-info { display: flex; align-items: center; gap: 0.75rem; }
+    .file-download { color: #4f46e5; font-weight: 600; text-decoration: none; }
+    
+    .submission-item { 
+        background: #f8fafc; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1rem; border-left: 4px solid #cbd5e1;
+    }
+    .submission-item.late { border-left-color: #ef4444; }
+    .submission-item.submitted { border-left-color: #22c55e; }
+    .submission-header { display: flex; justify-content: space-between; align-items: start; }
+    
+    .badge { 
+        padding: 0.35rem 0.875rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; 
+    }
+    .badge-submitted { background: #dcfce7; color: #166534; }
+    .badge-late { background: #fee2e2; color: #991b1b; }
+    .badge-missing { background: #fef2f2; color: #b91c1c; }
+    
+    .btn-primary { background: #4f46e5; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.875rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    .btn-primary:hover { background: #4338ca; }
+    
+    .btn-secondary { background: #f1f5f9; color: #0f172a; border: none; padding: 0.75rem 1.5rem; border-radius: 0.875rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    
+    .feedback-box { background: #f8fafc; border-radius: 1rem; padding: 1.25rem; margin-top: 1rem; }
+    .grade-display { font-size: 1.5rem; font-weight: 800; color: #0f172a; }
+</style>
+
+<div class="detail-container">
+    <a href="{% url 'classroom_assignments' classroom.id %}" style="color: #4f46e5; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 2rem;">
+        <i data-lucide="arrow-left"></i> Back to Assignments
+    </a>
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <h1>{{ assignment.title }}</h1>
+                <div class="meta-row">
+                    <span class="meta-item"><i data-lucide="calendar"></i> Due: {{ assignment.due_date|date:"M d, Y" }} at {{ assignment.due_date|time:"g:i A" }}</span>
+                    <span class="meta-item"><i data-lucide="award"></i> {{ assignment.total_marks }} points</span>
+                    {% if is_teacher %}
+                    <span class="meta-item"><i data-lucide="users"></i> {{ assignment.submissions.count }} submissions</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if is_teacher %}
+            <a href="{% url 'edit_assignment' assignment.id %}" class="btn-secondary" style="background: rgba(255,255,255,0.2); color: white;">
+                <i data-lucide="edit"></i> Edit
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid-layout">
+        <!-- Left Column - Assignment Info -->
+        <div>
+            <div class="section-card">
+                <h2 class="section-title"><i data-lucide="file-text"></i> Assignment Details</h2>
+                
+                {% if assignment.description %}
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">Description</h3>
+                    <p style="color: #475569; margin: 0;">{{ assignment.description|linebreaksbr }}</p>
+                </div>
+                {% endif %}
+                
+                {% if assignment.instructions %}
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">Instructions</h3>
+                    <p style="color: #475569; margin: 0;">{{ assignment.instructions|linebreaksbr }}</p>
+                </div>
+                {% endif %}
+                
+                {% if assignment.question_files.all %}
+                <div>
+                    <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">Attached Files</h3>
+                    <div class="file-list">
+                        {% for file in assignment.question_files.all %}
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i data-lucide="file"></i>
+                                <span>{{ file.filename }}</span>
+                            </div>
+                            <a href="{{ file.file.url }}" class="file-download" download>Download</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Student View - Submission Section -->
+            {% if not is_teacher %}
+            <div class="section-card" style="margin-top: 2rem;">
+                <h2 class="section-title"><i data-lucide="upload"></i> Your Submission</h2>
+                
+                {% if student_submission %}
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <span class="badge {% if student_submission.status == 'late' %}badge-late{% else %}badge-submitted{% endif %}">
+                                {{ student_submission.status|capfirst }}
+                            </span>
+                            <span style="color: #64748b; font-size: 0.875rem;">
+                                Submitted: {{ student_submission.submitted_at|date:"M d, Y" }} at {{ student_submission.submitted_at|time:"g:i A" }}
+                            </span>
+                        </div>
+                        
+                        {% if student_submission.files.all %}
+                        <div>
+                            <h4 style="font-size: 0.9375rem; font-weight: 600; color: #0f172a; margin-bottom: 0.75rem;">Submitted Files</h4>
+                            <div class="file-list">
+                                {% for file in student_submission.files.all %}
+                                <div class="file-item">
+                                    <div class="file-info">
+                                        <i data-lucide="file"></i>
+                                        <span>{{ file.filename }}</span>
+                                    </div>
+                                    <a href="{{ file.file.url }}" class="file-download" download>Download</a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if student_submission.evaluated_at %}
+                        <div class="feedback-box">
+                            <h4 style="font-size: 0.9375rem; font-weight: 700; color: #0f172a; margin-bottom: 0.75rem;">Feedback</h4>
+                            <div class="grade-display" style="margin-bottom: 0.75rem;">
+                                {{ student_submission.marks_obtained|default:0 }} / {{ assignment.total_marks }}
+                            </div>
+                            {% if student_submission.feedback %}
+                            <p style="color: #475569; margin: 0;">{{ student_submission.feedback|linebreaksbr }}</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <a href="{% url 'submit_assignment' assignment.id %}" class="btn-secondary">
+                        <i data-lucide="edit"></i> Update Submission
+                    </a>
+                {% else %}
+                    <p style="color: #64748b; margin-bottom: 1.25rem;">You haven't submitted this assignment yet.</p>
+                    <a href="{% url 'submit_assignment' assignment.id %}" class="btn-primary">
+                        <i data-lucide="upload"></i> Submit Assignment
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Right Column - Teacher View - Submissions List -->
+        {% if is_teacher %}
+        <div class="section-card">
+            <h2 class="section-title"><i data-lucide="inbox"></i> Submissions</h2>
+            
+            {% if submissions %}
+            <div style="max-height: 70vh; overflow-y: auto;">
+                {% for sub in submissions %}
+                <div class="submission-item {% if sub.status == 'late' %}late{% elif sub.status == 'submitted' %}submitted{% endif %}">
+                    <div class="submission-header">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <img src="https://ui-avatars.com/api/?name={{ sub.student.username }}&background=4f46e5&color=fff" style="width: 40px; height: 40px; border-radius: 50%;" alt="">
+                            <div>
+                                <p style="margin: 0; font-weight: 700; color: #0f172a;">{{ sub.student.get_full_name|default:sub.student.username }}</p>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #64748b;">
+                                    {% if sub.student.userprofile.roll_number %}{{ sub.student.userprofile.roll_number }}{% else %}Roll # not set{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <span class="badge {% if sub.status == 'late' %}badge-late{% elif sub.status == 'submitted' %}badge-submitted{% else %}badge-missing{% endif %}">
+                            {{ sub.status|capfirst }}
+                        </span>
+                    </div>
+                    
+                    {% if sub.submission %}
+                    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.8125rem; color: #64748b;">
+                                {{ sub.submitted_at|date:"M d, Y" }} at {{ sub.submitted_at|time:"g:i A" }}
+                            </span>
+                            {% if sub.submission.evaluated_at %}
+                            <span style="font-weight: 700; color: #16a34a;">
+                                {{ sub.submission.marks_obtained|default:"-" }} / {{ assignment.total_marks }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div style="display: flex; gap: 0.75rem;">
+                            {% if sub.submission.evaluated_at %}
+                            <a href="{% url 'evaluate_submission' sub.submission.id %}" class="btn-secondary" style="font-size: 0.8125rem; padding: 0.5rem 1rem;">Update Feedback</a>
+                            {% else %}
+                            <a href="{% url 'evaluate_submission' sub.submission.id %}" class="btn-primary" style="font-size: 0.8125rem; padding: 0.5rem 1rem;">Evaluate</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="text-align: center; color: #94a3b8; padding: 2rem 0;">No submissions yet</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

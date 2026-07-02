@@ -25,6 +25,7 @@ urlpatterns = [
     path('attendance/', include('attendance.urls')),
     path('videos/', include('videos.urls')),  # <-- Video URLs
     path('video-editing/', include('video_editing.urls')),  # <-- Video editing URLs
+    path('assignments/', include('assignments.urls')),  # <-- Assignments URLs
 ]
 
 # Error handlers

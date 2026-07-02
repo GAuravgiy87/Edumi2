@@ -163,6 +163,7 @@ INSTALLED_APPS = [
     'attendance',  # Face Recognition Attendance System
     'videos',  # New: Video streaming app!
     'video_editing',  # New: Video editing app!
+    'assignments',  # New: Assignments module!
     'django_extensions',  # For HTTPS development server
     'compressor',
 ]

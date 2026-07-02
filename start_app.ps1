@@ -234,7 +234,6 @@ Remove-Item $tmpScript -ErrorAction SilentlyContinue
 
 # Clear Chrome's SSL cache so it picks up the new cert immediately
 # (Chrome caches cert trust decisions — must be cleared after cert change)
-Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 $chromeSslFiles = @(
     "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\TransportSecurity",
     "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Certificate Revocation Lists"
@@ -243,7 +242,7 @@ foreach ($f in $chromeSslFiles) {
     if (Test-Path $f) { Remove-Item $f -Force -ErrorAction SilentlyContinue }
 }
 ipconfig /flushdns | Out-Null
-Write-Host "      [OK] Chrome SSL cache cleared, DNS flushed" -ForegroundColor Green
+Write-Host "      [OK] Chrome SSL cache cleared, DNS flushed (Chrome not closed)" -ForegroundColor Green
 
 
 # =======================================================
