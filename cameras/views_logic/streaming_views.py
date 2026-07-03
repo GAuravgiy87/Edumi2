@@ -762,7 +762,8 @@ def clear_stream_cache(request, camera_id):
 
 
 @login_required
-def publish_recording(request):    """Publish a finished recording with title and description"""
+def publish_recording(request):
+    """Publish a finished recording with title and description"""
     if request.method == 'POST':
         recording_id = request.POST.get('recording_id')
         title = request.POST.get('title')

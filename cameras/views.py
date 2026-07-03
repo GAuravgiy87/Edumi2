@@ -28,7 +28,7 @@ from cameras.views_logic import (
     start_streaming, stop_streaming, live_participants,
     student_lecture_list, watch_live,
     start_camera_recording, stop_camera_recording, publish_recording,
-    camera_feed_proxy,
+    camera_feed_proxy, clear_stream_cache,
     # permissions & admin content
     admin_content_manager, delete_recording_admin, delete_meeting_admin,
     grant_permission, revoke_permission, manage_permissions,
