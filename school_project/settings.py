@@ -389,7 +389,7 @@ LOGGING = {
     'loggers': {
         '': {  # Root logger
             'handlers': ['console', 'file'],
-            'level': os.environ.get('LOG_LEVEL', 'INFO'),
+            'level': os.environ.get('LOG_LEVEL', 'WARNING'),
         },
         'cameras': {
             'handlers': ['console', 'file'],

@@ -36,6 +36,7 @@ from .streaming_views import (
     stop_camera_recording,
     publish_recording,
     camera_feed_proxy,
+    clear_stream_cache,
 )
 from .permissions_views import (
     admin_content_manager,
@@ -101,6 +102,7 @@ __all__ = [
     'stop_camera_recording',
     'publish_recording',
     'camera_feed_proxy',
+    'clear_stream_cache',
     # Permissions
     'admin_content_manager',
     'delete_recording_admin',

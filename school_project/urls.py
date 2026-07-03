@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views
 from django.views.generic import RedirectView
 from meetings.livekit_http_proxy import livekit_http_proxy
-from cameras.views_logic.camera_views import camera_feed
+from cameras.views_logic.streaming_views import camera_feed_proxy
 
 # Override admin logout to redirect to login page
 admin.site.logout_template = None
@@ -18,7 +18,7 @@ urlpatterns = [
     re_path(r'^livekit-proxy(?P<lk_path>/.*)$', livekit_http_proxy),
     path('', include('accounts.urls')),
     # Put the most specific route first: /cameras/<int:camera_id>/feed/
-    path('cameras/<int:camera_id>/feed/', camera_feed, name='camera_feed_direct'),  # <-- Direct feed route first!
+    path('cameras/<int:camera_id>/feed/', camera_feed_proxy, name='camera_feed_direct'),  # <-- New streamer view!
     path('cameras/', include('cameras.urls')),
     path('mobile-cameras/', include('mobile_cameras.urls')),
     path('meetings/', include('meetings.urls')),

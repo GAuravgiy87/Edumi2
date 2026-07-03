@@ -206,7 +206,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 '-vn', 
                 '-map', '0:a?', 
                 '-acodec', 'libopus', '-b:a', '128k', '-ar', '48000', '-ac', '2',
-                '-af', 'volume=20.0,highpass=f=150,lowpass=f=14000,dynaudnorm=p=0.9:m=60.0:s=5,aresample=async=1:min_hard_comp=0.1:first_pts=0',
+                '-af', 'volume=10.0,aresample=async=1:min_hard_comp=0.1:first_pts=0',
                 '-fflags', '+genpts+discardcorrupt+igndts+nobuffer+flush_packets',
                 '-f', 'webm',
                 'pipe:1'
@@ -327,7 +327,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 '-vn',
                 '-map', '0:a?',
                 '-acodec', 'libopus', '-b:a', '128k', '-ar', '48000', '-ac', '2',
-                '-af', 'volume=20.0,highpass=f=150,lowpass=f=14000,dynaudnorm=p=0.9:m=60.0:s=5,aresample=async=1:min_hard_comp=0.1:first_pts=0',
+                '-af', 'volume=10.0,aresample=async=1:min_hard_comp=0.1:first_pts=0',
                 '-fflags', '+genpts+discardcorrupt+igndts+nobuffer+flush_packets',
                 '-f', 'webm',
                 'pipe:1'

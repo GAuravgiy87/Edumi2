@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from ..models import Camera, CameraPermission
 from .utils import is_admin, test_rtsp_paths
 
+logger = logging.getLogger('cameras')
+
 User = get_user_model()
 
 
@@ -37,12 +39,17 @@ def add_camera(request):
         port = int(request.POST.get('port', 554))
         username = request.POST.get('username', '')
         password = request.POST.get('password', '')
+        stream_path = request.POST.get('stream_path', None)
 
         if camera_type == 'rtsp':
-            # Auto-detect path
-            detected_path, _ = test_rtsp_paths(ip_address, port, username, password)
-            stream_path = detected_path if detected_path else '/stream'
-            is_active = True if detected_path else False
+            if not stream_path:
+                # Try auto-detect path, but if that fails use default
+                try:
+                    detected_path, _ = test_rtsp_paths(ip_address, port, username, password)
+                    stream_path = detected_path if detected_path else '/stream'
+                except Exception:
+                    stream_path = '/stream'
+            is_active = True  # Assume active, user can test later
         else:
             # Mobile cameras have fixed paths
             stream_path = '/video' if camera_type == 'ip_webcam' else '/mjpegfeed'
@@ -73,64 +80,86 @@ def edit_camera(request, camera_id):
     if not is_admin(request.user):
         return JsonResponse({'status': 'error', 'message': 'Permission denied'})
 
-    camera = get_object_or_404(Camera, id=camera_id)
+    try:
+        camera = get_object_or_404(Camera, id=camera_id)
+        logger.info(f"edit_camera called for camera {camera_id}, method: {request.method}")
+        if request.method == 'POST':
+            logger.info(f"POST data keys: {list(request.POST.keys())}")
+            # Check if we are updating camera details or just permissions
+            # If 'name' is in POST, we are updating details
+            if 'name' in request.POST:
+                logger.info("Updating camera details")
+                camera.name = request.POST.get('name')
+                camera.camera_type = request.POST.get('camera_type')
+                camera.ip_address = request.POST.get('ip_address')
+                port_val = request.POST.get('port')
+                if port_val:
+                    camera.port = int(port_val)
+                camera.username = request.POST.get('username', '')
+                camera.password = request.POST.get('password', '')
+                # Allow manual stream_path input
+                stream_path = request.POST.get('stream_path', None)
 
-    if request.method == 'POST':
-        # Check if we are updating camera details or just permissions
-        # If 'name' is in POST, we are updating details
-        if 'name' in request.POST:
-            camera.name = request.POST.get('name')
-            camera.camera_type = request.POST.get('camera_type')
-            camera.ip_address = request.POST.get('ip_address')
-            port_val = request.POST.get('port')
-            if port_val:
-                camera.port = int(port_val)
-            camera.username = request.POST.get('username', '')
-            camera.password = request.POST.get('password', '')
+                if camera.camera_type == 'rtsp':
+                    if stream_path:
+                        camera.stream_path = stream_path
+                    else:
+                        # Try re-detect path if no manual path provided, but don't fail
+                        try:
+                            detected_path, _ = test_rtsp_paths(camera.ip_address, camera.port, camera.username, camera.password)
+                            if detected_path:
+                                camera.stream_path = detected_path
+                        except Exception as e:
+                            logger.warning(f"Path detection failed: {e}")
+                            pass  # Keep existing stream_path if detection fails
+                else:
+                    # Mobile cameras have fixed paths
+                    camera.stream_path = '/video' if camera.camera_type == 'ip_webcam' else '/mjpegfeed'
+                camera.is_active = True  # Assume active
+                camera.save()
+                logger.info("Camera details saved")
 
-            # If RTSP and details changed, re-detect path
-            if camera.camera_type == 'rtsp':
-                detected_path, _ = test_rtsp_paths(camera.ip_address, camera.port, camera.username, camera.password)
-                if detected_path:
-                    camera.stream_path = detected_path
-                    camera.is_active = True
+            # Always handle teacher assignments if 'teachers' is in POST or if it's the assignment form
+            # The assignment form has a hidden input 'camera_id' and a list of 'teachers'
+            if 'teachers' in request.POST or ('name' not in request.POST and 'camera_id' in request.POST):
+                teacher_ids = request.POST.getlist('teachers')
+                logger.info(f"Updating permissions for camera {camera_id}. Teacher IDs: {teacher_ids}")
+                # Clear old permissions
+                CameraPermission.objects.filter(camera=camera).delete()
+                # Add new permissions
+                for t_id in teacher_ids:
+                    try:
+                        t_id_int = int(t_id)
+                        teacher = User.objects.get(id=t_id_int)
+                        CameraPermission.objects.create(camera=camera, teacher=teacher, granted_by=request.user)
+                        logger.info(f"Granted permission to teacher {teacher.username} for camera {camera.name}")
+                    except (ValueError, User.DoesNotExist) as e:
+                        logger.warning(f"Teacher with ID {t_id} does not exist or invalid: {e}")
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error granting permission: {e}", exc_info=True)
+                        continue
+                logger.info("Permissions updated")
 
-            camera.save()
+            return JsonResponse({'status': 'success', 'message': 'Camera updated successfully'})
 
-        # Always handle teacher assignments if 'teachers' is in POST or if it's the assignment form
-        # The assignment form has a hidden input 'camera_id' and a list of 'teachers'
-        if 'teachers' in request.POST or ('name' not in request.POST and 'camera_id' in request.POST):
-            teacher_ids = request.POST.getlist('teachers')
-            logger.info(f"Updating permissions for camera {camera_id}. Teachers: {teacher_ids}")
-            # Clear old permissions
-            CameraPermission.objects.filter(camera=camera).delete()
-            # Add new permissions
-            for t_id in teacher_ids:
-                try:
-                    teacher = User.objects.get(id=t_id)
-                    CameraPermission.objects.create(camera=camera, teacher=teacher, granted_by=request.user)
-                    logger.info(f"Granted permission to teacher {teacher.username} for camera {camera.name}")
-                except User.DoesNotExist:
-                    logger.warning(f"Teacher with ID {t_id} does not exist")
-                    continue
-                except Exception as e:
-                    logger.error(f"Error granting permission: {e}")
-                    continue
-
-        return JsonResponse({'status': 'success', 'message': 'Camera updated successfully'})
-
-    # Return camera data for modal
-    assigned_teachers = list(camera.get_authorized_teachers().values_list('id', flat=True))
-    return JsonResponse({
-        'id': camera.id,
-        'name': camera.name,
-        'camera_type': camera.camera_type,
-        'ip_address': camera.ip_address,
-        'port': camera.port,
-        'username': camera.username,
-        'password': camera.password,
-        'assigned_teachers': assigned_teachers
-    })
+        # Return camera data for modal
+        assigned_teachers = list(camera.get_authorized_teachers().values_list('id', flat=True))
+        logger.info(f"Returning camera data: assigned teachers {assigned_teachers}")
+        return JsonResponse({
+            'id': camera.id,
+            'name': camera.name,
+            'camera_type': camera.camera_type,
+            'ip_address': camera.ip_address,
+            'port': camera.port,
+            'username': camera.username,
+            'password': camera.password,
+            'stream_path': camera.stream_path,
+            'assigned_teachers': assigned_teachers
+        })
+    except Exception as e:
+        logger.error(f"Critical error in edit_camera: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 @login_required
@@ -158,6 +187,7 @@ def delete_camera(request, camera_id):
     return redirect('admin_dashboard')
 
 
+# @login_required  — permission enforced inside via can_view_camera
 @login_required
 def camera_feed(request, camera_id):
     """
@@ -177,6 +207,7 @@ def camera_feed(request, camera_id):
 
     camera = get_object_or_404(Camera, id=camera_id)
 
+    # Admins and authorized teachers can always view; students need is_live
     if not can_view_camera(request.user, camera):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
@@ -201,12 +232,28 @@ def camera_feed(request, camera_id):
                 upstream.close()
 
         response = StreamingHttpResponse(stream(), content_type=content_type)
-        response['Cache-Control'] = 'no-cache, no-store'
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
         response['X-Accel-Buffering'] = 'no'
         return response
 
     except req_lib.exceptions.ConnectionError:
-        return JsonResponse({'error': 'Camera service offline'}, status=503)
+        # Camera service offline — fall back to in-process streamer
+        logger.warning(f"Camera service offline for camera {camera_id}, falling back to in-process streamer")
+        from .streaming_views import camera_manager, _generate_frames
+        quality = request.GET.get('q', 'med')
+        quality_map = {'4k': '4k', 'high': 'high', '1080p': 'high', '720p': 'med', '480p': 'med', '360p': 'low'}
+        quality = quality_map.get(quality, quality)
+        full_url = camera.get_full_rtsp_url()
+        streamer = camera_manager.get_streamer(camera.id, full_url)
+        response = StreamingHttpResponse(
+            _generate_frames(streamer, camera, full_url, quality, camera_id),
+            content_type='multipart/x-mixed-replace; boundary=frame',
+        )
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['X-Accel-Buffering'] = 'no'
+        return response
     except Exception as e:
         logger.error(f"camera_feed proxy error for camera {camera_id}: {e}")
         return JsonResponse({'error': str(e)}, status=500)

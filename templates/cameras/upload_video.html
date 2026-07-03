@@ -143,6 +143,7 @@
 </style>
 
 <script>
+(function() {
     const videoInput = document.getElementById('videoInput');
     const thumbInput = document.getElementById('thumbInput');
     const dropZone = document.getElementById('dropZone');
@@ -283,5 +284,6 @@
 
         xhr.send(formData);
     });
+})();
 </script>
 {% endblock %}

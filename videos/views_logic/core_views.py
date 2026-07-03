@@ -2,6 +2,7 @@
 Core video management views
 """
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_http_methods
@@ -56,9 +57,14 @@ def upload_video(request):
             process_video.delay(video.id)
         except Exception:
             # Fallback to sync processing if Celery not available
+            from videos.views_logic.utils import process_video_sync
             process_video_sync(video.id)
 
-        return JsonResponse({'status': 'success', 'video_id': video.id})
+        return JsonResponse({
+            'status': 'success', 
+            'video_id': video.id,
+            'redirect_url': reverse('video_list')  # Redirect to video list
+        })
 
     # For GET requests, show upload page (using cameras/upload_video.html which we will overhaul)
     from cameras.models import Camera

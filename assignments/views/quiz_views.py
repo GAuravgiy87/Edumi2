@@ -250,37 +250,56 @@ def delete_question(request, question_id):
 
 @login_required
 def take_quiz(request, quiz_id):
-    """Student takes a quiz"""
+    """Student takes a quiz — with server-side timer support."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     classroom = quiz.classroom
-    
+
     if not hasattr(request.user, 'userprofile') or request.user.userprofile.user_type != 'student':
         messages.error(request, 'Only students can take quizzes')
         return redirect('student_classrooms')
-    
+
     if not classroom.memberships.filter(student=request.user, status='approved').exists():
         messages.error(request, 'You are not approved for this classroom')
         return redirect('student_classrooms')
-    
+
     if quiz.status != 'published':
         messages.error(request, 'This quiz is not yet published')
         return redirect('classroom_quizzes', classroom_id=classroom.id)
-    
-    existing_submission = QuizSubmission.objects.filter(
-        quiz=quiz,
-        student=request.user
-    ).first()
-    
+
+    existing_submission = QuizSubmission.objects.filter(quiz=quiz, student=request.user).first()
     if existing_submission:
         messages.warning(request, 'You have already submitted this quiz')
         return redirect('quiz_detail', quiz_id=quiz_id)
-    
+
+    # ── Record when the student first opens the quiz ──────────────────────────
+    session_key = f'quiz_{quiz_id}_started_at'
+    if session_key not in request.session:
+        request.session[session_key] = timezone.now().isoformat()
+
+    started_at = timezone.datetime.fromisoformat(request.session[session_key])
+    if timezone.is_naive(started_at):
+        started_at = timezone.make_aware(started_at)
+
+    # ── How many seconds remain ───────────────────────────────────────────────
+    seconds_remaining = None
+    if quiz.time_limit:
+        elapsed = int((timezone.now() - started_at).total_seconds())
+        seconds_remaining = max(0, quiz.time_limit * 60 - elapsed)
+
     if request.method == 'POST':
+        # Prevent double submission
+        if QuizSubmission.objects.filter(quiz=quiz, student=request.user).exists():
+            return redirect('quiz_detail', quiz_id=quiz_id)
+
+        time_taken = int((timezone.now() - started_at).total_seconds())
+
         submission = QuizSubmission.objects.create(
             quiz=quiz,
-            student=request.user
+            student=request.user,
+            started_at=started_at,
+            time_taken_seconds=time_taken,
         )
-        
+
         questions = quiz.questions.all()
         for question in questions:
             if question.question_type == 'mcq':
@@ -298,13 +317,66 @@ def take_quiz(request, quiz_id):
                     question=question,
                     text_answer=text_answer
                 )
-        
+
+        # Auto-grade MCQ questions
+        total = 0
+        all_graded = True
+        for answer in submission.answers.select_related('question', 'selected_choice'):
+            if answer.question.question_type == 'mcq':
+                pts = answer.question.marks if (answer.selected_choice and answer.selected_choice.is_correct) else 0
+                answer.marks_obtained = pts
+                total += pts
+                answer.save()
+            else:
+                all_graded = False  # text answers need manual grading
+
+        if all_graded:
+            submission.marks_obtained = total
+            submission.evaluated_at = timezone.now()
+            submission.evaluated_by = None  # auto-graded
+            submission.save()
+
+        # Clean session key
+        request.session.pop(session_key, None)
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'ok', 'redirect': f'/assignments/quizzes/{quiz_id}/'})
+
         messages.success(request, 'Quiz submitted successfully!')
         return redirect('quiz_detail', quiz_id=quiz_id)
-    
+
     return render(request, 'quizzes/take_quiz.html', {
         'quiz': quiz,
-        'questions': quiz.questions.all()
+        'questions': quiz.questions.all(),
+        'seconds_remaining': seconds_remaining,
+        'started_at_iso': started_at.isoformat(),
+    })
+
+
+@login_required
+def quiz_time_status(request, quiz_id):
+    """JSON endpoint — returns seconds remaining for the timer."""
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+
+    if not quiz.time_limit:
+        return JsonResponse({'has_timer': False})
+
+    session_key = f'quiz_{quiz_id}_started_at'
+    started_str = request.session.get(session_key)
+    if not started_str:
+        return JsonResponse({'has_timer': False})
+
+    started_at = timezone.datetime.fromisoformat(started_str)
+    if timezone.is_naive(started_at):
+        started_at = timezone.make_aware(started_at)
+
+    elapsed = int((timezone.now() - started_at).total_seconds())
+    remaining = max(0, quiz.time_limit * 60 - elapsed)
+
+    return JsonResponse({
+        'has_timer': True,
+        'seconds_remaining': remaining,
+        'time_limit_seconds': quiz.time_limit * 60,
     })
 
 

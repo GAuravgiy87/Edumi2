@@ -16,4 +16,5 @@ urlpatterns = [
     path('lectures/', views.student_lecture_list, name='student_lecture_list'),
     path('watch-live/<int:camera_id>/', views.watch_live, name='watch_live'),
     path('<int:camera_id>/feed/', views.camera_feed_proxy, name='camera_feed_proxy'),
+    path('clear-stream-cache/<int:camera_id>/', views.clear_stream_cache, name='clear_stream_cache'),
 ]

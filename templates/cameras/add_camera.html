@@ -48,6 +48,11 @@
                 </div>
             </div>
 
+            <div id="rtspPath" class="form-group">
+                <label>Stream Path (Optional - auto-detects if empty)</label>
+                <input type="text" id="camStreamPath" name="stream_path" class="form-control" placeholder="/stream or /live">
+            </div>
+
             <button type="submit" class="btn-save">Save Camera</button>
         </form>
     </div>
@@ -102,15 +107,19 @@
         const type = document.getElementById('camType').value;
         const portInput = document.getElementById('camPort');
         const rtspAuth = document.getElementById('rtspAuth');
+        const rtspPath = document.getElementById('rtspPath');
 
         if (type === 'rtsp') {
             rtspAuth.style.display = 'grid';
+            rtspPath.style.display = 'block';
             portInput.value = 554;
         } else if (type === 'ip_webcam') {
             rtspAuth.style.display = 'none';
+            rtspPath.style.display = 'none';
             portInput.value = 8080;
         } else {
             rtspAuth.style.display = 'none';
+            rtspPath.style.display = 'none';
             portInput.value = 4747;
         }
     }
@@ -127,6 +136,7 @@
         document.getElementById('camPort').value = data.port;
         document.getElementById('camUser').value = data.username;
         document.getElementById('camPass').value = data.password;
+        document.getElementById('camStreamPath').value = data.stream_path;
         
         handleTypeChange();
         document.getElementById('cameraModal').classList.add('show');
