@@ -63,6 +63,7 @@
 - [Trusting the SSL Certificate](#-trusting-the-ssl-certificate)
 - [Production Deployment (Docker)](#-production-deployment-docker)
 - [Default Credentials & Ports](#-default-credentials--ports)
+- [🖥️ Server Deployment Guide](SERVER_DEPLOY.md) ← **Deploy to a real server**
 - [Contributing](#-contributing)
 
 </details>
