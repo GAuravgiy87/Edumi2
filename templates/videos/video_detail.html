@@ -107,6 +107,8 @@
         color: #64748b;
     }
 </style>
+<!-- HLS.js for chunked streaming -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 {% endblock %}
 
 {% block content %}
@@ -115,7 +117,6 @@
         <div class="video-wrapper">
             {% if video.is_processed %}
             <video id="mainVideo" controls class="w-100 h-100" poster="{{ video.thumbnail.url|default:'' }}">
-                <source src="{{ video.original_file.url }}" type="{{ video.mime_type|default:'video/mp4' }}">
                 Your browser does not support the video tag.
             </video>
             {% else %}
@@ -126,6 +127,37 @@
             </div>
             {% endif %}
         </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                {% if video.is_processed %}
+                const video = document.getElementById('mainVideo');
+                const playlistUrl = "{% url 'video_playlist' video.id %}";
+                
+                if (Hls.isSupported()) {
+                    const hls = new Hls();
+                    hls.loadSource(playlistUrl);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                        console.log('HLS manifest loaded');
+                    });
+                    hls.on(Hls.Events.ERROR, function(event, data) {
+                        console.error('HLS error:', data);
+                        if (data.fatal) {
+                            // Fallback to original file on fatal error
+                            video.src = "{{ video.original_file.url }}";
+                        }
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Safari native HLS
+                    video.src = playlistUrl;
+                } else {
+                    // Fallback for other browsers
+                    video.src = "{{ video.original_file.url }}";
+                }
+                {% endif %}
+            });
+        </script>
 
         <h1 class="video-title">{{ video.title }}</h1>
         
@@ -140,6 +172,9 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
+                <button class="btn btn-light btn-sm d-flex align-items-center gap-1 like-btn" data-id="{{ video.id }}" data-type="video">
+                    <i data-lucide="thumbs-up" style="width: 16px;"></i> <span id="like-count">{{ video.likes_count|default:0 }}</span> Likes
+                </button>
                 {% if user == video.uploaded_by or user.is_superuser %}
                 <a href="{% url 'edit_video' video.id %}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
                     <i data-lucide="edit" style="width: 16px;"></i> Edit
@@ -149,6 +184,37 @@
                 </button>
                 {% endif %}
             </div>
+            
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const likeBtn = document.querySelector('.like-btn');
+                if (likeBtn) {
+                    likeBtn.addEventListener('click', function() {
+                        const id = this.dataset.id;
+                        const type = this.dataset.type;
+                        const url = `/videos/like/${id}/`;
+                        
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': '{{ csrf_token }}',
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                document.getElementById('like-count').textContent = data.likes_count;
+                                this.classList.remove('btn-light');
+                                this.classList.add('btn-primary');
+                            }
+                        })
+                        .catch(err => console.error('Error liking video:', err));
+                    });
+                }
+            });
+            </script>
         </div>
 
         <div class="description-box">

@@ -1,0 +1,128 @@
+{% extends 'layouts/sidebar_base.html' %}
+{% load static %}
+
+{% block title %}Analytics Studio - Edumi{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="background: #f8fafc; min-height: 100vh;">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="font-weight-bold mb-1 text-dark" style="font-size: 1.75rem; letter-spacing: -0.02em;">Analytics Studio</h2>
+            <p class="text-muted small mb-0">Track performance, views, and engagement metrics for your lectures.</p>
+        </div>
+        <a href="{% url 'manage_recordings' %}" class="btn btn-outline-primary d-flex align-items-center gap-2">
+            <i data-lucide="arrow-left" style="width: 18px;"></i>
+            Back to Lectures
+        </a>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm p-4 bg-white" style="border-radius: 16px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="text-muted font-weight-bold small text-uppercase">Channel Views</span>
+                    <div class="p-2 bg-indigo-50 text-indigo rounded-3" style="background: rgba(99, 102, 241, 0.1); color: #4f46e5;">
+                        <i data-lucide="eye" style="width: 24px; height: 24px;"></i>
+                    </div>
+                </div>
+                <h3 class="font-weight-bold text-dark mb-1" style="font-size: 2.25rem;">{{ total_views }}</h3>
+                <span class="text-success small d-flex align-items-center gap-1">
+                    <i data-lucide="trending-up" style="width: 16px;"></i>
+                    Total video views
+                </span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm p-4 bg-white" style="border-radius: 16px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="text-muted font-weight-bold small text-uppercase">Likes & Feedback</span>
+                    <div class="p-2 bg-emerald-50 text-emerald rounded-3" style="background: rgba(16, 185, 129, 0.1); color: #059669;">
+                        <i data-lucide="thumbs-up" style="width: 24px; height: 24px;"></i>
+                    </div>
+                </div>
+                <h3 class="font-weight-bold text-dark mb-1" style="font-size: 2.25rem;">{{ total_likes }}</h3>
+                <span class="text-success small d-flex align-items-center gap-1">
+                    <i data-lucide="heart" style="width: 16px;"></i>
+                    Teacher support
+                </span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm p-4 bg-white" style="border-radius: 16px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="text-muted font-weight-bold small text-uppercase">Total Uploads</span>
+                    <div class="p-2 bg-blue-50 text-blue rounded-3" style="background: rgba(59, 130, 246, 0.1); color: #2563eb;">
+                        <i data-lucide="video" style="width: 24px; height: 24px;"></i>
+                    </div>
+                </div>
+                <h3 class="font-weight-bold text-dark mb-1" style="font-size: 2.25rem;">{{ total_videos }}</h3>
+                <span class="text-muted small d-flex align-items-center gap-1">
+                    <i data-lucide="calendar" style="width: 16px;"></i>
+                    Published lectures
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Views Breakdown & Analytics Chart -->
+        <div class="col-12 col-lg-8">
+            <div class="card border-0 shadow-sm p-4 bg-white mb-4" style="border-radius: 16px;">
+                <h4 class="font-weight-bold text-dark mb-4" style="font-size: 1.25rem;">Performance Share</h4>
+                <div class="d-flex flex-column gap-4">
+                    {% for item in chart_data %}
+                    <div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="font-weight-bold text-dark small text-truncate" style="max-width: 75%;">{{ item.title }}</span>
+                            <span class="text-muted small">{{ item.views }} views</span>
+                        </div>
+                        <div class="progress" style="height: 10px; border-radius: 5px; background: #e2e8f0;">
+                            <div class="progress-bar bg-primary" role="progressbar" 
+                                 style="width: {% widthratio item.views total_views|default:1 100 %}%; border-radius: 5px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;">
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-5">
+                        <p class="text-muted mb-0">No lecture data available for statistics.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Performing Videos Sidebar -->
+        <div class="col-12 col-lg-4">
+            <div class="card border-0 shadow-sm p-4 bg-white" style="border-radius: 16px;">
+                <h4 class="font-weight-bold text-dark mb-3" style="font-size: 1.25rem;">Top Lectures</h4>
+                <p class="text-muted small mb-4">Your most viewed recordings ranked by engagement.</p>
+                <div class="d-flex flex-column gap-3">
+                    {% for rec in top_recordings %}
+                    <div class="d-flex align-items-center gap-3">
+                        <div style="width: 80px; aspect-ratio: 16/9; background: #0f172a; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
+                            {% if rec.thumbnail %}
+                            <img src="{{ rec.thumbnail.url }}" class="w-100 h-100 object-fit-cover">
+                            {% else %}
+                            <img src="{% static 'images/video-placeholder.svg' %}" class="w-100 h-100 object-fit-cover">
+                            {% endif %}
+                        </div>
+                        <div class="min-width-0 flex-grow-1">
+                            <div class="font-weight-bold text-dark text-truncate small">{{ rec.title }}</div>
+                            <div class="text-muted small d-flex gap-2">
+                                <span>{{ rec.views_count }} views</span>
+                                <span>•</span>
+                                <span>{{ rec.likes_count }} likes</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted text-center py-4 small">No top videos yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

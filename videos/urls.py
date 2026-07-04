@@ -9,4 +9,5 @@ urlpatterns = [
     path('<int:video_id>/delete/', views.delete_video, name='delete_video'),
     path('quality/<int:quality_id>/stream/', views.stream_quality_video, name='stream_quality_video'),
     path('quality/<int:quality_id>/chunk/<int:chunk_number>/', views.stream_video_chunk, name='stream_video_chunk'),
+    path('like/<int:video_id>/', views.like_video, name='like_video'),
 ]

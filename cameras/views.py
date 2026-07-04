@@ -20,15 +20,17 @@ from cameras.views_logic import (
     recording_playlist, teacher_profile, delete_recording,
     update_recording_edit, apply_recording_trim, generate_recording_thumbnail,
     edit_recording,
+    recording_analytics,
+    like_recording,
     # camera management
     admin_dashboard, add_camera, edit_camera, delete_camera,
-    camera_feed, test_camera, test_feed_page,
+    camera_feed, test_camera, test_feed_page, probe_camera,
     # streaming & control
     mobile_mic, teacher_camera_dashboard, teacher_control_room, update_zoom,
     start_streaming, stop_streaming, live_participants,
     student_lecture_list, watch_live,
     start_camera_recording, stop_camera_recording, publish_recording,
-    camera_feed_proxy,
+    camera_feed_proxy, clear_stream_cache,
     # permissions & admin content
     admin_content_manager, delete_recording_admin, delete_meeting_admin,
     grant_permission, revoke_permission, manage_permissions,

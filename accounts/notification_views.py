@@ -71,6 +71,7 @@ def get_recent_notifications(request):
 from django.contrib.auth.models import User
 from django.views.decorators.http import require_POST
 
+@login_required
 @require_POST
 def send_broadcast(request):
     """Send broadcast message to all users (admin only)"""

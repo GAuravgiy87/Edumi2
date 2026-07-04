@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.contrib.auth import get_user_model
 from ..models import Camera, CameraPermission, CameraRecording
 from meetings.models import Meeting
+from .utils import is_admin
 
 User = get_user_model()
 

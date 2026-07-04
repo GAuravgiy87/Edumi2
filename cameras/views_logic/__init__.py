@@ -7,6 +7,8 @@ from .utils import (
     broadcast_live_status,
 )
 from .video_views import (
+    like_recording,
+    recording_analytics,
     stream_video, upload_video, recordings_folder, manage_recordings,
     toggle_recording_publish, watch_recording, stream_recording_chunk,
     recording_playlist, teacher_profile, delete_recording,
@@ -21,6 +23,7 @@ from .camera_views import (
     camera_feed,
     test_camera,
     test_feed_page,
+    probe_camera,
 )
 from .streaming_views import (
     mobile_mic,
@@ -36,6 +39,7 @@ from .streaming_views import (
     stop_camera_recording,
     publish_recording,
     camera_feed_proxy,
+    clear_stream_cache,
 )
 from .permissions_views import (
     admin_content_manager,
@@ -79,6 +83,8 @@ __all__ = [
     'apply_recording_trim',
     'generate_recording_thumbnail',
     'edit_recording',
+    'like_recording',
+    'recording_analytics',
     # Camera
     'admin_dashboard',
     'add_camera',
@@ -87,6 +93,7 @@ __all__ = [
     'camera_feed',
     'test_camera',
     'test_feed_page',
+    'probe_camera',
     # Streaming
     'mobile_mic',
     'teacher_camera_dashboard',
@@ -101,6 +108,7 @@ __all__ = [
     'stop_camera_recording',
     'publish_recording',
     'camera_feed_proxy',
+    'clear_stream_cache',
     # Permissions
     'admin_content_manager',
     'delete_recording_admin',

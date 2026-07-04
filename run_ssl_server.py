@@ -61,14 +61,14 @@ server = Server(
     application=application,
     endpoints=[ssl_endpoint],
     signal_handlers=True,
-    http_timeout=120,
+    http_timeout=86400,  # 24 hours for long streaming
     websocket_timeout=86400,
     websocket_connect_timeout=20,
     ping_interval=20,
     ping_timeout=30,
-    application_close_timeout=10,
+    application_close_timeout=86400,
     root_path="",
-    verbosity=1,
+    verbosity=0,  # Only warnings/errors
 )
 
 server.run()

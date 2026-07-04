@@ -211,7 +211,11 @@ class QuizSubmission(models.Model):
     """Model for student submissions to quizzes"""
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="submissions")
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="quiz_submissions")
+    # Timer tracking
+    started_at = models.DateTimeField(null=True, blank=True, help_text="When the student opened the quiz")
     submitted_at = models.DateTimeField(auto_now_add=True)
+    time_taken_seconds = models.IntegerField(null=True, blank=True, help_text="Seconds taken to complete the quiz")
+    # Grading
     marks_obtained = models.IntegerField(null=True, blank=True)
     feedback = models.TextField(blank=True)
     evaluated_at = models.DateTimeField(null=True, blank=True)
@@ -225,6 +229,16 @@ class QuizSubmission(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.quiz.title}"
+
+    @property
+    def time_taken_display(self):
+        """Returns human-readable time taken, e.g. '4m 32s'"""
+        if self.time_taken_seconds is None:
+            return "—"
+        mins, secs = divmod(self.time_taken_seconds, 60)
+        if mins:
+            return f"{mins}m {secs}s"
+        return f"{secs}s"
 
 
 class StudentAnswer(models.Model):

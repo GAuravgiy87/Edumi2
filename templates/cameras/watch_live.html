@@ -28,6 +28,9 @@
     }
     .live-feed {
         width: 100%; height: 100%; object-fit: contain;
+        position: relative;
+        z-index: 10;
+        display: block;
     }
     .live-overlay {
         position: absolute;
@@ -201,7 +204,7 @@
 
     // ── Audio Implementation ──
     let audioConnectionAttempts = 0;
-    const MAX_AUDIO_ATTEMPTS = 3;
+    const MAX_AUDIO_ATTEMPTS = 1;
     
     function connectAudio() {
         if (audioWs) {
@@ -209,12 +212,11 @@
             audioWs = null;
         }
         if (audioConnectionAttempts >= MAX_AUDIO_ATTEMPTS) {
-            console.log("Max audio connection attempts reached, stopping");
+            console.log("Max audio connection attempts reached, stopping audio");
             return;
         }
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Connect as ip_cam source so the server relays the camera's built-in mic via RTSP
         const wsUrl = `${protocol}//${window.location.host}/ws/audio/${window.cameraId}/?source=ip_cam`;
         
         console.log("Connecting to IP-Cam Audio WebSocket:", wsUrl);
@@ -222,51 +224,58 @@
         audioWs.binaryType = 'arraybuffer';
 
         const audio = document.getElementById('liveAudio');
-        mediaSource = new MediaSource();
-        audio.src = URL.createObjectURL(mediaSource);
-        
         let sourceBuffer = null;
         let queue = [];
         let isFirstChunk = true;
+        let useMediaSource = true;
 
-        mediaSource.addEventListener('sourceopen', () => {
-            try {
-                // Using webm/opus which is what MediaRecorder sends
-                sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
-                
-                sourceBuffer.addEventListener('error', (e) => {
-                    console.warn("SourceBuffer error:", e);
-                });
+        try {
+            mediaSource = new MediaSource();
+            audio.src = URL.createObjectURL(mediaSource);
+            
+            mediaSource.addEventListener('sourceopen', () => {
+                try {
+                    sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
+                    
+                    sourceBuffer.addEventListener('error', (e) => {
+                        console.warn("SourceBuffer error, disabling audio for this session:", e);
+                        useMediaSource = false;
+                        if (audioWs) audioWs.close();
+                    });
 
-                sourceBuffer.addEventListener('updateend', () => {
-                    if (queue.length > 0 && !sourceBuffer.updating) {
-                        try {
-                            sourceBuffer.appendBuffer(queue.shift());
-                        } catch (err) {
-                            // Do nothing, just ignore
+                    sourceBuffer.addEventListener('updateend', () => {
+                        if (queue.length > 0 && !sourceBuffer.updating && useMediaSource) {
+                            try {
+                                sourceBuffer.appendBuffer(queue.shift());
+                            } catch (err) {
+                                console.warn("Error appending buffer:", err);
+                            }
                         }
-                    }
-                });
-            } catch (err) {
-                // Do nothing, just ignore
-            }
-        });
+                    });
+                } catch (err) {
+                    console.warn("Error setting up source buffer:", err);
+                    useMediaSource = false;
+                }
+            });
+        } catch (err) {
+            console.warn("MediaSource not supported, disabling audio:", err);
+            useMediaSource = false;
+        }
 
         audioWs.onmessage = (e) => {
-            if (sourceBuffer && !sourceBuffer.updating && mediaSource.readyState === 'open') {
+            if (useMediaSource && sourceBuffer && !sourceBuffer.updating && mediaSource.readyState === 'open') {
                 try {
                     sourceBuffer.appendBuffer(e.data);
-                    // Auto-play on first data if possible
                     if (isFirstChunk) {
                         audio.play().catch(() => {
-                            // Do nothing, just ignore
+                            console.log("Audio autoplay blocked by browser");
                         });
                         isFirstChunk = false;
                     }
                 } catch (err) {
                     queue.push(e.data);
                 }
-            } else if (sourceBuffer) {
+            } else if (useMediaSource && sourceBuffer) {
                 queue.push(e.data);
             }
         };
@@ -280,7 +289,7 @@
         };
 
         audioWs.onerror = (err) => {
-            // Do nothing, just ignore
+            console.warn("Audio WebSocket error:", err);
         };
     }
 
@@ -301,27 +310,39 @@
 
     // ── Initialize Direct Feed ──
     (function initFeed() {
-        // Use same-origin URL — Django proxies /cameras/<id>/feed/ through HTTPS.
-        // Never point the browser directly at port 8003 (plain HTTP) as that
-        // causes a Mixed-Content block when the main app is on HTTPS.
-        const feedUrl = `/cameras/${window.cameraId}/feed/?q=4k`;
+        // Use direct port 8003 camera service with matching SSL protocol
+        const feedUrl = `${window.location.protocol}//${window.location.hostname}:8003/cameras/${window.cameraId}/feed/?q=4k`;
 
         const img = document.getElementById('mainFeed');
         if (img) {
-            img.src = feedUrl;
-            console.log("Attempting direct feed connection:", window.location.protocol + '//' + window.location.host + feedUrl);
+            // Add cache-buster to force fresh stream on each load
+            img.src = feedUrl + '&t=' + new Date().getTime();
+            console.log("Attempting direct feed connection:", feedUrl);
+
+            let retryCount = 0;
+            const maxRetries = 10;
 
             img.onerror = function() {
-                console.error("Feed connection failed. Retrying in 3 seconds...");
-                if (typeof showToast === 'function') showToast('Camera connection failed. Retrying...', 'warning');
-                setTimeout(() => {
-                    this.src = feedUrl + '&t=' + new Date().getTime();
-                }, 3000);
+                retryCount++;
+                console.error(`Feed connection failed (attempt ${retryCount}). Retrying in 3s...`);
+                if (typeof showToast === 'function' && retryCount === 1) {
+                    showToast('Camera', 'Connecting to camera feed...', 'info');
+                }
+                if (retryCount <= maxRetries) {
+                    setTimeout(() => {
+                        this.src = feedUrl + '&t=' + new Date().getTime();
+                    }, 3000);
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast('Camera', 'Camera feed unavailable. Is the camera online?', 'warning');
+                    }
+                }
             };
 
             img.onload = function() {
+                retryCount = 0;
                 console.log("Feed successfully connected and streaming.");
-                if (typeof showToast === 'function') showToast('Camera connected!', 'success');
+                if (typeof showToast === 'function') showToast('Camera', 'Camera connected!', 'success');
             };
         }
 

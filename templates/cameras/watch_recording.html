@@ -161,6 +161,9 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
+                <button class="btn btn-light btn-sm d-flex align-items-center gap-1 like-btn" data-id="{{ recording.id }}" data-type="recording">
+                    <i data-lucide="thumbs-up" style="width: 16px;"></i> <span id="like-count">{{ recording.likes_count|default:0 }}</span> Likes
+                </button>
                 {% if user == recording.teacher or user.is_superuser %}
                 <a href="{% url 'manage_recordings' %}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
                     <i data-lucide="settings" style="width: 16px;"></i> Manage
@@ -170,6 +173,37 @@
                     <i data-lucide="share-2" style="width: 16px;"></i> Share
                 </button>
             </div>
+            
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const likeBtn = document.querySelector('.like-btn');
+                if (likeBtn) {
+                    likeBtn.addEventListener('click', function() {
+                        const id = this.dataset.id;
+                        const type = this.dataset.type;
+                        const url = `/cameras/recordings/like/${id}/`;
+                        
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': '{{ csrf_token }}',
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                document.getElementById('like-count').textContent = data.likes_count;
+                                this.classList.remove('btn-light');
+                                this.classList.add('btn-primary');
+                            }
+                        })
+                        .catch(err => console.error('Error liking recording:', err));
+                    });
+                }
+            });
+            </script>
         </div>
 
         <div class="description-box">

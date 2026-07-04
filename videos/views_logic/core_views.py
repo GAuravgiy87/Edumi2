@@ -2,6 +2,7 @@
 Core video management views
 """
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_http_methods
@@ -13,7 +14,7 @@ from videos.models import Video
 @login_required
 def video_list(request):
     """List all uploaded videos with YouTube-like grid."""
-    videos = Video.objects.all().select_related('uploaded_by')
+    videos = Video.objects.all().select_related('uploaded_by').order_by('-uploaded_at')
     return render(request, 'videos/video_list.html', {'videos': videos})
 
 
@@ -21,6 +22,8 @@ def video_list(request):
 def video_detail(request, video_id):
     """Show video detail page with player and quality selector."""
     video = get_object_or_404(Video, id=video_id)
+    video.views_count += 1
+    video.save(update_fields=['views_count'])
     # Get other videos for recommendations
     recommendations = Video.objects.exclude(id=video.id)[:8]
     return render(request, 'videos/video_detail.html', {
@@ -56,9 +59,14 @@ def upload_video(request):
             process_video.delay(video.id)
         except Exception:
             # Fallback to sync processing if Celery not available
+            from videos.views_logic.utils import process_video_sync
             process_video_sync(video.id)
 
-        return JsonResponse({'status': 'success', 'video_id': video.id})
+        return JsonResponse({
+            'status': 'success', 
+            'video_id': video.id,
+            'redirect_url': reverse('video_list')  # Redirect to video list
+        })
 
     # For GET requests, show upload page (using cameras/upload_video.html which we will overhaul)
     from cameras.models import Camera
@@ -105,3 +113,13 @@ def delete_video(request, video_id):
     video.delete()
     messages.success(request, "Video deleted successfully!")
     return redirect('video_list')
+
+
+@login_required
+@require_http_methods(["POST"])
+def like_video(request, video_id):
+    """Increment likes for a video."""
+    video = get_object_or_404(Video, id=video_id)
+    video.likes_count += 1
+    video.save(update_fields=['likes_count'])
+    return JsonResponse({'status': 'success', 'likes_count': video.likes_count})

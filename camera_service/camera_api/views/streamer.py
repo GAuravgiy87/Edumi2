@@ -87,16 +87,41 @@ class CameraStreamer:
             self.thread.join(timeout=2.0)
 
     def _connect_camera(self):
-        """Try TCP/UDP × HW-accel combinations; return working VideoCapture or None."""
+        """Try multiple connection strategies based on camera type (RTSP vs HTTP)."""
+        # Detect camera type from URL scheme
+        is_http = self.rtsp_url.lower().startswith('http')
+
+        if is_http:
+            # HTTP MJPEG cameras (IP Webcam, DroidCam) — no RTSP options needed
+            try:
+                os.environ.pop('OPENCV_FFMPEG_CAPTURE_OPTIONS', None)
+                cap = cv2.VideoCapture(self.rtsp_url)
+                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT * 2)
+                cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT * 2)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                if cap.isOpened():
+                    for _ in range(8):
+                        ret, frame = cap.read()
+                        if ret and frame is not None and frame.size > 0:
+                            self.connection_attempts = 0
+                            logger.info(f"HTTP camera {self.camera_id} connected: {self.rtsp_url}")
+                            return cap
+                        time.sleep(0.5)
+                cap.release()
+            except Exception as e:
+                logger.error(f"HTTP camera connection error: {e}")
+            return None
+
+        # RTSP cameras — try TCP then UDP, with and without HW accel
         combos = [
-            ('tcp', 'rtsp_transport;tcp', 'd3d11va', 'hwaccel;d3d11va'),
-            ('tcp', 'rtsp_transport;tcp', 'none', ''),
-            ('udp', 'rtsp_transport;udp', 'none', ''),
+            ('tcp', 'rtsp_transport;tcp;stimeout;4000000', 'd3d11va', 'hwaccel;d3d11va'),
+            ('tcp', 'rtsp_transport;tcp;stimeout;4000000', 'none', ''),
+            ('udp', 'rtsp_transport;udp;stimeout;4000000', 'none', ''),
         ]
         for transport, t_opt, hw_name, hw_opt in combos:
             cap = None
             try:
-                opts = f'{t_opt};stimeout;4000000'
+                opts = t_opt
                 if hw_opt:
                     opts += f';{hw_opt}'
                 os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = opts
@@ -107,8 +132,10 @@ class CameraStreamer:
                 if cap.isOpened():
                     for _ in range(5):
                         ret, frame = cap.read()
-                        if ret and frame is not None and np.mean(frame) > 0.1:
+                        # Accept any valid frame — removed strict brightness check
+                        if ret and frame is not None and frame.size > 0:
                             self.connection_attempts = 0
+                            logger.info(f"RTSP camera {self.camera_id} connected via {transport}/{hw_name}")
                             return cap
                         time.sleep(0.3)
                     cap.release()
@@ -119,14 +146,22 @@ class CameraStreamer:
                         cap.release()
                     except Exception:
                         pass
-        # Fallback
+
+        # Last-resort fallback with no options
         try:
-            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
-            cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+            os.environ.pop('OPENCV_FFMPEG_CAPTURE_OPTIONS', None)
+            cap = cv2.VideoCapture(self.rtsp_url)
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT)
             if cap.isOpened():
-                return cap
+                ret, frame = cap.read()
+                if ret and frame is not None and frame.size > 0:
+                    logger.info(f"Camera {self.camera_id} connected via fallback (no options)")
+                    return cap
+            cap.release()
         except Exception:
             pass
+
+        logger.warning(f"Camera {self.camera_id}: all connection attempts failed for {self.rtsp_url}")
         return None
 
     def _generate_placeholder(self):
@@ -136,8 +171,8 @@ class CameraStreamer:
         height, width = 1080, 1920
         frame = np.zeros((height, width, 3), dtype=np.uint8)
         
-        # Add some color
-        frame[:] = (30, 30, 50)
+        # Add some color (Bright Blue for visibility)
+        frame[:] = (255, 150, 0) # BGR for Bright Blue
         
         # Add text
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -174,7 +209,7 @@ class CameraStreamer:
                 self.lock.release()
                 
         while self.running:
-            if time.time() - self.last_access > 90:
+            if time.time() - self.last_access > 300:  # 5 minutes idle timeout
                 break
             if self.cap is None:
                 # Try to connect, but if not available, keep showing placeholder

@@ -279,7 +279,38 @@
 
     /* Video Box Controls */
     .video-box {
-        background: #000 !important;
+        background: #0f172a !important; /* Premium dark slate instead of flat black */
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .video-avatar-overlay {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #0f172a;
+        z-index: 2; /* Below nametag but above empty box */
+        transition: opacity 0.3s ease;
+    }
+    .video-avatar-img {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        object-fit: cover;
+    }
+    .video-avatar-name {
+        margin-top: 14px;
+        color: #cbd5e1;
+        font-size: 0.95rem;
+        font-weight: 600;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.6);
     }
     .video-nametag {
         background: rgba(15, 23, 42, 0.8) !important;
@@ -400,6 +431,14 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                     <span>Switch Camera</span>
                 </button>
+                <button class="menu-item" id="toggleStudentCameraBtn" onclick="toggleStudentViewPermission('student_can_view_camera'); toggleMoreOptions();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                    <span id="studentCameraStatusText">{% if student_can_view_camera %}Block Student Cam View{% else %}Allow Student Cam View{% endif %}</span>
+                </button>
+                <button class="menu-item" id="toggleStudentScreenshareBtn" onclick="toggleStudentViewPermission('student_can_view_screenshare'); toggleMoreOptions();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                    <span id="studentScreenshareStatusText">{% if student_can_view_screenshare %}Block Student Screen View{% else %}Allow Student Screen View{% endif %}</span>
+                </button>
                 {% endif %}
 
                 <div class="menu-separator"></div>
@@ -455,6 +494,8 @@
     data-unfreeze-url="{% url 'unfreeze_meeting' meeting.meeting_code %}"
     data-after-leave-url="{% if is_host %}{% url 'teacher_dashboard' %}{% else %}{% url 'student_dashboard' %}{% endif %}"
     data-csrf="{{ csrf_token }}"
+    data-student-can-view-camera="{% if student_can_view_camera %}true{% else %}false{% endif %}"
+    data-student-can-view-screenshare="{% if student_can_view_screenshare %}true{% else %}false{% endif %}"
     data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
     data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
     data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}"
@@ -495,7 +536,7 @@
 
 <!-- Hidden elements for IP camera streaming -->
 <canvas id="ipCamCanvas" style="visibility:hidden; position:absolute; left:-9999px;" width="1280" height="720"></canvas>
-<img id="ipCamImg" style="visibility:hidden; position:absolute; left:-9999px;" crossorigin="anonymous">
+<img id="ipCamImg" style="visibility:hidden; position:absolute; left:-9999px;">
 
 <!-- Monitoring Overlay (Teacher ONLY) -->
 <div id="monitoringOverlay">
@@ -527,7 +568,9 @@ window.meetingConfig = {
     kickUrl: _d.kickUrl,
     bannedUsersUrl: _d.bannedUsersUrl,
     revokeBanUrl: _d.revokeBanUrl,
-    globalControlUrl: _d.globalControlUrl
+    globalControlUrl: _d.globalControlUrl,
+    studentCanViewCamera: _d.studentCanViewCamera === 'true',
+    studentCanViewScreenshare: _d.studentCanViewScreenshare === 'true'
 };
 
 // Global shortcuts using window properties to prevent Turbo redeclaration errors
@@ -543,6 +586,8 @@ window.SLEEP_URL       = window.meetingConfig.SLEEP_URL;
 window.UNFREEZE_URL    = window.meetingConfig.UNFREEZE_URL;
 window.AFTER_LEAVE     = window.meetingConfig.AFTER_LEAVE;
 window.CSRF            = window.meetingConfig.CSRF;
+window.studentCanViewCamera = window.meetingConfig.studentCanViewCamera;
+window.studentCanViewScreenshare = window.meetingConfig.studentCanViewScreenshare;
 
 // ── LiveKit SDK Initialization ────────────────────────────────────────────────
 var Room, RoomEvent, Track, TrackEvent, LocalTrack,
@@ -774,6 +819,37 @@ function getOrCreateBox(identity, displayName, isLocal) {
     nameTag.textContent = isLocal ? 'You' : displayName;
     box.appendChild(nameTag);
 
+    // Create and append avatar overlay for camera-off state
+    const overlay = document.createElement('div');
+    overlay.className = 'video-avatar-overlay';
+    overlay.id = `avatar-overlay-${identity}`;
+
+    let pfpUrl = null;
+    let name = displayName;
+    let participantObj = null;
+    if (isLocal) {
+        participantObj = (typeof room !== 'undefined' && room) ? room.localParticipant : null;
+    } else {
+        participantObj = (typeof room !== 'undefined' && room) ? room.remoteParticipants.get(identity) : null;
+    }
+
+    if (participantObj && participantObj.metadata) {
+        try {
+            const meta = JSON.parse(participantObj.metadata);
+            if (meta.pfp) pfpUrl = meta.pfp;
+            if (meta.display_name) name = meta.display_name;
+        } catch(e) {}
+    }
+
+    const fallbackPfp = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff&size=128';
+    const finalPfp = pfpUrl || fallbackPfp;
+
+    overlay.innerHTML = `
+        <img class="video-avatar-img" src="${finalPfp}" alt="${name}" onerror="this.src='${fallbackPfp}'">
+        <div class="video-avatar-name">${name}</div>
+    `;
+    box.appendChild(overlay);
+
     document.getElementById('sidebarVideoArea').appendChild(box);
     updateLayout();
     updateParticipantsList(); // Update list when new box is created
@@ -833,73 +909,6 @@ function renderLocalParticipant() {
     });
 }
 
-function updateParticipantsList() {
-    const list = document.getElementById('participantsList');
-    if (!list || !room) return;
-    
-    list.innerHTML = '';
-    
-    // Add local participant
-    const lp = room.localParticipant;
-    addParticipantToList(lp, true);
-    
-    // Add remote participants
-    room.remoteParticipants.forEach(p => {
-        // Privacy Logic: Students only see Host
-        if (!isHost && userType === 'student') {
-            if (p.identity !== hostId) return;
-        }
-        addParticipantToList(p, false);
-    });
-    
-    updateParticipantCount();
-}
-
-function addParticipantToList(participant, isLocal) {
-    const list = document.getElementById('participantsList');
-    const item = document.createElement('div');
-    item.className = 'participant-item';
-    
-    const identity = participant.identity;
-    const name = isLocal ? 'You' : (participant.name || identity);
-    const isHost = participant.metadata && participant.metadata.includes('host');
-    
-    item.innerHTML = `
-        <div class="participant-avatar">
-            <img src="https://ui-avatars.com/api/?name=${name}&background=6366f1&color=fff" alt="${name}">
-        </div>
-        <div class="participant-info">
-            <div class="participant-name">
-                ${name}
-                ${isLocal ? '<span class="host-label">You</span>' : ''}
-                ${participant.identity == _d.hostId ? '<span class="host-label">Host</span>' : ''}
-            </div>
-        </div>
-        <div class="participant-status" id="status-${identity}">
-            <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        </div>
-    `;
-    
-    list.appendChild(item);
-}
-
-function updateParticipantCount() {
-    let count = (room ? room.remoteParticipants.size : 0) + 1;
-    
-    // Privacy Logic: Students only see themselves and host
-    if (!isHost && userType === 'student') {
-        let hasHost = false;
-        if (room) {
-            room.remoteParticipants.forEach(p => {
-                if (p.identity === hostId) hasHost = true;
-            });
-        }
-        count = hasHost ? 2 : 1;
-    }
-
-    const el = document.getElementById('participantCount');
-    if (el) el.textContent = count;
-}
 
 function attachTrackToBox(track, box, isLocal) {
     if (!track || !box) return;
@@ -1017,14 +1026,6 @@ function hideLocalScreenShare() {
 // ── Participant events ────────────────────────────────────────────────────────
 function onParticipantConnected(participant) {
     if (!participant) return;
-    
-    // Privacy Logic: Students only see Host
-    if (!isHost && userType === 'student') {
-        if (participant.identity !== hostId) {
-            console.log('Hiding student participant:', participant.identity);
-            return; 
-        }
-    }
 
     console.log('Participant joined:', participant.identity);
     getOrCreateBox(participant.identity, participant.name || participant.identity, false);
@@ -1054,9 +1055,21 @@ function onTrackSubscribed(track, publication, participant) {
     // Never process our own tracks here — handled by renderLocalParticipant
     if (room && room.localParticipant && participant.identity === room.localParticipant.identity) return;
 
-    // Privacy Logic: Students only see Host
-    if (!isHost && userType === 'student') {
-        if (participant.identity !== hostId) return;
+    // Visibility Restrictions for Host tracks on Student Side
+    if (!isHost && userType === 'student' && participant.identity === hostId) {
+        if (track.kind === Track.Kind.Video) {
+            if (publication.source === Track.Source.Camera) {
+                if (!window.studentCanViewCamera) {
+                    console.log('Skipping attachment of host camera track because studentCanViewCamera is false');
+                    return;
+                }
+            } else if (publication.source === Track.Source.ScreenShare || publication.source === 'screen_share') {
+                if (!window.studentCanViewScreenshare) {
+                    console.log('Skipping attachment of host screenshare track because studentCanViewScreenshare is false');
+                    return;
+                }
+            }
+        }
     }
 
     console.log(`Subscribed to track: ${track.kind} from ${participant.identity} (Source: ${publication.source})`);
@@ -1142,6 +1155,17 @@ function handleSignalingMessage(data) {
                 leaveMeeting();
             } else {
                 showNotification(`User kicked: ${data.user_id}`, 'info');
+            }
+            break;
+        case 'global_control_update':
+            if (data.control_type === 'student_can_view_camera') {
+                window.studentCanViewCamera = data.value;
+                showNotification(data.message, 'info');
+                updateTeacherTrackSubscription();
+            } else if (data.control_type === 'student_can_view_screenshare') {
+                window.studentCanViewScreenshare = data.value;
+                showNotification(data.message, 'info');
+                updateTeacherTrackSubscription();
             }
             break;
     }
@@ -1354,6 +1378,76 @@ function toggleCameraModal() {
     const modal = document.getElementById('cameraModal');
     if (!modal) return;
     modal.style.display = modal.style.display === 'none' ? 'flex' : 'none';
+}
+
+function updateTeacherTrackSubscription() {
+    if (isHost || userType !== 'student') return;
+    
+    if (!room) return;
+    let hostParticipant = null;
+    room.remoteParticipants.forEach(p => {
+        if (p.identity === hostId) {
+            hostParticipant = p;
+        }
+    });
+    
+    if (!hostParticipant) return;
+    
+    const box = getOrCreateBox(hostParticipant.identity, hostParticipant.name || hostParticipant.identity, false);
+    
+    hostParticipant.trackPublications.forEach(pub => {
+        if (pub.track) {
+            if (pub.source === Track.Source.Camera) {
+                if (window.studentCanViewCamera) {
+                    attachTrackToBox(pub.track, box, false);
+                } else {
+                    pub.track.detach().forEach(el => el.remove());
+                }
+            } else if (pub.source === Track.Source.ScreenShare || pub.source === 'screen_share') {
+                if (window.studentCanViewScreenshare) {
+                    attachTrackToBox(pub.track, box, false);
+                    moveToMain(box, hostParticipant.name || hostParticipant.identity, true);
+                } else {
+                    pub.track.detach().forEach(el => el.remove());
+                    if (box.parentElement && box.parentElement.id === 'mainVideoArea') {
+                        clearMain();
+                        updateLayout();
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function toggleStudentViewPermission(type) {
+    let currentVal = false;
+    if (type === 'student_can_view_camera') {
+        currentVal = window.studentCanViewCamera;
+    } else if (type === 'student_can_view_screenshare') {
+        currentVal = window.studentCanViewScreenshare;
+    }
+    const newVal = !currentVal;
+    
+    const res = await fetch(window.meetingConfig.globalControlUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, value: newVal })
+    });
+    
+    if (res.ok) {
+        if (type === 'student_can_view_camera') {
+            window.studentCanViewCamera = newVal;
+            const el = document.getElementById('studentCameraStatusText');
+            if (el) el.textContent = newVal ? 'Block Student Cam View' : 'Allow Student Cam View';
+        } else if (type === 'student_can_view_screenshare') {
+            window.studentCanViewScreenshare = newVal;
+            const el = document.getElementById('studentScreenshareStatusText');
+            if (el) el.textContent = newVal ? 'Block Student Screen View' : 'Allow Student Screen View';
+        }
+        showNotification(`Permission updated successfully`, 'success');
+    } else {
+        showNotification(`Failed to update permission`, 'error');
+    }
 }
 
 async function switchCameraSource(type, id, name) {
@@ -1681,6 +1775,7 @@ window.stopIpCameraStream = stopIpCameraStream;
 window.sendChatMessage = sendChatMessage;
 window.toggleSleepMode = toggleSleepMode;
 window.toggleGlobalControl = toggleGlobalControl;
+window.toggleStudentViewPermission = toggleStudentViewPermission;
 window.kickUser = kickUser;
 window.unbanUser = unbanUser;
 window.fetchBannedUsers = fetchBannedUsers;

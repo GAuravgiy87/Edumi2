@@ -229,6 +229,8 @@ def edit_recording(request, recording_id):
 def watch_recording(request, recording_id):
     """Watch a recorded lecture"""
     recording = get_object_or_404(CameraRecording, id=recording_id)
+    recording.views_count += 1
+    recording.save(update_fields=['views_count'])
 
     # Check permissions: owner or published
     if not (recording.is_published or recording.teacher == request.user or request.user.is_superuser):
@@ -381,4 +383,51 @@ def generate_recording_thumbnail(request, recording_id):
         'message': 'Thumbnail generated',
         'thumbnail_url': thumbnail_url
     })
+
+
+@login_required
+@require_http_methods(["POST"])
+def like_recording(request, recording_id):
+    """Increment likes for a recording."""
+    recording = get_object_or_404(CameraRecording, id=recording_id)
+    recording.likes_count += 1
+    recording.save(update_fields=['likes_count'])
+    return JsonResponse({'status': 'success', 'likes_count': recording.likes_count})
+
+
+@login_required
+def recording_analytics(request):
+    """YouTube Studio-like Analytics dashboard for teachers."""
+    if not (request.user.is_superuser or (hasattr(request.user, 'userprofile') and request.user.userprofile.user_type == 'teacher')):
+        return redirect('dashboard')
+        
+    # Get all recordings by this teacher
+    recordings = CameraRecording.objects.filter(teacher=request.user)
+    
+    # Calculate statistics
+    total_views = sum(rec.views_count for rec in recordings)
+    total_likes = sum(rec.likes_count for rec in recordings)
+    total_videos = recordings.count()
+    
+    # Get top viewed recordings
+    top_recordings = recordings.order_by('-views_count')[:5]
+    
+    # Prepare chart data
+    chart_data = []
+    for rec in recordings.order_by('-views_count')[:10]:
+        chart_data.append({
+            'title': rec.title,
+            'views': rec.views_count,
+            'likes': rec.likes_count,
+        })
+        
+    context = {
+        'total_views': total_views,
+        'total_likes': total_likes,
+        'total_videos': total_videos,
+        'top_recordings': top_recordings,
+        'chart_data': chart_data,
+        'recordings': recordings,
+    }
+    return render(request, 'cameras/recording_analytics.html', context)
 

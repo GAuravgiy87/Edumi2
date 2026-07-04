@@ -96,15 +96,16 @@ def test_camera(request, camera_id):
 
 # ── private helpers ───────────────────────────────────────────────────────────
 
-def _generate_frames(streamer, camera, full_url, quality, camera_id):
+async def _generate_frames(streamer, camera, full_url, quality, camera_id):
     """Yield MJPEG boundary frames; handles stale stream detection."""
+    import asyncio
     throttles = {'4k': 0.033, 'high': 0.033, 'med': 0.05, 'low': 0.1}
     delay = throttles.get(quality, 0.05)
 
     # Wait for streamer to have a frame (placeholder or real), but don't give up!
     wait_count = 0
     while streamer.get_frame() is None and wait_count < 300:
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
         wait_count += 1
 
     # Even if no frame yet, keep trying instead of returning
@@ -115,9 +116,9 @@ def _generate_frames(streamer, camera, full_url, quality, camera_id):
             if frame:
                 frame_count += 1
                 yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n'
-                time.sleep(delay)
+                await asyncio.sleep(delay)
             else:
-                time.sleep(0.1)  # Wait longer if no frame available
+                await asyncio.sleep(0.1)  # Wait longer if no frame available
     except GeneratorExit:
         logger.info(f"Client disconnected from camera {camera_id} after {frame_count} frames")
     except Exception as e:

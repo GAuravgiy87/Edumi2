@@ -65,6 +65,8 @@ class CameraPermission(models.Model):
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'userprofile__user_type': 'teacher'})
     granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='granted_permissions')
     granted_at = models.DateTimeField(auto_now_add=True)
+    # If True, students can view this camera in meetings
+    show_to_students = models.BooleanField(default=False)
     
     class Meta:
         unique_together = ('camera', 'teacher')
@@ -75,13 +77,19 @@ class CameraPermission(models.Model):
         return f"{self.teacher.username} - {self.camera.name}"
 
 
+def get_recording_upload_path(instance, filename):
+    return f"recordings/{instance.teacher.username}/recordings/{filename}"
+
+def get_thumbnail_upload_path(instance, filename):
+    return f"recordings/{instance.teacher.username}/thumbnails/{filename}"
+
 class CameraRecording(models.Model):
     camera = models.ForeignKey(Camera, on_delete=models.CASCADE, null=True, blank=True)
     teacher = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    video_file = models.FileField(upload_to='recordings/%Y/%m/%d/')
-    thumbnail = models.ImageField(upload_to='recordings/thumbnails/', blank=True)
+    video_file = models.FileField(upload_to=get_recording_upload_path)
+    thumbnail = models.ImageField(upload_to=get_thumbnail_upload_path, blank=True)
     duration = models.DurationField(null=True, blank=True)
     file_size = models.BigIntegerField(null=True, blank=True) # In bytes
     is_published = models.BooleanField(default=False)
@@ -95,6 +103,51 @@ class CameraRecording(models.Model):
     edit_start_time = models.FloatField(default=0.0, null=True, blank=True) # Trim start (seconds)
     edit_end_time = models.FloatField(null=True, blank=True) # Trim end (seconds)
     created_at = models.DateTimeField(auto_now_add=True)
+    views_count = models.PositiveIntegerField(default=0)
+    likes_count = models.PositiveIntegerField(default=0)
+
+    def generate_chunked_thumbnail(self):
+        """Generate a thumbnail for a chunked recording from its first chunk in DB"""
+        import tempfile
+        import subprocess
+        import os
+        from django.conf import settings
+        
+        first_chunk = self.chunks.order_by('sequence').first()
+        if not first_chunk or not first_chunk.data:
+            logger.warning("No chunks found for chunked thumbnail generation")
+            return None
+            
+        with tempfile.NamedTemporaryFile(suffix='.ts', delete=False) as temp_ts:
+            temp_ts.write(first_chunk.data)
+            temp_ts_path = temp_ts.name
+            
+        thumbnail_dir = os.path.join(settings.MEDIA_ROOT, 'recordings', self.teacher.username, 'thumbnails')
+        os.makedirs(thumbnail_dir, exist_ok=True)
+        thumbnail_filename = f'{self.id}_thumbnail.jpg'
+        thumbnail_path = os.path.join(thumbnail_dir, thumbnail_filename)
+        
+        cmd = [
+            'ffmpeg', '-y',
+            '-i', temp_ts_path,
+            '-vframes', '1',
+            '-vf', 'scale=640:360',
+            thumbnail_path
+        ]
+        
+        try:
+            logger.debug(f"Running FFmpeg for chunked thumbnail: {' '.join(cmd)}")
+            subprocess.run(cmd, capture_output=True, check=True, timeout=30)
+            self.thumbnail = f'recordings/{self.teacher.username}/thumbnails/{thumbnail_filename}'
+            self.save()
+            logger.info("Chunked thumbnail generated successfully!")
+            return self.thumbnail
+        except Exception as e:
+            logger.error(f"Error generating chunked thumbnail: {e}")
+            return None
+        finally:
+            if os.path.exists(temp_ts_path):
+                os.remove(temp_ts_path)
 
     def generate_thumbnail(self, time_sec=1.0):
         """Generate a thumbnail from the video file at the given time (in seconds)"""

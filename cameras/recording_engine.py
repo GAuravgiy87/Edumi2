@@ -21,13 +21,13 @@ class RecordingEngine:
         self.teacher_id = teacher_id
         self.process = None
         self.output_path = None
-        self.audio_path = audio_path # External audio file from browser
+        self.audio_path = audio_path  # External audio file from browser
         self.recording_id = None
         self.start_time = None
         self.finalized = False
         self.is_chunked = is_chunked
         self.chunk_sequence = 0
-        self.lock = threading.RLock() # Use RLock to prevent re-entrant deadlocks during monitor callback
+        self.lock = threading.RLock()  # Use RLock to prevent re-entrant deadlocks during monitor callback
 
     @classmethod
     def start_recording(cls, camera, teacher, quality='1080p', audio_source='pc', is_chunked=True):
@@ -80,20 +80,19 @@ class RecordingEngine:
             return success, msg
 
     def _start(self, camera, teacher, quality):
-        # Define output path with structured hierarchy: recordings/Camera_Name/YYYY/MM/DD/
+        # Determine separate folder: 'streams' if camera is live, else 'recordings'
+        subfolder = 'streams' if camera.is_live else 'recordings'
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-        safe_camera_name = "".join([c if c.isalnum() else "_" for c in camera.name])
-        date_path = timezone.now().strftime('%Y/%m/%d')
         
         if self.is_chunked:
             # For chunked, we use a directory for the chunks
             filename_pattern = "chunk_%03d.ts"
-            relative_dir = os.path.join('recordings', safe_camera_name, date_path, f"rec_{camera.id}_{timestamp}")
+            relative_dir = os.path.join('recordings', teacher.username, subfolder, f"rec_{camera.id}_{timestamp}")
             self.output_path = os.path.join(settings.MEDIA_ROOT, relative_dir, filename_pattern)
             os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
         else:
-            filename = f"rec_{camera.id}_{timestamp}.mkv" # Record to MKV for crash resilience
-            relative_path = os.path.join('recordings', safe_camera_name, date_path, filename)
+            filename = f"rec_{camera.id}_{timestamp}.mkv"  # Record to MKV for crash resilience
+            relative_path = os.path.join('recordings', teacher.username, subfolder, filename)
             self.output_path = os.path.join(settings.MEDIA_ROOT, relative_path)
             os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
         
@@ -107,83 +106,65 @@ class RecordingEngine:
         }
         res = quality_map.get(quality, '1280x720')
 
-        # Determine encoder: Use hevc_amf (H.265) if available for better compression, else h264_amf
-        encoder = 'hevc_amf'
+        # Determine encoder: Use hardware-accelerated if available, else libx264
+        encoder = 'libx264'
         try:
             test_cmd = ['ffmpeg', '-hide_banner', '-encoders']
-            res_encoders = subprocess.check_output(test_cmd).decode()
-            if 'hevc_amf' not in res_encoders:
-                if 'h264_amf' in res_encoders:
-                    encoder = 'h264_amf'
-                elif 'libx265' in res_encoders:
-                    encoder = 'libx265'
-                else:
-                    encoder = 'libx264'
+            encoders_output = subprocess.check_output(test_cmd, stderr=subprocess.STDOUT).decode()
+            if 'h264_amf' in encoders_output:
+                encoder = 'h264_amf'
+            elif 'h264_nvenc' in encoders_output:
+                encoder = 'h264_nvenc'
+            elif 'h264_qsv' in encoders_output:
+                encoder = 'h264_qsv'
         except Exception as e:
-            encoder = 'libx264'
-            logger.warning(f"Failed to check for encoders, using libx264: {e}")
+            logger.warning(f"Failed to detect encoders, using libx264: {e}")
 
         logger.info(f"Using encoder: {encoder} for recording")
 
-        # Base command with global sync settings
+        # Build robust FFmpeg command
         cmd = [
             'ffmpeg', '-y',
             '-hide_banner',
-            '-loglevel', 'warning', 
-            '-probesize', '15M', '-analyzeduration', '15M',
-            '-hwaccel', 'd3d11va' if 'amf' in encoder else 'auto', 
-            '-thread_queue_size', '8192',
-            '-use_wallclock_as_timestamps', '1',
-            '-fflags', '+genpts+discardcorrupt+igndts',
+            '-loglevel', 'info',
+            '-probesize', '100M',
+            '-analyzeduration', '100M',
+            '-thread_queue_size', '4096'
         ]
-        
-        if stream_url := camera.get_stream_url():
-            if stream_url.startswith('rtsp'):
-                cmd.extend(['-rtsp_transport', 'tcp', '-fflags', '+nobuffer'])
+
+        stream_url = camera.get_stream_url()
+        if stream_url and stream_url.startswith('rtsp'):
+            cmd.extend(['-rtsp_transport', 'tcp', '-fflags', '+nobuffer', '-flags', '+low_delay'])
+        if stream_url:
             cmd.extend(['-i', stream_url])
 
+        # Add audio input if available
         if self.audio_path and os.path.exists(self.audio_path):
             cmd.extend([
-                '-itsoffset', '1.2', 
-                '-probesize', '10M', '-analyzeduration', '10M', 
+                '-itsoffset', '1.0',
+                '-probesize', '50M', '-analyzeduration', '50M',
                 '-i', self.audio_path
             ])
 
-        cmd.extend([
-            '-s', res,
-            '-c:v', encoder,
-        ])
-        
-        if 'amf' in encoder:
-            cmd.extend([
-                '-quality', 'quality', 
-                '-rc', 'cbr', 
-                '-b:v', '4M' if quality == '4K' else '2.5M', # Reduced bitrate for HEVC
-                '-profile', 'main',
-            ])
+        cmd.extend(['-s', res, '-c:v', encoder])
+
+        # Encoder-specific options
+        if encoder in ['h264_amf', 'h264_nvenc', 'h264_qsv']:
+            cmd.extend(['-quality', 'balanced', '-rc', 'cbr', '-b:v', '4M' if quality == '4K' else '2.5M'])
         else:
-            cmd.extend(['-preset', 'faster', '-crf', '23', '-profile:v', 'main'])
-            
+            cmd.extend(['-preset', 'ultrafast', '-crf', '23', '-profile:v', 'main'])
+
         cmd.extend(['-pix_fmt', 'yuv420p'])
 
-        sync_delay = '1200' if self.audio_path else '0'
-        audio_filters = (
-            f'aresample=async=1000:min_hard_comp=0.05:first_pts=0,'
-            f'adelay={sync_delay}|{sync_delay},'
-            'highpass=f=150,lowpass=f=14000,'
-            'volume=20.0,'
-            'afftdn=nf=-35,'
-            'speechnorm=e=4:p=0.5,'
-            'agate=threshold=0.01:range=0:attack=50:release=200,'
-            'dynaudnorm=p=0.9:m=60.0:s=5,'
-            'aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo'
-        )
-
+        # Audio processing
+        audio_input_index = '1' if (self.audio_path and os.path.exists(self.audio_path)) else '0'
         cmd.extend([
             '-map', '0:v:0',
-            '-map', '1:a:0' if self.audio_path else '0:a?',
-            '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
-            '-af', audio_filters,
+            '-map', f'{audio_input_index}:a:0?',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-ar', '44100',
+            '-af', 'aresample=async=1000:min_hard_comp=0.1:first_pts=0'
         ])
 
         if self.is_chunked:
@@ -216,18 +197,21 @@ class RecordingEngine:
             self.recording_id = rec.id
             self.start_time = timezone.now()
 
+            logger.info(f"Starting FFmpeg with command: {' '.join(cmd)}")
             self.process = subprocess.Popen(
-                cmd, 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.DEVNULL,
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             )
             
-            time.sleep(1)
+            time.sleep(2)
             if self.process.poll() is not None:
+                stderr = self.process.stderr.read().decode()
+                logger.error(f"FFmpeg failed to start: {stderr}")
                 rec.recording_status = 'failed'
                 rec.save()
-                return False, "FFmpeg failed to start. Check camera stream URL."
+                return False, "FFmpeg failed to start recording"
 
             logger.info(f"Started FFmpeg recording for camera {camera.id} at {self.output_path}")
             
@@ -238,7 +222,7 @@ class RecordingEngine:
             
             return True, "Recording started"
         except Exception as e:
-            logger.error(f"Failed to start recording: {e}")
+            logger.error(f"Failed to start recording: {e}", exc_info=True)
             return False, str(e)
 
     def _chunk_watcher(self):
@@ -283,7 +267,7 @@ class RecordingEngine:
                     recording=rec,
                     sequence=sequence,
                     data=data,
-                    duration=10.0 # Standard segment time
+                    duration=10.0  # Standard segment time
                 )
                 logger.info(f"Saved chunk {sequence} for recording {self.recording_id} to DB")
         except Exception as e:
@@ -405,6 +389,16 @@ class RecordingEngine:
                 
             return False, None
 
+    @classmethod
+    def get_active_session(cls, camera_id):
+        """Return the active recording instance for a camera, or None."""
+        with cls._lock:
+            for k, instance in list(cls._instances.items()):
+                if k.startswith(f"{camera_id}_"):
+                    if instance.process and instance.process.poll() is None:
+                        return instance
+        return None
+
     def _stop(self, auto_save=False):
         with self.lock:
             if self.finalized:
@@ -449,7 +443,7 @@ class RecordingEngine:
                     
                     # For chunked recordings, process the remaining chunks
                     if self.is_chunked:
-                        self.finalized = True # Signal watcher to stop
+                        self.finalized = True  # Signal watcher to stop
                         chunk_dir = os.path.dirname(self.output_path)
                         if os.path.exists(chunk_dir):
                             remaining_chunks = sorted([f for f in os.listdir(chunk_dir) if f.endswith('.ts')])
@@ -466,6 +460,13 @@ class RecordingEngine:
                         rec.recording_status = 'completed'
                         rec.duration = timezone.now() - self.start_time
                         rec.save()
+                        
+                        # Generate thumbnail from chunks
+                        try:
+                            rec.generate_chunked_thumbnail()
+                        except Exception as e:
+                            logger.error(f"Failed to generate chunked thumbnail: {e}")
+                            
                         return True
 
                     # Check if file exists and has size (for non-chunked)
