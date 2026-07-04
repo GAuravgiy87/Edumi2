@@ -1312,6 +1312,7 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
     
     <!-- Conversation List -->
     <div class="messages-list-wrapper">
+      <div id="conversationsListContainer">
       {% if conversations %}
         {% for conv in conversations %}
         <a href="{% url 'conversation_detail' conv.id %}" class="conversation-item {% if conversation and conv.id == conversation.id %}active-conv{% endif %} {% if conv.unread_count > 0 %}unread-conv{% endif %}" data-participants="{{ conv.participants.count }}" data-username="{{ conv.other_user.username|lower|default:'' }}" data-display-name="{{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username|lower|default:'' }}" data-display-name-raw="{{ conv.other_user.userprofile.display_name|default:conv.other_user.get_full_name|default:conv.other_user.username }}">
@@ -1361,6 +1362,13 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
           No chats or messages found
         </div>
       {% endif %}
+      </div>
+      
+      <!-- Global User Search Results -->
+      <div id="globalSearchResultsContainer" style="display: none; border-top: 1px solid var(--msg-border); margin-top: 10px; padding-top: 10px;">
+        <h4 style="font-size: 0.75rem; text-transform: uppercase; color: var(--msg-text-muted); margin: 0 10px 10px 10px; font-weight: 700; letter-spacing: 0.05em;">Other Users</h4>
+        <div id="globalSearchResultsList"></div>
+      </div>
     </div>
   </div>
 
@@ -1650,16 +1658,87 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
     });
   }
 
+  let searchDebounceTimeout = null;
+
+  function performGlobalUserSearch(query) {
+    const container = document.getElementById('globalSearchResultsContainer');
+    const list = document.getElementById('globalSearchResultsList');
+    if (!container || !list) return;
+
+    if (!query) {
+      container.style.display = 'none';
+      list.innerHTML = '';
+      return;
+    }
+
+    // Use absolute URL to avoid relative path issues (e.g., /accounts/...)
+    const searchUrl = "{% url 'search_users_ajax' %}"; // resolves to /inbox/search-users-ajax/
+    fetch(searchUrl + "?q=" + encodeURIComponent(query))
+      .then(res => res.json())
+      .then(data => {
+        list.innerHTML = '';
+        if (data.users && data.users.length > 0) {
+          data.users.forEach(u => {
+            if (u.has_conv) {
+              const localItem = document.querySelector(`.conversation-item[data-username="${u.username.toLowerCase()}"]`);
+              if (localItem && localItem.style.display !== 'none') {
+                return;
+              }
+            }
+
+            const item = document.createElement('a');
+            item.href = "{% url 'start_conversation' 'USERNAME_PLACEHOLDER' %}".replace('USERNAME_PLACEHOLDER', u.username);
+            item.className = 'conversation-item';
+            
+            const pfpUrl = u.pfp || `https://ui-avatars.com/api/?name=${u.username}&background=667eea&color=fff`;
+            const typeLabel = u.user_type === 'teacher' ? 'Teacher' : 'Student';
+            
+            item.innerHTML = `
+              <div class="avatar-container">
+                <img src="${pfpUrl}" alt="${u.username}" class="conversation-avatar" onerror="this.src='https://ui-avatars.com/api/?name=${u.username}&background=667eea&color=fff'">
+              </div>
+              <div class="conversation-details">
+                <div class="details-top-row">
+                  <span class="other-username">${highlightText(u.display_name, query)}</span>
+                </div>
+                <div class="details-bottom-row">
+                  <span class="last-message-preview"><em class="start-prompt">Message this ${typeLabel} (@${u.username})</em></span>
+                </div>
+              </div>
+            `;
+            list.appendChild(item);
+          });
+
+          if (list.children.length > 0) {
+            container.style.display = 'block';
+          } else {
+            container.style.display = 'none';
+          }
+        } else {
+          container.style.display = 'none';
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching search suggestions:', err);
+      });
+  }
+
   function initSearchFilter() {
     const searchField = document.querySelector('.search-field');
     const clearBtn = document.querySelector('.clear-search-btn');
     if (!searchField) return;
 
     searchField.addEventListener('input', () => {
+      const query = searchField.value.trim();
       if (clearBtn) {
-        clearBtn.style.display = searchField.value.trim().length > 0 ? 'flex' : 'none';
+        clearBtn.style.display = query.length > 0 ? 'flex' : 'none';
       }
       applyFilters();
+
+      clearTimeout(searchDebounceTimeout);
+      searchDebounceTimeout = setTimeout(() => {
+        performGlobalUserSearch(query);
+      }, 250);
     });
 
     if (clearBtn) {
@@ -1667,6 +1746,7 @@ body.dark-mode .chat-msg-row.sent .chat-msg-time {
         searchField.value = '';
         clearBtn.style.display = 'none';
         applyFilters();
+        performGlobalUserSearch('');
         searchField.focus();
       });
     }

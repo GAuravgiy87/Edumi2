@@ -104,6 +104,10 @@ class Meeting(models.Model):
     global_mute = models.BooleanField(default=False)
     global_camera_off = models.BooleanField(default=False)
     global_screenshare_off = models.BooleanField(default=False)
+    # Controls whether students can see the teacher's camera feed
+    student_can_view_camera = models.BooleanField(default=False)
+    # Controls whether students can see the teacher's screen share
+    student_can_view_screenshare = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     ended_at = models.DateTimeField(null=True, blank=True)

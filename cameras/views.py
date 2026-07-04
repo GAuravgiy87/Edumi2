@@ -20,6 +20,8 @@ from cameras.views_logic import (
     recording_playlist, teacher_profile, delete_recording,
     update_recording_edit, apply_recording_trim, generate_recording_thumbnail,
     edit_recording,
+    recording_analytics,
+    like_recording,
     # camera management
     admin_dashboard, add_camera, edit_camera, delete_camera,
     camera_feed, test_camera, test_feed_page, probe_camera,

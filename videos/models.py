@@ -37,6 +37,8 @@ class Video(models.Model):
     file_size = models.PositiveBigIntegerField(blank=True, null=True)
     duration_seconds = models.PositiveIntegerField(blank=True, null=True)
     mime_type = models.CharField(max_length=100, blank=True, null=True)
+    views_count = models.PositiveIntegerField(default=0)
+    likes_count = models.PositiveIntegerField(default=0)
     
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, 

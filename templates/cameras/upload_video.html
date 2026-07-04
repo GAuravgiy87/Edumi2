@@ -13,7 +13,7 @@
                     <p class="text-muted">Share your knowledge with students around the world.</p>
                 </div>
                 <div class="card-body px-5 pb-5">
-                    <form id="lectureUploadForm" action="{% url 'upload_video' %}" method="post" enctype="multipart/form-data">
+                    <form id="lectureUploadForm" action="{% url 'camera_upload_video' %}" method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         
                         <!-- Step 1: Video File Selection -->
@@ -241,7 +241,7 @@
         console.log("Starting upload...");
 
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', '{% url "upload_video" %}', true);
+        xhr.open('POST', '{% url "camera_upload_video" %}', true);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
         xhr.upload.onprogress = function(e) {

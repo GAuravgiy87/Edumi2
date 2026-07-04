@@ -10,10 +10,16 @@
             <h2 class="font-weight-bold mb-1">My Lectures</h2>
             <p class="text-muted small mb-0">Manage your recorded sessions and uploaded videos.</p>
         </div>
-        <a href="{% url 'upload_video' %}" class="btn btn-primary d-flex align-items-center gap-2">
-            <i data-lucide="upload-cloud" style="width: 20px;"></i>
-            Upload New
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{% url 'recording_analytics' %}" class="btn btn-outline-primary d-flex align-items-center gap-2">
+                <i data-lucide="bar-chart-2" style="width: 20px;"></i>
+                Analytics Studio
+            </a>
+            <a href="{% url 'camera_upload_video' %}" class="btn btn-primary d-flex align-items-center gap-2">
+                <i data-lucide="upload-cloud" style="width: 20px;"></i>
+                Upload New
+            </a>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
@@ -24,6 +30,7 @@
                         <th class="px-4 py-3 border-0">Lecture</th>
                         <th class="py-3 border-0">Status</th>
                         <th class="py-3 border-0">Visibility</th>
+                        <th class="py-3 border-0">Stats</th>
                         <th class="py-3 border-0">Recorded On</th>
                         <th class="px-4 py-3 border-0 text-end">Actions</th>
                     </tr>
@@ -66,6 +73,18 @@
                                 </label>
                             </div>
                         </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="small text-muted d-flex align-items-center gap-1" title="Views">
+                                    <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                                    {{ rec.views_count }}
+                                </span>
+                                <span class="small text-muted d-flex align-items-center gap-1" title="Likes">
+                                    <i data-lucide="thumbs-up" style="width: 16px; height: 16px;"></i>
+                                    {{ rec.likes_count }}
+                                </span>
+                            </div>
+                        </td>
                         <td class="text-muted small">
                             {{ rec.created_at|date:"M d, Y" }}<br>
                             {{ rec.created_at|date:"H:i" }}
@@ -92,7 +111,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-5">
+                        <td colspan="6" class="text-center py-5">
                             <p class="text-muted mb-0">You haven't recorded any lectures yet.</p>
                         </td>
                     </tr>

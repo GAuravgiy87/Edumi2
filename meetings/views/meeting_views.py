@@ -179,10 +179,13 @@ def join_meeting(request, meeting_code):
         if request.user.is_superuser:
             teacher_cameras = Camera.objects.all()
         else:
-            camera_ids = CameraPermission.objects.filter(teacher=request.user).values_list('camera_id', flat=True)
+            # Only include cameras that teacher is allowed to show to students
+            camera_qs = CameraPermission.objects.filter(teacher=request.user)
+            camera_ids = camera_qs.values_list('camera_id', flat=True)
             teacher_cameras = Camera.objects.filter(id__in=camera_ids)
-
-    return render(request, 'meetings/meeting_room.html', {
+    
+    # Pass visibility flags to template
+    context = {
         'meeting': meeting,
         'participant': participant,
         'is_host': is_host,
@@ -191,7 +194,10 @@ def join_meeting(request, meeting_code):
         'livekit_url': settings.LIVEKIT_URL,
         'face_not_registered': face_not_registered,
         'teacher_cameras': teacher_cameras,
-    })
+        'student_can_view_camera': meeting.student_can_view_camera,
+        'student_can_view_screenshare': meeting.student_can_view_screenshare,
+    }
+    return render(request, 'meetings/meeting_room.html', context)
 
 
 @login_required
@@ -279,11 +285,24 @@ def livekit_token(request, meeting_code):
         if not (is_teacher or is_approved):
             return JsonResponse({'error': 'Access denied'}, status=403)
 
+    import json
+    pfp_url = None
+    display_name = request.user.username
+    if hasattr(request.user, 'userprofile'):
+        pfp_url = request.user.userprofile.get_profile_picture_url()
+        display_name = getattr(request.user.userprofile, 'display_name', '') or request.user.get_full_name() or request.user.username
+
+    metadata_str = json.dumps({
+        'pfp': pfp_url,
+        'display_name': display_name
+    })
+
     is_host = meeting.teacher == request.user or request.user.is_superuser
     token = (
         AccessToken(settings.LIVEKIT_API_KEY, settings.LIVEKIT_API_SECRET)
         .with_identity(str(request.user.id))
         .with_name(request.user.username)
+        .with_metadata(metadata_str)
         .with_grants(VideoGrants(
             room_join=True, room=meeting_code,
             can_publish=True, can_subscribe=True, can_publish_data=True,

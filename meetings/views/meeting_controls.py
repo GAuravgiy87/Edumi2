@@ -117,11 +117,16 @@ def meeting_global_control(request, meeting_id):
         data = json.loads(request.body)
         control_type = data.get('type')
         value = data.get('value')
+
+        if control_type in ['student_can_view_camera', 'student_can_view_screenshare', 'global_mute', 'global_camera_off', 'global_screenshare_off']:
+            setattr(meeting, control_type, value)
+            meeting.save()
+
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f'meeting_{meeting.meeting_code}',
             {'type': 'global_control_update', 'control_type': control_type, 'value': value,
-             'message': f'Teacher has {"enabled" if value else "disabled"} global {control_type.replace("_", " ")}'}
+             'message': f'Teacher has {"enabled" if value else "disabled" if not isinstance(value, bool) else "allowed" if value else "blocked"} student {control_type.replace("student_can_view_", "").replace("_", " ")}' if "student_can_view" in control_type else f'Teacher has {"enabled" if value else "disabled"} global {control_type.replace("_", " ")}'}
         )
         return JsonResponse({'status': 'success'})
     except Exception as e:

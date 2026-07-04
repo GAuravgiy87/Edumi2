@@ -203,3 +203,40 @@ def send_message(request, conversation_id):
             'created_at': local_created_at.strftime('%I:%M %p'),
         })
     return redirect('conversation_detail', conversation_id=conversation_id)
+
+
+@login_required
+def search_users_ajax(request):
+    """AJAX endpoint to search for users to message."""
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'users': []})
+
+    matching_users = User.objects.filter(
+        models.Q(username__icontains=query) |
+        models.Q(first_name__icontains=query) |
+        models.Q(last_name__icontains=query) |
+        models.Q(email__icontains=query) |
+        models.Q(userprofile__display_name__icontains=query)
+    ).exclude(id=request.user.id).select_related('userprofile').distinct()[:10]
+
+    users_data = []
+    for u in matching_users:
+        has_conv = Conversation.objects.filter(participants=request.user).filter(participants=u).exists()
+        
+        # Safely obtain display name whether or not the user has a profile
+        if hasattr(u, 'userprofile'):
+            display_name = getattr(u.userprofile, 'display_name', '') or u.get_full_name() or u.username
+        else:
+            display_name = u.get_full_name() or u.username
+        pfp = u.userprofile.get_profile_picture_url() if hasattr(u, 'userprofile') else None
+        
+        users_data.append({
+            'username': u.username,
+            'display_name': display_name,
+            'pfp': pfp,
+            'user_type': u.userprofile.user_type if hasattr(u, 'userprofile') else 'student',
+            'has_conv': has_conv,
+        })
+
+    return JsonResponse({'users': users_data})

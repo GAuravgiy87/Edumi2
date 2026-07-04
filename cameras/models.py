@@ -65,6 +65,8 @@ class CameraPermission(models.Model):
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'userprofile__user_type': 'teacher'})
     granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='granted_permissions')
     granted_at = models.DateTimeField(auto_now_add=True)
+    # If True, students can view this camera in meetings
+    show_to_students = models.BooleanField(default=False)
     
     class Meta:
         unique_together = ('camera', 'teacher')
@@ -101,6 +103,8 @@ class CameraRecording(models.Model):
     edit_start_time = models.FloatField(default=0.0, null=True, blank=True) # Trim start (seconds)
     edit_end_time = models.FloatField(null=True, blank=True) # Trim end (seconds)
     created_at = models.DateTimeField(auto_now_add=True)
+    views_count = models.PositiveIntegerField(default=0)
+    likes_count = models.PositiveIntegerField(default=0)
 
     def generate_chunked_thumbnail(self):
         """Generate a thumbnail for a chunked recording from its first chunk in DB"""
