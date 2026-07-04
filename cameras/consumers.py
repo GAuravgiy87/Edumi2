@@ -41,6 +41,9 @@ class AudioConsumer(AsyncWebsocketConsumer):
         elif 'source=ip_cam' in query_params:
             self.source = 'ip_cam'
         
+        # Initialize mute flag for this connection
+        self.is_muted = False
+        
         # Group Names:
         # - camera_audio_{id}: For teacher's mic audio OR ip_cam audio (sent to students)
         # - camera_monitor_{id}: For IP camera's internal mic audio (sent to teacher monitor)
@@ -129,9 +132,10 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 self.stop_ip_cam_audio_relay()
 
     async def receive(self, text_data=None, bytes_data=None):
+        # Handle binary audio chunks (microphone input)
         if bytes_data:
-            # Teachers can only send audio if they are NOT in monitor mode
-            if self.is_teacher and self.source != 'pc_monitor':
+            # Only send audio if not muted and teacher is allowed (or any participant not in monitor mode)
+            if not getattr(self, 'is_muted', False) and self.source != 'pc_monitor':
                 # Store the first chunk as the header for new students
                 if self.header_key not in audio_headers:
                     audio_headers[self.header_key] = bytes_data
@@ -147,11 +151,43 @@ class AudioConsumer(AsyncWebsocketConsumer):
                         'sender_channel_name': self.channel_name
                     }
                 )
+        # Handle textual commands (e.g., mute/unmute) from any user
+        if text_data:
+            try:
+                payload = json.loads(text_data)
+                action = payload.get('action')
+                if action == 'mute':
+                    self.is_muted = True
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'mic_status',
+                            'source': self.source,
+                            'status': 'muted',
+                            'user_id': self.user.id
+                        }
+                    )
+                elif action == 'unmute':
+                    self.is_muted = False
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'mic_status',
+                            'source': self.source,
+                            'status': 'unmuted',
+                            'user_id': self.user.id
+                        }
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to process control message: {e}")
 
     async def audio_chunk(self, event):
         # Don't send back to the sender
         if self.channel_name != event.get('sender_channel_name'):
-            await self.send(bytes_data=event['data'])
+            try:
+                await self.send(bytes_data=event['data'])
+            except Exception as e:
+                logger.warning(f"Failed to send audio chunk (likely closed connection): {e}")
 
     async def mic_status(self, event):
         """Handle mic status updates (connected/disconnected)"""

@@ -51,6 +51,7 @@ class UserProfile(models.Model):
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_seen = models.DateTimeField(null=True, blank=True, help_text='Timestamp of last activity')
     
     def __str__(self):
         return f"{self.user.username} - {self.user_type}"

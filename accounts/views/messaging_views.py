@@ -160,25 +160,57 @@ def start_conversation(request, username):
 
 
 @login_required
+def delete_conversation(request, conversation_id):
+    """Delete a conversation (chat) from the inbox for the requesting user.
+    Only participants can delete; the entire conversation is removed.
+    """
+    conversation = get_object_or_404(Conversation, id=conversation_id)
+    if request.user not in conversation.participants.all():
+        messages.error(request, 'You do not have permission to delete this conversation')
+        return redirect('inbox')
+    conversation.delete()
+    messages.success(request, 'Conversation deleted successfully')
+    return redirect('inbox')
+
+
+@login_required
 @require_http_methods(["POST"])
 def send_message(request, conversation_id):
-    """Send a message (text, image, or file) in a conversation."""
+    """Send a message (text, image, or file) in a conversation, handling uploads correctly."""
     conversation = get_object_or_404(Conversation, id=conversation_id)
     if request.user not in conversation.participants.all():
         return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
 
     content = request.POST.get('content', '').strip()
-    image = request.FILES.get('image')
-    file = request.FILES.get('file')
+    uploaded_image = request.FILES.get('image')
+    uploaded_file = request.FILES.get('file')
 
-    if not content and not image and not file:
+    # Determine which file field to use, avoiding duplicates
+    image_file = None
+    generic_file = None
+    if uploaded_image:
+        if uploaded_image.content_type.startswith('image/'):
+            image_file = uploaded_image
+        else:
+            generic_file = uploaded_image
+    elif uploaded_file:
+        if uploaded_file.content_type.startswith('image/'):
+            image_file = uploaded_file
+        else:
+            generic_file = uploaded_file
+
+    if not content and not image_file and not generic_file:
         return JsonResponse({'status': 'error', 'message': 'Message cannot be empty'}, status=400)
 
     message = Message.objects.create(
-        conversation=conversation, sender=request.user,
-        content=content, image=image, file=file
+        conversation=conversation,
+        sender=request.user,
+        content=content,
+        image=image_file,
+        file=generic_file,
     )
-    conversation.save()
+
+
 
     from accounts.notification_utils import notify_new_message
     other_user = conversation.get_other_user(request.user)
@@ -221,22 +253,31 @@ def search_users_ajax(request):
     ).exclude(id=request.user.id).select_related('userprofile').distinct()[:10]
 
     users_data = []
+    now = timezone.now()
+    online_delta = timezone.timedelta(minutes=5)
     for u in matching_users:
         has_conv = Conversation.objects.filter(participants=request.user).filter(participants=u).exists()
-        
-        # Safely obtain display name whether or not the user has a profile
-        if hasattr(u, 'userprofile'):
-            display_name = getattr(u.userprofile, 'display_name', '') or u.get_full_name() or u.username
+        profile = getattr(u, 'userprofile', None)
+        # Determine display name safely
+        if profile:
+            display_name = getattr(profile, 'display_name', '') or u.get_full_name() or u.username
+            pfp = profile.get_profile_picture_url()
+            last_seen = profile.last_seen
         else:
             display_name = u.get_full_name() or u.username
-        pfp = u.userprofile.get_profile_picture_url() if hasattr(u, 'userprofile') else None
-        
+            pfp = None
+            last_seen = None
+        is_online = False
+        if last_seen:
+            is_online = (now - last_seen) <= online_delta
         users_data.append({
             'username': u.username,
             'display_name': display_name,
             'pfp': pfp,
-            'user_type': u.userprofile.user_type if hasattr(u, 'userprofile') else 'student',
+            'user_type': profile.user_type if profile else 'student',
             'has_conv': has_conv,
+            'last_seen': last_seen.isoformat() if last_seen else None,
+            'is_online': is_online,
         })
 
     return JsonResponse({'users': users_data})
