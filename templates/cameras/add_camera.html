@@ -12,53 +12,81 @@
 
             <div class="form-group">
                 <label>Camera Name</label>
-                <input type="text" id="camName" name="name" class="form-control" required>
+                <input type="text" id="camName" name="name" class="form-control" required placeholder="e.g. Classroom Front Camera">
             </div>
 
             <div class="form-group">
                 <label>Camera Type</label>
                 <select id="camType" name="camera_type" class="form-control" onchange="handleTypeChange()">
-                    <option value="rtsp">RTSP Camera</option>
-                    <option value="ip_webcam">IP Webcam</option>
-                    <option value="droidcam">DroidCam</option>
+                    <option value="rtsp">RTSP IP Camera</option>
+                    <option value="ip_webcam">IP Webcam (Android app)</option>
+                    <option value="droidcam">DroidCam (iPhone / Android)</option>
                 </select>
             </div>
+
+            <!-- Type-specific hint banner -->
+            <div id="typeHint" style="
+                background: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 0.5rem;
+                padding: 0.75rem 1rem;
+                font-size: 0.8rem;
+                color: #1e40af;
+                margin-bottom: 1rem;
+                line-height: 1.5;
+            "></div>
 
             <div class="grid-2">
                 <div class="form-group">
                     <label>IP Address</label>
-                    <input type="text" id="camIp" name="ip_address" class="form-control" required>
+                    <input type="text" id="camIp" name="ip_address" class="form-control" required placeholder="192.168.1.x">
                 </div>
 
                 <div class="form-group">
-                    <label>Port</label>
+                    <label id="portLabel">Port</label>
                     <input type="number" id="camPort" name="port" class="form-control" value="554">
                 </div>
             </div>
 
             <div id="rtspAuth" class="grid-2">
                 <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="camUser" name="username" class="form-control">
+                    <label>Username <span style="color:#94a3b8; font-weight:400;">(optional)</span></label>
+                    <input type="text" id="camUser" name="username" class="form-control" placeholder="Leave blank if none">
                 </div>
-
                 <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="camPass" name="password" class="form-control">
+                    <label>Password <span style="color:#94a3b8; font-weight:400;">(optional)</span></label>
+                    <input type="password" id="camPass" name="password" class="form-control" placeholder="Leave blank if none">
                 </div>
             </div>
 
             <div id="rtspPath" class="form-group">
-                <label>Stream Path (Optional - auto-detects if empty)</label>
-                <input type="text" id="camStreamPath" name="stream_path" class="form-control" placeholder="/stream or /live">
+                <label>Stream Path <span style="color:#94a3b8; font-weight:400;">(optional — auto-detected if empty)</span></label>
+                <input type="text" id="camStreamPath" name="stream_path" class="form-control" placeholder="/stream  or  /live  or  /h264">
             </div>
 
-            <button type="submit" class="btn-save">Save Camera</button>
+            <!-- Test result area -->
+            <div id="testResult" style="display:none; margin-bottom:1rem; padding:0.75rem 1rem; border-radius:0.5rem; font-size:0.8rem;"></div>
+
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+                <button type="button" id="testBtn" onclick="testCameraConnection()" style="
+                    flex:1; min-width:120px;
+                    padding:0.75rem;
+                    background:#f1f5f9;
+                    color:#475569;
+                    border:1px solid #e2e8f0;
+                    border-radius:0.5rem;
+                    font-weight:600;
+                    cursor:pointer;
+                    display:flex; align-items:center; justify-content:center; gap:0.5rem;
+                ">
+                    🔍 Test Connection
+                </button>
+                <button type="submit" class="btn-save" style="flex:2; min-width:160px;">Save Camera</button>
+            </div>
         </form>
     </div>
 </div>
 
-<!-- ================= MODAL STYLES ================= -->
 <style>
     .close-btn {
         border: none;
@@ -68,31 +96,68 @@
         cursor: pointer;
         transition: color 0.2s;
     }
-
-    .close-btn:hover {
-        color: var(--text-main);
-    }
-
-    /* Grid */
+    .close-btn:hover { color: var(--text-main); }
     .grid-2 {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
     }
-
     @media (max-width: 480px) {
-        .grid-2 {
-            grid-template-columns: 1fr;
-        }
+        .grid-2 { grid-template-columns: 1fr; }
     }
 </style>
 
-<!-- ================= MODAL SCRIPT ================= -->
 <script>
+    const TYPE_META = {
+        rtsp: {
+            port: 554,
+            showAuth: true,
+            showPath: true,
+            hint: `<b>RTSP Camera</b> — e.g. Hikvision, Dahua, Reolink, etc.<br>
+                   • Default port: <b>554</b><br>
+                   • Leave stream path blank to auto-detect, or enter manually (e.g. <code>/stream</code>, <code>/h264</code>)<br>
+                   • Username / password: only if your camera requires login`,
+        },
+        ip_webcam: {
+            port: 8080,
+            showAuth: false,
+            showPath: false,
+            hint: `<b>IP Webcam (Android)</b> — install the "IP Webcam" app by Pavel Khlebovich<br>
+                   • Open the app → tap <b>Start server</b> — note the URL shown (e.g. <code>http://192.168.1.5:8080</code>)<br>
+                   • Default port: <b>8080</b> — enter the IP shown in the app<br>
+                   • Make sure your phone and this PC are on the <b>same WiFi network</b>`,
+        },
+        droidcam: {
+            port: 4747,
+            showAuth: false,
+            showPath: false,
+            hint: `<b>DroidCam</b> — install DroidCam on your iPhone or Android<br>
+                   • Open the app → note the <b>WiFi IP</b> shown on screen<br>
+                   • Default port: <b>4747</b><br>
+                   • Make sure your phone and this PC are on the <b>same WiFi network</b><br>
+                   • For iPhone: use DroidCam from the App Store`,
+        },
+    };
+
+    function handleTypeChange() {
+        const type = document.getElementById('camType').value;
+        const meta = TYPE_META[type];
+
+        document.getElementById('camPort').value = meta.port;
+        document.getElementById('typeHint').innerHTML = meta.hint;
+
+        document.getElementById('rtspAuth').style.display = meta.showAuth ? 'grid' : 'none';
+        document.getElementById('rtspPath').style.display = meta.showPath ? 'block' : 'none';
+
+        // Reset test result on type change
+        document.getElementById('testResult').style.display = 'none';
+    }
+
     function openAddModal() {
         document.getElementById('cameraForm').reset();
         document.getElementById('cameraId').value = '';
         document.getElementById('modalTitle').innerText = 'Add Camera';
+        document.getElementById('testResult').style.display = 'none';
         handleTypeChange();
         document.getElementById('cameraModal').classList.add('show');
         if (typeof disableScroll === 'function') disableScroll();
@@ -103,51 +168,107 @@
         if (typeof enableScroll === 'function') enableScroll();
     }
 
-    function handleTypeChange() {
-        const type = document.getElementById('camType').value;
-        const portInput = document.getElementById('camPort');
-        const rtspAuth = document.getElementById('rtspAuth');
-        const rtspPath = document.getElementById('rtspPath');
-
-        if (type === 'rtsp') {
-            rtspAuth.style.display = 'grid';
-            rtspPath.style.display = 'block';
-            portInput.value = 554;
-        } else if (type === 'ip_webcam') {
-            rtspAuth.style.display = 'none';
-            rtspPath.style.display = 'none';
-            portInput.value = 8080;
-        } else {
-            rtspAuth.style.display = 'none';
-            rtspPath.style.display = 'none';
-            portInput.value = 4747;
-        }
-    }
-
     async function openEditModal(id) {
         const res = await fetch(`/cameras/edit-camera/${id}/`);
         const data = await res.json();
-        
+
         document.getElementById('modalTitle').innerText = 'Edit Camera';
         document.getElementById('cameraId').value = data.id;
         document.getElementById('camName').value = data.name;
         document.getElementById('camType').value = data.camera_type;
         document.getElementById('camIp').value = data.ip_address;
         document.getElementById('camPort').value = data.port;
-        document.getElementById('camUser').value = data.username;
-        document.getElementById('camPass').value = data.password;
-        document.getElementById('camStreamPath').value = data.stream_path;
-        
+        document.getElementById('camUser').value = data.username || '';
+        document.getElementById('camPass').value = data.password || '';
+        document.getElementById('camStreamPath').value = data.stream_path || '';
+        document.getElementById('testResult').style.display = 'none';
+
         handleTypeChange();
         document.getElementById('cameraModal').classList.add('show');
         if (typeof disableScroll === 'function') disableScroll();
     }
 
+    async function testCameraConnection() {
+        const ip   = document.getElementById('camIp').value.trim();
+        const port = document.getElementById('camPort').value.trim();
+        const type = document.getElementById('camType').value;
+        const id   = document.getElementById('cameraId').value;
+
+        if (!ip) {
+            showTestResult('error', 'Enter an IP address first.');
+            return;
+        }
+
+        const btn = document.getElementById('testBtn');
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Testing...';
+        showTestResult('info', 'Probing camera — this may take a few seconds...');
+
+        // If editing an existing camera, test it directly
+        if (id) {
+            try {
+                const res = await fetch(`/cameras/test-camera/${id}/`);
+                const data = await res.json();
+                renderTestResult(data);
+            } catch(e) {
+                showTestResult('error', `Network error: ${e.message}`);
+            }
+            btn.disabled = false;
+            btn.innerHTML = '🔍 Test Connection';
+            return;
+        }
+
+        // For unsaved cameras, do a quick browser-side reachability check using
+        // a temporary save → test → the test endpoint probes all paths.
+        // We use the probe endpoint directly.
+        try {
+            const probeUrl = `/cameras/probe/?type=${encodeURIComponent(type)}&ip=${encodeURIComponent(ip)}&port=${encodeURIComponent(port)}`;
+            const res = await fetch(probeUrl);
+            const data = await res.json();
+            renderTestResult(data);
+        } catch(e) {
+            showTestResult('error', `Could not reach server: ${e.message}`);
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '🔍 Test Connection';
+    }
+
+    function renderTestResult(data) {
+        if (data.overall_status === 'success') {
+            const path = data.working_path || '';
+            showTestResult('success',
+                `✅ <b>Camera reachable!</b>  Working path: <code>${path}</code><br>${data.hint || ''}`
+            );
+            // Auto-fill stream path if RTSP
+            if (path && document.getElementById('rtspPath').style.display !== 'none') {
+                document.getElementById('camStreamPath').value = path;
+            }
+        } else {
+            const results = (data.results || []).map(r =>
+                `<code>${r.url || r.method}</code> → ${r.status}`
+            ).join('<br>');
+            showTestResult('error',
+                `❌ <b>Camera not reachable</b><br>${data.hint || ''}<br><br>${results}`
+            );
+        }
+    }
+
+    function showTestResult(type, html) {
+        const el = document.getElementById('testResult');
+        const styles = {
+            success: 'background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;',
+            error:   'background:#fef2f2; border:1px solid #fecaca; color:#991b1b;',
+            info:    'background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af;',
+        };
+        el.style.cssText = `display:block; padding:0.75rem 1rem; border-radius:0.5rem; font-size:0.8rem; line-height:1.6; ${styles[type] || styles.info}`;
+        el.innerHTML = html;
+    }
+
     async function saveCamera(e) {
         e.preventDefault();
-
-        const cameraForm = document.getElementById('cameraForm');
-        const formData = new FormData(cameraForm);
+        const form = document.getElementById('cameraForm');
+        const formData = new FormData(form);
         const id = formData.get('camera_id');
         const url = id ? `/cameras/edit-camera/${id}/` : `/cameras/add-camera/`;
 
@@ -157,6 +278,14 @@
             headers: { 'X-CSRFToken': '{{ csrf_token }}' }
         });
 
-        if (res.ok) window.location.reload();
+        const data = await res.json();
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            alert(data.message || 'Failed to save camera');
+        }
     }
+
+    // Run handleTypeChange on first load so hint + defaults are correct
+    document.addEventListener('DOMContentLoaded', handleTypeChange);
 </script>

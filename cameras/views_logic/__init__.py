@@ -21,6 +21,7 @@ from .camera_views import (
     camera_feed,
     test_camera,
     test_feed_page,
+    probe_camera,
 )
 from .streaming_views import (
     mobile_mic,
@@ -88,6 +89,7 @@ __all__ = [
     'camera_feed',
     'test_camera',
     'test_feed_page',
+    'probe_camera',
     # Streaming
     'mobile_mic',
     'teacher_camera_dashboard',

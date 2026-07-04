@@ -729,3 +729,836 @@ Run `.\start_app.bat` and go. 🚀
 <sub>Made with ❤️ by <a href="https://github.com/GAuravgiy87">GAuravgiy87</a> · <a href="https://github.com/tarunkumar-sys">tarunkumar-sys</a></sub>
 
 </div>
+
+---
+
+# 📘 Complete Setup Guide — From a Brand New PC to a Running EduMi Server
+
+> This guide assumes you are starting from **zero** — a fresh PC with nothing installed. Follow every step in order. Sections are split by operating system.
+
+---
+
+## 🖥️ WINDOWS — Full Setup from Scratch
+
+### Phase 1: Install System Software
+
+#### Step 1.1 — Install Python 3.11+
+
+1. Open your browser and go to: **https://python.org/downloads/**
+2. Click the latest **Python 3.11.x** or **3.12.x** release button
+3. Run the installer
+4. ⚠️ **CRITICAL** — On the first screen, check **"Add Python to PATH"** before clicking Install
+5. Click **"Install Now"**
+6. After it finishes, open **Command Prompt** (`Win + R` → type `cmd` → press Enter)
+7. Verify:
+
+```cmd
+python --version
+pip --version
+```
+
+Both should print version numbers. If you see `'python' is not recognized`, restart your PC and try again.
+
+---
+
+#### Step 1.2 — Install Git
+
+1. Go to: **https://git-scm.com/download/win**
+2. Download and run the installer — accept all defaults
+3. Verify in Command Prompt:
+
+```cmd
+git --version
+```
+
+---
+
+#### Step 1.3 — Install FFmpeg
+
+FFmpeg is required for all recording and video processing features.
+
+1. Go to: **https://ffmpeg.org/download.html** → Click **Windows** → **Windows builds by BtbN**
+2. Download `ffmpeg-master-latest-win64-gpl.zip`
+3. Extract the ZIP — you'll get a folder like `ffmpeg-master-latest-win64-gpl`
+4. Move the extracted folder to `C:\ffmpeg`
+5. Add FFmpeg to PATH:
+   - Press `Win + S` → search **"Environment Variables"** → click **"Edit the system environment variables"**
+   - Click **"Environment Variables"** button
+   - Under **System variables**, find **Path** → click **Edit**
+   - Click **New** → type `C:\ffmpeg\bin` → click **OK** on all windows
+6. Open a new Command Prompt and verify:
+
+```cmd
+ffmpeg -version
+```
+
+---
+
+#### Step 1.4 — Install Redis (Windows)
+
+Redis is required for real-time WebSocket features and background task queuing.
+
+**Option A — Using WSL2 (Recommended):**
+
+1. Open PowerShell as Administrator → run:
+
+```powershell
+wsl --install
+```
+
+2. Restart your PC when prompted
+3. Open the **Ubuntu** app from the Start Menu, set a username and password
+4. Install Redis inside Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install redis-server -y
+sudo service redis-server start
+redis-cli ping    # Should print: PONG
+```
+
+**Option B — Native Windows Redis:**
+
+1. Download from: **https://github.com/microsoftarchive/redis/releases**
+2. Download `Redis-x64-3.x.x.msi` and run the installer
+3. Redis will start automatically as a Windows Service
+4. Verify in Command Prompt:
+
+```cmd
+redis-cli ping
+```
+
+---
+
+#### Step 1.5 — Download LiveKit Server Binary
+
+1. Go to: **https://github.com/livekit/livekit/releases**
+2. Download the latest `livekit-server_windows_amd64.zip`
+3. Extract it — you'll get `livekit-server.exe`
+4. You'll place this in the project folder later (Step 2.3 below)
+
+---
+
+### Phase 2: Get the EduMi Project
+
+#### Step 2.1 — Clone the Repository
+
+Open Command Prompt in the folder where you want the project (e.g., Desktop):
+
+```cmd
+cd %USERPROFILE%\Desktop
+git clone -b new_edumi https://github.com/GAuravgiy87/Edumi2.git
+cd Edumi2
+```
+
+---
+
+#### Step 2.2 — Create a Python Virtual Environment
+
+```cmd
+python -m venv venv
+venv\Scripts\activate
+```
+
+Your prompt will now start with `(venv)` — this means you're inside the virtual environment. **Always activate it before running any Python commands.**
+
+---
+
+#### Step 2.3 — Place the LiveKit Binary
+
+```cmd
+mkdir livekit-bin
+```
+
+Copy `livekit-server.exe` (downloaded in Step 1.5) into the `livekit-bin\` folder inside the project.
+
+---
+
+#### Step 2.4 — Install Python Dependencies
+
+```cmd
+pip install -r requirements.txt
+```
+
+> This installs ~52 packages including Django, OpenCV, face recognition, Daphne, Celery, and all other dependencies. This may take 5–10 minutes on first run.
+
+---
+
+#### Step 2.5 — Configure Environment Variables
+
+```cmd
+copy config\.env.example .env
+notepad .env
+```
+
+Fill in these required values:
+
+```env
+# Generate a secret key with:
+# python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+SECRET_KEY=paste-generated-key-here
+
+DEBUG=True
+ALLOWED_HOSTS=*
+
+LIVEKIT_API_KEY=devkey
+LIVEKIT_API_SECRET=secret-must-be-at-least-32-characters-long
+LIVEKIT_URL=ws://localhost:8002/livekit-proxy
+LIVEKIT_INTERNAL_URL=ws://localhost:7880
+LIVEKIT_INTERNAL_HTTP_URL=http://localhost:7880
+
+REDIS_URL=redis://localhost:6379/0
+
+# Generate a face encryption key with:
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FACE_ENCRYPTION_KEY=paste-generated-key-here
+FACE_MATCH_THRESHOLD=0.50
+FACE_PRESENCE_DURATION=30
+
+CAMERA_SERVICE_URL=http://localhost:8003
+LOG_LEVEL=INFO
+CSRF_TRUSTED_ORIGINS=https://localhost:8002,https://127.0.0.1:8002
+```
+
+Save and close Notepad.
+
+---
+
+#### Step 2.6 — Run Database Migrations
+
+```cmd
+python manage.py migrate
+```
+
+---
+
+#### Step 2.7 — Create an Admin Account
+
+```cmd
+python manage.py createsuperuser
+```
+
+Enter a username, email (optional), and password when prompted.
+
+---
+
+### Phase 3: Start the Application
+
+#### Step 3.1 — One-Click Full Start (Recommended)
+
+Double-click `start_app.bat` in the project folder, **or** run from PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File start_app.ps1
+```
+
+This automatically:
+- Generates an SSL certificate
+- Installs it as a trusted certificate in Windows
+- Adds `edumi.ac.in` to your hosts file
+- Starts Redis, Celery, Camera Service, LiveKit, and Daphne
+
+#### Step 3.2 — Open in Browser
+
+Navigate to any of:
+
+```
+https://localhost:8002
+https://127.0.0.1:8002
+https://edumi.ac.in:8002
+```
+
+> If you see **"Your connection is not private"**, click **Advanced** → **Proceed to localhost (unsafe)**. To remove this warning permanently, run `scripts\trust_ssl_cert.bat`.
+
+---
+
+## 🐧 LINUX (Ubuntu / Debian) — Full Setup from Scratch
+
+### Phase 1: Install System Software
+
+```bash
+# Update package lists
+sudo apt update && sudo apt upgrade -y
+
+# Install Python 3.11+
+sudo apt install python3.11 python3.11-venv python3-pip -y
+
+# Install Git
+sudo apt install git -y
+
+# Install FFmpeg
+sudo apt install ffmpeg -y
+
+# Install Redis
+sudo apt install redis-server -y
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
+
+# Install dlib build dependencies (for face recognition)
+sudo apt install cmake build-essential libopenblas-dev liblapack-dev libx11-dev libgtk-3-dev -y
+
+# Install additional system libraries
+sudo apt install python3-dev default-libmysqlclient-dev -y
+```
+
+Verify everything is installed:
+
+```bash
+python3 --version      # Python 3.11.x
+ffmpeg -version        # FFmpeg version
+redis-cli ping         # PONG
+git --version          # git version
+```
+
+---
+
+### Phase 2: Download LiveKit Binary (Linux)
+
+```bash
+# Create directory in your project folder (do this after cloning)
+# Download latest livekit binary
+wget https://github.com/livekit/livekit/releases/latest/download/livekit_linux_amd64.tar.gz
+tar -xzf livekit_linux_amd64.tar.gz
+# Move to project's livekit-bin folder (after cloning below)
+```
+
+---
+
+### Phase 3: Get the Project & Set Up
+
+```bash
+# Clone
+git clone -b new_edumi https://github.com/GAuravgiy87/Edumi2.git
+cd Edumi2
+
+# Place LiveKit binary
+mkdir -p livekit-bin
+mv ../livekit-server livekit-bin/
+
+# Create virtual environment
+python3.11 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp config/.env.example .env
+nano .env    # Edit and fill in values (see Windows section above for details)
+
+# Run migrations
+python manage.py migrate
+
+# Create admin user
+python manage.py createsuperuser
+```
+
+---
+
+### Phase 4: Start on Linux
+
+```bash
+# Give execute permission
+chmod +x start.sh
+
+# Start everything
+./start.sh
+```
+
+Or manually in separate terminals:
+
+```bash
+# Terminal 1 — Redis (already running as service, but if not:)
+redis-server
+
+# Terminal 2 — Celery
+source venv/bin/activate
+celery -A school_project worker -l info -P threads
+
+# Terminal 3 — Camera Service
+source venv/bin/activate
+python camera_service/serve.py
+
+# Terminal 4 — LiveKit
+./livekit-bin/livekit-server --config config/livekit.yaml
+
+# Terminal 5 — Django (Main App)
+source venv/bin/activate
+python run_ssl_server.py
+```
+
+Access at: `https://localhost:8002` or `https://<your-lan-ip>:8002`
+
+---
+
+## 🖥️ SERVER DEPLOYMENT (VPS / Cloud — Ubuntu)
+
+> For deploying EduMi on a cloud VPS (AWS, DigitalOcean, Hetzner, etc.) with a real domain and Let's Encrypt SSL.
+
+### Phase 1: Server Setup
+
+```bash
+# SSH into your server
+ssh root@your-server-ip
+
+# Update system
+apt update && apt upgrade -y
+
+# Install required packages
+apt install python3.11 python3.11-venv python3-pip git ffmpeg redis-server \
+    nginx certbot python3-certbot-nginx cmake build-essential \
+    libopenblas-dev liblapack-dev libx11-dev -y
+
+# Enable and start Redis
+systemctl enable redis-server
+systemctl start redis-server
+```
+
+---
+
+### Phase 2: Set Up the Application
+
+```bash
+# Create a dedicated user (don't run as root in production)
+adduser edumi
+usermod -aG sudo edumi
+su - edumi
+
+# Clone the project
+git clone -b new_edumi https://github.com/GAuravgiy87/Edumi2.git
+cd Edumi2
+
+# Download LiveKit binary
+mkdir -p livekit-bin
+cd livekit-bin
+wget https://github.com/livekit/livekit/releases/latest/download/livekit_linux_amd64.tar.gz
+tar -xzf livekit_linux_amd64.tar.gz
+rm livekit_linux_amd64.tar.gz
+cd ..
+
+# Create virtual environment and install dependencies
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure environment for production
+cp config/.env.example .env
+nano .env
+```
+
+Edit `.env` for production:
+
+```env
+SECRET_KEY=<generate-strong-key>
+DEBUG=False
+ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+
+# Use your real domain in CSRF origins
+CSRF_TRUSTED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+
+LIVEKIT_API_KEY=<strong-random-key>
+LIVEKIT_API_SECRET=<strong-random-secret-32-chars>
+LIVEKIT_URL=wss://yourdomain.com/livekit-proxy
+LIVEKIT_INTERNAL_URL=ws://localhost:7880
+LIVEKIT_INTERNAL_HTTP_URL=http://localhost:7880
+
+REDIS_URL=redis://localhost:6379/0
+FACE_ENCRYPTION_KEY=<generate-fernet-key>
+CAMERA_SERVICE_URL=http://localhost:8003
+LOG_LEVEL=WARNING
+```
+
+```bash
+# Run migrations and collect static files
+python manage.py migrate
+python manage.py collectstatic --noinput
+python manage.py createsuperuser
+```
+
+---
+
+### Phase 3: Configure Nginx as Reverse Proxy
+
+```bash
+sudo nano /etc/nginx/sites-available/edumi
+```
+
+Paste this configuration:
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name yourdomain.com www.yourdomain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    client_max_body_size 2G;
+
+    location /static/ {
+        alias /home/edumi/Edumi2/staticfiles/;
+    }
+
+    location /media/ {
+        alias /home/edumi/Edumi2/database/media/;
+    }
+
+    location /livekit-proxy/ {
+        proxy_pass http://localhost:7880/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        proxy_pass http://localhost:8002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+```bash
+# Enable the site
+sudo ln -s /etc/nginx/sites-available/edumi /etc/nginx/sites-enabled/
+sudo nginx -t       # Test config
+sudo systemctl reload nginx
+
+# Get a free SSL certificate from Let's Encrypt
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+```
+
+---
+
+### Phase 4: Create systemd Services (Auto-Restart)
+
+Create service files so all components restart automatically on server reboot:
+
+```bash
+sudo nano /etc/systemd/system/edumi-web.service
+```
+
+```ini
+[Unit]
+Description=EduMi Django Web Server
+After=network.target redis.service
+
+[Service]
+User=edumi
+WorkingDirectory=/home/edumi/Edumi2
+Environment="PATH=/home/edumi/Edumi2/venv/bin"
+ExecStart=/home/edumi/Edumi2/venv/bin/python run_ssl_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo nano /etc/systemd/system/edumi-celery.service
+```
+
+```ini
+[Unit]
+Description=EduMi Celery Worker
+After=redis.service
+
+[Service]
+User=edumi
+WorkingDirectory=/home/edumi/Edumi2
+Environment="PATH=/home/edumi/Edumi2/venv/bin"
+ExecStart=/home/edumi/Edumi2/venv/bin/celery -A school_project worker -l info -P threads
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo nano /etc/systemd/system/edumi-camera.service
+```
+
+```ini
+[Unit]
+Description=EduMi Camera AI Service
+After=network.target
+
+[Service]
+User=edumi
+WorkingDirectory=/home/edumi/Edumi2
+Environment="PATH=/home/edumi/Edumi2/venv/bin"
+ExecStart=/home/edumi/Edumi2/venv/bin/python camera_service/serve.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo nano /etc/systemd/system/edumi-livekit.service
+```
+
+```ini
+[Unit]
+Description=LiveKit WebRTC SFU Server
+After=network.target
+
+[Service]
+User=edumi
+WorkingDirectory=/home/edumi/Edumi2
+ExecStart=/home/edumi/Edumi2/livekit-bin/livekit-server --config config/livekit.yaml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Enable and start all services
+sudo systemctl daemon-reload
+sudo systemctl enable edumi-web edumi-celery edumi-camera edumi-livekit
+sudo systemctl start edumi-web edumi-celery edumi-camera edumi-livekit
+
+# Check status
+sudo systemctl status edumi-web
+```
+
+---
+
+## 🔧 Troubleshooting Guide
+
+### ❌ `python` not recognized (Windows)
+
+**Cause:** Python was not added to PATH during installation.
+
+**Fix:**
+```cmd
+# Check if Python is installed
+where python
+
+# If not found, reinstall Python and CHECK "Add Python to PATH"
+# Or manually add: C:\Users\<YourName>\AppData\Local\Programs\Python\Python311\
+# to your System Environment Variables → PATH
+```
+
+---
+
+### ❌ `pip install -r requirements.txt` fails on `dlib` or `face_recognition`
+
+**Windows Fix:** The project uses `dlib-bin` (pre-compiled wheel). If it still fails:
+```cmd
+pip install --upgrade pip setuptools wheel
+pip install dlib-bin
+pip install face_recognition
+```
+
+**Linux Fix:** Install build dependencies first:
+```bash
+sudo apt install cmake build-essential libopenblas-dev liblapack-dev libx11-dev -y
+pip install dlib
+pip install face_recognition
+```
+
+---
+
+### ❌ `redis-cli ping` returns error / connection refused
+
+**Windows (native Redis):**
+```cmd
+# Check if Redis service is running
+sc query Redis
+
+# Start it
+net start Redis
+```
+
+**Windows (WSL2):**
+```bash
+# In Ubuntu terminal
+sudo service redis-server start
+```
+
+**Linux:**
+```bash
+sudo systemctl start redis-server
+sudo systemctl enable redis-server   # Auto-start on boot
+```
+
+---
+
+### ❌ Browser shows "Your connection is not private" (NET::ERR_CERT_AUTHORITY_INVALID)
+
+This is expected for self-signed certificates. Solutions:
+
+**Quick bypass (Chrome):** Click **Advanced** → **Proceed to localhost (unsafe)**
+
+**Permanent fix (Windows):**
+```batch
+scripts\trust_ssl_cert.bat
+```
+Then fully restart Chrome: go to `chrome://restart`
+
+**Permanent fix (Linux):**
+```bash
+sudo cp certs/edumi.crt /usr/local/share/ca-certificates/edumi.crt
+sudo update-ca-certificates
+```
+
+---
+
+### ❌ Camera feed shows black screen
+
+**Checklist:**
+1. Is the camera service running on port 8003?
+   ```cmd
+   curl http://localhost:8003/health
+   ```
+2. Is the RTSP URL correct? Test it directly:
+   ```cmd
+   ffplay rtsp://username:password@camera-ip:554/live
+   ```
+3. Is `CAMERA_SERVICE_URL=http://localhost:8003` set in `.env`?
+4. Check firewall — port 8003 must be open locally
+5. Camera must be reachable from the server's network
+
+---
+
+### ❌ Meetings not working / WebRTC fails
+
+**Checklist:**
+1. Is LiveKit running?
+   ```cmd
+   .\livekit-bin\livekit-server.exe --config config\livekit.yaml
+   ```
+2. Check `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` in `.env` match `config\livekit.yaml`
+3. Verify the secret is **at least 32 characters long**
+4. For LAN access, make sure ports `7880` and `7881` are open in Windows Firewall:
+   ```powershell
+   scripts\allow_firewall.bat
+   ```
+
+---
+
+### ❌ `manage.py migrate` fails with database error
+
+```cmd
+# Delete the old database and start fresh
+del database\db.sqlite3
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+---
+
+### ❌ Static files not loading (CSS/JS missing)
+
+```cmd
+python manage.py collectstatic --noinput
+```
+
+Then hard refresh the browser with `Ctrl + Shift + R`.
+
+---
+
+### ❌ Port 8002 already in use
+
+```powershell
+# Find and kill the process using port 8002
+$proc = Get-NetTCPConnection -LocalPort 8002 -ErrorAction SilentlyContinue
+if ($proc) { Stop-Process -Id $proc.OwningProcess -Force }
+```
+
+---
+
+### ❌ Recording stops but video is corrupted / won't play
+
+This is prevented by the chunked HLS recording system. If it still happens:
+
+1. Check that FFmpeg is correctly installed and in PATH: `ffmpeg -version`
+2. The recording folder must exist and be writable:
+   ```cmd
+   icacls database\media\recordings /grant Everyone:F /T
+   ```
+3. Chunks are saved every 10 seconds — if the server crashes mid-chunk, only the last 10 seconds may be lost. Previous chunks are always safe.
+
+---
+
+### ❌ `start_app.ps1` fails with "running scripts is disabled"
+
+```powershell
+# Run this once in an elevated PowerShell:
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+Then run the script again.
+
+---
+
+### ❌ Celery not starting / tasks not processing
+
+```cmd
+# Make sure Redis is running first, then:
+venv\Scripts\celery.exe -A school_project worker -l info -P threads
+```
+
+Check that `REDIS_URL=redis://localhost:6379/0` is correctly set in `.env`.
+
+---
+
+### 🔍 Reading Logs
+
+All application logs are written to the terminal where the server runs. For persistent logs:
+
+```bash
+# Linux — check systemd logs
+sudo journalctl -u edumi-web -f
+sudo journalctl -u edumi-celery -f
+
+# Or check application log files
+tail -f logs/edumi.log
+```
+
+---
+
+## ✅ Quick Verification Checklist
+
+After setup, verify each component:
+
+```
+[ ] python --version          → Python 3.11+
+[ ] pip --version             → pip 23+
+[ ] ffmpeg -version           → FFmpeg installed
+[ ] redis-cli ping            → PONG
+[ ] livekit-server --version  → LiveKit version
+[ ] https://localhost:8002    → EduMi login page loads
+[ ] Admin login works         → /admin/ accessible
+[ ] Camera feed visible       → Control room shows live feed
+[ ] Recording works           → Start/stop creates chunks
+[ ] Publish modal opens       → Clean layout, no trim inputs
+[ ] Meeting connects          → LiveKit WebRTC session starts
+[ ] Student can join meeting  → Participant list shows student
+```
+
+---
+
+<div align="center">
+
+**Still stuck?** Open an issue on [GitHub](https://github.com/GAuravgiy87/Edumi2/issues) with your OS, error message, and the output of `python --version` and `pip list`.
+
+</div>

@@ -354,6 +354,15 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = DATABASE_DIR / 'media'
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)  # Ensure media directory exists
 
+# Caching Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'edumi-local-cache',
+    }
+}
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+
 LOGIN_URL = 'login'
 LOGOUT_REDIRECT_URL = '/'
 LOGIN_REDIRECT_URL = 'student_dashboard'
@@ -440,7 +449,7 @@ EMOTION_LOGGING_ENABLED = True
 # Camera Service URL (internal, server-side only)
 # In Docker: uses service name via CAMERA_SERVICE_URL env var
 # In dev: falls back to localhost:8003
-CAMERA_SERVICE_URL = os.environ.get('CAMERA_SERVICE_URL', 'http://localhost:8003')
+CAMERA_SERVICE_URL = os.environ.get('CAMERA_SERVICE_URL', 'https://localhost:8003')
 
 # Generate a key once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Then add it to .env as FACE_ENCRYPTION_KEY=<your-key>

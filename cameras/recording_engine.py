@@ -80,20 +80,19 @@ class RecordingEngine:
             return success, msg
 
     def _start(self, camera, teacher, quality):
-        # Define output path with structured hierarchy: recordings/Camera_Name/YYYY/MM/DD/
+        # Determine separate folder: 'streams' if camera is live, else 'recordings'
+        subfolder = 'streams' if camera.is_live else 'recordings'
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-        safe_camera_name = "".join([c if c.isalnum() else "_" for c in camera.name])
-        date_path = timezone.now().strftime('%Y/%m/%d')
         
         if self.is_chunked:
             # For chunked, we use a directory for the chunks
             filename_pattern = "chunk_%03d.ts"
-            relative_dir = os.path.join('recordings', safe_camera_name, date_path, f"rec_{camera.id}_{timestamp}")
+            relative_dir = os.path.join('recordings', teacher.username, subfolder, f"rec_{camera.id}_{timestamp}")
             self.output_path = os.path.join(settings.MEDIA_ROOT, relative_dir, filename_pattern)
             os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
         else:
             filename = f"rec_{camera.id}_{timestamp}.mkv"  # Record to MKV for crash resilience
-            relative_path = os.path.join('recordings', safe_camera_name, date_path, filename)
+            relative_path = os.path.join('recordings', teacher.username, subfolder, filename)
             self.output_path = os.path.join(settings.MEDIA_ROOT, relative_path)
             os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
         
@@ -390,6 +389,16 @@ class RecordingEngine:
                 
             return False, None
 
+    @classmethod
+    def get_active_session(cls, camera_id):
+        """Return the active recording instance for a camera, or None."""
+        with cls._lock:
+            for k, instance in list(cls._instances.items()):
+                if k.startswith(f"{camera_id}_"):
+                    if instance.process and instance.process.poll() is None:
+                        return instance
+        return None
+
     def _stop(self, auto_save=False):
         with self.lock:
             if self.finalized:
@@ -451,6 +460,13 @@ class RecordingEngine:
                         rec.recording_status = 'completed'
                         rec.duration = timezone.now() - self.start_time
                         rec.save()
+                        
+                        # Generate thumbnail from chunks
+                        try:
+                            rec.generate_chunked_thumbnail()
+                        except Exception as e:
+                            logger.error(f"Failed to generate chunked thumbnail: {e}")
+                            
                         return True
 
                     # Check if file exists and has size (for non-chunked)

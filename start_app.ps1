@@ -160,6 +160,7 @@ key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=def
 san = [
     x509.DNSName(DOMAIN), x509.DNSName(f'www.{DOMAIN}'),
     x509.DNSName('localhost'), x509.DNSName(hostname),
+    x509.DNSName('localdns'),
 ]
 for ip in lan_ips:
     try: san.append(x509.IPAddress(ipaddress.IPv4Address(ip)))

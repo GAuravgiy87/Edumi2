@@ -10,4 +10,5 @@ urlpatterns = [
     path('camera-feed/<int:camera_id>/', views.camera_feed, name='camera_feed'),
     path('test-camera/<int:camera_id>/', views.test_camera, name='test_camera'),
     path('test-feed/', views.test_feed_page, name='test_feed_page'),
+    path('probe/', views.probe_camera, name='probe_camera'),
 ]

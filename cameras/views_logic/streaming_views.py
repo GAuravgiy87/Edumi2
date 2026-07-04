@@ -379,8 +379,9 @@ class CameraManager:
 
 camera_manager = CameraManager()
 
-def _generate_frames(streamer, camera, full_url, quality, camera_id):
+async def _generate_frames(streamer, camera, full_url, quality, camera_id):
     """Yield MJPEG boundary frames; handles stale stream detection."""
+    import asyncio
     throttles = {'4k': 0.033, 'high': 0.033, 'med': 0.05, 'low': 0.1}
     delay = throttles.get(quality, 0.05)
 
@@ -397,10 +398,10 @@ def _generate_frames(streamer, camera, full_url, quality, camera_id):
 
             if frame:
                 yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n'
-                time.sleep(delay)
+                await asyncio.sleep(delay)
             else:
                 logger.warning(f"No frame to send for camera {camera_id}")
-                time.sleep(0.1)
+                await asyncio.sleep(0.1)
     except Exception as e:
         logger.error(f"Streaming error camera {camera_id}: {e}", exc_info=True)
 
@@ -476,6 +477,15 @@ def teacher_control_room(request, camera_id):
 
     # Check if recording is in progress
     is_recording, recording_start_time = recording_engine.is_recording(camera.id, request.user.id)
+
+    # Auto-heal: if the DB says camera is live but there's no active recording engine session,
+    # the previous stream was never cleanly stopped (e.g. server restart). Reset the flag.
+    if camera.is_live and not is_recording:
+        # Check the recording engine to see if we have any active stream sessions
+        active_session = recording_engine.get_active_session(camera.id)
+        if not active_session:
+            camera.is_live = False
+            camera.save(update_fields=['is_live'])
 
     # Use the camera-feed proxy (port 8003 with in-process fallback)
     camera_feed_base = reverse('camera_feed', args=[camera.id])
@@ -692,15 +702,17 @@ def stop_camera_recording(request, camera_id):
     if success:
         rec = None
         try:
-            from .models import CameraRecording
+            from cameras.models import CameraRecording
             rec = CameraRecording.objects.filter(id=recording_id).first()
         except Exception as e:
             logger.warning(f"Error fetching recording: {e}")
         
         video_url = None
+        is_chunked = False
         if rec:
+            is_chunked = rec.is_chunked
             if rec.is_chunked:
-                video_url = reverse('watch_recording', args=[rec.id])
+                video_url = reverse('recording_playlist', args=[rec.id])
             elif rec.video_file:
                 video_url = rec.video_file.url
 
@@ -708,6 +720,7 @@ def stop_camera_recording(request, camera_id):
             'status': 'success',
             'recording_id': recording_id,
             'video_url': video_url,
+            'is_chunked': is_chunked,
             'message': 'Recording stopped and being processed'
         })
     else:
@@ -763,19 +776,25 @@ def clear_stream_cache(request, camera_id):
 
 @login_required
 def publish_recording(request):
-    """Publish a finished recording with title and description"""
+    """Publish a finished recording with title, description and optional thumbnail"""
     if request.method == 'POST':
         recording_id = request.POST.get('recording_id')
         title = request.POST.get('title')
         description = request.POST.get('description')
+        is_draft = request.POST.get('is_draft') == 'true'
+        thumbnail = request.FILES.get('thumbnail')
 
         try:
             rec = CameraRecording.objects.get(id=recording_id, teacher=request.user)
             rec.title = title
             rec.description = description
-            rec.is_published = True
+            if thumbnail:
+                rec.thumbnail = thumbnail
+            rec.is_published = not is_draft
             rec.save()
-            return JsonResponse({'status': 'success', 'message': 'Lecture published successfully'})
+            
+            status_msg = 'Lecture saved as draft' if is_draft else 'Lecture published successfully'
+            return JsonResponse({'status': 'success', 'message': status_msg})
         except CameraRecording.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Recording not found'})
 

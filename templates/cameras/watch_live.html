@@ -310,16 +310,14 @@
 
     // ── Initialize Direct Feed ──
     (function initFeed() {
-        // Use same-origin URL — Django proxies /cameras/camera-feed/<id>/ through HTTPS.
-        // Never point the browser directly at port 8003 (plain HTTP) as that
-        // causes a Mixed-Content block when the main app is on HTTPS.
-        const feedUrl = `/cameras/camera-feed/${window.cameraId}/?q=4k`;
+        // Use direct port 8003 camera service with matching SSL protocol
+        const feedUrl = `${window.location.protocol}//${window.location.hostname}:8003/cameras/${window.cameraId}/feed/?q=4k`;
 
         const img = document.getElementById('mainFeed');
         if (img) {
             // Add cache-buster to force fresh stream on each load
             img.src = feedUrl + '&t=' + new Date().getTime();
-            console.log("Attempting direct feed connection:", window.location.protocol + '//' + window.location.host + feedUrl);
+            console.log("Attempting direct feed connection:", feedUrl);
 
             let retryCount = 0;
             const maxRetries = 10;

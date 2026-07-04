@@ -19,8 +19,9 @@ User = get_user_model()
 logger = logging.getLogger('cameras')
 
 
-def get_video_stream(file_path, start, end):
+async def get_video_stream(file_path, start, end):
     """Generator to stream video in chunks with support for Range requests"""
+    import asyncio
     chunk_size = 1024 * 1024  # 1MB chunks for responsiveness
 
     with open(file_path, 'rb') as f:
@@ -33,6 +34,7 @@ def get_video_stream(file_path, start, end):
                 break
             yield data
             remaining -= read_size
+            await asyncio.sleep(0.001)
 
 
 def is_admin(user):

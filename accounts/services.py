@@ -102,7 +102,7 @@ def get_admin_stats():
     camera_service_online = False
     try:
         internal_url = getattr(settings, 'CAMERA_SERVICE_URL', 'http://localhost:8003')
-        response = requests.get(f"{internal_url}/cameras/", timeout=1)
+        response = requests.get(f"{internal_url}/cameras/", timeout=1, verify=False)
         camera_service_online = (response.status_code == 200)
     except Exception as e:
         logger.warning(f"Camera service connection check failed: {e}")

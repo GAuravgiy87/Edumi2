@@ -35,12 +35,12 @@
     <div class="container">
         <h1>Camera Feed Test</h1>
         <div class="info">
-            <p><strong>Feed URL:</strong> {% url 'camera_feed' 10 %}</p>
+            <p><strong>Feed URL:</strong> <span id="feed-url-text">Loading...</span></p>
             <p><strong>Status:</strong> <span id="status">Loading...</span></p>
         </div>
         
         <h2>Direct Feed:</h2>
-        <img id="feed" src="{% url 'camera_feed' 10 %}" alt="Camera Feed">
+        <img id="feed" src="" alt="Camera Feed">
         
         <div class="info">
             <p>If you see a video feed above, the camera is working!</p>
@@ -55,6 +55,11 @@
     <script>
         const img = document.getElementById('feed');
         const status = document.getElementById('status');
+        const feedUrlText = document.getElementById('feed-url-text');
+        
+        const feedUrl = `${window.location.protocol}//${window.location.hostname}:8003/cameras/10/feed/`;
+        img.src = feedUrl + '?t=' + Date.now();
+        feedUrlText.textContent = feedUrl;
         
         // For MJPEG streams, the onload event doesn't fire
         // So we'll just assume it's loading after 2 seconds
