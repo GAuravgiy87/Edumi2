@@ -24,7 +24,7 @@ $SSL_KEY        = Join-Path $BASE_DIR "certs\edumi.key"
 $SSL_EXPORT     = Join-Path $BASE_DIR "certs\edumi-trust-this.crt"
 $HOSTS_FILE     = "$env:windir\System32\drivers\etc\hosts"
 $DOMAIN         = "edumi.ac.in"
-$PYTHON         = Join-Path $BASE_DIR "venv\Scripts\python.exe"
+$PYTHON         = Join-Path $BASE_DIR "venv311\Scripts\python.exe"
 
 Set-Location $BASE_DIR
 
@@ -294,7 +294,7 @@ Write-Host "      [OK] Migrations done, static files collected" -ForegroundColor
 # =======================================================
 Write-Host "[8/9] Starting Celery worker and Camera Service..." -ForegroundColor Yellow
 
-Start-Process (Join-Path $BASE_DIR "venv\Scripts\celery.exe") `
+Start-Process (Join-Path $BASE_DIR "venv311\Scripts\celery.exe") `
     -ArgumentList "-A school_project worker -l info -P threads" `
     -WorkingDirectory $BASE_DIR -WindowStyle Minimized
 
