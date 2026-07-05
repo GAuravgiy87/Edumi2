@@ -8,8 +8,8 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm border-0" style="border-radius: 16px;">
-                <div class="card-header bg-white py-4 border-0 text-center">
-                    <h3 class="font-weight-bold mb-1">Upload Your Lecture</h3>
+                <div class="card-header bg-white upload-header-override border-0">
+                    <h3 class="font-weight-bold">Upload Your Lecture</h3>
                     <p class="text-muted">Share your knowledge with students around the world.</p>
                 </div>
                 <div class="card-body px-5 pb-5">
@@ -21,18 +21,20 @@
                             <div class="upload-zone mb-4" id="dropZone">
                                 <input type="file" name="video" class="upload-input" id="videoInput" accept="video/*" required>
                                 <div id="uploadPlaceholder">
-                                    <div class="bg-light rounded-circle d-inline-flex p-4 mb-3">
-                                        <i data-lucide="upload" class="text-primary" style="width: 48px; height: 48px;"></i>
+                                    <div class="upload-icon-wrapper text-primary">
+                                        <i data-lucide="upload-cloud" style="width: 44px; height: 44px;"></i>
                                     </div>
-                                    <h5>Select video file to upload</h5>
-                                    <p class="text-muted small">Your videos will be private until you publish them.</p>
-                                    <button type="button" class="btn btn-primary px-4">Select File</button>
+                                    <h5 class="font-weight-bold mb-1">Select video file to upload</h5>
+                                    <p class="text-muted small mb-3">Your videos will be private until you publish them.</p>
+                                    <button type="button" class="btn btn-primary px-4 py-2 font-weight-bold" style="border-radius: 8px;">Select File</button>
                                 </div>
                                 <div id="fileInfo" class="d-none">
-                                    <i data-lucide="check-circle" class="text-success mb-2" style="width: 48px; height: 48px;"></i>
-                                    <h5 id="fileName" class="mb-1"></h5>
+                                    <div class="upload-icon-wrapper text-success">
+                                        <i data-lucide="check-circle" style="width: 44px; height: 44px;"></i>
+                                    </div>
+                                    <h5 id="fileName" class="font-weight-bold mb-1"></h5>
                                     <p id="fileSize" class="text-muted small mb-3"></p>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetUpload()">Change File</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnChangeFile">Change File</button>
                                 </div>
                             </div>
                         </div>
@@ -58,7 +60,7 @@
                                     <div class="mb-4">
                                         <label class="form-label font-weight-bold">Thumbnail</label>
                                         <p class="text-muted small">Select or upload a picture that shows what's in your video.</p>
-                                        <div class="thumbnail-selector" onclick="document.getElementById('thumbInput').click()">
+                                        <div class="thumbnail-selector" id="thumbSelector">
                                             <input type="file" name="thumbnail" id="thumbInput" accept="image/*" class="d-none">
                                             <div id="thumbPreviewWrapper" class="w-100 aspect-ratio-16-9 bg-light rounded d-flex flex-column align-items-center justify-content-center border overflow-hidden">
                                                 <i data-lucide="image-plus" class="text-muted mb-2"></i>
@@ -91,7 +93,7 @@
                             </div>
 
                             <div class="d-flex justify-content-end gap-3 pt-3">
-                                <button type="button" class="btn btn-light px-4" onclick="resetUpload()">Cancel</button>
+                                <button type="button" class="btn btn-light px-4" id="btnCancelUpload">Cancel</button>
                                 <button type="submit" class="btn btn-primary px-5 font-weight-bold" id="submitBtn">Publish Lecture</button>
                             </div>
                         </div>
@@ -103,19 +105,49 @@
 </div>
 
 <style>
+    /* Card Header Flex Override */
+    .card-header.upload-header-override {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        padding: 30px 24px 20px 24px !important;
+        border-bottom: none !important;
+    }
+    
+    .card-header.upload-header-override h3 {
+        color: var(--text-main) !important;
+        font-weight: 700;
+        margin-bottom: 6px !important;
+    }
+    
+    .card-header.upload-header-override p {
+        color: var(--text-muted) !important;
+        margin: 0 !important;
+        font-size: 14px;
+    }
+
+    /* Upload Zone */
     .upload-zone {
-        border: 2px dashed #e2e8f0;
-        border-radius: 12px;
+        border: 2px dashed var(--border-color);
+        border-radius: 16px;
         padding: 60px 20px;
+        transition: all 0.25s ease;
+        background: var(--bg-body);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         text-align: center;
         position: relative;
-        transition: all 0.3s;
-        background: #f8fafc;
     }
+    
     .upload-zone:hover, .upload-zone.dragover {
-        border-color: #6366f1;
-        background: #f5f3ff;
+        border-color: var(--primary);
+        background: var(--hover-bg);
     }
+    
     .upload-input {
         position: absolute;
         width: 100%;
@@ -124,21 +156,113 @@
         left: 0;
         opacity: 0;
         cursor: pointer;
+        z-index: 10;
     }
-    .aspect-ratio-16-9 {
-        aspect-ratio: 16/9;
+    
+    #uploadPlaceholder, #fileInfo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        width: 100%;
     }
+    
+    .upload-icon-wrapper {
+        background: var(--hover-bg);
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid var(--border-color);
+        transition: all 0.25s ease;
+    }
+    
+    .upload-zone:hover .upload-icon-wrapper {
+        border-color: var(--primary);
+        color: var(--primary) !important;
+        transform: translateY(-4px);
+    }
+
+    /* Thumbnail Selector */
     .thumbnail-selector {
         cursor: pointer;
-        transition: transform 0.2s;
+        transition: transform 0.2s ease, border-color 0.2s ease;
     }
+    
     .thumbnail-selector:hover {
-        transform: scale(1.02);
+        transform: scale(1.01);
     }
+    
+    #thumbPreviewWrapper {
+        aspect-ratio: 16/9;
+        background: var(--hover-bg);
+        border: 1px dashed var(--border-color);
+        border-radius: 8px;
+        transition: border-color 0.2s ease;
+    }
+    
+    .thumbnail-selector:hover #thumbPreviewWrapper {
+        border-color: var(--primary);
+    }
+    
     #thumbPreviewWrapper img {
         width: 100%;
         height: 100%;
         object-fit: cover;
+    }
+
+    /* Input & Form Styling */
+    .form-control, .form-select {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        border-radius: 8px;
+        font-size: 14px;
+        padding: 10px 14px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        background-color: var(--bg-card);
+        border-color: var(--primary);
+        color: var(--text-main);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+    }
+    
+    .form-control-lg {
+        font-size: 16px;
+        padding: 12px 16px;
+        font-weight: 500;
+    }
+    
+    .form-label {
+        color: var(--text-main);
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    
+    /* Dark Mode Settings override */
+    body.dark-mode .card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color) !important;
+    }
+    
+    body.dark-mode .bg-white {
+        background-color: var(--bg-card) !important;
+    }
+
+    /* Progress bar */
+    .progress {
+        background-color: var(--border-color);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .progress-bar {
+        background-color: var(--primary);
     }
 </style>
 
@@ -213,6 +337,22 @@
         if (window.lucide) lucide.createIcons();
     }
 
+    // Programmatic event listeners to fix global scope reference bugs
+    const btnChangeFile = document.getElementById('btnChangeFile');
+    if (btnChangeFile) {
+        btnChangeFile.addEventListener('click', resetUpload);
+    }
+    const btnCancelUpload = document.getElementById('btnCancelUpload');
+    if (btnCancelUpload) {
+        btnCancelUpload.addEventListener('click', resetUpload);
+    }
+    const thumbSelector = document.getElementById('thumbSelector');
+    if (thumbSelector) {
+        thumbSelector.addEventListener('click', () => {
+            thumbInput.click();
+        });
+    }
+
     // Thumbnail preview
     thumbInput.addEventListener('change', function(e) {
         const file = this.files[0];
@@ -228,7 +368,6 @@
     // Form submission with progress
     document.getElementById('lectureUploadForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        console.log("Form submitted!");
         
         const formData = new FormData(this);
         const submitBtn = document.getElementById('submitBtn');
@@ -238,26 +377,21 @@
 
         submitBtn.disabled = true;
         progressDiv.classList.remove('d-none');
-        console.log("Starting upload...");
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '{% url "camera_upload_video" %}', true);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
         xhr.upload.onprogress = function(e) {
-            console.log("Upload progress:", e.loaded, "/", e.total);
             if (e.lengthComputable) {
                 const percent = Math.round((e.loaded / e.total) * 100);
-                console.log("Percent:", percent);
                 progressBar.style.width = percent + '%';
                 progressPercent.textContent = percent + '%';
             }
         };
 
         xhr.onload = function() {
-            console.log("XHR onload!", xhr.status);
             if (xhr.status === 200) {
-                console.log("Response text:", xhr.responseText);
                 try {
                     const response = JSON.parse(xhr.responseText);
                     if (response.status === 'success') {
@@ -267,7 +401,6 @@
                         submitBtn.disabled = false;
                     }
                 } catch (e) {
-                    console.error("JSON parse error:", e);
                     alert("Invalid server response. Please try again.");
                     submitBtn.disabled = false;
                 }

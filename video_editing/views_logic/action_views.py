@@ -17,7 +17,7 @@ def add_edit_action(request, session_id):
     session = get_object_or_404(VideoEditSession, id=session_id, created_by=request.user)
 
     action_type = request.POST.get('action_type')
-    parameters = {}
+    parameters = {}  
 
     # Parse parameters based on action type
     if action_type == 'split':
@@ -67,7 +67,16 @@ def add_edit_action(request, session_id):
             edit_action.audio_file = request.FILES['audio']
             edit_action.save()
 
-    return JsonResponse({'status': 'success'})
+    return JsonResponse({
+        'status': 'success',
+        'action': {
+            'id': edit_action.id,
+            'action_type': edit_action.action_type,
+            'action_type_display': edit_action.get_action_type_display(),
+            'parameters': edit_action.parameters,
+            'order': edit_action.order,
+        }
+    })
 
 
 @login_required

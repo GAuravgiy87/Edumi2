@@ -65,12 +65,18 @@
                             {% endif %}
                         </td>
                         <td>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input publish-toggle" type="checkbox" 
-                                       data-id="{{ rec.id }}" {% if rec.is_published %}checked{% endif %}>
-                                <label class="form-check-label small text-muted">
-                                    {{ rec.is_published|yesno:"Public,Private" }}
-                                </label>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input publish-toggle" type="checkbox" style="cursor: pointer;"
+                                           data-id="{{ rec.id }}" {% if rec.is_published %}checked{% endif %}>
+                                </div>
+                                <span class="badge visibility-badge px-2 py-1 d-inline-flex align-items-center gap-1 {% if rec.is_published %}bg-success-light text-success{% else %}bg-secondary-light text-secondary{% endif %}" id="visibility-badge-{{ rec.id }}" style="font-size: 11px; font-weight: 600;">
+                                    {% if rec.is_published %}
+                                    <i data-lucide="globe" style="width: 12px; height: 12px;"></i> Public
+                                    {% else %}
+                                    <i data-lucide="lock" style="width: 12px; height: 12px;"></i> Private
+                                    {% endif %}
+                                </span>
                             </div>
                         </td>
                         <td>
@@ -90,22 +96,25 @@
                             {{ rec.created_at|date:"H:i" }}
                         </td>
                         <td class="px-4 text-end">
-                            <div class="dropdown">
-                                <button class="btn btn-light btn-sm rounded-circle" data-bs-toggle="dropdown">
-                                    <i data-lucide="more-vertical" style="width: 18px;"></i>
+                            <div style="position: relative; display: inline-block;">
+                                <button class="btn-action-trigger d-inline-flex align-items-center justify-content-center" 
+                                        data-id="{{ rec.id }}"
+                                        aria-label="Actions">
+                                    <i data-lucide="more-vertical" style="width: 18px; height: 18px;"></i>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-                                    <li><a class="dropdown-item py-2" href="{% url 'watch_recording' rec.id %}">
-                                        <i data-lucide="play" class="me-2" style="width: 16px;"></i> Watch
-                                    </a></li>
-                                    <li><a class="dropdown-item py-2" href="{% url 'edit_recording' rec.id %}">
-                                        <i data-lucide="edit-3" class="me-2" style="width: 16px;"></i> Edit
-                                    </a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><button class="dropdown-item py-2 text-danger delete-rec-btn" data-id="{{ rec.id }}" data-title="{{ rec.title }}">
-                                        <i data-lucide="trash-2" class="me-2" style="width: 16px;"></i> Delete
-                                    </button></li>
-                                </ul>
+                                
+                                <div class="custom-portal-dropdown" id="portal-menu-{{ rec.id }}" style="display: none;">
+                                    <a class="dropdown-portal-item" href="{% url 'watch_recording' rec.id %}">
+                                        <i data-lucide="play" style="width: 16px; height: 16px;"></i> Watch
+                                    </a>
+                                    <a class="dropdown-portal-item" href="{% url 'edit_recording' rec.id %}">
+                                        <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i> Edit
+                                    </a>
+                                    <div class="dropdown-portal-divider"></div>
+                                    <button class="dropdown-portal-item text-danger delete-rec-btn" data-id="{{ rec.id }}" data-title="{{ rec.title }}">
+                                        <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Delete
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -175,6 +184,8 @@
         const editModal = new bootstrap.Modal(document.getElementById('editModal'));
         const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
         let currentDeleteId = null;
+        let activeDropdown = null;
+        let activeTrigger = null;
 
         // Toggle Visibility
         document.querySelectorAll('.publish-toggle').forEach(toggle => {
@@ -187,7 +198,19 @@
                     }
                 }).then(res => res.json()).then(data => {
                     if (data.status === 'success') {
-                        this.nextElementSibling.textContent = data.is_published ? 'Public' : 'Private';
+                        const badge = document.getElementById(`visibility-badge-${id}`);
+                        if (badge) {
+                            if (data.is_published) {
+                                badge.className = 'badge visibility-badge px-2 py-1 d-inline-flex align-items-center gap-1 bg-success-light text-success';
+                                badge.innerHTML = '<i data-lucide="globe" style="width: 12px; height: 12px;"></i> Public';
+                            } else {
+                                badge.className = 'badge visibility-badge px-2 py-1 d-inline-flex align-items-center gap-1 bg-secondary-light text-secondary';
+                                badge.innerHTML = '<i data-lucide="lock" style="width: 12px; height: 12px;"></i> Private';
+                            }
+                            if (window.lucide) {
+                                lucide.createIcons();
+                            }
+                        }
                     }
                 });
             });
@@ -223,19 +246,112 @@
             });
         });
 
-        // Delete
-        document.querySelectorAll('.delete-rec-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                currentDeleteId = this.dataset.id;
-                document.getElementById('deleteTitle').textContent = this.dataset.title;
-                deleteModal.show();
+        // Dropdown Portal Engine
+        function closeActiveDropdown() {
+            if (activeDropdown && activeTrigger) {
+                activeDropdown.classList.remove('show');
+                activeTrigger.classList.remove('active');
+                
+                const dropdown = activeDropdown;
+                const triggerContainer = activeTrigger.parentElement;
+                setTimeout(() => {
+                    if (dropdown && !dropdown.classList.contains('show') && dropdown.parentElement === document.body) {
+                        dropdown.style.display = 'none';
+                        triggerContainer.appendChild(dropdown);
+                    }
+                }, 150);
+                
+                activeDropdown = null;
+                activeTrigger = null;
+            }
+        }
+
+        document.querySelectorAll('.btn-action-trigger').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const id = this.dataset.id;
+                const dropdown = document.getElementById('portal-menu-' + id);
+                
+                if (activeTrigger === this) {
+                    closeActiveDropdown();
+                    return;
+                }
+                
+                closeActiveDropdown();
+                
+                activeTrigger = this;
+                activeDropdown = dropdown;
+                
+                this.classList.add('active');
+                
+                // Append to body (Portal)
+                document.body.appendChild(dropdown);
+                dropdown.style.display = 'flex';
+                dropdown.style.flexDirection = 'column';
+                
+                // Force reflow
+                dropdown.offsetHeight;
+                
+                // Measure position
+                const rect = this.getBoundingClientRect();
+                const dropdownWidth = 150;
+                const dropdownHeight = dropdown.offsetHeight || 135;
+                
+                let top = rect.bottom + 6;
+                let left = rect.right - dropdownWidth;
+                
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Automatic Flipping (upward)
+                if (rect.bottom + dropdownHeight > viewportHeight && rect.top > dropdownHeight) {
+                    top = rect.top - dropdownHeight - 6;
+                }
+                
+                // Keep horizontally on screen
+                if (left < 12) {
+                    left = 12;
+                } else if (left + dropdownWidth > viewportWidth - 12) {
+                    left = viewportWidth - dropdownWidth - 12;
+                }
+                
+                // Keep vertically on screen
+                if (top < 12) {
+                    top = 12;
+                }
+                
+                dropdown.style.top = `${top}px`;
+                dropdown.style.left = `${left}px`;
+                
+                dropdown.classList.add('show');
             });
+        });
+
+        // Close on clicks outside
+        document.addEventListener('click', function(e) {
+            if (activeDropdown && !activeDropdown.contains(e.target)) {
+                closeActiveDropdown();
+            }
+        });
+
+        // Close on scroll or resize to prevent layout detachment
+        window.addEventListener('scroll', closeActiveDropdown, { passive: true });
+        window.addEventListener('resize', closeActiveDropdown, { passive: true });
+
+        // Event delegation for delete clicks inside portalled dropdowns
+        document.body.addEventListener('click', function(e) {
+            const btn = e.target.closest('.delete-rec-btn');
+            if (btn) {
+                currentDeleteId = btn.dataset.id;
+                document.getElementById('deleteTitle').textContent = btn.dataset.title;
+                deleteModal.show();
+                closeActiveDropdown();
+            }
         });
 
         document.getElementById('confirmDelete').addEventListener('click', function() {
             if (!currentDeleteId) return;
             
-            // Note: We need a delete view for CameraRecording. I'll add it.
             fetch(`/cameras/delete-recording/${currentDeleteId}/`, {
                 method: 'POST',
                 headers: {
@@ -251,9 +367,138 @@
 </script>
 
 <style>
-    .bg-success-light { background: #dcfce7; }
-    .bg-warning-light { background: #fef9c3; }
-    .bg-danger-light { background: #fee2e2; }
-    .bg-secondary-light { background: #f1f5f9; }
+    /* Light/Dark Badge Overrides */
+    .bg-success-light { background: #dcfce7; color: #15803d !important; }
+    .bg-warning-light { background: #fef9c3; color: #a16207 !important; }
+    .bg-danger-light { background: #fee2e2; color: #b91c1c !important; }
+    .bg-secondary-light { background: #f1f5f9; color: #475569 !important; }
+
+    body.dark-mode .bg-success-light { background: rgba(22, 163, 74, 0.2); color: #4ade80 !important; }
+    body.dark-mode .bg-warning-light { background: rgba(202, 138, 4, 0.2); color: #facc15 !important; }
+    body.dark-mode .bg-danger-light { background: rgba(220, 38, 38, 0.2); color: #f87171 !important; }
+    body.dark-mode .bg-secondary-light { background: rgba(100, 116, 139, 0.2); color: #cbd5e1 !important; }
+
+    /* Professional Table UX & Sticky Headers */
+    .table-responsive {
+        max-height: 75vh;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+    }
+    
+    .table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--bg-card);
+        border-bottom: 2px solid var(--border-color) !important;
+    }
+    
+    /* Row hover effect */
+    .table tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    
+    .table tbody tr:hover {
+        background-color: var(--hover-bg) !important;
+    }
+    
+    /* Action trigger button */
+    .btn-action-trigger {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid var(--border-color);
+        background: var(--bg-card);
+        color: var(--text-main);
+        cursor: pointer;
+        padding: 0;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-action-trigger:hover, .btn-action-trigger.active {
+        background: var(--hover-bg);
+        border-color: var(--primary);
+        color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+    }
+    
+    /* Custom Portal Dropdown (Body-level fixed element) */
+    .custom-portal-dropdown {
+        position: fixed;
+        z-index: 999999;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 16px -6px rgba(0, 0, 0, 0.05);
+        padding: 6px;
+        min-width: 150px;
+        
+        /* Fade & Scale Transitions */
+        opacity: 0;
+        transform: scale(0.95);
+        pointer-events: none;
+        transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .custom-portal-dropdown.show {
+        opacity: 1;
+        transform: scale(1);
+        pointer-events: auto;
+    }
+    
+    body.dark-mode .custom-portal-dropdown {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 16px -6px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* Dropdown Items */
+    .dropdown-portal-item {
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: none;
+        color: var(--text-main) !important;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 8px;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    
+    .dropdown-portal-item:hover {
+        background: var(--hover-bg);
+        color: var(--primary) !important;
+    }
+    
+    .dropdown-portal-item i, .dropdown-portal-item svg {
+        color: var(--text-muted);
+        transition: color 0.15s ease;
+    }
+    
+    .dropdown-portal-item:hover i, .dropdown-portal-item:hover svg {
+        color: var(--primary);
+    }
+    
+    .dropdown-portal-item.text-danger {
+        color: var(--danger) !important;
+    }
+    
+    .dropdown-portal-item.text-danger:hover {
+        background: rgba(239, 68, 68, 0.08);
+        color: var(--danger) !important;
+    }
+    
+    .dropdown-portal-item.text-danger i, .dropdown-portal-item.text-danger svg {
+        color: var(--danger);
+    }
+    
+    .dropdown-portal-divider {
+        border-top: 1px solid var(--border-color);
+        margin: 6px 0;
+    }
 </style>
 {% endblock %}

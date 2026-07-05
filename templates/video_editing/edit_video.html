@@ -239,7 +239,7 @@
                     {% if actions %}
                     <ul class="list-group" id="actionList">
                         {% for action in actions %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <li class="list-group-item d-flex justify-content-between align-items-center" id="action-item-{{ action.id }}">
                             <div>
                                 <strong>{{ action.get_action_type_display }}</strong>
                                 {% if action.parameters.text %}
@@ -378,6 +378,64 @@ function seekTo(percentage) {
     }
 }
 
+function appendActionDOM(action) {
+    const container = document.getElementById('actionListContainer');
+    let ul = document.getElementById('actionList');
+    if (!ul) {
+        container.innerHTML = '';
+        ul = document.createElement('ul');
+        ul.className = 'list-group';
+        ul.id = 'actionList';
+        container.appendChild(ul);
+    }
+    
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.id = `action-item-${action.id}`;
+    
+    let textHTML = `<strong>${action.action_type_display}</strong>`;
+    if (action.parameters && action.parameters.text) {
+        const safeText = action.parameters.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        textHTML += `<br><small>"${safeText}"</small>`;
+    }
+    
+    li.innerHTML = `
+        <div>
+            ${textHTML}
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="removeEditAction(${action.id})">
+            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+        </button>
+    `;
+    
+    ul.appendChild(li);
+    lucide.createIcons();
+    
+    const countEl = document.getElementById('actionCount');
+    if (countEl) {
+        countEl.textContent = parseInt(countEl.textContent || '0') + 1;
+    }
+}
+
+function removeActionDOM(actionId) {
+    const li = document.getElementById(`action-item-${actionId}`);
+    if (li) {
+        li.remove();
+    }
+    
+    const ul = document.getElementById('actionList');
+    if (ul && ul.children.length === 0) {
+        ul.remove();
+        const container = document.getElementById('actionListContainer');
+        container.innerHTML = '<p class="text-muted">No edit actions added yet.</p>';
+    }
+    
+    const countEl = document.getElementById('actionCount');
+    if (countEl) {
+        countEl.textContent = Math.max(0, parseInt(countEl.textContent || '0') - 1);
+    }
+}
+
 async function addEditAction(actionType) {
     let form;
     let formData = new FormData();
@@ -421,7 +479,7 @@ async function addEditAction(actionType) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            window.location.reload();
+            appendActionDOM(data.action);
         } else {
             alert('Error adding action: ' + (data.message || 'Unknown error'));
         }
@@ -446,7 +504,7 @@ async function addAudioAction() {
         const data = await response.json();
         
         if (data.status === 'success') {
-            window.location.reload();
+            appendActionDOM(data.action);
         } else {
             alert('Error adding audio: ' + (data.message || 'Unknown error'));
         }
@@ -467,7 +525,7 @@ async function removeEditAction(actionId) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            window.location.reload();
+            removeActionDOM(actionId);
         } else {
             alert('Error removing action: ' + (data.message || 'Unknown error'));
         }
