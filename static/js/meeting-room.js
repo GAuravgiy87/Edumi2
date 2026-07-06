@@ -115,7 +115,7 @@ function renderParticipants() {
     Object.values(_peers).forEach(d => {
         const item = document.createElement('div');
         item.className = 'participant-item';
-        item.innerHTML = `<div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${encodeURIComponent(d.username)}&background=1877f2&color=fff" alt="${d.username}"></div>
+        item.innerHTML = `<div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${encodeURIComponent(d.username)}&background=1877f2&color=fff" alt="${d.username}"><span class="status-indicator"></span></div>
             <div class="participant-info"><div class="participant-name">${d.username}</div>
             <div style="display:flex;gap:4px;margin-top:2px;">
                 ${d.isAdmin ? '<span class="host-label" style="background:#ef4444;font-size:10px;padding:1px 6px;">Admin</span>' : ''}
@@ -195,10 +195,13 @@ function sendChatMessage() {
     ws.send(JSON.stringify({ type: 'chat', message: msg, timestamp: new Date().toISOString() }));
     appendChatMessage('You', msg, true);
     input.value = '';
+    document.getElementById('chatSendBtn')?.classList.remove('ready');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('chatInput')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
+    const input = document.getElementById('chatInput');
+    input?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
+    input?.addEventListener('input', e => { document.getElementById('chatSendBtn')?.classList.toggle('ready', e.target.value.trim().length > 0); });
 });
 
 function appendChatMessage(username, message, isOwn, timestamp) {
@@ -208,7 +211,7 @@ function appendChatMessage(username, message, isOwn, timestamp) {
     div.className = `chat-msg${isOwn ? ' own' : ''}`;
     const time = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     div.innerHTML = `<div class="chat-msg-header"><strong>${username}</strong><span class="chat-msg-time">${time}</span></div><div class="chat-msg-text">${message}</div>`;
-    box.appendChild(div); box.scrollTop = box.scrollHeight;
+    box.prepend(div);
     const panel = document.getElementById('chatPanel');
     if (!panel?.classList.contains('active')) { const b = document.getElementById('chatBadge'); if (b) { b.style.display = 'inline'; b.textContent = (parseInt(b.textContent) || 0) + 1; } }
 }

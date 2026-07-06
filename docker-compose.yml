@@ -1,239 +1,161 @@
-# ==============================================================================
-#  EduMi 2 — Production Docker Compose
-#  Services: postgres, redis, livekit, web (daphne), worker (celery),
-#            camera_service, nginx
-#  Usage: docker-compose up -d
-# ==============================================================================
-
-x-django-env: &django-env
-  SECRET_KEY:              "${SECRET_KEY}"
-  DEBUG:                   "False"
-  ALLOWED_HOSTS:           "${DOMAIN:-localhost},www.${DOMAIN:-localhost},localhost,127.0.0.1"
-  CSRF_TRUSTED_ORIGINS:    "https://${DOMAIN:-localhost},https://www.${DOMAIN:-localhost}"
-  DATABASE_URL:            "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
-  REDIS_URL:               "redis://redis:6379/0"
-  LIVEKIT_URL:             "wss://${DOMAIN:-localhost}/livekit-proxy"
-  LIVEKIT_INTERNAL_URL:    "ws://livekit:7880"
-  LIVEKIT_INTERNAL_HTTP_URL: "http://livekit:7880"
-  LIVEKIT_API_KEY:         "${LIVEKIT_API_KEY}"
-  LIVEKIT_API_SECRET:      "${LIVEKIT_API_SECRET}"
-  FACE_ENCRYPTION_KEY:     "${FACE_ENCRYPTION_KEY}"
-  FACE_MATCH_THRESHOLD:    "0.50"
-  FACE_PRESENCE_DURATION:  "30"
-  CAMERA_SERVICE_URL:      "http://camera_service:8003"
-  LOG_LEVEL:               "WARNING"
-  SECURE_SSL_REDIRECT:     "False"   # Nginx handles SSL, not Django
-  SESSION_COOKIE_SECURE:   "True"
-  CSRF_COOKIE_SECURE:      "True"
-  SECURE_HSTS_SECONDS:     "31536000"
-  SECURE_HSTS_INCLUDE_SUBDOMAINS: "True"
-  TIME_ZONE:               "${TIME_ZONE:-Asia/Kolkata}"
-  FORCE_REDIS_CHANNELS:    "True"
+version: "3.9"
 
 services:
-
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  # -------------------------------------------------
+  # PostgreSQL – persisted data on host volume
+  # -------------------------------------------------
   db:
     image: postgres:15-alpine
     container_name: edumi_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB:       "${POSTGRES_DB:-edumi}"
-      POSTGRES_USER:     "${POSTGRES_USER:-edumi}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: edumi_db
+      POSTGRES_USER: edumi_user
+      POSTGRES_PASSWORD: edumi_pass
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-edumi} -d ${POSTGRES_DB:-edumi}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U edumi_user"]
+      interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 10s
-    networks:
-      - edumi_net
 
-  # ── Redis ────────────────────────────────────────────────────────────────────
+  # -------------------------------------------------
+  # Redis – required for Channels & Celery
+  # -------------------------------------------------
   redis:
     image: redis:7-alpine
     container_name: edumi_redis
     restart: unless-stopped
-    command: >
-      redis-server
-        --save 60 1
-        --loglevel warning
-        --maxmemory 256mb
-        --maxmemory-policy allkeys-lru
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - edumi_net
+    ports:
+      - "6379:6379"
 
-  # ── LiveKit WebRTC SFU ───────────────────────────────────────────────────────
+  # -------------------------------------------------
+  # LiveKit – media/SFU server
+  # -------------------------------------------------
   livekit:
     image: livekit/livekit-server:latest
     container_name: edumi_livekit
     restart: unless-stopped
-    command: --config /etc/livekit/livekit.yaml
     ports:
-      - "7881:7881/tcp"    # LiveKit TCP relay (exposed for WebRTC)
-      - "7882:7882/udp"    # LiveKit UDP  (exposed for WebRTC)
-    volumes:
-      - ./config/livekit.yaml:/etc/livekit/livekit.yaml:ro
-    networks:
-      - edumi_net
-
-  # ── Django / Daphne ASGI ─────────────────────────────────────────────────────
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-    image: edumi_web:latest
-    container_name: edumi_web
-    restart: unless-stopped
-    command: >
-      sh -c "
-        python manage.py migrate --noinput &&
-        python manage.py collectstatic --noinput --clear -v 0 &&
-        daphne -b 0.0.0.0 -p 8002 school_project.asgi:application
-      "
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50200:50000-50200/udp"
     environment:
-      <<: *django-env
-    volumes:
-      - media_data:/app/database/media
-      - static_data:/app/staticfiles
-      - log_data:/app/logs
-      - ./certs:/app/certs:ro
+      LIVEKIT_PORT: "7880"
+
+  # -------------------------------------------------
+  # Django web containers – one per logical domain
+  # -------------------------------------------------
+  auth:
+    build: .
+    container_name: edumi_auth
+    restart: unless-stopped
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8002", "school_project.asgi:application"]
+    env_file: .env
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsk https://localhost:8002/health/ || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - edumi_net
+        condition: service_started
+    ports:
+      - "8002:8002"
 
-  # ── Celery Worker ────────────────────────────────────────────────────────────
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-    image: edumi_web:latest
-    container_name: edumi_worker
+  admin:
+    build: .
+    container_name: edumi_admin
     restart: unless-stopped
-    command: >
-      celery -A school_project worker
-        -l warning
-        -P threads
-        --concurrency=4
-        --max-tasks-per-child=100
-    environment:
-      <<: *django-env
-    volumes:
-      - media_data:/app/database/media
-      - log_data:/app/logs
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - edumi_net
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8003", "school_project.asgi:application"]
+    env_file: .env
+    depends_on: [db, redis]
 
-  # ── Camera AI Service ─────────────────────────────────────────────────────────
-  camera_service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-    image: edumi_web:latest
+  meeting:
+    build: .
+    container_name: edumi_meeting
+    restart: unless-stopped
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8004", "school_project.asgi:application"]
+    env_file: .env
+    depends_on: [db, redis]
+
+  camera:
+    build: .
     container_name: edumi_camera
     restart: unless-stopped
-    command: python camera_service/serve.py
-    environment:
-      <<: *django-env
-    volumes:
-      - media_data:/app/database/media
-      - log_data:/app/logs
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsk http://localhost:8003/health/ || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - edumi_net
+    command: ["python", "camera_service/serve.py"]
+    env_file: .env
+    depends_on: [db, redis]
 
-  # ── Nginx Reverse Proxy ───────────────────────────────────────────────────────
+  msg:
+    build: .
+    container_name: edumi_msg
+    restart: unless-stopped
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8005", "school_project.asgi:application"]
+    env_file: .env
+    depends_on: [db, redis]
+
+  profile:
+    build: .
+    container_name: edumi_profile
+    restart: unless-stopped
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8006", "school_project.asgi:application"]
+    env_file: .env
+    depends_on: [db, redis]
+
+  video:
+    build: .
+    container_name: edumi_video
+    restart: unless-stopped
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8007", "school_project.asgi:application"]
+    env_file: .env
+    depends_on: [db, redis]
+
+  video_editing:
+    build: .
+    container_name: edumi_video_editing
+    restart: unless-stopped
+    command: ["python", "video_editing/manage_editing.py"]
+    env_file: .env
+    depends_on: [db, redis]
+
+  live_stream:
+    build: .
+    container_name: edumi_live_stream
+    restart: unless-stopped
+    command: ["python", "live_stream/run_stream.py"]
+    env_file: .env
+    depends_on: [db, redis, livekit]
+
+  # -------------------------------------------------
+  # Celery worker – single instance (scale as needed)
+  # -------------------------------------------------
+  celery:
+    build: .
+    container_name: edumi_celery
+    restart: unless-stopped
+    command: ["celery", "-A", "school_project", "worker", "-l", "info", "-P", "threads"]
+    env_file: .env
+    depends_on: [db, redis]
+
+  # -------------------------------------------------
+  # Optional Nginx reverse‑proxy for HTTPS termination
+  # -------------------------------------------------
   nginx:
-    image: nginx:1.25-alpine
+    image: nginx:stable-alpine
     container_name: edumi_nginx
     restart: unless-stopped
     ports:
-      - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./certs:/etc/nginx/certs:ro
-      - static_data:/app/static:ro
-      - media_data:/app/media:ro
-      - certbot_www:/var/www/certbot:ro
-      - certbot_certs:/etc/letsencrypt:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/ssl/certs:ro
+      - ./staticfiles:/app/staticfiles:ro
     depends_on:
-      web:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "nginx -t 2>/dev/null && curl -sf http://localhost/health/ || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - edumi_net
-
-  # ── Certbot (Let's Encrypt auto-renewal) ─────────────────────────────────────
-  certbot:
-    image: certbot/certbot:latest
-    container_name: edumi_certbot
-    restart: unless-stopped
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_certs:/etc/letsencrypt
-    entrypoint: >
-      sh -c "trap exit TERM;
-             while :; do
-               certbot renew --webroot -w /var/www/certbot --quiet;
-               sleep 12h & wait $${!};
-             done"
-    profiles:
-      - production    # Only starts when: docker-compose --profile production up
-
-volumes:
-  postgres_data:  { name: edumi_postgres }
-  redis_data:     { name: edumi_redis }
-  static_data:    { name: edumi_static }
-  media_data:     { name: edumi_media }
-  log_data:       { name: edumi_logs }
-  certbot_www:    { name: edumi_certbot_www }
-  certbot_certs:  { name: edumi_certbot_certs }
-
-networks:
-  edumi_net:
-    name: edumi_network
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
+      - auth
+      - admin
+      - meeting
+      - camera
+      - msg
+      - profile
+      - video
+      - video_editing
+      - live_stream

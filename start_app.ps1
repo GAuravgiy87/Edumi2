@@ -24,7 +24,7 @@ $SSL_KEY        = Join-Path $BASE_DIR "certs\edumi.key"
 $SSL_EXPORT     = Join-Path $BASE_DIR "certs\edumi-trust-this.crt"
 $HOSTS_FILE     = "$env:windir\System32\drivers\etc\hosts"
 $DOMAIN         = "edumi.ac.in"
-$PYTHON         = Join-Path $BASE_DIR "venv311\Scripts\python.exe"
+$PYTHON         = Join-Path $BASE_DIR "venv\Scripts\python.exe"
 
 Set-Location $BASE_DIR
 
@@ -272,6 +272,17 @@ if (Test-Path $LIVEKIT) {
 } else {
     Write-Host "      LiveKit binary not found - SKIP" -ForegroundColor DarkYellow
 }
+# =======================================================
+# STEP 6.5: POSTGRESQL
+# =======================================================
+Write-Host "[6.5/9] Starting PostgreSQL service..." -ForegroundColor Yellow
+try {
+    Start-Service -Name postgresql-x64-15 -ErrorAction Stop
+    Write-Host "      [OK] PostgreSQL started" -ForegroundColor Green
+} catch {
+    Write-Host "      [WARN] PostgreSQL service not found or already running" -ForegroundColor Yellow
+}
+Start-Sleep -Seconds 5
 Start-Sleep -Seconds 2
 
 
@@ -295,7 +306,7 @@ Write-Host "      [OK] Migrations done, static files collected" -ForegroundColor
 # =======================================================
 Write-Host "[8/9] Starting Celery worker and Camera Service..." -ForegroundColor Yellow
 
-Start-Process (Join-Path $BASE_DIR "venv311\Scripts\celery.exe") `
+Start-Process (Join-Path $BASE_DIR "venv\Scripts\celery.exe") `
     -ArgumentList "-A school_project worker -l info -P threads" `
     -WorkingDirectory $BASE_DIR -WindowStyle Minimized
 
