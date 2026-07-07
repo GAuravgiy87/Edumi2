@@ -1,4 +1,4 @@
-version: "3.9"
+# version removed (Compose V2) – not needed
 
 services:
   # -------------------------------------------------
@@ -48,7 +48,11 @@ services:
   # Django web containers – one per logical domain
   # -------------------------------------------------
   auth:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_auth
     restart: unless-stopped
     command: ["daphne", "-b", "0.0.0.0", "-p", "8002", "school_project.asgi:application"]
@@ -62,7 +66,11 @@ services:
       - "8002:8002"
 
   admin:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_admin
     restart: unless-stopped
     command: ["daphne", "-b", "0.0.0.0", "-p", "8003", "school_project.asgi:application"]
@@ -70,7 +78,11 @@ services:
     depends_on: [db, redis]
 
   meeting:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_meeting
     restart: unless-stopped
     command: ["daphne", "-b", "0.0.0.0", "-p", "8004", "school_project.asgi:application"]
@@ -78,7 +90,11 @@ services:
     depends_on: [db, redis]
 
   camera:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_camera
     restart: unless-stopped
     command: ["python", "camera_service/serve.py"]
@@ -86,7 +102,11 @@ services:
     depends_on: [db, redis]
 
   msg:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_msg
     restart: unless-stopped
     command: ["daphne", "-b", "0.0.0.0", "-p", "8005", "school_project.asgi:application"]
@@ -94,7 +114,11 @@ services:
     depends_on: [db, redis]
 
   profile:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_profile
     restart: unless-stopped
     command: ["daphne", "-b", "0.0.0.0", "-p", "8006", "school_project.asgi:application"]
@@ -102,7 +126,11 @@ services:
     depends_on: [db, redis]
 
   video:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_video
     restart: unless-stopped
     command: ["daphne", "-b", "0.0.0.0", "-p", "8007", "school_project.asgi:application"]
@@ -110,7 +138,11 @@ services:
     depends_on: [db, redis]
 
   video_editing:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_video_editing
     restart: unless-stopped
     command: ["python", "video_editing/manage_editing.py"]
@@ -118,7 +150,11 @@ services:
     depends_on: [db, redis]
 
   live_stream:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_live_stream
     restart: unless-stopped
     command: ["python", "live_stream/run_stream.py"]
@@ -129,7 +165,11 @@ services:
   # Celery worker – single instance (scale as needed)
   # -------------------------------------------------
   celery:
-    build: .
+    build:
+      context: .
+      args:
+        SECRET_KEY: ${SECRET_KEY}
+        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
     container_name: edumi_celery
     restart: unless-stopped
     command: ["celery", "-A", "school_project", "worker", "-l", "info", "-P", "threads"]
