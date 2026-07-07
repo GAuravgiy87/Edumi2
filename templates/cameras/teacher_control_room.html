@@ -436,13 +436,14 @@
 </div>
 
 <script>
+    window.cameraId = {{ camera.id }};
     let isStreaming = {{ is_live|yesno:"true,false" }};
     let isRecording = {{ is_recording|yesno:"true,false" }};
     let recStartTime = {% if recording_start_time %}new Date("{{ recording_start_time }}"){% else %}null{% endif %};
     let recTimerInterval = null;
 
     // Initialize UI from server state
-    window.addEventListener('DOMContentLoaded', () => {
+    const initializeControlRoom = () => {
         const streamBtn = document.getElementById('streamBtn');
         const fsStreamBtn = document.getElementById('fsStreamBtn');
         const recordBtn = document.getElementById('recordBtn');
@@ -529,7 +530,13 @@
                 console.warn("Lucide icon error:", err.message);
             }
         }
-    });
+    };
+
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initializeControlRoom);
+    } else {
+        initializeControlRoom();
+    }
 
     function updateRecTimer() {
         if (!recStartTime) return;

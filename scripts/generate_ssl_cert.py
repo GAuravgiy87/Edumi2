@@ -42,8 +42,51 @@ DOMAIN = "edumi.ac.in"
 
 
 def generate_with_cryptography():
-    """Generate using modern cryptography library"""
-    # ── RSA key pair ──────────────────────────────────────────────────
+    import ipaddress
+    # ── Root CA ───────────────────────────────────────────────────────
+    ca_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+
+    ca_subject = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, "IN"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "EduMi Academic Local CA"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "EduMi Local Root CA"),
+    ])
+
+    now = datetime.datetime.utcnow()
+    ca_cert = (
+        x509.CertificateBuilder()
+        .subject_name(ca_subject)
+        .issuer_name(ca_subject)
+        .public_key(ca_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(days=1))
+        .not_valid_after(now + datetime.timedelta(days=365 * 10))
+        .add_extension(
+            x509.BasicConstraints(ca=True, path_length=None),
+            critical=True,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(ca_key, hashes.SHA256(), default_backend())
+    )
+
+    # ── Server/Leaf Key ───────────────────────────────────────────────
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
@@ -71,8 +114,8 @@ def generate_with_cryptography():
         except Exception:
             pass
 
-    # ── X.509 certificate ─────────────────────────────────────────────
-    subject = issuer = x509.Name([
+    # ── Server/Leaf Certificate ───────────────────────────────────────
+    subject = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, "IN"),
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Maharashtra"),
         x509.NameAttribute(NameOID.LOCALITY_NAME, "Pune"),
@@ -81,14 +124,13 @@ def generate_with_cryptography():
         x509.NameAttribute(NameOID.COMMON_NAME, DOMAIN),
     ])
 
-    now = datetime.datetime.utcnow()
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject)
-        .issuer_name(issuer)
+        .issuer_name(ca_subject)
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(now)
+        .not_valid_before(now - datetime.timedelta(days=1))
         .not_valid_after(now + datetime.timedelta(days=365 * 10))
         .add_extension(
             x509.SubjectAlternativeName(san_list),
@@ -98,10 +140,45 @@ def generate_with_cryptography():
             x509.BasicConstraints(ca=False, path_length=None),
             critical=True,
         )
-        .sign(private_key, hashes.SHA256(), default_backend())
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage([
+                x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
+                x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
+            ]),
+            critical=False,
+        )
+        .sign(ca_key, hashes.SHA256(), default_backend())
     )
 
     # ── Write to disk ─────────────────────────────────────────────────
+    CA_KEY_FILE = CERT_DIR / "edumi-root-ca.key"
+    CA_CERT_FILE = CERT_DIR / "edumi-root-ca.crt"
+    TRUST_FILE = CERT_DIR / "edumi-trust-this.crt"
+
+    CA_KEY_FILE.write_bytes(
+        ca_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+    )
+    CA_CERT_FILE.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+    TRUST_FILE.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+
     KEY_FILE.write_bytes(
         private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -111,26 +188,47 @@ def generate_with_cryptography():
     )
     CERT_FILE.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
 
-    print(f"[OK] Private key  -> {KEY_FILE}")
-    print(f"[OK] Certificate  -> {CERT_FILE}")
-    print(f"     Domain       : {DOMAIN}")
-    print(f"     Valid until  : {now.year + 10}-xx-xx")
-    print(f"     SANs         : {len(san_list)} entries")
+    print(f"[OK] Root CA Key    -> {CA_KEY_FILE}")
+    print(f"[OK] Root CA Cert   -> {CA_CERT_FILE}")
+    print(f"[OK] Server Key     -> {KEY_FILE}")
+    print(f"[OK] Server Cert    -> {CERT_FILE}")
+    print(f"[OK] Trust Cert     -> {TRUST_FILE}")
+    print(f"     Domain         : {DOMAIN}")
+    print(f"     Valid until    : {now.year + 10}-xx-xx")
+    print(f"     SANs           : {len(san_list)} entries")
     print()
-    print("NOTE: Because this is a self-signed certificate, browsers will show a")
-    print("      security warning. Click 'Advanced -> Proceed' to continue.")
+    print("NOTE: Root CA generated and trusted certificate copied to edumi-trust-this.crt.")
 
 
 def generate_with_pyopenssl():
     """Generate using legacy pyOpenSSL library"""
-    # ── RSA key pair ──────────────────────────────────────────────────
+    # ── Root CA ───────────────────────────────────────────────────────
+    ca_key = crypto.PKey()
+    ca_key.generate_key(crypto.TYPE_RSA, 2048)
+
+    ca_cert = crypto.X509()
+    ca_subj = ca_cert.get_subject()
+    ca_subj.C  = "IN"
+    ca_subj.O  = "EduMi Academic Local CA"
+    ca_subj.CN = "EduMi Local Root CA"
+    ca_cert.set_serial_number(1)
+    ca_cert.set_issuer(ca_subj)
+    ca_cert.gmtime_adj_notBefore(-86400)
+    ca_cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
+    ca_cert.set_pubkey(ca_key)
+    ca_cert.add_extensions([
+        crypto.X509Extension(b"basicConstraints", True, b"CA:TRUE"),
+        crypto.X509Extension(b"keyUsage", True, b"keyCertSign, cRLSign"),
+    ])
+    ca_cert.sign(ca_key, "sha256")
+
+    # ── Server/Leaf Key ───────────────────────────────────────────────
     key = crypto.PKey()
     key.generate_key(crypto.TYPE_RSA, 2048)
 
-    # ── X.509 certificate ─────────────────────────────────────────────
+    # ── Server/Leaf Certificate ───────────────────────────────────────
     cert = crypto.X509()
 
-    # Subject
     subject = cert.get_subject()
     subject.C  = "IN"
     subject.ST = "Maharashtra"
@@ -139,16 +237,11 @@ def generate_with_pyopenssl():
     subject.OU = "IT Department"
     subject.CN = DOMAIN
 
-    # Serial + issuer (self-signed ⇒ issuer == subject)
     cert.set_serial_number(1000)
-    cert.set_issuer(subject)
+    cert.set_issuer(ca_subj) # issuer is CA subject
 
-    # Validity — 10 years from now
-    now = datetime.datetime.utcnow()
-    cert.gmtime_adj_notBefore(0)
+    cert.gmtime_adj_notBefore(-86400)
     cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
-
-    # Public key
     cert.set_pubkey(key)
 
     # ── Extensions (Subject Alternative Names) ────────────────────────
@@ -160,12 +253,11 @@ def generate_with_pyopenssl():
     san_entries = [
         f"DNS:{DOMAIN}",
         f"DNS:www.{DOMAIN}",
-        "DNS:localhost",
+        f"DNS:localhost",
         "IP:127.0.0.1",
         "IP:::1",
         f"IP:{local_ip}",
     ]
-    # Deduplicate
     san_entries = list(dict.fromkeys(san_entries))
 
     cert.add_extensions([
@@ -175,23 +267,37 @@ def generate_with_pyopenssl():
         crypto.X509Extension(
             b"basicConstraints", True, b"CA:FALSE"
         ),
+        crypto.X509Extension(
+            b"keyUsage", True, b"digitalSignature, keyEncipherment"
+        ),
+        crypto.X509Extension(
+            b"extendedKeyUsage", False, b"serverAuth, clientAuth"
+        ),
     ])
 
     # ── Sign ──────────────────────────────────────────────────────────
-    cert.sign(key, "sha256")
+    cert.sign(ca_key, "sha256")
 
     # ── Write to disk ─────────────────────────────────────────────────
+    CA_KEY_FILE = CERT_DIR / "edumi-root-ca.key"
+    CA_CERT_FILE = CERT_DIR / "edumi-root-ca.crt"
+    TRUST_FILE = CERT_DIR / "edumi-trust-this.crt"
+
+    CA_KEY_FILE.write_bytes(crypto.dump_privatekey(crypto.FILETYPE_PEM, ca_key))
+    CA_CERT_FILE.write_bytes(crypto.dump_certificate(crypto.FILETYPE_PEM, ca_cert))
+    TRUST_FILE.write_bytes(crypto.dump_certificate(crypto.FILETYPE_PEM, ca_cert))
+
     KEY_FILE.write_bytes(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
     CERT_FILE.write_bytes(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
 
-    print(f"[OK] Private key  -> {KEY_FILE}")
-    print(f"[OK] Certificate  -> {CERT_FILE}")
-    print(f"     Domain       : {DOMAIN}")
-    print(f"     Valid until  : {now.year + 10}-xx-xx")
-    print(f"     SANs         : {', '.join(san_entries)}")
-    print()
-    print("NOTE: Because this is a self-signed certificate, browsers will show a")
-    print("      security warning. Click 'Advanced -> Proceed' to continue.")
+    print(f"[OK] Root CA Key    -> {CA_KEY_FILE}")
+    print(f"[OK] Root CA Cert   -> {CA_CERT_FILE}")
+    print(f"[OK] Server Key     -> {KEY_FILE}")
+    print(f"[OK] Server Cert    -> {CERT_FILE}")
+    print(f"[OK] Trust Cert     -> {TRUST_FILE}")
+    print(f"     Domain         : {DOMAIN}")
+    print(f"     Valid until    : {now.year + 10}-xx-xx")
+    print(f"     SANs           : {', '.join(san_entries)}")
 
 
 if __name__ == "__main__":

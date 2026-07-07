@@ -110,27 +110,33 @@
 <script>
     const TYPE_META = {
         rtsp: {
+            ip: '192.168.1.100',
             port: 554,
-            showAuth: true,
-            showPath: true,
+            username: 'admin',
+            password: 'admin',
+            stream_path: '/h264',
             hint: `<b>RTSP Camera</b> — e.g. Hikvision, Dahua, Reolink, etc.<br>
                    • Default port: <b>554</b><br>
                    • Leave stream path blank to auto-detect, or enter manually (e.g. <code>/stream</code>, <code>/h264</code>)<br>
                    • Username / password: only if your camera requires login`,
         },
         ip_webcam: {
+            ip: '192.168.1.100',
             port: 8080,
-            showAuth: false,
-            showPath: false,
+            username: 'admin',
+            password: 'admin',
+            stream_path: '/video',
             hint: `<b>IP Webcam (Android)</b> — install the "IP Webcam" app by Pavel Khlebovich<br>
                    • Open the app → tap <b>Start server</b> — note the URL shown (e.g. <code>http://192.168.1.5:8080</code>)<br>
                    • Default port: <b>8080</b> — enter the IP shown in the app<br>
                    • Make sure your phone and this PC are on the <b>same WiFi network</b>`,
         },
         droidcam: {
+            ip: '192.168.1.100',
             port: 4747,
-            showAuth: false,
-            showPath: false,
+            username: 'admin',
+            password: 'admin',
+            stream_path: '/mjpegfeed',
             hint: `<b>DroidCam</b> — install DroidCam on your iPhone or Android<br>
                    • Open the app → note the <b>WiFi IP</b> shown on screen<br>
                    • Default port: <b>4747</b><br>
@@ -142,12 +148,21 @@
     function handleTypeChange() {
         const type = document.getElementById('camType').value;
         const meta = TYPE_META[type];
+        const isNew = !document.getElementById('cameraId').value;
+
+        if (isNew) {
+            document.getElementById('camIp').value = meta.ip;
+            document.getElementById('camUser').value = meta.username;
+            document.getElementById('camPass').value = meta.password;
+            document.getElementById('camStreamPath').value = meta.stream_path;
+        }
 
         document.getElementById('camPort').value = meta.port;
         document.getElementById('typeHint').innerHTML = meta.hint;
 
-        document.getElementById('rtspAuth').style.display = meta.showAuth ? 'grid' : 'none';
-        document.getElementById('rtspPath').style.display = meta.showPath ? 'block' : 'none';
+        // Keep fields visible for all types so auto-assigned values can be reviewed/edited
+        document.getElementById('rtspAuth').style.display = 'grid';
+        document.getElementById('rtspPath').style.display = 'block';
 
         // Reset test result on type change
         document.getElementById('testResult').style.display = 'none';

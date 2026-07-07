@@ -155,6 +155,46 @@ except: pass
 
 hostname = socket.gethostname()
 
+# ── Root CA ───────────────────────────────────────────────────────────
+CA_KEY_FILE = CERT_DIR / 'edumi-root-ca.key'
+CA_CERT_FILE = CERT_DIR / 'edumi-root-ca.crt'
+TRUST_FILE = CERT_DIR / 'edumi-trust-this.crt'
+
+if CA_KEY_FILE.exists() and CA_CERT_FILE.exists():
+    ca_key = serialization.load_pem_private_key(CA_KEY_FILE.read_bytes(), password=None, backend=default_backend())
+    ca_cert = x509.load_pem_x509_certificate(CA_CERT_FILE.read_bytes(), default_backend())
+    ca_subj = ca_cert.subject
+    print('[OK] Using existing Local Root CA')
+else:
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+    ca_subj = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, 'IN'),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'EduMi Academic Local CA'),
+        x509.NameAttribute(NameOID.COMMON_NAME, 'EduMi Local Root CA'),
+    ])
+    now = datetime.datetime.utcnow()
+    ca_cert = (x509.CertificateBuilder()
+        .subject_name(ca_subj).issuer_name(ca_subj)
+        .public_key(ca_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(days=1))
+        .not_valid_after(now + datetime.timedelta(days=3650))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(x509.KeyUsage(
+            digital_signature=True, content_commitment=False, key_encipherment=False,
+            data_encipherment=False, key_agreement=False, key_cert_sign=True,
+            crl_sign=True, encipher_only=False, decipher_only=False
+        ), critical=True)
+        .sign(ca_key, hashes.SHA256(), default_backend()))
+    
+    CA_KEY_FILE.write_bytes(ca_key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
+        serialization.NoEncryption()))
+    CA_CERT_FILE.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+    TRUST_FILE.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+    print('[OK] Generated new Local Root CA')
+
+# ── Leaf Server Key & Certificate ─────────────────────────────────────
 key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
 
 san = [
@@ -167,27 +207,36 @@ for ip in lan_ips:
     except: pass
 san.append(x509.IPAddress(ipaddress.IPv6Address('::1')))
 
-subj = issuer = x509.Name([
+subj = x509.Name([
     x509.NameAttribute(NameOID.COUNTRY_NAME, 'IN'),
     x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'EduMi Academic'),
     x509.NameAttribute(NameOID.COMMON_NAME, DOMAIN),
 ])
+
 now = datetime.datetime.utcnow()
 cert = (x509.CertificateBuilder()
-    .subject_name(subj).issuer_name(issuer)
+    .subject_name(subj).issuer_name(ca_subj)
     .public_key(key.public_key())
     .serial_number(x509.random_serial_number())
-    .not_valid_before(now)
+    .not_valid_before(now - datetime.timedelta(days=1))
     .not_valid_after(now + datetime.timedelta(days=3650))
     .add_extension(x509.SubjectAlternativeName(san), critical=False)
     .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-    .sign(key, hashes.SHA256(), default_backend()))
+    .add_extension(x509.KeyUsage(
+        digital_signature=True, content_commitment=False, key_encipherment=True,
+        data_encipherment=False, key_agreement=False, key_cert_sign=False,
+        crl_sign=False, encipher_only=False, decipher_only=False
+    ), critical=True)
+    .add_extension(x509.ExtendedKeyUsage([
+        x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
+        x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH
+    ]), critical=False)
+    .sign(ca_key, hashes.SHA256(), default_backend()))
 
 (CERT_DIR / 'edumi.key').write_bytes(key.private_bytes(
     serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
     serialization.NoEncryption()))
 (CERT_DIR / 'edumi.crt').write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-shutil.copy2(CERT_DIR / 'edumi.crt', CERT_DIR / 'edumi-trust-this.crt')
 print('[OK] cert covers:', [str(s) for s in san])
 "@
 
@@ -206,7 +255,7 @@ Write-Host "      [OK] Certificate generated (covers LAN IP: $LAN_IP)" -Foregrou
 Write-Host "[4/9] Installing certificate into Trusted Root CA..." -ForegroundColor Yellow
 
 $installScript = @"
-`$certPath = '$SSL_CERT'
+`$certPath = '$SSL_EXPORT'
 `$newCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(`$certPath)
 
 # Remove all old EduMi certs from LocalMachine Root
@@ -226,9 +275,19 @@ if ($isAdmin) {
     & powershell -ExecutionPolicy Bypass -File $tmpScript
     Write-Host "      [OK] Certificate trusted (admin)" -ForegroundColor Green
 } else {
-    # Need UAC elevation
-    Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$tmpScript`"" -Verb RunAs -Wait
-    Write-Host "      [OK] Certificate trusted (elevated)" -ForegroundColor Green
+    try {
+        # Need UAC elevation
+        Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$tmpScript`"" -Verb RunAs -Wait -ErrorAction Stop
+        Write-Host "      [OK] Certificate trusted (elevated)" -ForegroundColor Green
+    } catch {
+        Write-Host "      [INFO] UAC elevation declined/failed. Attempting to install to Current User store..." -ForegroundColor Yellow
+        $userScript = $installScript -replace "'Root','LocalMachine'", "'Root','CurrentUser'"
+        $tmpUserScript = "$env:TEMP\edumi_trust_user.ps1"
+        $userScript | Out-File $tmpUserScript -Encoding UTF8
+        & powershell -ExecutionPolicy Bypass -File $tmpUserScript
+        Remove-Item $tmpUserScript -ErrorAction SilentlyContinue
+        Write-Host "      [OK] Certificate trusted (CurrentUser)" -ForegroundColor Green
+    }
 }
 
 Remove-Item $tmpScript -ErrorAction SilentlyContinue

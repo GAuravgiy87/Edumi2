@@ -7,36 +7,33 @@
 # =====================================================
 
 $BASE_DIR  = Split-Path -Parent $PSScriptRoot
-$CERT_FILE = Join-Path $BASE_DIR "certs\edumi.crt"
-$CERT_NAME = "EduMi Academic - Local Dev"
-
-# ── Check if already trusted ──────────────────────────────────────────
-$existing = Get-ChildItem -Path "Cert:\LocalMachine\Root" |
-    Where-Object { $_.Subject -match "edumi\.ac\.in" }
-
-if ($existing) {
-    Write-Host "[OK] Certificate is already trusted in this machine." -ForegroundColor Green
-    Write-Host "     Subject : $($existing.Subject)" -ForegroundColor Gray
-    Write-Host "     Thumbprint: $($existing.Thumbprint)" -ForegroundColor Gray
-    exit 0
-}
+$CERT_FILE = Join-Path $BASE_DIR "certs\edumi-trust-this.crt"
+$CERT_NAME = "EduMi Academic Local CA"
 
 # ── Self-elevate if not running as admin ──────────────────────────────
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$targetStore = "LocalMachine"
 
 if (-not $isAdmin) {
     Write-Host "Requesting administrator privileges (UAC prompt)..." -ForegroundColor Yellow
-    Start-Process powershell `
-        -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" `
-        -Verb RunAs `
-        -Wait
-    exit
+    try {
+        Start-Process powershell `
+            -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" `
+            -Verb RunAs `
+            -Wait -ErrorAction Stop
+        exit
+    } catch {
+        Write-Host "[WARNING] Elevation declined or failed. Falling back to installing for the Current User." -ForegroundColor Yellow
+        Write-Host "          Note: A Windows Security Warning dialog may pop up to ask for your confirmation." -ForegroundColor Yellow
+        $targetStore = "CurrentUser"
+    }
 }
 
 # ── Install the certificate ───────────────────────────────────────────
 Write-Host ""
-Write-Host "Installing EduMi SSL certificate as Trusted Root CA..." -ForegroundColor Cyan
+Write-Host "Installing EduMi Local Root CA certificate..." -ForegroundColor Cyan
 Write-Host "  File: $CERT_FILE" -ForegroundColor Gray
+Write-Host "  Store: $targetStore" -ForegroundColor Gray
 Write-Host ""
 
 if (-not (Test-Path $CERT_FILE)) {
@@ -46,11 +43,28 @@ if (-not (Test-Path $CERT_FILE)) {
 }
 
 try {
-    # Import into LocalMachine\Root (trusted for all users on this PC)
+    # Remove old certs first
+    $stores = @(
+        [System.Security.Cryptography.X509Certificates.X509Store]::new("Root", "LocalMachine"),
+        [System.Security.Cryptography.X509Certificates.X509Store]::new("Root", "CurrentUser")
+    )
+    foreach ($store in $stores) {
+        try {
+            $store.Open("ReadWrite")
+            $old = $store.Certificates | Where-Object { $_.Subject -match "edumi" -or $_.Issuer -match "edumi" }
+            foreach ($c in $old) {
+                $store.Remove($c)
+                Write-Host "      Removed old cert: $($c.Thumbprint) from $($store.Location)" -ForegroundColor DarkYellow
+            }
+            $store.Close()
+        } catch {}
+    }
+
+    # Import into target store Root
     $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($CERT_FILE)
     $store = New-Object System.Security.Cryptography.X509Certificates.X509Store(
         [System.Security.Cryptography.X509Certificates.StoreName]::Root,
-        [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
+        $targetStore
     )
     $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
     $store.Add($cert)

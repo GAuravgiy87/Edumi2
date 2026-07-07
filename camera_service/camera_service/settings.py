@@ -9,6 +9,9 @@ MAIN_PROJECT_DIR = BASE_DIR.parent
 
 sys.path.insert(0, str(MAIN_PROJECT_DIR))
 
+from dotenv import load_dotenv
+load_dotenv(MAIN_PROJECT_DIR / '.env', override=True)
+
 SECRET_KEY = os.environ.get('CAMERA_SERVICE_SECRET_KEY', 'camera-service-key-change-in-production')
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '10.17.2.47', '*']
@@ -78,7 +81,7 @@ DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 if os.environ.get('DATABASE_URL'):
     import dj_database_url
     DATABASES = {
-        'default': dj_database_url.config(conn_max_age=600)
+        'default': dj_database_url.config(conn_max_age=0)
     }
 else:
     DATABASES = {
