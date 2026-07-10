@@ -1,101 +1,114 @@
 {% extends "video_editing/base.html" %}
-{% block title %}Your projects &mdash; Reel{% endblock %}
-{% block content %}
-<div class="page-head">
-    <div>
-        <h1 class="page-title">Your projects</h1>
-        <p class="page-sub">Every upload becomes a project you can trim, remix, and export.</p>
-    </div>
-    <button type="button" class="btn btn--primary" id="open-upload-modal">+ Upload video</button>
-</div>
+{% block page_title %}Video Editor{% endblock %}
 
-{% if projects %}
-<div class="project-grid">
-    {% for project in projects %}
-    <a href="{% url 'project_detail' project.pk %}" class="project-card">
-        <div class="project-card__thumb">
-            <video muted preload="metadata" src="{{ project.working_file.url }}#t=0.5"></video>
-            <span class="status-pill status-pill--{{ project.status }}">{{ project.get_status_display }}</span>
+{% block ve_content %}
+<div class="ve-page">
+
+    <div class="ve-page-head">
+        <div>
+            <h1 class="ve-page-title">Video Editor</h1>
+            <p class="ve-page-sub">Upload, trim, merge and annotate your lecture recordings.</p>
         </div>
-        <div class="project-card__body">
-            <h3>{{ project.display_title }}</h3>
-            <p class="muted-text">
-                {% if project.duration_seconds %}{{ project.display_duration }} &middot;{% endif %}
-                {% if project.width %}{{ project.width }}&times;{{ project.height }}{% endif %}
-            </p>
-            <p class="muted-text muted-text--small">Updated {{ project.updated_at|timesince }} ago</p>
+        <button type="button" class="ve-btn ve-btn-primary" id="open-upload-modal">
+            <i data-lucide="upload" style="width:15px;height:15px;"></i>
+            Upload Video
+        </button>
+    </div>
+
+    {% if projects %}
+    <div class="ve-project-grid">
+        {% for project in projects %}
+        <a href="{% url 'project_detail' project.pk %}" class="ve-card ve-project-card">
+            <div class="ve-card-thumb">
+                <video muted preload="metadata" src="{{ project.working_file.url }}#t=0.5"></video>
+                <span class="ve-status-pill ve-status-{{ project.status }}">{{ project.get_status_display }}</span>
+            </div>
+            <div class="ve-card-body">
+                <h3 class="ve-card-title">{{ project.display_title }}</h3>
+                <p class="ve-card-meta">
+                    {% if project.duration_seconds %}{{ project.display_duration }} &middot;{% endif %}
+                    {% if project.width %}{{ project.width }}&times;{{ project.height }}{% endif %}
+                </p>
+                <p class="ve-card-meta ve-card-meta--small">Updated {{ project.updated_at|timesince }} ago</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="ve-empty-state">
+        <div class="ve-empty-icon">
+            <i data-lucide="film" style="width:40px;height:40px;color:var(--primary);"></i>
         </div>
-    </a>
-    {% endfor %}
+        <h2>No projects yet</h2>
+        <p>Upload a video to start trimming, muting, adding text overlays, and merging clips.</p>
+        <button type="button" class="ve-btn ve-btn-primary" id="open-upload-modal-empty">
+            <i data-lucide="upload" style="width:15px;height:15px;"></i>
+            Upload your first video
+        </button>
+    </div>
+    {% endif %}
+
 </div>
-{% else %}
-<div class="empty-state">
-    <p class="empty-state__icon">&#9993;</p>
-    <h2>No projects yet</h2>
-    <p>Upload a video to start trimming, muting, overlaying text, and merging clips.</p>
-    <button type="button" class="btn btn--primary" id="open-upload-modal-empty">Upload your first video</button>
-</div>
-{% endif %}
 
 <!-- Upload Modal -->
-<div class="upload-modal-backdrop" id="upload-modal-backdrop">
-    <div class="upload-modal" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
-        <div class="upload-modal-head">
-            <h2 class="upload-modal-title" id="upload-modal-title">Upload a video</h2>
-            <button type="button" class="upload-modal-close" id="close-upload-modal" aria-label="Close">&times;</button>
+<div class="ve-modal-backdrop" id="upload-modal-backdrop">
+    <div class="ve-modal" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
+        <div class="ve-modal-head">
+            <h2 id="upload-modal-title">Upload a video</h2>
+            <button type="button" class="ve-modal-close" id="close-upload-modal" aria-label="Close">&times;</button>
         </div>
-        <p class="page-sub" style="margin: 0 0 20px;">MP4, MOV, AVI, MKV, or WebM &middot; up to 500&nbsp;MB</p>
+        <p class="ve-modal-sub">MP4, MOV, AVI, MKV, or WebM &middot; up to 500&nbsp;MB</p>
 
-        <form method="post" enctype="multipart/form-data" class="stacked-form" id="upload-form" action="{% url 'project_upload' %}">
+        <form method="post" enctype="multipart/form-data" class="ve-form" id="upload-form" action="{% url 'project_upload' %}">
             {% csrf_token %}
-            <div class="field">
-                <label for="{{ form.title.id_for_label }}">Project title <span style="color:var(--text-faint);font-weight:400;">(optional)</span></label>
+            <div class="ve-field">
+                <label for="{{ form.title.id_for_label }}">
+                    Project title
+                    <span class="ve-label-optional">(optional)</span>
+                </label>
                 {{ form.title }}
-                {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                {% for error in form.title.errors %}<p class="ve-field-error">{{ error }}</p>{% endfor %}
             </div>
 
-            <div class="field">
+            <div class="ve-field">
                 <label>Video file</label>
-                <div class="dropzone" id="dropzone">
-                    <p class="dropzone__hint" id="dropzone-hint">Drag a video here, or click to browse</p>
-                    <p class="dropzone__filename" id="dropzone-filename"></p>
+                <div class="ve-dropzone" id="dropzone">
+                    <i data-lucide="upload-cloud" style="width:28px;height:28px;color:var(--primary);margin-bottom:8px;"></i>
+                    <p class="ve-dropzone-hint" id="dropzone-hint">Drag a video here, or click to browse</p>
+                    <p class="ve-dropzone-filename" id="dropzone-filename"></p>
                     {{ form.original_file }}
                 </div>
-                {% for error in form.original_file.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                {% for error in form.original_file.errors %}<p class="ve-field-error">{{ error }}</p>{% endfor %}
             </div>
 
-            <button type="submit" class="btn btn--primary btn--full" id="upload-submit">Upload &amp; start editing</button>
-            <p class="upload-progress-note" id="upload-note"></p>
+            <button type="submit" class="ve-btn ve-btn-primary ve-btn-full" id="upload-submit">
+                Upload &amp; start editing
+            </button>
+            <p class="ve-upload-note" id="upload-note"></p>
         </form>
     </div>
 </div>
-
 {% endblock %}
 
-{% block extra_js %}
+{% block ve_extra_js %}
 <script>
 (function () {
-    const backdrop = document.getElementById('upload-modal-backdrop');
-    const openBtn  = document.getElementById('open-upload-modal');
-    const openBtnEmpty = document.getElementById('open-upload-modal-empty');
-    const closeBtn = document.getElementById('close-upload-modal');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
-    function openModal() {
-        backdrop.classList.add('upload-modal-backdrop--visible');
-        document.body.style.overflow = 'hidden';
-    }
-    function closeModal() {
-        backdrop.classList.remove('upload-modal-backdrop--visible');
-        document.body.style.overflow = '';
-    }
+    const backdrop   = document.getElementById('upload-modal-backdrop');
+    const openBtn    = document.getElementById('open-upload-modal');
+    const openBtnE   = document.getElementById('open-upload-modal-empty');
+    const closeBtn   = document.getElementById('close-upload-modal');
 
-    if (openBtn) openBtn.addEventListener('click', openModal);
-    if (openBtnEmpty) openBtnEmpty.addEventListener('click', openModal);
+    function openModal()  { backdrop.classList.add('ve-modal-backdrop--visible'); document.body.style.overflow = 'hidden'; }
+    function closeModal() { backdrop.classList.remove('ve-modal-backdrop--visible'); document.body.style.overflow = ''; }
+
+    if (openBtn)  openBtn.addEventListener('click', openModal);
+    if (openBtnE) openBtnE.addEventListener('click', openModal);
     closeBtn.addEventListener('click', closeModal);
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
-    // Dropzone behaviour
     const input      = document.querySelector('#dropzone input[type="file"]');
     const dropzone   = document.getElementById('dropzone');
     const hint       = document.getElementById('dropzone-hint');
@@ -106,31 +119,19 @@
 
     dropzone.addEventListener('click', (e) => { if (e.target !== input) input.click(); });
     input.addEventListener('change', () => {
-        if (input.files.length) {
-            filenameEl.textContent = input.files[0].name;
-            hint.textContent = 'Selected:';
-        }
+        if (input.files.length) { filenameEl.textContent = input.files[0].name; hint.textContent = 'Selected:'; }
     });
-    ['dragover', 'dragenter'].forEach(evt => dropzone.addEventListener(evt, (e) => {
-        e.preventDefault(); dropzone.classList.add('dropzone--active');
-    }));
-    ['dragleave', 'drop'].forEach(evt => dropzone.addEventListener(evt, (e) => {
-        e.preventDefault(); dropzone.classList.remove('dropzone--active');
-    }));
+    ['dragover','dragenter'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('ve-dropzone--active'); }));
+    ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('ve-dropzone--active'); }));
     dropzone.addEventListener('drop', (e) => {
-        if (e.dataTransfer.files.length) {
-            input.files = e.dataTransfer.files;
-            filenameEl.textContent = e.dataTransfer.files[0].name;
-            hint.textContent = 'Selected:';
-        }
+        if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; filenameEl.textContent = e.dataTransfer.files[0].name; hint.textContent = 'Selected:'; }
     });
     form.addEventListener('submit', () => {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Uploading\u2026';
-        note.textContent = 'Reading video metadata \u2014 this may take a moment for larger files.';
+        note.textContent = 'Reading video metadata \u2014 this may take a moment.';
     });
 
-    // Auto-open if Django returned form errors (upload was attempted)
     {% if form.errors %}openModal();{% endif %}
 })();
 </script>

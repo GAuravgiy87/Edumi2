@@ -6,19 +6,25 @@
 (function () {
     "use strict";
 
-    // ---- Tool tab switching -------------------------------------------
-    const tabs = document.querySelectorAll(".tool-tab");
-    const panels = document.querySelectorAll(".tool-section");
+    // ---- Tool tab switching (supports both ve- prefixed and legacy classes)
+    const tabs = document.querySelectorAll(".tool-tab, .ve-tool-tab");
+    const panels = document.querySelectorAll(".tool-section, .ve-tool-section");
 
     tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
             const target = tab.dataset.tab;
 
-            tabs.forEach((t) => t.classList.remove("tool-tab--active"));
+            tabs.forEach((t) => {
+                t.classList.remove("tool-tab--active");
+                t.classList.remove("ve-tool-tab--active");
+            });
             tab.classList.add("tool-tab--active");
+            tab.classList.add("ve-tool-tab--active");
 
             panels.forEach((p) => {
-                p.classList.toggle("tool-section--active", p.dataset.panel === target);
+                const active = p.dataset.panel === target;
+                p.classList.toggle("tool-section--active", active);
+                p.classList.toggle("ve-tool-section--active", active);
             });
         });
     });
@@ -27,7 +33,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const activeTab = urlParams.get("tab");
     if (activeTab) {
-        const targetTab = document.querySelector(`.tool-tab[data-tab="${activeTab}"]`);
+        const targetTab = document.querySelector(`.tool-tab[data-tab="${activeTab}"], .ve-tool-tab[data-tab="${activeTab}"]`);
         if (targetTab) {
             targetTab.click();
         }
