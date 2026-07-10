@@ -1,0 +1,137 @@
+{% extends "video_editing/base.html" %}
+{% block title %}Your projects &mdash; Reel{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Your projects</h1>
+        <p class="page-sub">Every upload becomes a project you can trim, remix, and export.</p>
+    </div>
+    <button type="button" class="btn btn--primary" id="open-upload-modal">+ Upload video</button>
+</div>
+
+{% if projects %}
+<div class="project-grid">
+    {% for project in projects %}
+    <a href="{% url 'project_detail' project.pk %}" class="project-card">
+        <div class="project-card__thumb">
+            <video muted preload="metadata" src="{{ project.working_file.url }}#t=0.5"></video>
+            <span class="status-pill status-pill--{{ project.status }}">{{ project.get_status_display }}</span>
+        </div>
+        <div class="project-card__body">
+            <h3>{{ project.display_title }}</h3>
+            <p class="muted-text">
+                {% if project.duration_seconds %}{{ project.display_duration }} &middot;{% endif %}
+                {% if project.width %}{{ project.width }}&times;{{ project.height }}{% endif %}
+            </p>
+            <p class="muted-text muted-text--small">Updated {{ project.updated_at|timesince }} ago</p>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p class="empty-state__icon">&#9993;</p>
+    <h2>No projects yet</h2>
+    <p>Upload a video to start trimming, muting, overlaying text, and merging clips.</p>
+    <button type="button" class="btn btn--primary" id="open-upload-modal-empty">Upload your first video</button>
+</div>
+{% endif %}
+
+<!-- Upload Modal -->
+<div class="upload-modal-backdrop" id="upload-modal-backdrop">
+    <div class="upload-modal" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
+        <div class="upload-modal-head">
+            <h2 class="upload-modal-title" id="upload-modal-title">Upload a video</h2>
+            <button type="button" class="upload-modal-close" id="close-upload-modal" aria-label="Close">&times;</button>
+        </div>
+        <p class="page-sub" style="margin: 0 0 20px;">MP4, MOV, AVI, MKV, or WebM &middot; up to 500&nbsp;MB</p>
+
+        <form method="post" enctype="multipart/form-data" class="stacked-form" id="upload-form" action="{% url 'project_upload' %}">
+            {% csrf_token %}
+            <div class="field">
+                <label for="{{ form.title.id_for_label }}">Project title <span style="color:var(--text-faint);font-weight:400;">(optional)</span></label>
+                {{ form.title }}
+                {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+
+            <div class="field">
+                <label>Video file</label>
+                <div class="dropzone" id="dropzone">
+                    <p class="dropzone__hint" id="dropzone-hint">Drag a video here, or click to browse</p>
+                    <p class="dropzone__filename" id="dropzone-filename"></p>
+                    {{ form.original_file }}
+                </div>
+                {% for error in form.original_file.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+
+            <button type="submit" class="btn btn--primary btn--full" id="upload-submit">Upload &amp; start editing</button>
+            <p class="upload-progress-note" id="upload-note"></p>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const backdrop = document.getElementById('upload-modal-backdrop');
+    const openBtn  = document.getElementById('open-upload-modal');
+    const openBtnEmpty = document.getElementById('open-upload-modal-empty');
+    const closeBtn = document.getElementById('close-upload-modal');
+
+    function openModal() {
+        backdrop.classList.add('upload-modal-backdrop--visible');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+        backdrop.classList.remove('upload-modal-backdrop--visible');
+        document.body.style.overflow = '';
+    }
+
+    if (openBtn) openBtn.addEventListener('click', openModal);
+    if (openBtnEmpty) openBtnEmpty.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+    // Dropzone behaviour
+    const input      = document.querySelector('#dropzone input[type="file"]');
+    const dropzone   = document.getElementById('dropzone');
+    const hint       = document.getElementById('dropzone-hint');
+    const filenameEl = document.getElementById('dropzone-filename');
+    const form       = document.getElementById('upload-form');
+    const submitBtn  = document.getElementById('upload-submit');
+    const note       = document.getElementById('upload-note');
+
+    dropzone.addEventListener('click', (e) => { if (e.target !== input) input.click(); });
+    input.addEventListener('change', () => {
+        if (input.files.length) {
+            filenameEl.textContent = input.files[0].name;
+            hint.textContent = 'Selected:';
+        }
+    });
+    ['dragover', 'dragenter'].forEach(evt => dropzone.addEventListener(evt, (e) => {
+        e.preventDefault(); dropzone.classList.add('dropzone--active');
+    }));
+    ['dragleave', 'drop'].forEach(evt => dropzone.addEventListener(evt, (e) => {
+        e.preventDefault(); dropzone.classList.remove('dropzone--active');
+    }));
+    dropzone.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files.length) {
+            input.files = e.dataTransfer.files;
+            filenameEl.textContent = e.dataTransfer.files[0].name;
+            hint.textContent = 'Selected:';
+        }
+    });
+    form.addEventListener('submit', () => {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Uploading\u2026';
+        note.textContent = 'Reading video metadata \u2014 this may take a moment for larger files.';
+    });
+
+    // Auto-open if Django returned form errors (upload was attempted)
+    {% if form.errors %}openModal();{% endif %}
+})();
+</script>
+{% endblock %}

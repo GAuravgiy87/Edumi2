@@ -383,7 +383,7 @@
                     </div>
                     {% endif %}
                 </div>
-                <div class="sidebar-panel" id="chatPanel">
+                <div class="sidebar-panel" id="chatPanel" style="display:none;">
                     <div class="chat-messages" id="chatMessages"></div>
                     <div class="chat-input-box">
                         <input type="text" id="chatInput" placeholder="Send a message to everyone"
@@ -499,7 +499,8 @@
     data-kick-url="{% url 'kick_participant' meeting.id 0 %}"
     data-banned-users-url="{% url 'get_banned_users' meeting.id %}"
     data-revoke-ban-url="{% url 'revoke_ban' meeting.id 0 %}"
-    data-global-control-url="{% url 'meeting_global_control' meeting.id %}">
+    data-global-control-url="{% url 'meeting_global_control' meeting.id %}"
+    data-host-joined-at-ms="{{ host_joined_at_ms }}">
 </script>
 
 {% if is_host %}
@@ -571,7 +572,8 @@ window.meetingConfig = {
     revokeBanUrl: _d.revokeBanUrl,
     globalControlUrl: _d.globalControlUrl,
     studentCanViewCamera: _d.studentCanViewCamera === 'true',
-    studentCanViewScreenshare: _d.studentCanViewScreenshare === 'true'
+    studentCanViewScreenshare: _d.studentCanViewScreenshare === 'true',
+    hostJoinedAtMs: parseInt(_d.hostJoinedAtMs || "0")
 };
 
 // Global shortcuts using window properties to prevent Turbo redeclaration errors
@@ -638,19 +640,21 @@ window.signalingWs    = null;
 window.currentVideoSource = 'webcam'; // 'webcam' or 'ip'
 window.currentIpCamId = null;
 
+// ── Manual participant registry ────────────────────────────────────────────────
+// Key: identity string → participant object or plain info object.
+// This is more reliable than room.remoteParticipants across proxy/SDK versions.
+window._remoteParticipantsRegistry = new Map();
+
 function getRemoteParticipants() {
-    if (!window.room) return [];
-    const pMap = window.room.remoteParticipants || window.room.participants;
-    if (!pMap) return [];
-    if (typeof pMap.values === 'function') {
-        return Array.from(pMap.values());
+    // Merge manual registry with LiveKit SDK map so we never miss anyone.
+    const combined = new Map(window._remoteParticipantsRegistry);
+    if (window.room) {
+        const pMap = window.room.remoteParticipants || window.room.participants;
+        if (pMap && typeof pMap.forEach === 'function') {
+            pMap.forEach((p, key) => { if (p && p.identity) combined.set(p.identity, p); });
+        }
     }
-    if (typeof pMap.forEach === 'function') {
-        const list = [];
-        pMap.forEach(p => list.push(p));
-        return list;
-    }
-    return Object.values(pMap);
+    return Array.from(combined.values());
 }
 window.ipCamImg = null;
 window.ipCamAnimationId = null;
@@ -774,9 +778,26 @@ async function init() {
         updateControlButtons();
         renderLocalParticipant();
 
+        // Seed manual registry from SDK's remoteParticipants map (already connected peers)
+        if (window.room.remoteParticipants) {
+            window.room.remoteParticipants.forEach((p, identity) => {
+                if (p && p.identity) {
+                    window._remoteParticipantsRegistry.set(p.identity, p);
+                }
+            });
+        }
+
         getRemoteParticipants().forEach(p => onParticipantConnected(p));
 
         updateParticipantCount();
+        // Immediately show correct elapsed time before first tick fires
+        if (window.meetingConfig.hostJoinedAtMs > 0) {
+            timerSeconds = Math.max(0, Math.floor((Date.now() - window.meetingConfig.hostJoinedAtMs) / 1000));
+            const _m0 = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+            const _s0 = String(timerSeconds % 60).padStart(2, '0');
+            const _el = document.getElementById('meetTimer');
+            if (_el) _el.textContent = `${_m0}:${_s0}`;
+        }
         startTimer();
 
         // Periodically refresh the participants list to prevent out-of-sync states
@@ -1057,6 +1078,8 @@ function onParticipantConnected(participant) {
     if (!participant) return;
 
     console.log('Participant joined:', participant.identity);
+    // Register in our manual registry
+    window._remoteParticipantsRegistry.set(participant.identity, participant);
     getOrCreateBox(participant.identity, participant.name || participant.identity, false);
     updateParticipantsList();
     updateParticipantCount();
@@ -1073,6 +1096,8 @@ function onParticipantConnected(participant) {
 
 function onParticipantDisconnected(participant) {
     console.log('Participant left:', participant.identity);
+    // Remove from manual registry
+    window._remoteParticipantsRegistry.delete(participant.identity);
     const box = document.getElementById(`video-box-${participant.identity}`);
     if (box) box.remove();
     updateParticipantsList();
@@ -1719,7 +1744,9 @@ async function toggleSleepMode() {
     // Broadcast to all via data channel
     const type = isSleeping ? 'meeting_unfrozen' : 'meeting_sleeping';
     const payload = JSON.stringify({ type });
-    await room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+    if (window.room && window.room.localParticipant) {
+        await window.room.localParticipant.publishData(new TextEncoder().encode(payload), { reliable: true });
+    }
 
     isSleeping = !isSleeping;
     const btn = document.getElementById('sleepBtn');
@@ -1860,20 +1887,34 @@ document.addEventListener('click', function(e) {
 
 function switchSidebarTab(tab) {
     document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.sidebar-panel').forEach(p => p.style.display = 'none');
+    // Use CSS class-based show/hide to match the .sidebar-panel / .sidebar-panel.active rules
+    document.querySelectorAll('.sidebar-panel').forEach(p => p.classList.remove('active'));
     document.querySelector(`.sidebar-tab[onclick*="${tab}"]`).classList.add('active');
-    document.getElementById(tab + 'Panel').style.display = 'flex';
+    const targetPanel = document.getElementById(tab + 'Panel');
+    if (targetPanel) {
+        targetPanel.classList.add('active');
+        targetPanel.style.removeProperty('display'); // Clear any inline override
+    }
 
     if (tab === 'chat') {
         unreadMessages = 0;
         const badge = document.getElementById('chatBadge');
-        badge.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        // Scroll chat to bottom on open
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+    } else if (tab === 'people') {
+        // Refresh participants and banned list when opening people tab
+        updateParticipantsList();
+        if (isHost) fetchBannedUsers();
     }
 }
 
 // ── Participants list ─────────────────────────────────────────────────────────
 function updateParticipantsList() {
     const list = document.getElementById('participantsList');
+    if (!list) return;
+
     list.innerHTML = `
         <div class="participant-item">
             <div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${currentUsername}&background=1877f2&color=fff" alt="${currentUsername}"></div>
@@ -1884,22 +1925,39 @@ function updateParticipantsList() {
         </div>`;
 
     getRemoteParticipants().forEach(p => {
+        if (!p) return;
+
+        let name = p.name || p.identity;
+        let pfpUrl = null;
+        if (p.metadata) {
+            try {
+                const meta = JSON.parse(p.metadata);
+                if (meta.display_name) name = meta.display_name;
+                if (meta.pfp) pfpUrl = meta.pfp;
+            } catch(e) {}
+        }
+
+        const fallbackPfp = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff&size=128';
+        const finalPfp = pfpUrl || fallbackPfp;
+        const isParticipantHost = p.identity === hostId;
+
         const item = document.createElement('div');
         item.className = 'participant-item';
         item.innerHTML = `
-            <div class="participant-avatar"><img src="https://ui-avatars.com/api/?name=${p.name||p.identity}&background=6366f1&color=fff" alt="${p.name||p.identity}"></div>
+            <div class="participant-avatar"><img src="${finalPfp}" alt="${name}"></div>
             <div class="participant-info">
-                <div class="participant-name">${p.name || p.identity}</div>
+                <div class="participant-name">${name}</div>
+                ${isParticipantHost ? '<span class="host-label">Host</span>' : ''}
             </div>
-            ${isHost ? `
+            ${isHost && !isParticipantHost ? `
             <div class="participant-actions">
                 <button class="action-btn danger" onclick="kickUser('${p.identity}')" title="Kick Out">🚫</button>
             </div>
             ` : ''}`;
         list.appendChild(item);
     });
-    
-    if (isHost) fetchBannedUsers();
+    // Note: fetchBannedUsers is called separately (when People tab is opened)
+    // to avoid excessive API polling every 2s.
 }
 
 function updateParticipantCount() {
@@ -1914,7 +1972,11 @@ function updateParticipantCount() {
 // ── Timer ─────────────────────────────────────────────────────────────────────
 function startTimer() {
     timerInterval = setInterval(() => {
-        timerSeconds++;
+        if (window.meetingConfig.hostJoinedAtMs > 0) {
+            timerSeconds = Math.max(0, Math.floor((Date.now() - window.meetingConfig.hostJoinedAtMs) / 1000));
+        } else {
+            timerSeconds++;
+        }
         const m = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
         const s = String(timerSeconds % 60).padStart(2, '0');
         document.getElementById('meetTimer').textContent = `${m}:${s}`;

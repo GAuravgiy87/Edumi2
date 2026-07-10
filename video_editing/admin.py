@@ -1,23 +1,22 @@
 from django.contrib import admin
-from .models import VideoEditSession, VideoEditAction
+from .models import VideoProject, EditOperation
 
 
-class VideoEditActionInline(admin.TabularInline):
-    model = VideoEditAction
+class EditOperationInline(admin.TabularInline):
+    model = EditOperation
     extra = 0
+    readonly_fields = ["operation_type", "description", "created_at"]
 
 
-@admin.register(VideoEditSession)
-class VideoEditSessionAdmin(admin.ModelAdmin):
-    list_display = ['original_video', 'created_by', 'status', 'created_at']
-    list_filter = ['status', 'created_at']
-    search_fields = ['original_video__title', 'created_by__username']
-    inlines = [VideoEditActionInline]
+@admin.register(VideoProject)
+class VideoProjectAdmin(admin.ModelAdmin):
+    list_display = ["title", "owner", "status", "duration_seconds", "created_at"]
+    list_filter = ["status"]
+    search_fields = ["title", "owner__username"]
+    inlines = [EditOperationInline]
 
 
-@admin.register(VideoEditAction)
-class VideoEditActionAdmin(admin.ModelAdmin):
-    list_display = ['session', 'action_type', 'order', 'created_at']
-    list_filter = ['action_type', 'created_at']
-    search_fields = ['session__original_video__title']
-    readonly_fields = ['audio_file']
+@admin.register(EditOperation)
+class EditOperationAdmin(admin.ModelAdmin):
+    list_display = ["project", "operation_type", "created_at"]
+    list_filter = ["operation_type"]

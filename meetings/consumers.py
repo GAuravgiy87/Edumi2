@@ -147,6 +147,10 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             return []
     
     async def disconnect(self, close_code):
+        # Guard: if connect() failed before attributes were set, skip cleanup
+        if not hasattr(self, 'meeting_code') or not hasattr(self, 'user'):
+            return
+
         # Remove from tracking for CAM_* rooms
         if self.meeting_code.startswith('CAM_'):
             if self.meeting_code in cam_room_participants:

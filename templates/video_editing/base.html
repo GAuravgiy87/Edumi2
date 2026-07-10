@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Reel &mdash; Video Editor{% endblock %} | EduMi</title>
+<link rel="stylesheet" href="{% static 'video_editing/css/style.css' %}">
+</head>
+<body>
+
+<header class="topbar">
+    <a href="{% url 'project_list' %}" class="brand">
+        <span class="brand-mark">&#8859;</span> Reel
+    </a>
+    <nav class="topnav">
+        {% if user.is_authenticated %}
+        <a href="{% if user.userprofile.user_type == 'teacher' %}{% url 'teacher_dashboard' %}{% else %}{% url 'student_dashboard' %}{% endif %}" class="btn btn--ghost" style="font-size:13px;">&larr; Back to EduMi</a>
+        {% endif %}
+    </nav>
+</header>
+
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+        <div class="message message--{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<main class="main">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+    <span>Reel &mdash; Video Editor &middot; EduMi Academic Platform</span>
+</footer>
+
+<script src="{% static 'video_editing/js/app.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

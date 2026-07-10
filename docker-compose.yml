@@ -137,17 +137,6 @@ services:
     env_file: .env
     depends_on: [db, redis]
 
-  video_editing:
-    build:
-      context: .
-      args:
-        SECRET_KEY: ${SECRET_KEY}
-        DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-school_project.settings}
-    container_name: edumi_video_editing
-    restart: unless-stopped
-    command: ["python", "video_editing/manage_editing.py"]
-    env_file: .env
-    depends_on: [db, redis]
 
   live_stream:
     build:
@@ -197,5 +186,4 @@ services:
       - msg
       - profile
       - video
-      - video_editing
       - live_stream

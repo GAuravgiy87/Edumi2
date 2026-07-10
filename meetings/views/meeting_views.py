@@ -44,7 +44,7 @@ def create_meeting(request):
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
         description = request.POST.get('description', '')
-        scheduled_time = request.POST.get('scheduled_time')
+        scheduled_time_str = request.POST.get('scheduled_time', '').strip()
         duration_minutes = int(request.POST.get('duration_minutes', 60))
         allow_screen_share = request.POST.get('allow_screen_share') == 'on'
         allow_chat = request.POST.get('allow_chat') == 'on'
@@ -58,6 +58,21 @@ def create_meeting(request):
         ).exclude(status__in=['ended', 'cancelled']).exists():
             messages.error(request, f'You already have a meeting named "{title}".')
             return render(request, 'meetings/create_meeting.html')
+
+        # Parse scheduled_time or default to now
+        if scheduled_time_str:
+            try:
+                from django.utils.dateparse import parse_datetime
+                scheduled_time = parse_datetime(scheduled_time_str)
+                if scheduled_time is None:
+                    # Try naive datetime format from datetime-local input
+                    from datetime import datetime
+                    naive_dt = datetime.strptime(scheduled_time_str, '%Y-%m-%dT%H:%M')
+                    scheduled_time = timezone.make_aware(naive_dt)
+            except (ValueError, TypeError):
+                scheduled_time = timezone.now()
+        else:
+            scheduled_time = timezone.now()
 
         Meeting.objects.create(
             title=title, description=description, teacher=request.user,
@@ -149,9 +164,11 @@ def join_meeting(request, meeting_code):
         meeting=meeting, user=request.user,
         defaults={'joined_at': timezone.now(), 'is_active': True}
     )
-    join_time = timezone.now()
     if not created:
-        participant.joined_at = join_time
+        if not participant.is_active:
+            # They had left and are rejoining — reset the join timestamp
+            participant.joined_at = timezone.now()
+        # Always mark as active on (re)join
         participant.is_active = True
         participant.save(update_fields=['joined_at', 'is_active'])
 
@@ -184,6 +201,13 @@ def join_meeting(request, meeting_code):
             camera_ids = camera_qs.values_list('camera_id', flat=True)
             teacher_cameras = Camera.objects.filter(id__in=camera_ids)
     
+    host_participant = MeetingParticipant.objects.filter(meeting=meeting, user=meeting.teacher).first()
+    host_joined_at_ms = 0
+    if host_participant and host_participant.joined_at:
+        import datetime
+        epoch = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+        host_joined_at_ms = int((host_participant.joined_at - epoch).total_seconds() * 1000)
+
     # Pass visibility flags to template
     context = {
         'meeting': meeting,
@@ -196,6 +220,7 @@ def join_meeting(request, meeting_code):
         'teacher_cameras': teacher_cameras,
         'student_can_view_camera': meeting.student_can_view_camera,
         'student_can_view_screenshare': meeting.student_can_view_screenshare,
+        'host_joined_at_ms': host_joined_at_ms,
     }
     return render(request, 'meetings/meeting_room.html', context)
 

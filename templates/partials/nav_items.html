@@ -76,6 +76,10 @@
                     <span class="sidebar-nav-icon"><i data-lucide="upload"></i></span>
                     <span class="sidebar-nav-text">Upload Video</span>
                 </a>
+                <a href="{% url 'project_list' %}" class="sidebar-nav-item {% if request.resolver_match.url_name == 'project_list' or '/video-editor/' in request.path or '/video-editor/project/' in request.path %}active{% endif %}">
+                    <span class="sidebar-nav-icon"><i data-lucide="film"></i></span>
+                    <span class="sidebar-nav-text">Video Editor</span>
+                </a>
             </div>
         {% endif %}
     {% elif user.userprofile.user_type == 'student' %}

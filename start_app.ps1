@@ -24,7 +24,7 @@ $SSL_KEY        = Join-Path $BASE_DIR "certs\edumi.key"
 $SSL_EXPORT     = Join-Path $BASE_DIR "certs\edumi-trust-this.crt"
 $HOSTS_FILE     = "$env:windir\System32\drivers\etc\hosts"
 $DOMAIN         = "edumi.ac.in"
-$PYTHON         = Join-Path $BASE_DIR "venv\Scripts\python.exe"
+$PYTHON         = "C:\Users\hp\AppData\Local\Programs\Python\Python311\python.exe"
 
 Set-Location $BASE_DIR
 
@@ -332,18 +332,36 @@ if (Test-Path $LIVEKIT) {
     Write-Host "      LiveKit binary not found - SKIP" -ForegroundColor DarkYellow
 }
 # =======================================================
-# STEP 6.5: POSTGRESQL
+# STEP 6.5: POSTGRESQL (only if DATABASE_URL is configured)
 # =======================================================
-Write-Host "[6.5/9] Starting PostgreSQL service..." -ForegroundColor Yellow
-try {
-    Start-Service -Name postgresql-x64-15 -ErrorAction Stop
-    Write-Host "      [OK] PostgreSQL started" -ForegroundColor Green
-} catch {
-    Write-Host "      [WARN] PostgreSQL service not found or already running" -ForegroundColor Yellow
-}
-Start-Sleep -Seconds 5
-Start-Sleep -Seconds 2
+Write-Host "[6.5/9] Checking database setup..." -ForegroundColor Yellow
 
+# Read .env to detect if PostgreSQL is configured
+$dbUrl = $null
+if (Test-Path ".env") {
+    $dbUrl = (Get-Content ".env" | Where-Object { $_ -match '^DATABASE_URL=' -and $_ -notmatch '^#' } | Select-Object -First 1) -replace '^DATABASE_URL=',''
+}
+
+if ($dbUrl) {
+    # PostgreSQL mode - try to start the service
+    Write-Host "      DATABASE_URL detected - starting PostgreSQL service..." -ForegroundColor Cyan
+    try {
+        # Try common PostgreSQL service names
+        $pgService = @('postgresql-x64-16','postgresql-x64-15','postgresql-x64-14','postgresql') | `
+            Where-Object { Get-Service $_ -ErrorAction SilentlyContinue } | Select-Object -First 1
+        if ($pgService) {
+            Start-Service -Name $pgService -ErrorAction Stop
+            Write-Host "      [OK] PostgreSQL ($pgService) started" -ForegroundColor Green
+            Start-Sleep -Seconds 3
+        } else {
+            Write-Host "      [WARN] PostgreSQL service not found - ensure it is running manually" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "      [INFO] PostgreSQL already running or started externally" -ForegroundColor Cyan
+    }
+} else {
+    Write-Host "      [OK] Using SQLite (no DATABASE_URL set) - skipping PostgreSQL" -ForegroundColor Green
+}
 
 # =======================================================
 # STEP 7: DB MIGRATIONS + STATIC FILES
@@ -365,7 +383,7 @@ Write-Host "      [OK] Migrations done, static files collected" -ForegroundColor
 # =======================================================
 Write-Host "[8/9] Starting Celery worker and Camera Service..." -ForegroundColor Yellow
 
-Start-Process (Join-Path $BASE_DIR "venv\Scripts\celery.exe") `
+Start-Process "C:\Users\hp\AppData\Local\Programs\Python\Python311\Scripts\celery.exe" `
     -ArgumentList "-A school_project worker -l info -P threads" `
     -WorkingDirectory $BASE_DIR -WindowStyle Minimized
 

@@ -48,9 +48,16 @@ urls.txt
 venv/
 venv311/
 venv113/
+venv_linux/
 env/
 ENV/
 .venv/
+
+# ================================================
+# CLEANUP — empty/dead directories
+# ================================================
+video_editing_new/
+
 
 # ================================================
 # IDE & EDITOR FILES
