@@ -436,11 +436,38 @@
 </div>
 
 <script>
+(function() {
     window.cameraId = {{ camera.id }};
-    let isStreaming = {{ is_live|yesno:"true,false" }};
-    let isRecording = {{ is_recording|yesno:"true,false" }};
-    let recStartTime = {% if recording_start_time %}new Date("{{ recording_start_time }}"){% else %}null{% endif %};
-    let recTimerInterval = null;
+    var isStreaming = {{ is_live|yesno:"true,false" }};
+    var isRecording = {{ is_recording|yesno:"true,false" }};
+    var recStartTime = {% if recording_start_time %}new Date("{{ recording_start_time }}"){% else %}null{% endif %};
+    var recTimerInterval = null;
+    var currentRecordingId = null;
+    var currentZoom = 1.0;
+    var zoomX = 0.5;
+    var zoomY = 0.5;
+
+    // Audio Variables
+    var audioStream = null;
+    var audioContext = null;
+    var audioWorklet = null;
+    var micLevelInterval = null;
+    var audioSocket = null;
+    var remoteMicStatusSocket = null;
+    var monitorSocket = null;
+    var monitorMediaSource = null;
+    var isSelfMonitoring = false;
+    var localLoopbackNode = null;
+    var visualizerAnimationFrame = null;
+
+    var monitorAudioContext = null;
+    var monitorSourceNode = null;
+    var monitorAnalyzer = null;
+    var isConnectingMonitor = false;
+
+    var chatWs = null;
+    var activeParticipants = new Map();
+
 
     // Initialize UI from server state
     const initializeControlRoom = () => {
@@ -561,15 +588,16 @@
     async function toggleStreaming() {
         const btn = document.getElementById('streamBtn');
         const fsBtn = document.getElementById('fsStreamBtn');
+        const micSelectEl = document.getElementById('micSelect');
         if (!isStreaming) {
             // Start Streaming
             const res = await fetch(`/cameras/start-streaming/{{ camera.id }}/`);
             const data = await res.json();
             if (data.status === 'success') {
                 isStreaming = true;
-                
+
                 // Also start audio if a mic is selected
-                if (document.getElementById('micSelect').value) {
+                if (micSelectEl && micSelectEl.value) {
                     initAudioSocket();
                 }
 
@@ -616,22 +644,8 @@
         }
     }
 
-    let currentRecordingId = null;
-    let currentZoom = 1.0;
-    let zoomX = 0.5;
-    let zoomY = 0.5;
-
     // Audio Variables
-    let audioStream = null;
-    let audioContext = null;
-    let audioWorklet = null;
-    let micLevelInterval = null;
-    let audioSocket = null;
-    let remoteMicStatusSocket = null;
-    let monitorSocket = null;
-    let monitorMediaSource = null;
-    let isSelfMonitoring = false;
-    let localLoopbackNode = null;
+
 
     function toggleSelfListen() {
         const btn = document.getElementById('selfListenBtn');
@@ -732,10 +746,7 @@
         }
     });
 
-    let monitorAudioContext = null;
-    let monitorSourceNode = null;
-    let monitorAnalyzer = null;
-    let isConnectingMonitor = false;
+
 
     function initMonitorSocket() {
         if (isConnectingMonitor) return;
@@ -886,7 +897,7 @@
         return;
     }
 
-    let visualizerAnimationFrame = null;
+    
 
     async function startAudioCapture() {
         const val = document.getElementById('micSelect').value;
@@ -1423,8 +1434,8 @@
     window.cameraId = "{{ camera.id }}";
     window.meetingCode = "CAM_" + window.cameraId;
     window.currentUserId = "{{ user.id }}";
-    var chatWs = null;
-    var activeParticipants = new Map();
+    chatWs = null;
+    activeParticipants = new Map();
 
     function connectChat() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1558,5 +1569,26 @@
 
     // Start chat connection
     connectChat();
+
+    // Expose functions needed by inline onclick handlers to window scope
+    window.toggleStreaming = toggleStreaming;
+    window.toggleRecording = toggleRecording;
+    window.initRemoteMicStatus = initRemoteMicStatus;
+    window.initializeControlRoom = initializeControlRoom;
+    window.toggleMonitorAudio = toggleMonitorAudio;
+    window.toggleSelfListen = toggleSelfListen;
+    window.handleZoomSlider = handleZoomSlider;
+    window.adjustZoom = adjustZoom;
+    window.resetZoom = resetZoom;
+    window.toggleFullScreen = toggleFullScreen;
+    window.setZoomTarget = setZoomTarget;
+    window.captureAreaImage = captureAreaImage;
+    window.sendChatMessage = sendChatMessage;
+    window.handleThumbnailSelection = handleThumbnailSelection;
+    window.generateThumbnail = generateThumbnail;
+    window.finishPublish = finishPublish;
+    window.closePublishModal = closePublishModal;
+    window.redirectToEditor = redirectToEditor;
+})();
 </script>
 {% endblock %}

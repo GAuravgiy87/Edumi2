@@ -1,5 +1,6 @@
 {% extends 'layouts/sidebar_base.html' %}
 {% load static %}
+{% load common_tags %}
 
 {% block page_title %}Live / Videos{% endblock %}
 
@@ -160,7 +161,6 @@
         </form>
     </div>
 
-    {% if live_sessions %}
     <h2 class="section-title"><span class="live-dot"></span> Live Now</h2>
     <div class="lecture-grid">
         {% for cam in live_sessions %}
@@ -177,9 +177,13 @@
                 </div>
             </div>
         </a>
+        {% empty %}
+        <div style="grid-column: 1/-1; text-align: center; padding: 3rem; background: white; border-radius: 1rem; border: 1px solid #e2e8f0; color: #94a3b8;">
+            <i data-lucide="tv" style="width:48px; height:48px; margin-bottom:1rem; opacity:0.5; display: inline-block;"></i>
+            <p style="margin: 0; font-weight: 500;">No live lectures right now.</p>
+        </div>
         {% endfor %}
     </div>
-    {% endif %}
 
     <h2 class="section-title"><i data-lucide="video"></i> Recorded Lectures</h2>
     <div class="lecture-grid">
@@ -189,10 +193,10 @@
                 {% if rec.thumbnail %}
                 <img src="{{ rec.thumbnail.url }}" alt="{{ rec.title }}">
                 {% else %}
-                <img src="{% static 'images/video-placeholder.jpg' %}" alt="Thumbnail">
+                <img src="{% static 'images/video-placeholder.svg' %}" alt="Thumbnail">
                 {% endif %}
                 {% if rec.duration %}
-                <span class="duration-badge">{{ rec.duration }}</span>
+                <span class="duration-badge">{{ rec.duration|duration_hms }}</span>
                 {% endif %}
             </div>
             <div class="card-body">
@@ -215,24 +219,31 @@
 </div>
 
 <script>
-    // Load live previews directly from camera service on port 8003
-    document.addEventListener('DOMContentLoaded', () => {
+    (function() {
+        // Load live previews immediately (works under both Turbo and standard loads)
         document.querySelectorAll('.live-feed-thumb').forEach(img => {
             const camId = img.getAttribute('data-camera-id');
             img.src = `${window.location.protocol}//${window.location.hostname}:8003/cameras/${camId}/feed/?q=low&t=${new Date().getTime()}`;
         });
-    });
 
-    // Handle real-time updates for live lectures
-    window.addEventListener('live_status_change', function(e) {
-        console.log('Live status change detected:', e.detail);
-        // Automatically reload the page content using Turbo for a smooth experience
-        if (typeof Turbo !== 'undefined') {
-            Turbo.visit(window.location.href, { action: 'replace' });
-        } else {
-            // Fallback if Turbo is not available
-            window.location.reload();
+        // Use a non-accumulating window handler pattern to avoid leaking event listeners
+        window.onLiveStatusChange = function(e) {
+            console.log('Live status change detected in student lectures:', e.detail);
+            if (typeof Turbo !== 'undefined') {
+                Turbo.visit(window.location.href, { action: 'replace' });
+            } else {
+                window.location.reload();
+            }
+        };
+
+        if (!window.hasLiveStatusChangeListener) {
+            window.addEventListener('live_status_change', function(e) {
+                if (typeof window.onLiveStatusChange === 'function') {
+                    window.onLiveStatusChange(e);
+                }
+            });
+            window.hasLiveStatusChangeListener = true;
         }
-    });
+    })();
 </script>
 {% endblock %}

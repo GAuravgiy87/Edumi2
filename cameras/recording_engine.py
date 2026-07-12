@@ -7,6 +7,7 @@ import signal
 from django.conf import settings
 from django.utils import timezone
 from .models import Camera, CameraRecording
+from .ffmpeg_helpers import get_ffmpeg_binary
 
 logger = logging.getLogger('cameras')
 
@@ -109,7 +110,7 @@ class RecordingEngine:
         # Determine encoder: Use hardware-accelerated if available, else libx264
         encoder = 'libx264'
         try:
-            test_cmd = ['ffmpeg', '-hide_banner', '-encoders']
+            test_cmd = [get_ffmpeg_binary(), '-hide_banner', '-encoders']
             encoders_output = subprocess.check_output(test_cmd, stderr=subprocess.STDOUT).decode()
             if 'h264_amf' in encoders_output:
                 encoder = 'h264_amf'
@@ -124,7 +125,7 @@ class RecordingEngine:
 
         # Build robust FFmpeg command
         cmd = [
-            'ffmpeg', '-y',
+            get_ffmpeg_binary(), '-y',
             '-hide_banner',
             '-loglevel', 'info',
             '-probesize', '100M',
@@ -274,13 +275,35 @@ class RecordingEngine:
             logger.error(f"Failed to save chunk {sequence} to DB: {e}")
 
     def _monitor_process(self):
-        """Monitor the FFmpeg process and auto-save if it stops unexpectedly"""
-        # Wait for the process to exit
-        self.process.wait()
+        """Monitor the FFmpeg process, enforce a 12-hour limit, and auto-save if it stops unexpectedly"""
+        max_duration = 12 * 3600  # 12 hours in seconds
+        poll_interval = 2.0
         
-        # If the process exited and we haven't finalized yet, it's a crash or disconnect
-        # IMPORTANT: Only cleanup if it's NOT a deliberate manual stop
-        
+        while True:
+            # Check if deliberately finalized
+            with self.lock:
+                if self.finalized:
+                    break
+            
+            # Check if process ended naturally
+            if self.process.poll() is not None:
+                break
+                
+            # Check elapsed duration since start
+            elapsed = (timezone.now() - self.start_time).total_seconds()
+            if elapsed >= max_duration:
+                logger.warning(f"Recording for camera {self.camera_id} reached 12-hour limit. Stopping.")
+                self._stop(auto_save=True)
+                break
+                
+            time.sleep(poll_interval)
+
+        # Wait for the process to exit completely (if not already done)
+        try:
+            self.process.wait(timeout=5)
+        except Exception:
+            pass
+
         # We use a slight delay to ensure file handles are released before finalization
         time.sleep(1)
         

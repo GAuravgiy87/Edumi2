@@ -431,6 +431,35 @@
     // Start chat connection
     connectChat();
 
+    // Handle real-time updates for the live session status
+    window.onWatchLiveStatusChange = function(e) {
+        const data = e.detail;
+        console.log("Watch live status change event received:", data);
+        if (String(data.camera_id) === String(window.cameraId)) {
+            if (data.status === 'stopped') {
+                if (typeof showToast === 'function') {
+                    showToast('Class Ended', 'The teacher has stopped the live stream.', 'warning');
+                }
+                setTimeout(() => {
+                    if (typeof Turbo !== 'undefined') {
+                        Turbo.visit("{% url 'student_lecture_list' %}");
+                    } else {
+                        window.location.href = "{% url 'student_lecture_list' %}";
+                    }
+                }, 2000);
+            }
+        }
+    };
+
+    if (!window.hasWatchLiveStatusChangeListener) {
+        window.addEventListener('live_status_change', function(e) {
+            if (typeof window.onWatchLiveStatusChange === 'function') {
+                window.onWatchLiveStatusChange(e);
+            }
+        });
+        window.hasWatchLiveStatusChangeListener = true;
+    }
+
     // Export function to window
     window.sendMessage = sendMessage;
 })();

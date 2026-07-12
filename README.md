@@ -148,6 +148,10 @@ Everything runs over **HTTPS**. Biometrics are **encrypted at rest**. Real-time 
 <summary><b>✂️ Non-Destructive Video Editor</b></summary>
 
 - Edit recordings **without touching the original file** — source is always preserved
+- **Intelligent Sequencer**: Real-time gap-skipping playback engine that instantly jumps over deleted clips during preview
+- **State Persistence**: Browser-level `localStorage` auto-saving ensures your edits survive page reloads
+- **Precision Trimming**: Live video scrubbing preview while dragging clip edges on the timeline
+- **Keyboard-Driven Workflow**: Industry-standard shortcuts (`Space` to play, `S` to split, `Del` to remove, `Ctrl+C/V/X`, Arrow key seeking)
 - Actions (trim, mute, rotate, add text overlay, add audio) stored as an ordered sequence in the database
 - Final export applies all actions as a **single FFmpeg pipeline pass** — no generation loss
 

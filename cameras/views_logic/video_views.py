@@ -28,7 +28,7 @@ def stream_video(request, recording_id):
         return HttpResponse("Unauthorized", status=403)
 
     file_path = recording.video_file.path
-    if not os.path.exists(file_path):
+    if not os.path.exists(file_path) or os.path.isdir(file_path):
         return HttpResponse("Video file not found", status=404)
 
     size = os.path.getsize(file_path)
@@ -119,9 +119,22 @@ def upload_video(request):
                 # Auto-generate a thumbnail if none provided
                 logger.info("Generating thumbnail...")
                 recording.generate_thumbnail(time_sec=1.0)
+
+            # Auto-extract duration from uploaded video
+            try:
+                from ..ffmpeg_helpers import get_video_duration
+                from datetime import timedelta
+                duration_sec = get_video_duration(recording.video_file.path)
+                if duration_sec:
+                    recording.duration = timedelta(seconds=duration_sec)
+                    recording.save()
+                    logger.info(f"Set duration of uploaded video to {recording.duration}")
+            except Exception as e:
+                logger.warning(f"Failed to auto-extract uploaded video duration: {e}")
             
             logger.info("Upload successful!")
-            return JsonResponse({'status': 'success', 'redirect_url': '/cameras/manage-recordings/'})
+            redirect_url = reverse('edit_recording', args=[recording.id])
+            return JsonResponse({'status': 'success', 'redirect_url': redirect_url})
             
         except Exception as e:
             logger.error(f"Error in upload: {str(e)}")
@@ -199,30 +212,133 @@ def toggle_recording_publish(request, recording_id):
 
 @login_required
 def edit_recording(request, recording_id):
-    """Edit a recording (trim, thumbnail, etc.)"""
+    """Bridge view to edit a camera recording in the existing Video Editor app"""
+    from cameras.models import CameraRecording, RecordingChunk
+    from video_editing.models import VideoProject, EditOperation
+    from video_editing import ffmpeg_utils
+    from django.core.files import File
+    from django.contrib import messages
+    import shutil
+    import tempfile
+    import uuid
+    import subprocess
+
     recording = get_object_or_404(CameraRecording, id=recording_id)
     if not (request.user.is_superuser or recording.teacher == request.user):
         return redirect('dashboard')
+
+    project_title = f"Edit - {recording.title}"
     
-    if request.method == 'POST':
-        title = request.POST.get('title', recording.title)
-        description = request.POST.get('description', recording.description)
-        edit_start = request.POST.get('edit_start', recording.edit_start_time)
-        edit_end = request.POST.get('edit_end', recording.edit_end_time)
-        
-        recording.title = title
-        recording.description = description
-        try:
-            if edit_start:
-                recording.edit_start_time = float(edit_start)
-            if edit_end:
-                recording.edit_end_time = float(edit_end)
-        except ValueError as e:
-            logger.warning(f"Invalid time values: {e}")
-        recording.save()
-        return redirect('manage_recordings')
-    
-    return render(request, 'cameras/edit_recording.html', {'recording': recording})
+    # Check if a project already exists with this title/owner to avoid duplicate conversions
+    existing_project = VideoProject.objects.filter(owner=request.user, title=project_title).first()
+    if existing_project:
+        url = reverse("project_detail", kwargs={"pk": existing_project.pk})
+        return redirect(f"{url}?recording_id={recording.id}")
+
+    # Create a new VideoProject
+    project = VideoProject.objects.create(
+        owner=request.user,
+        title=project_title,
+        status="processing"
+    )
+
+    try:
+        if recording.is_chunked:
+            # Stitch chunks together
+            chunks = RecordingChunk.objects.filter(recording=recording).order_by('sequence')
+            if not chunks.exists():
+                raise Exception("No video chunks found for this recording.")
+
+            with tempfile.NamedTemporaryFile(suffix='.ts', delete=False) as temp_video:
+                for chunk in chunks:
+                    if chunk.data:
+                        temp_video.write(chunk.data)
+                temp_video_path = temp_video.name
+
+            # Remux / copy it to an MP4 so it plays natively in the browser editor
+            mp4_path = temp_video_path.replace('.ts', '.mp4')
+            ffmpeg_bin = ffmpeg_utils.settings.FFMPEG_BINARY
+            cmd = [
+                ffmpeg_bin, '-y',
+                '-i', temp_video_path,
+                '-c', 'copy',
+                mp4_path
+            ]
+            subprocess.run(cmd, capture_output=True, check=True)
+
+            with open(mp4_path, 'rb') as f:
+                project.original_file.save(f"{uuid.uuid4().hex}.mp4", File(f), save=False)
+
+            try:
+                os.remove(temp_video_path)
+                os.remove(mp4_path)
+            except:
+                pass
+        else:
+            if not recording.video_file or not os.path.exists(recording.video_file.path):
+                raise Exception("Original recording video file not found.")
+
+            file_path = recording.video_file.path
+            # If MKV, remux to MP4 for native browser playback
+            if file_path.endswith('.mkv'):
+                mp4_path = file_path.replace('.mkv', '_remux.mp4')
+                ffmpeg_bin = ffmpeg_utils.settings.FFMPEG_BINARY
+                cmd = [
+                    ffmpeg_bin, '-y',
+                    '-i', file_path,
+                    '-c', 'copy',
+                    mp4_path
+                ]
+                subprocess.run(cmd, capture_output=True, check=True)
+                with open(mp4_path, 'rb') as f:
+                    project.original_file.save(f"{uuid.uuid4().hex}.mp4", File(f), save=False)
+                try: os.remove(mp4_path)
+                except: pass
+            else:
+                with open(file_path, 'rb') as f:
+                    filename = os.path.basename(file_path)
+                    project.original_file.save(filename, File(f), save=False)
+
+        # Get metadata
+        meta = ffmpeg_utils.probe(project.original_file.path)
+        # Parse duration
+        duration = float(meta.get('format', {}).get('duration', 0.0))
+        # Parse size
+        width = None
+        height = None
+        has_audio = True
+        for stream in meta.get('streams', []):
+            if stream.get('codec_type') == 'video':
+                width = int(stream.get('width', 0))
+                height = int(stream.get('height', 0))
+            elif stream.get('codec_type') == 'audio':
+                has_audio = True
+
+        project.duration_seconds = duration
+        project.width = width
+        project.height = height
+        project.has_audio = has_audio
+        project.status = "ready"
+        project.save()
+
+        # Log upload operation
+        EditOperation.objects.create(
+            project=project,
+            operation_type="upload",
+            description=f"Loaded recording: {recording.title}",
+        )
+
+        messages.success(request, "Recording loaded into Video Editor successfully.")
+        url = reverse("project_detail", kwargs={"pk": project.pk})
+        return redirect(f"{url}?recording_id={recording.id}")
+
+    except Exception as e:
+        logger.error(f"Error preparing video for editing: {e}", exc_info=True)
+        project.status = "error"
+        project.error_message = str(e)
+        project.save()
+        messages.error(request, f"Error preparing video for editing: {str(e)}")
+        return redirect("manage_recordings")
 
 
 @login_required

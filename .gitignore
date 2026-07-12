@@ -57,6 +57,14 @@ ENV/
 # CLEANUP — empty/dead directories
 # ================================================
 video_editing_new/
+editing/
+
+# ================================================
+# FFMPEG LOCAL BINARIES
+# ================================================
+ffmpeg-master-latest-win64-gpl/
+ffmpeg.exe
+ffprobe.exe
 
 
 # ================================================

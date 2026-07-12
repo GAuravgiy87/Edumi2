@@ -586,27 +586,129 @@ def op_background_audio(request, pk):
     return redirect(reverse("project_detail", args=[pk]) + "?tab=audio")
 
 
+from .models import ProjectAsset
+
 @require_POST
-def upload_audio_temp(request, pk):
-    """Save background audio file temporarily and return its path/name."""
+def upload_asset(request, pk):
+    """Save an asset file (audio/video) into the ProjectAsset model."""
     project = get_object_or_404(VideoProject, pk=pk)
     
-    audio_file = request.FILES.get("audio_file")
-    if not audio_file:
+    asset_file = request.FILES.get("asset_file")
+    asset_type = request.POST.get("asset_type", "audio")
+    
+    if not asset_file:
         return JsonResponse({"error": "no_file"}, status=400)
         
-    tmp_dir = os.path.join(settings.MEDIA_ROOT, "tmp")
-    os.makedirs(tmp_dir, exist_ok=True)
-    audio_tmp_path = os.path.join(tmp_dir, f"audio_{uuid.uuid4().hex}_{audio_file.name}")
+    asset = ProjectAsset.objects.create(
+        project=project,
+        asset_type=asset_type,
+        file=asset_file,
+        filename=asset_file.name
+    )
     
-    with open(audio_tmp_path, "wb") as dest:
-        for chunk in audio_file.chunks():
-            dest.write(chunk)
+    # Try to extract duration if possible
+    try:
+        meta = ffmpeg_utils.get_metadata(asset.file.path)
+        asset.duration_seconds = meta.get("duration", 0)
+        asset.save(update_fields=['duration_seconds'])
+    except Exception:
+        pass
             
     return JsonResponse({
         "status": "success",
-        "temp_path": audio_tmp_path,
-        "filename": audio_file.name
+        "asset_id": asset.id,
+        "url": asset.file.url,
+        "filename": asset.filename,
+        "duration": asset.duration_seconds
     })
 
+import json
+from django.views.decorators.csrf import csrf_exempt
 
+@require_POST
+def save_timeline(request, pk):
+    """Save the JSON timeline state for the project."""
+    project = get_object_or_404(VideoProject, pk=pk)
+    try:
+        data = json.loads(request.body)
+        project.timeline_state = data
+        project.save(update_fields=['timeline_state'])
+        return JsonResponse({"status": "success"})
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+@require_POST
+def export_timeline(request, pk):
+    """Compile the JSON timeline state into a final exported video."""
+    project = get_object_or_404(VideoProject, pk=pk)
+    try:
+        data = json.loads(request.body)
+        project.timeline_state = data
+        project.save(update_fields=['timeline_state'])
+        
+        project.status = "processing"
+        project.save(update_fields=['status'])
+        
+        # Dispatch Celery background task
+        from .tasks import export_video_task
+        export_video_task.delay(project.id, data)
+        
+        return JsonResponse({"status": "processing"})
+        
+    except Exception as e:
+        project.status = "error"
+        project.error_message = str(e)
+        project.save(update_fields=['status', 'error_message'])
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@require_POST
+def publish_to_lecture(request, pk):
+    """
+    Publish the edited VideoProject back to its CameraRecording and set it to published.
+    """
+    from cameras.models import CameraRecording
+    from django.core.files import File
+    import os
+    
+    project = get_object_or_404(VideoProject, pk=pk)
+    recording_id = request.GET.get('recording_id')
+    
+    if not recording_id:
+        messages.error(request, "Recording ID missing. Cannot publish.")
+        return redirect('project_detail', pk=pk)
+        
+    recording = get_object_or_404(CameraRecording, id=recording_id)
+    
+    if not (request.user.is_superuser or recording.teacher == request.user):
+        messages.error(request, "Unauthorized to publish this recording.")
+        return redirect('project_detail', pk=pk)
+        
+    try:
+        # Overwrite the original recording video_file with the project's working_file
+        edited_path = project.working_file.path
+        filename = os.path.basename(edited_path)
+        
+        # Save a copy to the recording so the VideoProject is unaffected
+        with open(edited_path, 'rb') as f:
+            recording.video_file.save(filename, File(f), save=False)
+            
+        recording.is_published = True
+        recording.recording_status = 'completed'
+        
+        # Update duration if available
+        try:
+            if project.duration_seconds:
+                from datetime import timedelta
+                recording.duration = timedelta(seconds=project.duration_seconds)
+        except Exception:
+            pass
+            
+        recording.save()
+        
+        messages.success(request, f"Lecture '{recording.title}' has been successfully published!")
+        return redirect('manage_recordings')
+        
+    except Exception as e:
+        messages.error(request, f"Failed to publish lecture: {str(e)}")
+        return redirect(f"{reverse('project_detail', args=[pk])}?recording_id={recording_id}")

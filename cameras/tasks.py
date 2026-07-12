@@ -4,6 +4,7 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from .models import CameraRecording
+from .ffmpeg_helpers import get_ffmpeg_binary
 
 logger = logging.getLogger('cameras')
 
@@ -37,7 +38,7 @@ def process_recording_task(recording_id):
         
         # Try to get frame at 1 second, or 0 if it fails
         thumb_cmd = [
-            'ffmpeg', '-y', '-i', video_path,
+            get_ffmpeg_binary(), '-y', '-i', video_path,
             '-ss', '00:00:01', '-vframes', '1',
             '-q:v', '2', thumbnail_path
         ]

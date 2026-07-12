@@ -375,8 +375,10 @@
                     if (data.status === 'started') {
                         showToast(`Live Lecture!`, `${data.teacher_name} is now live in ${data.camera_name}`, 'success');
                     }
-                    // Only refresh if not in a meeting or camera control room to avoid disruption
-                    if (!window.location.pathname.includes('/meetings/join/') && !window.location.pathname.includes('/cameras/teacher/')) {
+                    // Only refresh if not in a meeting or camera control room/watch page to avoid disruption
+                    if (!window.location.pathname.includes('/meetings/join/') && 
+                        !window.location.pathname.includes('/cameras/control-room/') && 
+                        !window.location.pathname.includes('/cameras/watch-live/')) {
                         refreshCurrentPage();
                     }
                     window.dispatchEvent(new CustomEvent('live_status_change', { detail: data }));
@@ -597,6 +599,7 @@
     <!-- Not authenticated - redirect to login -->
     <script>window.location.href = "{% url 'login' %}";</script>
     {% endif %}
+    {% block extra_js %}{% endblock %}
     {% include 'components/lucide_icons.html' %}
 </body>
 

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 import logging
+from .ffmpeg_helpers import get_ffmpeg_binary
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -128,7 +129,7 @@ class CameraRecording(models.Model):
         thumbnail_path = os.path.join(thumbnail_dir, thumbnail_filename)
         
         cmd = [
-            'ffmpeg', '-y',
+            get_ffmpeg_binary(), '-y',
             '-i', temp_ts_path,
             '-vframes', '1',
             '-vf', 'scale=640:360',
@@ -165,7 +166,7 @@ class CameraRecording(models.Model):
         
         # FFmpeg command to extract thumbnail
         cmd = [
-            'ffmpeg', '-y',
+            get_ffmpeg_binary(), '-y',
             '-ss', str(time_sec),
             '-i', self.video_file.path,
             '-vframes', '1',
@@ -213,7 +214,7 @@ class CameraRecording(models.Model):
         trimmed_path = os.path.join(video_dir, f'{self.id}_trimmed.mp4')
 
         # Build FFmpeg trim command
-        cmd = ['ffmpeg', '-y', '-i', self.video_file.path]
+        cmd = [get_ffmpeg_binary(), '-y', '-i', self.video_file.path]
 
         if self.edit_start_time is not None and self.edit_start_time > 0:
             cmd.extend(['-ss', str(self.edit_start_time)])

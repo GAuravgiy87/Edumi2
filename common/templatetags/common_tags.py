@@ -18,6 +18,31 @@ def format_duration_filter(seconds):
     return format_duration(seconds)
 
 
+@register.filter(name='duration_hms')
+def duration_hms_filter(duration):
+    """
+    Format a duration (timedelta or seconds) into HH:MM:SS format
+    Usage: {{ recording.duration|duration_hms }}
+    """
+    if duration is None:
+        return "--:--:--"
+    
+    if hasattr(duration, 'total_seconds'):
+        seconds = int(duration.total_seconds())
+    else:
+        try:
+            seconds = int(float(duration))
+        except (ValueError, TypeError):
+            return "--:--:--"
+            
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+
 @register.filter(name='time_since')
 def time_since_filter(dt):
     """

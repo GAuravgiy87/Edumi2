@@ -18,20 +18,28 @@
     {% if projects %}
     <div class="ve-project-grid">
         {% for project in projects %}
-        <a href="{% url 'project_detail' project.pk %}" class="ve-card ve-project-card">
-            <div class="ve-card-thumb">
-                <video muted preload="metadata" src="{{ project.working_file.url }}#t=0.5"></video>
-                <span class="ve-status-pill ve-status-{{ project.status }}">{{ project.get_status_display }}</span>
-            </div>
-            <div class="ve-card-body">
-                <h3 class="ve-card-title">{{ project.display_title }}</h3>
-                <p class="ve-card-meta">
-                    {% if project.duration_seconds %}{{ project.display_duration }} &middot;{% endif %}
-                    {% if project.width %}{{ project.width }}&times;{{ project.height }}{% endif %}
-                </p>
-                <p class="ve-card-meta ve-card-meta--small">Updated {{ project.updated_at|timesince }} ago</p>
-            </div>
-        </a>
+        <div class="ve-card ve-project-card" style="position: relative;">
+            <a href="{% url 'project_detail' project.pk %}" style="text-decoration: none; color: inherit; display: block; height: 100%;">
+                <div class="ve-card-thumb">
+                    <video muted preload="metadata" src="{{ project.working_file.url }}#t=0.5"></video>
+                    <span class="ve-status-pill ve-status-{{ project.status }}">{{ project.get_status_display }}</span>
+                </div>
+                <div class="ve-card-body">
+                    <h3 class="ve-card-title">{{ project.display_title }}</h3>
+                    <p class="ve-card-meta">
+                        {% if project.duration_seconds %}{{ project.display_duration }} &middot;{% endif %}
+                        {% if project.width %}{{ project.width }}&times;{{ project.height }}{% endif %}
+                    </p>
+                    <p class="ve-card-meta ve-card-meta--small">Updated {{ project.updated_at|timesince }} ago</p>
+                </div>
+            </a>
+            <form method="POST" action="{% url 'project_delete' project.pk %}" style="position: absolute; bottom: 15px; right: 15px; z-index: 10;" onsubmit="return confirm('Are you sure you want to delete this project?');">
+                {% csrf_token %}
+                <button type="submit" title="Delete Project" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; border-radius: 6px; padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'">
+                    <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                </button>
+            </form>
+        </div>
         {% endfor %}
     </div>
     {% else %}
@@ -95,44 +103,50 @@
 (function () {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
-    const backdrop   = document.getElementById('upload-modal-backdrop');
     const openBtn    = document.getElementById('open-upload-modal');
     const openBtnE   = document.getElementById('open-upload-modal-empty');
-    const closeBtn   = document.getElementById('close-upload-modal');
-
-    function openModal()  { backdrop.classList.add('ve-modal-backdrop--visible'); document.body.style.overflow = 'hidden'; }
-    function closeModal() { backdrop.classList.remove('ve-modal-backdrop--visible'); document.body.style.overflow = ''; }
-
-    if (openBtn)  openBtn.addEventListener('click', openModal);
-    if (openBtnE) openBtnE.addEventListener('click', openModal);
-    closeBtn.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-
-    const input      = document.querySelector('#dropzone input[type="file"]');
-    const dropzone   = document.getElementById('dropzone');
-    const hint       = document.getElementById('dropzone-hint');
-    const filenameEl = document.getElementById('dropzone-filename');
+    
     const form       = document.getElementById('upload-form');
-    const submitBtn  = document.getElementById('upload-submit');
-    const note       = document.getElementById('upload-note');
+    const input      = document.querySelector('#upload-form input[type="file"]');
+    
+    // Instead of a modal, click directly triggers the file input
+    function triggerFileInput() {
+        if (input) input.click();
+    }
 
-    dropzone.addEventListener('click', (e) => { if (e.target !== input) input.click(); });
-    input.addEventListener('change', () => {
-        if (input.files.length) { filenameEl.textContent = input.files[0].name; hint.textContent = 'Selected:'; }
-    });
-    ['dragover','dragenter'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('ve-dropzone--active'); }));
-    ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('ve-dropzone--active'); }));
-    dropzone.addEventListener('drop', (e) => {
-        if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; filenameEl.textContent = e.dataTransfer.files[0].name; hint.textContent = 'Selected:'; }
-    });
-    form.addEventListener('submit', () => {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Uploading\u2026';
-        note.textContent = 'Reading video metadata \u2014 this may take a moment.';
-    });
+    if (openBtn)  openBtn.addEventListener('click', triggerFileInput);
+    if (openBtnE) openBtnE.addEventListener('click', triggerFileInput);
+    
+    // Auto-submit the form as soon as a file is selected
+    if (input) {
+        input.addEventListener('change', () => {
+            if (input.files.length > 0) {
+                // Change button text to indicate upload
+                if (openBtn) {
+                    openBtn.disabled = true;
+                    openBtn.innerHTML = '<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading...';
+                }
+                if (openBtnE) {
+                    openBtnE.disabled = true;
+                    openBtnE.innerHTML = '<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading...';
+                }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                form.submit();
+            }
+        });
+    }
 
-    {% if form.errors %}openModal();{% endif %}
+    // Since we no longer use the modal visually, if there are form errors, we can just alert them.
+    {% if form.errors %}
+        alert("There was an error uploading the video. Please try again.");
+    {% endif %}
 })();
 </script>
+<style>
+    /* Hide the modal elements since we are bypassing them */
+    .ve-modal-backdrop { display: none !important; }
+    #upload-form { display: none; }
+    .lucide-spin { animation: spin 2s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+</style>
 {% endblock %}

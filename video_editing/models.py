@@ -10,7 +10,13 @@ def project_upload_path(instance, filename):
     """Store uploads under media/videos/<user_id>/<uuid>_<filename>."""
     ext = os.path.splitext(filename)[1]
     new_name = f"{uuid.uuid4().hex}{ext}"
-    return f"videos/{instance.owner_id}/{new_name}"
+    
+    if hasattr(instance, 'owner_id'):
+        owner_id = instance.owner_id
+    else:
+        owner_id = instance.project.owner_id
+        
+    return f"videos/{owner_id}/{new_name}"
 
 
 class VideoProject(models.Model):
@@ -45,6 +51,9 @@ class VideoProject(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ready")
     error_message = models.TextField(blank=True, default="")
+    
+    # NEW: JSON state of the timeline (clips, tracks, splits, overlays)
+    timeline_state = models.JSONField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -93,9 +102,57 @@ class VideoProject(models.Model):
 
     @property
     def working_file(self):
-
         """The file that edit operations should act on."""
         return self.current_file if self.current_file else self.original_file
+
+
+class ProjectAsset(models.Model):
+    """
+    Holds extra audio, video, or image files uploaded to a project for multi-track editing.
+    """
+    ASSET_TYPES = [
+        ("video", "Video"),
+        ("audio", "Audio"),
+        ("image", "Image"),
+    ]
+    project = models.ForeignKey(VideoProject, on_delete=models.CASCADE, related_name="assets")
+    asset_type = models.CharField(max_length=10, choices=ASSET_TYPES)
+    file = models.FileField(upload_to=project_upload_path)
+    filename = models.CharField(max_length=255, blank=True)
+    duration_seconds = models.FloatField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    @property
+    def display_title(self):
+        return self.filename or os.path.basename(self.file.name)
+
+    def __str__(self):
+        return f"{self.display_title} ({self.get_asset_type_display()})"
+
+    def get_absolute_url(self):
+        return self.file.url
+
+    @property
+    def display_duration(self):
+        if not self.duration_seconds:
+            return ""
+        secs = self.duration_seconds
+        h = int(secs // 3600)
+        m = int((secs % 3600) // 60)
+        s = int(secs % 60)
+        ms = int(round((secs % 1) * 10))
+        if h > 0:
+            time_str = f"{h}:{m:02d}:{s:02d}"
+        else:
+            time_str = f"{m}:{s:02d}"
+        if ms > 0:
+            time_str += f".{ms}"
+        return time_str
 
 
 class EditOperation(models.Model):

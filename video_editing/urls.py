@@ -25,6 +25,11 @@ urlpatterns = [
     path("project/<int:pk>/fade/", views.op_fade, name="op_fade"),
     path("project/<int:pk>/reset/", views.op_reset, name="op_reset"),
     path("project/<int:pk>/export/", views.export_project, name="export_project"),
+    path("project/<int:pk>/publish/", views.publish_to_lecture, name="publish_to_lecture"),
     path("project/<int:pk>/background-audio/", views.op_background_audio, name="op_background_audio"),
-    path("project/<int:pk>/upload-audio/", views.upload_audio_temp, name="upload_audio_temp"),
+    path("project/<int:pk>/upload-asset/", views.upload_asset, name="upload_asset"),
+    
+    # Timeline JSON endpoints
+    path("project/<int:pk>/save-timeline/", views.save_timeline, name="save_timeline"),
+    path("project/<int:pk>/export-timeline/", views.export_timeline, name="export_timeline"),
 ]

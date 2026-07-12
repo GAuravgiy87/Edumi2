@@ -9,6 +9,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from .models import Camera
 from channels.db import database_sync_to_async
+from .ffmpeg_helpers import get_ffmpeg_binary
 
 import traceback
 
@@ -234,7 +235,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
             # 2. Use -map 0:a? to capture ALL possible audio tracks
             # 3. Apply a massive 20x gain and high-intensity normalization
             cmd = [
-                'ffmpeg', '-y', '-hide_banner', '-loglevel', 'info',
+                get_ffmpeg_binary(), '-y', '-hide_banner', '-loglevel', 'info',
                 '-nostdin',
                 '-rtsp_transport', 'tcp', 
                 '-probesize', '40M', '-analyzeduration', '40M',
@@ -355,7 +356,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
             rtsp_url = camera.get_full_rtsp_url()
 
             cmd = [
-                'ffmpeg', '-y', '-hide_banner', '-loglevel', 'warning',
+                get_ffmpeg_binary(), '-y', '-hide_banner', '-loglevel', 'warning',
                 '-nostdin',
                 '-rtsp_transport', 'tcp',
                 '-probesize', '40M', '-analyzeduration', '40M',

@@ -175,7 +175,7 @@
             </div>
             
             <script>
-            document.addEventListener('DOMContentLoaded', function() {
+            (function() {
                 const likeBtn = document.querySelector('.like-btn');
                 if (likeBtn) {
                     likeBtn.addEventListener('click', function() {
@@ -202,14 +202,14 @@
                         .catch(err => console.error('Error liking recording:', err));
                     });
                 }
-            });
+            })();
             </script>
         </div>
 
         <div class="description-box">
             <div class="d-flex justify-content-between mb-2">
                 <span class="font-weight-bold">Description</span>
-                <span class="text-muted small">{{ recording.duration|default:"--" }} duration</span>
+                <span class="text-muted small">{{ recording.duration|duration_hms }} duration</span>
             </div>
             {{ recording.description|default:"No description provided for this lecture." }}
         </div>
@@ -241,24 +241,31 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    (function() {
         const video = document.getElementById('videoPlayer');
+        if (!video) return;
         
         {% if recording.is_chunked %}
         const playlistUrl = "{% url 'recording_playlist' recording.id %}";
         
         if (Hls.isSupported()) {
+            if (window.currentHls) {
+                try {
+                    window.currentHls.destroy();
+                } catch(e) {}
+            }
             const hls = new Hls();
             hls.loadSource(playlistUrl);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 // video.play();
             });
+            window.currentHls = hls;
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             // For Safari
             video.src = playlistUrl;
         }
         {% endif %}
-    });
+    })();
 </script>
 {% endblock %}

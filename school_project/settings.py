@@ -523,5 +523,11 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS  = 10_000
 # ==============================================================================
 # FFMPEG / FFPROBE BINARY PATHS
 # ==============================================================================
-FFMPEG_BINARY = env('FFMPEG_BINARY', 'ffmpeg')
-FFPROBE_BINARY = env('FFPROBE_BINARY', 'ffprobe')
+try:
+    from cameras.ffmpeg_helpers import get_ffmpeg_binary, get_ffprobe_binary
+    FFMPEG_BINARY = get_ffmpeg_binary()
+    FFPROBE_BINARY = get_ffprobe_binary()
+except Exception:
+    FFMPEG_BINARY = env('FFMPEG_BINARY', 'ffmpeg')
+    FFPROBE_BINARY = env('FFPROBE_BINARY', 'ffprobe')
+

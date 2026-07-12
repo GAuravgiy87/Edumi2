@@ -1,407 +1,332 @@
 {% extends "video_editing/base.html" %}
-{% block page_title %}{{ project.display_title }} &mdash; Video Editor{% endblock %}
+{% load static %}
+
+{% block page_title %}{{ project.display_title }} — Video Editor{% endblock %}
+
+
 
 {% block ve_content %}
-<div class="ve-page ve-editor-page">
-
-    <!-- Editor Header -->
-    <div class="ve-editor-head">
+<div class="ve-editor-page">
+    <!-- Topbar -->
+    <header class="ve-editor-head">
         <div class="ve-editor-head-left">
-            <a href="{% url 'project_list' %}" class="ve-back-btn" title="Back to projects">
-                <i data-lucide="arrow-left" style="width:16px;height:16px;"></i>
-            </a>
-            <div>
-                <h1 class="ve-editor-title">{{ project.display_title }}</h1>
-                <p class="ve-editor-meta">
-                    {% if project.duration_seconds %}{{ project.display_duration }} &middot;{% endif %}
-                    {% if project.width %}{{ project.width }}&times;{{ project.height }} &middot;{% endif %}
-                    {% if project.has_audio %}has audio{% else %}no audio{% endif %}
-                </p>
-            </div>
+            <h1 class="ve-editor-title">{{ project.display_title }}</h1>
         </div>
+        
         <div class="ve-editor-head-actions">
-            <button type="button" class="ve-tb-btn" id="tb-undo" title="Undo">&#8630;</button>
-            <button type="button" class="ve-tb-btn" id="tb-redo" title="Redo">&#8631;</button>
-            <span class="ve-status-pill ve-status-{{ project.status }}" id="status-pill">{{ project.get_status_display }}</span>
-            <a href="{% url 'project_download' project.pk %}" class="ve-btn ve-btn-ghost">
-                <i data-lucide="download" style="width:14px;height:14px;"></i> Download
-            </a>
-            <a href="{% url 'project_download_mkv' project.pk %}" class="ve-btn ve-btn-ghost ve-btn-green">
-                <i data-lucide="download" style="width:14px;height:14px;"></i> MKV
-            </a>
-            <form action="{% url 'project_delete' project.pk %}" method="post" style="margin:0;"
-                  onsubmit="return confirm('Delete this project permanently?');">
+            <button class="ve-btn ve-btn-icon" id="tb-undo" title="Undo (Ctrl+Z)">
+                <i data-lucide="undo"></i>
+            </button>
+            <button class="ve-btn ve-btn-icon" id="tb-redo" title="Redo (Ctrl+Shift+Z)">
+                <i data-lucide="redo"></i>
+            </button>
+            <span style="color:var(--text-muted); margin: 0 10px;">|</span>
+            <button class="ve-btn ve-btn-primary" id="btn-master-export" title="Export">
+                <span style="margin-right:5px;">
+                    <i data-lucide="download" style="width:14px;height:14px;"></i>
+                </span> Export
+            </button>
+            {% if request.GET.recording_id %}
+            <form method="POST" action="{% url 'publish_to_lecture' project.pk %}?recording_id={{ request.GET.recording_id }}" style="display:inline-block; margin-left:10px;" onsubmit="return confirm('Publish this edited video to your lectures?');">
                 {% csrf_token %}
-                <button type="submit" class="ve-btn ve-btn-danger-ghost">
-                    <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Delete
+                <button type="submit" class="ve-btn ve-btn-primary" style="background-color: #22c55e; border-color: #22c55e;" title="Publish to Lectures">
+                    <span style="margin-right:5px;">
+                        <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i>
+                    </span> Publish
                 </button>
             </form>
+            {% endif %}
         </div>
-    </div>
+    </header>
 
-    <!-- Main Editor Grid -->
-    <div class="ve-editor-grid">
-
-        <!-- LEFT: Video Player -->
-        <div class="ve-editor-main">
-            <div class="ve-video-stage" id="video-stage">
-                <div class="ve-processing-overlay" id="processing-overlay"
-                     style="{% if project.status == 'processing' %}display:flex;{% else %}display:none;{% endif %}">
-                    <div class="ve-spinner"></div>
-                    <p>Processing video&hellip;</p>
-                </div>
-                {% if project.status == 'error' %}
-                <div class="ve-error-banner">
-                    <strong>Something went wrong.</strong>
-                    <p>{{ project.error_message|truncatechars:300 }}</p>
-                </div>
-                {% endif %}
-                <div class="ve-video-wrapper">
-                    <video preload="metadata" src="{{ project.working_file.url }}" id="main-video"></video>
-                    <div id="text-overlay-container"></div>
-                </div>
-                <!-- Player Controls -->
-                <div class="ve-player-controls">
-                    <button type="button" class="ve-ctrl-btn" id="btn-skip-start" title="Skip to Start">&#9198;</button>
-                    <button type="button" class="ve-ctrl-btn" id="btn-back-5" title="Rewind 5s">&#8722;5s</button>
-                    <button type="button" class="ve-ctrl-btn ve-ctrl-play" id="btn-play-pause" title="Play/Pause">&#9654;</button>
-                    <button type="button" class="ve-ctrl-btn" id="btn-forward-5" title="Forward 5s">+5s</button>
-                    <button type="button" class="ve-ctrl-btn" id="btn-skip-end" title="Skip to End">&#9197;</button>
-                    <button type="button" class="ve-ctrl-btn ve-ctrl-right" id="btn-fullscreen" title="Fullscreen">
-                        <i data-lucide="maximize-2" style="width:14px;height:14px;pointer-events:none;"></i>
+    <!-- Main Body Area -->
+    <main class="ve-editor-grid">
+        
+        <!-- Center Stage -->
+        <div class="ve-video-stage">
+            <div class="ve-video-wrapper" id="video-wrapper">
+                <video preload="metadata" src="{{ project.working_file.url }}" id="main-video"></video>
+                <div id="text-overlay-container"></div>
+            </div>
+            
+            <!-- Player Controls -->
+            <div class="ve-player-controls">
+                <button class="ve-ctrl-btn" id="btn-skip-start" title="Skip to start">
+                    <i data-lucide="skip-back"></i>
+                </button>
+                <button class="ve-ctrl-btn" id="btn-back-5" title="Back 5 seconds">
+                    <i data-lucide="rotate-ccw"></i>
+                </button>
+                <button class="ve-ctrl-btn ve-ctrl-play" id="btn-play-pause" title="Play/Pause (Space)">
+                    <i data-lucide="play" id="play-icon"></i>
+                    <i data-lucide="pause" id="pause-icon" style="display:none;"></i>
+                </button>
+                <button class="ve-ctrl-btn" id="btn-forward-5" title="Forward 5 seconds">
+                    <i data-lucide="rotate-cw"></i>
+                </button>
+                <button class="ve-ctrl-btn" id="btn-skip-end" title="Skip to end">
+                    <i data-lucide="skip-forward"></i>
+                </button>
+                
+                <span class="ve-time-display" style="margin-left: 20px;">
+                    <span id="time-current">0:00:00</span> 
+                    <span class="ve-time-divider">/</span> 
+                    <span id="time-total">0:00:00</span>
+                </span>
+                
+                <div class="ve-ctrl-right" style="display:flex; align-items:center; gap:10px;">
+                    <button class="ve-ctrl-btn" id="btn-mute" title="Mute/Unmute">
+                        <i data-lucide="volume-2" id="volume-icon"></i>
+                        <i data-lucide="volume-x" id="mute-icon" style="display:none;"></i>
+                    </button>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1" style="width:80px;">
+                    <button class="ve-ctrl-btn" id="btn-fullscreen" title="Fullscreen">
+                        <i data-lucide="maximize"></i>
                     </button>
                 </div>
             </div>
-
-            <!-- Timeline -->
-            <div class="ve-timeline" id="visual-trim-container">
-                <!-- Timeline Toolbar -->
-                <div class="ve-timeline-toolbar">
-                    <div class="ve-toolbar-left">
-                        <button type="button" class="ve-tb-btn ve-tb-accent" id="timeline-trim-btn" title="Split Clip">
-                            &#9986; <span id="trim-btn-text">Split</span>
-                        </button>
-                        <button type="button" class="ve-tb-btn" title="Rotate">&#8635;</button>
-                        <button type="button" class="ve-tb-btn ve-tb-danger" id="tb-delete" title="Discard all edits">
-                            <i data-lucide="trash-2" style="width:13px;height:13px;pointer-events:none;"></i>
-                        </button>
-                        <div class="ve-toolbar-speed">
-                            <form action="{% url 'op_speed' project.pk %}" method="post" class="ve-speed-form">
-                                {% csrf_token %}
-                                <span class="ve-speed-label">Speed:</span>
-                                {{ speed_form.speed_factor }}
-                                <button type="submit" class="ve-tb-btn ve-tb-accent-fill">Apply</button>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="ve-toolbar-center">
-                        <span class="ve-time-display" id="time-display-current">0:00.00</span>
-                        <span class="ve-time-divider">/</span>
-                        <span class="ve-time-display" id="time-display-total">0:00.00</span>
-                    </div>
-                    <div class="ve-toolbar-right">
-                        <button type="button" class="ve-tb-btn" id="tb-zoom-fit" title="Zoom to fit">Fit</button>
-                        <button type="button" class="ve-tb-btn" id="tb-zoom-out" title="Zoom out">&#8722;</button>
-                        <button type="button" class="ve-tb-btn" id="tb-zoom-in" title="Zoom in">+</button>
-                        <button type="button" class="ve-tb-btn ve-tb-export" id="btn-master-export">
-                            <i data-lucide="check-circle" style="width:13px;height:13px;pointer-events:none;"></i>
-                            Export
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Hidden trim form -->
-                <form id="trim-form" action="{% url 'op_trim' project.pk %}" method="post" style="display:none;">
-                    {% csrf_token %}
-                    {{ trim_form.start_seconds }}
-                    {{ trim_form.end_seconds }}
-                    <input type="radio" name="trim_mode" value="extract" checked>
-                    <input type="radio" name="trim_mode" value="delete">
-                    <input type="checkbox" name="fade_in">
-                    <input type="checkbox" name="fade_out">
-                </form>
-
-                <!-- Timeline Scroll Area -->
-                <div class="ve-timeline-scroll" style="overflow-x:auto;width:100%;position:relative;">
-                    <div class="trim-ruler" id="trim-ruler"></div>
-                    <div class="timeline-tracks-wrapper">
-                        <div class="trim-playhead" id="trim-playhead">
-                            <div class="playhead-tooltip" id="playhead-tooltip">0:00.00</div>
-                        </div>
-                        <!-- Text Track -->
-                        <div class="timeline-track-row text-track-row">
-                            <div class="track-label-cell">
-                                <i data-lucide="type" style="width:13px;height:13px;flex-shrink:0;"></i>
-                                <span>Text</span>
-                                <button type="button" class="ve-track-add" id="timeline-add-text-btn" title="Add text">+</button>
-                            </div>
-                            <div class="track-content-cell" id="text-track-content"></div>
-                        </div>
-                        <!-- Video Track -->
-                        <div class="timeline-track-row video-track-row">
-                            <div class="track-label-cell">
-                                <i data-lucide="film" style="width:13px;height:13px;flex-shrink:0;"></i>
-                                <span>Video</span>
-                            </div>
-                            <div class="track-content-cell trim-track" id="trim-track">
-                                <div class="trim-thumbnails" id="trim-thumbnails"></div>
-                                <div class="trim-dim trim-dim-left" id="trim-dim-left"></div>
-                                <div class="trim-selection" id="trim-selection">
-                                    <div class="trim-handle trim-handle-left" id="trim-handle-left">
-                                        <span>||</span>
-                                        <div class="handle-tooltip" id="handle-tooltip-left">0:00.00</div>
-                                    </div>
-                                    <div class="trim-handle trim-handle-right" id="trim-handle-right">
-                                        <span>||</span>
-                                        <div class="handle-tooltip" id="handle-tooltip-right">0:00.00</div>
-                                    </div>
-                                </div>
-                                <div class="trim-dim trim-dim-right" id="trim-dim-right"></div>
-                            </div>
-                        </div>
-                        <!-- Audio Track -->
-                        <div class="timeline-track-row audio-track-row">
-                            <div class="track-label-cell">
-                                <i data-lucide="music" style="width:13px;height:13px;flex-shrink:0;"></i>
-                                <span>Audio</span>
-                                <button type="button" class="ve-track-add" id="timeline-add-audio-btn" title="Add audio">+</button>
-                            </div>
-                            <div class="track-content-cell audio-track" id="audio-track">
-                                <div class="audio-block" id="audio-block">
-                                    <span class="audio-name">{% if project.has_audio %}Original Soundtrack{% else %}No Audio Track{% endif %}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
-
-        <!-- RIGHT: Tool Panel -->
+        
+        <!-- Right Sidebar (Tools) -->
         <aside class="ve-tool-panel">
-            <div class="ve-tool-tabs" id="tool-tabs">
-                <button class="ve-tool-tab ve-tool-tab--active" data-tab="audio">Audio</button>
-                <button class="ve-tool-tab" data-tab="volume">Volume</button>
-                <button class="ve-tool-tab" data-tab="merge">Merge</button>
+            <div class="ve-tool-tabs">
+                <button class="ve-tool-tab ve-tool-tab--active" data-tab="import">Media</button>
                 <button class="ve-tool-tab" data-tab="text">Text</button>
-                <button class="ve-tool-tab" data-tab="fx">Effects</button>
+                <button class="ve-tool-tab" data-tab="audio">Audio</button>
+                <button class="ve-tool-tab" data-tab="effects">Effects</button>
+                <button class="ve-tool-tab" data-tab="export">Export</button>
             </div>
-
+            
             <div class="ve-tool-panels">
-                <!-- AUDIO -->
-                <section class="ve-tool-section ve-tool-section--active" data-panel="audio">
-                    <h3 class="ve-section-title">Background Music</h3>
-                    <p class="ve-section-hint">Mix an audio track into your video.</p>
-                    <form id="bg-audio-form" action="{% url 'op_background_audio' project.pk %}" method="post" enctype="multipart/form-data" class="ve-form">
-                        {% csrf_token %}
+                <!-- Import Panel -->
+                <div class="ve-tool-section ve-tool-section--active" data-panel="import">
+                    <h3 class="ve-section-title">Media Library</h3>
+                    <div class="ve-upload-area" id="media-upload-area">
+                        <input type="file" id="media-file-input" accept="video/*,audio/*,image/*" multiple style="display:none;">
+                        <div class="ve-drop-zone" id="drop-zone">
+                            <i data-lucide="upload-cloud" style="width:48px;height:48px;color:var(--text-muted);margin-bottom:10px;"></i>
+                            <p class="ve-muted">Drag & drop files here or click to browse</p>
+                            <button class="ve-btn ve-btn-secondary ve-btn-full" id="btn-browse-media" style="margin-top:10px;">Browse Files</button>
+                        </div>
+                    </div>
+                    <div class="ve-media-list" id="media-list" style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">
+                        <!-- Media items will be added here -->
+                    </div>
+                </div>
+                
+                <!-- Text Panel -->
+                <div class="ve-tool-section" data-panel="text">
+                    <h3 class="ve-section-title">Add Text</h3>
+                    <button class="ve-btn ve-btn-secondary ve-btn-full" id="btn-add-text">Add Text Overlay</button>
+                    <div id="text-properties" style="display:none; margin-top:16px;">
                         <div class="ve-field">
-                            <label>Audio file</label>
-                            {{ bg_audio_form.audio_file }}
+                            <label>Text</label>
+                            <input type="text" id="text-input" placeholder="Enter your text">
                         </div>
-                        <div class="ve-field-row">
-                            <div class="ve-field">
-                                <label>Start at (s)</label>
-                                <div class="ve-input-row">
-                                    {{ bg_audio_form.start_seconds }}
-                                    <button type="button" class="ve-btn ve-btn-icon" id="btn-bg-set-start" title="Set to playhead">&#9201;</button>
-                                </div>
+                        <div class="ve-field-row" style="display:flex; gap:10px; margin-top:10px;">
+                            <div class="ve-field" style="flex:1;">
+                                <label>Font Size</label>
+                                <input type="number" id="font-size-input" value="32" min="12" max="120">
                             </div>
-                            <div class="ve-field">
-                                <label>Stop at (s)</label>
-                                <div class="ve-input-row">
-                                    {{ bg_audio_form.end_seconds }}
-                                    <button type="button" class="ve-btn ve-btn-icon" id="btn-bg-set-end" title="Set to playhead">&#9201;</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="ve-field-row">
-                            <div class="ve-field">
-                                <label>{{ bg_audio_form.bg_volume.label }}</label>
-                                {{ bg_audio_form.bg_volume }}
-                            </div>
-                            <div class="ve-field">
-                                <label>{{ bg_audio_form.video_volume.label }}</label>
-                                {{ bg_audio_form.video_volume }}
-                            </div>
-                        </div>
-                        <button type="submit" class="ve-btn ve-btn-primary ve-btn-full">Add Background Music</button>
-                    </form>
-                </section>
-
-                <!-- VOLUME -->
-                <section class="ve-tool-section" data-panel="volume">
-                    <h3 class="ve-section-title">Volume</h3>
-                    <p class="ve-section-hint">Adjust or mute the video&rsquo;s audio.</p>
-                    <form action="{% url 'op_volume' project.pk %}" method="post" class="ve-form">
-                        {% csrf_token %}
-                        <div class="ve-field">
-                            <label>{{ volume_form.volume.label }}</label>
-                            {{ volume_form.volume }}
-                        </div>
-                        <button type="submit" class="ve-btn ve-btn-primary ve-btn-full">Apply volume</button>
-                    </form>
-                    <div class="ve-divider"></div>
-                    <h3 class="ve-section-title">Mute</h3>
-                    <p class="ve-section-hint">Remove the audio track entirely.</p>
-                    <form action="{% url 'op_mute' project.pk %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Mute audio track</button>
-                    </form>
-                </section>
-
-                <!-- MERGE -->
-                <section class="ve-tool-section" data-panel="merge">
-                    <h3 class="ve-section-title">Merge / Insert Clip</h3>
-                    <p class="ve-section-hint">Append another clip to the start or end.</p>
-                    <form action="{% url 'op_merge' project.pk %}" method="post" enctype="multipart/form-data" class="ve-form">
-                        {% csrf_token %}
-                        <div class="ve-field">
-                            <label>{{ merge_form.clip_file.label }}</label>
-                            {{ merge_form.clip_file }}
-                        </div>
-                        <div class="ve-field">
-                            <label>{{ merge_form.position.label }}</label>
-                            {{ merge_form.position }}
-                        </div>
-                        <button type="submit" class="ve-btn ve-btn-primary ve-btn-full">Merge clip</button>
-                    </form>
-                </section>
-
-                <!-- TEXT -->
-                <section class="ve-tool-section" data-panel="text">
-                    <h3 class="ve-section-title">Text Overlay</h3>
-                    <p class="ve-section-hint">Burn a caption onto the video.</p>
-                    <form action="{% url 'op_text_overlay' project.pk %}" method="post" class="ve-form">
-                        {% csrf_token %}
-                        <div class="ve-field">
-                            <label>{{ text_form.text.label }}</label>
-                            {{ text_form.text }}
-                        </div>
-                        <div class="ve-field-row">
-                            <div class="ve-field">
-                                <label>Position</label>
-                                {{ text_form.position }}
-                            </div>
-                            <div class="ve-field">
+                            <div class="ve-field" style="flex:1;">
                                 <label>Color</label>
-                                {{ text_form.color }}
+                                <input type="color" id="text-color-input" value="#ffffff">
                             </div>
                         </div>
+                        <div class="ve-field" style="margin-top:10px;">
+                            <label>Position</label>
+                            <select id="text-position-select" style="width:100%;">
+                                <option value="bottom">Bottom</option>
+                                <option value="top">Top</option>
+                                <option value="center">Center</option>
+                            </select>
+                        </div>
+                        <div class="ve-field" style="margin-top:10px;">
+                            <label>Duration</label>
+                            <div class="ve-input-row">
+                                <input type="number" id="text-start-input" placeholder="Start (s)" step="0.01" min="0">
+                                <input type="number" id="text-end-input" placeholder="End (s)" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <button class="ve-btn ve-btn-primary ve-btn-full" id="btn-apply-text" style="margin-top:10px;">Apply Text</button>
+                    </div>
+                </div>
+                
+                <!-- Audio Panel -->
+                <div class="ve-tool-section" data-panel="audio">
+                    <h3 class="ve-section-title">Audio</h3>
+                    <button class="ve-btn ve-btn-secondary ve-btn-full" id="btn-add-audio">Add Audio</button>
+                    <div id="audio-properties" style="display:none; margin-top:16px;">
                         <div class="ve-field">
-                            <label>Font size</label>
-                            {{ text_form.font_size }}
+                            <label>Volume</label>
+                            <input type="range" id="audio-volume-slider" min="0" max="2" step="0.01" value="1" style="width:100%;">
                         </div>
-                        <div class="ve-field-row">
-                            <div class="ve-field">
-                                <label>Show from (s)</label>
-                                <div class="ve-input-row">
-                                    {{ text_form.start_seconds }}
-                                    <button type="button" class="ve-btn ve-btn-icon" id="btn-text-set-start" title="Set to playhead">&#9201;</button>
-                                </div>
-                            </div>
-                            <div class="ve-field">
-                                <label>Show until (s)</label>
-                                <div class="ve-input-row">
-                                    {{ text_form.end_seconds }}
-                                    <button type="button" class="ve-btn ve-btn-icon" id="btn-text-set-end" title="Set to playhead">&#9201;</button>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="ve-field-help">Leave blank to show for the whole video.</p>
-                        <button type="submit" class="ve-btn ve-btn-primary ve-btn-full">Add text overlay</button>
-                    </form>
-                </section>
-
-                <!-- EFFECTS -->
-                <section class="ve-tool-section" data-panel="fx">
-                    <h3 class="ve-section-title">Rotate</h3>
-                    <form action="{% url 'op_rotate' project.pk %}" method="post" class="ve-form">
-                        {% csrf_token %}
-                        <div class="ve-field">
-                            <label>Degrees</label>
-                            {{ rotate_form.degrees }}
-                        </div>
-                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply rotation</button>
-                    </form>
-
-                    <div class="ve-divider"></div>
-                    <h3 class="ve-section-title">Resize</h3>
-                    <form action="{% url 'op_resize' project.pk %}" method="post" class="ve-form">
-                        {% csrf_token %}
-                        <div class="ve-field-row">
-                            <div class="ve-field">
-                                <label>Width</label>
-                                {{ resize_form.width }}
-                            </div>
-                            <div class="ve-field">
-                                <label>Height</label>
-                                {{ resize_form.height }}
-                            </div>
-                        </div>
-                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply resize</button>
-                    </form>
-
-                    <div class="ve-divider"></div>
-                    <h3 class="ve-section-title">Grayscale</h3>
-                    <form action="{% url 'op_grayscale' project.pk %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply grayscale</button>
-                    </form>
-
-                    <div class="ve-divider"></div>
-                    <h3 class="ve-section-title">Fade In / Out</h3>
-                    <form action="{% url 'op_fade' project.pk %}" method="post" class="ve-form">
-                        {% csrf_token %}
-                        <div class="ve-field-row">
-                            <div class="ve-field">
-                                <label>Fade in (s)</label>
-                                {{ fade_form.fade_in_seconds }}
-                            </div>
-                            <div class="ve-field">
-                                <label>Fade out (s)</label>
-                                {{ fade_form.fade_out_seconds }}
-                            </div>
-                        </div>
-                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply fade</button>
-                    </form>
-                </section>
+                    </div>
+                </div>
+                
+                <!-- Effects Panel -->
+                <div class="ve-tool-section" data-panel="effects">
+                    <h3 class="ve-section-title">Effects</h3>
+                    <div class="ve-effects-grid" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-top:10px;">
+                        <button class="ve-effect-btn" data-effect="grayscale">Grayscale</button>
+                        <button class="ve-effect-btn" data-effect="sepia">Sepia</button>
+                        <button class="ve-effect-btn" data-effect="blur">Blur</button>
+                        <button class="ve-effect-btn" data-effect="brightness">Brightness</button>
+                        <button class="ve-effect-btn" data-effect="contrast">Contrast</button>
+                        <button class="ve-effect-btn" data-effect="saturate">Saturate</button>
+                    </div>
+                </div>
+                
+                <!-- Export Panel -->
+                <div class="ve-tool-section" data-panel="export">
+                    <h3 class="ve-section-title">Export Settings</h3>
+                    <div class="ve-field" style="margin-top:10px;">
+                        <label>Resolution</label>
+                        <select id="export-resolution" style="width:100%;">
+                            <option value="480p">480p</option>
+                            <option value="720p">720p</option>
+                            <option value="1080p" selected>1080p Full HD</option>
+                            <option value="1440p">1440p</option>
+                            <option value="4k">4K</option>
+                        </select>
+                    </div>
+                    <div class="ve-field" style="margin-top:10px;">
+                        <label>Quality</label>
+                        <select id="export-quality" style="width:100%;">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high" selected>High</option>
+                            <option value="ultra">Ultra</option>
+                        </select>
+                    </div>
+                    <div class="ve-field" style="margin-top:10px;">
+                        <label>Format</label>
+                        <select id="export-format" style="width:100%;">
+                            <option value="mp4" selected>MP4</option>
+                            <option value="webm">WebM</option>
+                            <option value="mov">MOV</option>
+                        </select>
+                    </div>
+                    <button class="ve-btn ve-btn-primary ve-btn-full" id="btn-export" style="margin-top:16px;">Export Video</button>
+                </div>
             </div>
         </aside>
-    </div>
+        
+    </main>
 
-    <!-- Edit History -->
-    <div class="ve-history-panel">
-        <div class="ve-history-head">
-            <h3>Edit History</h3>
-            <form id="reset-form" action="{% url 'op_reset' project.pk %}" method="post"
-                  onsubmit="return confirm('Discard all edits and revert to the original upload?');">
-                {% csrf_token %}
-                <button type="submit" class="ve-link-btn ve-link-btn--danger">Reset to original</button>
-            </form>
+    <!-- Bottom Timeline Area -->
+    <div class="ve-timeline">
+        <div class="ve-timeline-toolbar">
+            <div class="ve-toolbar-left">
+                <button class="ve-tb-btn" id="btn-split" title="Split Clip (S)">
+                    <i data-lucide="scissors"></i> Split
+                </button>
+                <button class="ve-tb-btn ve-tb-danger" id="btn-delete" title="Delete Selected (Del)">
+                    <i data-lucide="trash-2"></i> Delete
+                </button>
+                <span style="width:1px; height:20px; background:var(--border-color); margin:0 8px;"></span>
+                <button class="ve-tb-btn" id="btn-copy" title="Copy (Ctrl+C)">
+                    <i data-lucide="copy"></i> Copy
+                </button>
+                <button class="ve-tb-btn" id="btn-paste" title="Paste (Ctrl+V)">
+                    <i data-lucide="clipboard-paste"></i> Paste
+                </button>
+            </div>
+            
+
+            
+            <div class="ve-toolbar-right">
+                <button class="ve-tb-btn" id="btn-zoom-out" title="Zoom Out">
+                    <i data-lucide="zoom-out"></i>
+                </button>
+                <button class="ve-tb-btn" id="btn-zoom-in" title="Zoom In">
+                    <i data-lucide="zoom-in"></i>
+                </button>
+                <button class="ve-tb-btn" id="btn-zoom-fit" title="Fit to Screen">
+                    <i data-lucide="maximize"></i>
+                </button>
+            </div>
         </div>
-        {% if operations %}
-        <ul class="ve-history-list">
-            {% for op in operations %}
-            <li>
-                <span class="ve-history-tag">{{ op.get_operation_type_display }}</span>
-                <span class="ve-history-desc" data-op-type="{{ op.operation_type }}" data-desc="{{ op.description }}">{{ op.description }}</span>
-                <span class="ve-history-time">{{ op.created_at|timesince }} ago</span>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="ve-muted">No edits yet.</p>
-        {% endif %}
+        
+        <div class="ve-timeline-main">
+            <!-- Sidebar / Track Headers -->
+            <div class="ve-timeline-sidebar">
+                <div class="ve-timeline-corner"></div>
+                <div class="ve-track-headers">
+                    <div class="ve-track-header ve-track-video-header">
+                        <i data-lucide="video" class="ve-track-icon"></i>
+                        <span class="ve-track-label">Video</span>
+                        <div class="ve-track-controls">
+                            <button class="ve-track-btn" id="mute-video-btn" title="Mute Video" style="opacity:0.5;">
+                                <i data-lucide="volume-x"></i>
+                            </button>
+                            <button class="ve-track-btn" id="hide-video-btn" title="Hide Video">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ve-track-header ve-track-audio-header">
+                        <i data-lucide="music" class="ve-track-icon"></i>
+                        <span class="ve-track-label">Audio</span>
+                        <div class="ve-track-controls">
+                            <button class="ve-track-btn" id="mute-audio-btn" title="Mute Audio">
+                                <i data-lucide="volume-x"></i>
+                            </button>
+                            <button class="ve-track-btn" id="solo-audio-btn" title="Solo Audio">
+                                <i data-lucide="headphones"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ve-track-header ve-track-text-header">
+                        <i data-lucide="type" class="ve-track-icon"></i>
+                        <span class="ve-track-label">Text</span>
+                        <div class="ve-track-controls">
+                            <button class="ve-track-btn" id="hide-text-btn" title="Hide Text">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Scrollable Timeline Content -->
+            <div class="ve-timeline-scroll" id="timeline-scroll">
+                <div class="ve-time-ruler" id="time-ruler"></div>
+                
+                <div class="ve-timeline-tracks" id="timeline-tracks">
+                    <div class="ve-track ve-track-video">
+                        <div class="ve-track-content" id="video-track"></div>
+                    </div>
+                    <div class="ve-track ve-track-audio">
+                        <div class="ve-track-content" id="audio-track"></div>
+                    </div>
+                    <div class="ve-track ve-track-text">
+                        <div class="ve-track-content" id="text-track"></div>
+                    </div>
+                </div>
+                
+                <div class="ve-playhead" id="playhead">
+                    <div class="ve-playhead-tooltip" id="playhead-tooltip">0:00:00</div>
+                </div>
+            </div>
+        </div>
     </div>
-
 </div>
+
 {% endblock %}
 
-{% block ve_extra_js %}
+{% block extra_js %}
+<script src="https://unpkg.com/lucide@latest"></script>
 <script>
-window.REEL_STATUS_URL = "{% url 'project_status' project.pk %}";
-window.REEL_PROJECT_STATUS = "{{ project.status }}";
-window.REEL_PROJECT_HAS_AUDIO = "{{ project.has_audio }}";
-if (typeof lucide !== 'undefined') lucide.createIcons();
+    window.PROJECT_ID = {{ project.pk }};
+    window.PROJECT_DURATION = {{ project.duration_seconds|default:"0" }};
+    window.PROJECT_SRC = "{{ project.working_file.url }}";
+    
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    });
 </script>
+<script src="{% static 'video_editing/js/app.js' %}" defer></script>
 {% endblock %}
