@@ -35,6 +35,13 @@
                     </span> Publish
                 </button>
             </form>
+            {% else %}
+            <!-- Standalone project without recording_id -->
+            <button type="button" class="ve-btn ve-btn-primary" style="background-color: #22c55e; border-color: #22c55e; margin-left:10px;" title="Publish to Lectures" onclick="alert('This project was created independently and is not linked to a class recording. Please use the \'Export\' button to download the video.');">
+                <span style="margin-right:5px;">
+                    <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i>
+                </span> Publish
+            </button>
             {% endif %}
         </div>
     </header>
@@ -116,39 +123,13 @@
                 
                 <!-- Text Panel -->
                 <div class="ve-tool-section" data-panel="text">
-                    <h3 class="ve-section-title">Add Text</h3>
-                    <button class="ve-btn ve-btn-secondary ve-btn-full" id="btn-add-text">Add Text Overlay</button>
-                    <div id="text-properties" style="display:none; margin-top:16px;">
-                        <div class="ve-field">
-                            <label>Text</label>
-                            <input type="text" id="text-input" placeholder="Enter your text">
-                        </div>
-                        <div class="ve-field-row" style="display:flex; gap:10px; margin-top:10px;">
-                            <div class="ve-field" style="flex:1;">
-                                <label>Font Size</label>
-                                <input type="number" id="font-size-input" value="32" min="12" max="120">
-                            </div>
-                            <div class="ve-field" style="flex:1;">
-                                <label>Color</label>
-                                <input type="color" id="text-color-input" value="#ffffff">
-                            </div>
-                        </div>
-                        <div class="ve-field" style="margin-top:10px;">
-                            <label>Position</label>
-                            <select id="text-position-select" style="width:100%;">
-                                <option value="bottom">Bottom</option>
-                                <option value="top">Top</option>
-                                <option value="center">Center</option>
-                            </select>
-                        </div>
-                        <div class="ve-field" style="margin-top:10px;">
-                            <label>Duration</label>
-                            <div class="ve-input-row">
-                                <input type="number" id="text-start-input" placeholder="Start (s)" step="0.01" min="0">
-                                <input type="number" id="text-end-input" placeholder="End (s)" step="0.01" min="0">
-                            </div>
-                        </div>
-                        <button class="ve-btn ve-btn-primary ve-btn-full" id="btn-apply-text" style="margin-top:10px;">Apply Text</button>
+                    <h3 class="ve-section-title">Text Overlays</h3>
+                    <p style="font-size:12px;color:var(--ve-text-muted);margin:0 0 10px;">Add text that appears over your video at a specific time.</p>
+                    <button class="ve-btn ve-btn-primary ve-btn-full" id="btn-add-text">
+                        <i data-lucide="plus" style="width:14px;height:14px;"></i> New Text Clip
+                    </button>
+                    <div id="text-clip-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+                        <!-- populated by JS -->
                     </div>
                 </div>
                 
@@ -215,103 +196,202 @@
     </main>
 
     <!-- Bottom Timeline Area -->
-    <div class="ve-timeline">
+    <div class="ve-timeline" id="ve-timeline">
+
+        <!-- Timeline Toolbar -->
         <div class="ve-timeline-toolbar">
             <div class="ve-toolbar-left">
-                <button class="ve-tb-btn" id="btn-split" title="Split Clip (S)">
-                    <i data-lucide="scissors"></i> Split
+                <!-- Edit actions -->
+                <button class="ve-tb-btn" id="btn-split" title="Split at Playhead (S)">
+                    <i data-lucide="scissors"></i><span>Split</span>
                 </button>
                 <button class="ve-tb-btn ve-tb-danger" id="btn-delete" title="Delete Selected (Del)">
-                    <i data-lucide="trash-2"></i> Delete
+                    <i data-lucide="trash-2"></i><span>Delete</span>
                 </button>
-                <span style="width:1px; height:20px; background:var(--border-color); margin:0 8px;"></span>
+                <div class="ve-tb-sep"></div>
                 <button class="ve-tb-btn" id="btn-copy" title="Copy (Ctrl+C)">
-                    <i data-lucide="copy"></i> Copy
+                    <i data-lucide="copy"></i><span>Copy</span>
                 </button>
                 <button class="ve-tb-btn" id="btn-paste" title="Paste (Ctrl+V)">
-                    <i data-lucide="clipboard-paste"></i> Paste
+                    <i data-lucide="clipboard-paste"></i><span>Paste</span>
+                </button>
+                <div class="ve-tb-sep"></div>
+                <!-- Quick add text to timeline -->
+                <button class="ve-tb-btn ve-tb-accent" id="btn-add-text-quick" title="Add Text Clip at Playhead (T)">
+                    <i data-lucide="type"></i><span>Add Text</span>
                 </button>
             </div>
-            
 
-            
             <div class="ve-toolbar-right">
-                <button class="ve-tb-btn" id="btn-zoom-out" title="Zoom Out">
-                    <i data-lucide="zoom-out"></i>
+                <!-- Snap toggle -->
+                <button class="ve-tb-btn ve-tb-toggle" id="btn-snap" title="Toggle Snap" data-active="true">
+                    <i data-lucide="magnet"></i><span>Snap</span>
                 </button>
-                <button class="ve-tb-btn" id="btn-zoom-in" title="Zoom In">
-                    <i data-lucide="zoom-in"></i>
+                <div class="ve-tb-sep"></div>
+                <!-- Zoom -->
+                <button class="ve-tb-btn" id="btn-zoom-out" title="Zoom Out (-)">
+                    <i data-lucide="minus"></i>
                 </button>
-                <button class="ve-tb-btn" id="btn-zoom-fit" title="Fit to Screen">
-                    <i data-lucide="maximize"></i>
+                <div class="ve-zoom-slider-wrap" title="Zoom">
+                    <input type="range" id="zoom-slider" min="10" max="300" value="50" step="5">
+                </div>
+                <button class="ve-tb-btn" id="btn-zoom-in" title="Zoom In (+)">
+                    <i data-lucide="plus"></i>
+                </button>
+                <button class="ve-tb-btn" id="btn-zoom-fit" title="Fit All (F)">
+                    <i data-lucide="maximize-2"></i>
                 </button>
             </div>
         </div>
-        
-        <div class="ve-timeline-main">
-            <!-- Sidebar / Track Headers -->
-            <div class="ve-timeline-sidebar">
-                <div class="ve-timeline-corner"></div>
-                <div class="ve-track-headers">
-                    <div class="ve-track-header ve-track-video-header">
-                        <i data-lucide="video" class="ve-track-icon"></i>
-                        <span class="ve-track-label">Video</span>
-                        <div class="ve-track-controls">
-                            <button class="ve-track-btn" id="mute-video-btn" title="Mute Video" style="opacity:0.5;">
-                                <i data-lucide="volume-x"></i>
-                            </button>
-                            <button class="ve-track-btn" id="hide-video-btn" title="Hide Video">
-                                <i data-lucide="eye-off"></i>
-                            </button>
-                        </div>
+
+        <!-- Timeline Body: track headers + scrollable canvas -->
+        <div class="ve-timeline-body">
+
+            <!-- Fixed left: track headers -->
+            <div class="ve-tl-headers" id="tl-headers">
+                <!-- Corner (aligns with ruler) -->
+                <div class="ve-tl-corner"></div>
+
+                <!-- Video track header -->
+                <div class="ve-tl-header" data-track="video">
+                    <div class="ve-tl-header-icon ve-tl-icon-video">
+                        <i data-lucide="film"></i>
                     </div>
-                    <div class="ve-track-header ve-track-audio-header">
-                        <i data-lucide="music" class="ve-track-icon"></i>
-                        <span class="ve-track-label">Audio</span>
-                        <div class="ve-track-controls">
-                            <button class="ve-track-btn" id="mute-audio-btn" title="Mute Audio">
-                                <i data-lucide="volume-x"></i>
-                            </button>
-                            <button class="ve-track-btn" id="solo-audio-btn" title="Solo Audio">
-                                <i data-lucide="headphones"></i>
-                            </button>
-                        </div>
+                    <span class="ve-tl-header-label">Video</span>
+                    <div class="ve-tl-header-btns">
+                        <button class="ve-track-btn" id="mute-video-btn" title="Mute">
+                            <i data-lucide="volume-2"></i>
+                        </button>
+                        <button class="ve-track-btn" id="hide-video-btn" title="Hide">
+                            <i data-lucide="eye"></i>
+                        </button>
                     </div>
-                    <div class="ve-track-header ve-track-text-header">
-                        <i data-lucide="type" class="ve-track-icon"></i>
-                        <span class="ve-track-label">Text</span>
-                        <div class="ve-track-controls">
-                            <button class="ve-track-btn" id="hide-text-btn" title="Hide Text">
-                                <i data-lucide="eye-off"></i>
-                            </button>
-                        </div>
+                </div>
+
+                <!-- Audio track header -->
+                <div class="ve-tl-header" data-track="audio">
+                    <div class="ve-tl-header-icon ve-tl-icon-audio">
+                        <i data-lucide="music-2"></i>
+                    </div>
+                    <span class="ve-tl-header-label">Audio</span>
+                    <div class="ve-tl-header-btns">
+                        <button class="ve-track-btn" id="mute-audio-btn" title="Mute">
+                            <i data-lucide="volume-2"></i>
+                        </button>
+                        <button class="ve-track-btn" id="solo-audio-btn" title="Solo">
+                            <i data-lucide="headphones"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Text track header -->
+                <div class="ve-tl-header" data-track="text">
+                    <div class="ve-tl-header-icon ve-tl-icon-text">
+                        <i data-lucide="type"></i>
+                    </div>
+                    <span class="ve-tl-header-label">Text</span>
+                    <div class="ve-tl-header-btns">
+                        <button class="ve-track-btn" id="hide-text-btn" title="Hide">
+                            <i data-lucide="eye"></i>
+                        </button>
                     </div>
                 </div>
             </div>
-            
-            <!-- Scrollable Timeline Content -->
-            <div class="ve-timeline-scroll" id="timeline-scroll">
-                <div class="ve-time-ruler" id="time-ruler"></div>
-                
-                <div class="ve-timeline-tracks" id="timeline-tracks">
-                    <div class="ve-track ve-track-video">
+
+            <!-- Scrollable right: ruler + tracks -->
+            <div class="ve-tl-scroll" id="timeline-scroll">
+                <!-- Snap guide line (appears on drag) -->
+                <div class="ve-snap-guide" id="snap-guide"></div>
+
+                <!-- Ruler -->
+                <div class="ve-tl-ruler" id="time-ruler"></div>
+
+                <!-- Track rows -->
+                <div class="ve-tl-tracks" id="timeline-tracks">
+                    <div class="ve-tl-track ve-tl-track-video">
                         <div class="ve-track-content" id="video-track"></div>
                     </div>
-                    <div class="ve-track ve-track-audio">
+                    <div class="ve-tl-track ve-tl-track-audio">
                         <div class="ve-track-content" id="audio-track"></div>
                     </div>
-                    <div class="ve-track ve-track-text">
+                    <div class="ve-tl-track ve-tl-track-text">
                         <div class="ve-track-content" id="text-track"></div>
                     </div>
                 </div>
-                
+
+                <!-- Playhead -->
                 <div class="ve-playhead" id="playhead">
-                    <div class="ve-playhead-tooltip" id="playhead-tooltip">0:00:00</div>
+                    <div class="ve-playhead-head" id="playhead-tooltip">
+                        <span id="playhead-time">0:00</span>
+                    </div>
+                    <div class="ve-playhead-line"></div>
                 </div>
             </div>
         </div>
+
+    </div><!-- /.ve-timeline -->
+
+    <!-- Inline text-add modal (shown via btn-add-text-quick) -->
+    <div class="ve-text-modal-backdrop" id="text-modal-backdrop">
+        <div class="ve-text-modal" id="text-modal">
+            <div class="ve-text-modal-header">
+                <span>Add Text Overlay</span>
+                <button class="ve-text-modal-close" id="text-modal-close"><i data-lucide="x"></i></button>
+            </div>
+            <div class="ve-text-modal-body">
+                <div class="ve-field">
+                    <label>Text content</label>
+                    <input type="text" id="text-input" placeholder="Your text here…" autocomplete="off">
+                </div>
+                <div class="ve-field-row">
+                    <div class="ve-field" style="flex:2">
+                        <label>Font size</label>
+                        <input type="number" id="font-size-input" value="36" min="10" max="200">
+                    </div>
+                    <div class="ve-field" style="flex:1">
+                        <label>Color</label>
+                        <input type="color" id="text-color-input" value="#ffffff" style="height:38px;padding:2px 4px;cursor:pointer;">
+                    </div>
+                </div>
+                <div class="ve-field-row">
+                    <div class="ve-field" style="flex:1">
+                        <label>Position</label>
+                        <select id="text-position-select">
+                            <option value="bottom">Bottom</option>
+                            <option value="center">Center</option>
+                            <option value="top">Top</option>
+                        </select>
+                    </div>
+                    <div class="ve-field" style="flex:1">
+                        <label>Background</label>
+                        <select id="text-bg-select">
+                            <option value="none">None</option>
+                            <option value="dark">Dark</option>
+                            <option value="blur">Blur</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="ve-field-row">
+                    <div class="ve-field" style="flex:1">
+                        <label>Start (s)</label>
+                        <input type="number" id="text-start-input" placeholder="0.00" step="0.1" min="0">
+                    </div>
+                    <div class="ve-field" style="flex:1">
+                        <label>End (s)</label>
+                        <input type="number" id="text-end-input" placeholder="5.00" step="0.1" min="0">
+                    </div>
+                </div>
+            </div>
+            <div class="ve-text-modal-footer">
+                <button class="ve-btn ve-btn-ghost" id="text-modal-cancel">Cancel</button>
+                <button class="ve-btn ve-btn-primary" id="btn-apply-text">
+                    <i data-lucide="plus"></i> Add to Timeline
+                </button>
+            </div>
+        </div>
     </div>
-</div>
+
+</div><!-- /.ve-editor-page -->
 
 {% endblock %}
 

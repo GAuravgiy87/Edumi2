@@ -8,44 +8,45 @@
 /* ---- Theme Bridge: Map ve- vars to global vars ---- */
 :root {
     /* Primary accent — uses global --primary from base.css */
-    --ve-primary: var(--primary, #667eea);
-    --ve-primary-dark: var(--primary-dark, #5568d3);
-    --ve-primary-light: var(--primary-light, #818cf8);
-    --ve-danger: var(--danger, #ef4444);
-    --ve-success: var(--success, #10b981);
-    --ve-warning: var(--warning, #f59e0b);
+    --ve-primary: #667eea;
+    --ve-primary-dark: #5568d3;
+    --ve-primary-light: #818cf8;
+    --ve-danger: #ef4444;
+    --ve-success: #10b981;
+    --ve-warning: #f59e0b;
 
-    /* Backgrounds */
-    --ve-bg: var(--white, #ffffff);
-    --ve-bg-secondary: var(--gray-50, #f9fafb);
-    --ve-bg-raised: var(--gray-100, #f3f4f6);
+    /* Backgrounds — light mode */
+    --ve-bg: #ffffff;
+    --ve-bg-secondary: #f9fafb;
+    --ve-bg-raised: #f3f4f6;
 
-    /* Text */
-    --ve-text: var(--gray-900, #111827);
-    --ve-text-secondary: var(--gray-700, #374151);
-    --ve-text-muted: var(--gray-500, #6b7280);
+    /* Text — light mode */
+    --ve-text: #111827;
+    --ve-text-secondary: #374151;
+    --ve-text-muted: #6b7280;
 
-    /* Borders */
-    --ve-border: var(--gray-200, #e5e7eb);
-    --ve-border-strong: var(--gray-300, #d1d5db);
+    /* Borders — light mode */
+    --ve-border: #e5e7eb;
+    --ve-border-strong: #d1d5db;
 
     /* Shadows */
-    --ve-shadow-sm: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
-    --ve-shadow: var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.1));
-    --ve-shadow-lg: var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.1));
+    --ve-shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --ve-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    --ve-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
 
     /* Radius */
-    --ve-radius: var(--radius, 8px);
-    --ve-radius-sm: var(--radius-sm, 6px);
-    --ve-radius-lg: var(--radius-lg, 12px);
+    --ve-radius: 8px;
+    --ve-radius-sm: 6px;
+    --ve-radius-lg: 12px;
 
-    /* Glassmorphism */
-    --ve-glass-bg: rgba(255, 255, 255, 0.85);
+    /* Glassmorphism — light mode */
+    --ve-glass-bg: rgba(255, 255, 255, 0.92);
     --ve-glass-border: rgba(229, 231, 235, 0.6);
 }
 
-/* Dark mode overrides (kept for backward compatibility with global toggle if it exists, though now redundant) */
-body.dark-mode {
+/* Dark mode overrides — mirrors the dark-mode vars set by base.css */
+body.dark-mode,
+html.dark-mode body {
     --ve-bg: #1e293b;
     --ve-bg-secondary: #0f172a;
     --ve-bg-raised: #334155;
@@ -54,8 +55,8 @@ body.dark-mode {
     --ve-text-muted: #64748b;
     --ve-border: #334155;
     --ve-border-strong: #475569;
-    --ve-glass-bg: rgba(30, 41, 59, 0.85);
-    --ve-glass-border: rgba(51, 65, 85, 0.6);
+    --ve-glass-bg: rgba(15, 23, 42, 0.92);
+    --ve-glass-border: rgba(51, 65, 85, 0.7);
 }
 
 /* ============================================================
@@ -527,29 +528,60 @@ body.dark-mode {
 
 /* ============================================================
    EDITOR PAGE LAYOUT
+   The editor uses 100% width and height of its container.
+   Global overrides (at bottom) ensure the container has no padding.
    ============================================================ */
 
-/* ==============================================================
-   EDITOR PAGE — Full-Bleed Layout Fix
-   The editor lives inside .content-area which has padding.
-   We escape that padding with negative margins so the editor
-   fills the entire available space (CapCut/Canva style).
-   ============================================================== */
+/* Override content-area padding for editor page */
+html body:has(.ve-editor-page) .main-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    margin-left: var(--sidebar-width) !important;
+    height: calc(100vh - var(--topbar-height)) !important;
+    min-height: calc(100vh - var(--topbar-height)) !important;
+    margin-top: var(--topbar-height) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+html body:has(.ve-editor-page) .main-content .content-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+}
+
+html body:has(.ve-editor-page) .content-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+}
+
 .ve-editor-page {
-    /* Escape .content-area padding on all sides */
-    margin: calc(-1 * clamp(16px, 3vw, 24px));
-    /* Fill the full available width after escaping padding */
-    width: calc(100% + 2 * clamp(16px, 3vw, 24px));
-    /* Fill the full viewport height minus the topbar */
-    height: calc(100vh - var(--topbar-height, 60px));
-    /* Clip everything inside, never scroll the editor container */
-    overflow: hidden;
+    width: 100%;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
     background: var(--ve-bg-secondary);
-    /* Prevent the editor itself from creating a horizontal scrollbar */
     box-sizing: border-box;
-    position: relative;
+    /* Fixed height for full content area */
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden;
 }
 
 /* ---- Editor Header / Topbar ---- */
@@ -557,36 +589,38 @@ body.dark-mode {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
-    background: var(--ve-glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--ve-glass-border);
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--ve-bg) 0%, var(--ve-bg-secondary) 100%);
+    border-bottom: 1px solid var(--ve-border);
     flex-shrink: 0;
-    gap: 12px;
-    box-shadow: var(--ve-shadow-sm);
+    gap: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     z-index: 100;
+    min-height: 64px;
 }
 
 .ve-editor-head-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     min-width: 0;
 }
 
 .ve-timeline-toolbar .ve-time-display {
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--ve-text);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     letter-spacing: 0.5px;
 }
 
 .ve-editor-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--ve-text);
+    font-size: 18px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--ve-primary) 0%, #8b5cf6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -596,22 +630,19 @@ body.dark-mode {
 .ve-editor-head-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
     flex-shrink: 0;
 }
 
-/* ---- Main grid: video + tool panel ---- */
+/* ---- Main grid: video stage + right tool panel ---- */
 .ve-editor-grid {
     display: grid;
-    /* Use minmax(0,1fr) so the video stage NEVER exceeds available width */
-    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 360px;
     gap: 0;
     flex: 1;
     overflow: hidden;
-    min-height: 0;
-    min-width: 0;
-    /* Ensure grid itself doesn't overflow the page */
     width: 100%;
+    min-height: 0;
     max-width: 100%;
 }
 
@@ -619,9 +650,10 @@ body.dark-mode {
 .ve-video-stage {
     display: flex;
     flex-direction: column;
-    background: var(--ve-bg-secondary);
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
     overflow: hidden;
     border-right: 1px solid var(--ve-border);
+    height: 100%;
     min-width: 0;
 }
 
@@ -631,19 +663,18 @@ body.dark-mode {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
+    background: radial-gradient(ellipse at center, #1e293b 0%, #020617 100%);
     overflow: hidden;
-    min-height: 0;
-    min-width: 0;
-    padding: 24px;
+    min-height: 250px;
+    padding: 32px;
 }
 
 #main-video {
     max-width: 100%;
     max-height: 100%;
     display: block;
-    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
-    border-radius: var(--ve-radius-sm);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(148, 163, 184, 0.1);
+    border-radius: 16px;
     background: #000;
 }
 
@@ -658,61 +689,66 @@ body.dark-mode {
 .ve-player-controls {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: var(--ve-glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-top: 1px solid var(--ve-glass-border);
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, #020617 100%);
+    border-top: 1px solid rgba(51,65,85,0.6);
     flex-shrink: 0;
-    /* Never let controls wrap — they should scroll if too tight */
     flex-wrap: nowrap;
     overflow: hidden;
     min-width: 0;
     z-index: 100;
+    min-height: 72px;
 }
 
 .ve-ctrl-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: transparent;
-    border: none;
-    color: var(--ve-text-secondary);
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(30,41,59,0.7);
+    border: 1px solid rgba(71,85,105,0.5);
+    color: #e2e8f0;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .ve-ctrl-btn:hover {
-    background: var(--ve-bg-secondary);
-    color: var(--ve-text);
+    background: rgba(51,65,85,0.9);
+    color: #ffffff;
+    border-color: rgba(148,163,184,0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.ve-ctrl-btn:active {
+    transform: translateY(0);
 }
 
 .ve-ctrl-play {
-    width: 42px;
-    height: 42px;
-    background: rgba(102, 126, 234, 0.15);
-    color: var(--ve-primary) !important;
-    border: 1px solid rgba(102, 126, 234, 0.25);
-    backdrop-filter: blur(4px);
-    transition: all 0.2s ease;
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, #667eea 0%, #7c3aed 100%);
+    color: #ffffff !important;
+    border: none;
+    box-shadow: 0 8px 24px rgba(102,126,234,0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ve-ctrl-play:hover {
-    background: rgba(102, 126, 234, 0.25);
-    color: var(--ve-primary) !important;
-    border-color: var(--ve-primary);
-    transform: scale(1.05);
+    background: linear-gradient(135deg, #5a67d8 0%, #6d28d9 100%);
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 0 12px 32px rgba(102,126,234,0.55);
 }
 
 .ve-ctrl-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     margin-left: auto;
     flex-shrink: 0;
     min-width: 0;
@@ -720,16 +756,20 @@ body.dark-mode {
 
 .ve-time-display {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ve-text-secondary);
+    font-size: 14px;
+    font-weight: 700;
+    color: #e2e8f0;
     letter-spacing: 0.5px;
     white-space: nowrap;
+    background: rgba(30,41,59,0.7);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(71,85,105,0.5);
 }
 
 .ve-time-divider {
-    color: var(--ve-text-muted);
-    margin: 0 3px;
+    color: #94a3b8;
+    margin: 0 4px;
 }
 
 /* Volume slider */
@@ -765,69 +805,98 @@ body.dark-mode {
    ============================================================ */
 
 .ve-tool-panel {
-    background: var(--ve-bg);
+    background: linear-gradient(180deg, var(--ve-bg) 0%, var(--ve-bg-secondary) 100%);
     border-left: 1px solid var(--ve-border);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: -4px 0 15px rgba(0,0,0,0.03);
-    /* Fixed width — do NOT let it grow */
-    width: 280px;
-    min-width: 280px;
-    max-width: 280px;
+    width: 100%;
     flex-shrink: 0;
+    height: 100%;
 }
 
 .ve-tool-tabs {
     display: flex;
     border-bottom: 1px solid var(--ve-border);
-    background: var(--ve-bg-secondary);
+    background: linear-gradient(135deg, rgba(248,250,252,0.9) 0%, rgba(241,245,249,0.9) 100%);
     overflow-x: auto;
     flex-shrink: 0;
+    padding: 8px 12px;
+    gap: 6px;
+}
+
+body.dark-mode .ve-tool-tabs {
+    background: linear-gradient(135deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.95) 100%);
 }
 
 .ve-tool-tabs::-webkit-scrollbar {
-    height: 2px;
+    height: 3px;
+}
+
+.ve-tool-tabs::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
+    border-radius: 3px;
 }
 
 .ve-tool-tab {
     flex: 1;
-    min-width: 52px;
-    padding: 11px 6px;
+    min-width: 60px;
+    padding: 10px 12px;
     background: transparent;
     border: none;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--ve-text-muted);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     white-space: nowrap;
-    border-bottom: 2px solid transparent;
+    border-radius: 10px;
 }
 
 .ve-tool-tab:hover {
     color: var(--ve-text);
-    background: rgba(102, 126, 234, 0.04);
+    background: rgba(102, 126, 234, 0.08);
+    transform: translateY(-1px);
 }
 
 .ve-tool-tab--active {
-    color: var(--ve-primary);
-    background: var(--ve-bg);
-    border-bottom-color: var(--ve-primary);
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--ve-primary) 0%, #8b5cf6 100%);
+    box-shadow: 0 4px 14px rgba(102,126,234,0.35);
 }
 
 .ve-tool-panels {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: 16px;
+    overflow-x: hidden;
+    padding: 20px;
+}
+
+/* Styled scrollbar for tool panel */
+.ve-tool-panels::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ve-tool-panels::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ve-tool-panels::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #667eea 0%, #8b5cf6 100%);
+    border-radius: 6px;
+}
+
+.ve-tool-panels::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #5a67d8 0%, #7c3aed 100%);
 }
 
 .ve-tool-section {
     display: none;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 .ve-tool-section--active {
@@ -947,39 +1016,42 @@ body.dark-mode {
 }
 
 /* ============================================================
-   TIMELINE  (bottom section)
+   TIMELINE  — Professional Blender/Canva-style bottom panel
    ============================================================ */
 
-.ve-timeline {
-    background: var(--ve-bg);
-    border-top: 1px solid var(--ve-border);
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    /* Slightly larger timeline for CapCut-style editing experience */
-    height: 220px;
-    min-height: 180px;
-    max-height: 280px;
-    box-shadow: 0 -4px 15px rgba(0,0,0,0.03);
-    z-index: 10;
-    /* Never allow the timeline to overflow the page */
-    overflow: hidden;
-    width: 100%;
+/* Track row height — single source of truth */
+:root {
+    --tl-track-h: 52px;
+    --tl-ruler-h: 32px;
+    --tl-header-w: 160px;
+    --tl-toolbar-h: 42px;
 }
 
+.ve-timeline {
+    background: linear-gradient(180deg, #020617 0%, #020617 100%);
+    border-top: 1px solid rgba(30,41,59,0.9);
+    display: flex;
+    flex-direction: column;
+    height: 260px;
+    min-height: 220px;
+    flex-shrink: 0;
+    overflow: hidden;
+    width: 100%;
+    user-select: none;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.4);
+}
+
+/* ---- Toolbar ---- */
 .ve-timeline-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 16px;
-    background: var(--ve-glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 4px solid var(--ve-bg-raised);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #020617 0%, #020617 100%);
+    border-bottom: 1px solid rgba(51,65,85,0.7);
+    height: var(--tl-toolbar-h);
     flex-shrink: 0;
-    z-index: 100;
+    gap: 8px;
 }
 
 .ve-toolbar-left,
@@ -987,127 +1059,365 @@ body.dark-mode {
 .ve-toolbar-right {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
 }
 
-.ve-toolbar-center {
-    flex: 1;
-    justify-content: center;
+.ve-toolbar-center { flex: 1; justify-content: center; }
+
+/* Timecode display in toolbar center */
+.ve-tl-timecode {
+    font-family: ui-monospace, 'SF Mono', 'Fira Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--ve-text);
+    background: var(--ve-bg-raised);
+    border: 1px solid var(--ve-border);
+    border-radius: var(--ve-radius-sm);
+    padding: 3px 10px;
+    min-width: 88px;
+    text-align: center;
 }
 
-.ve-timeline-scroll {
-    position: relative;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex: 1;
-    background: var(--ve-bg-secondary);
+.ve-tb-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--ve-border);
+    margin: 0 4px;
+    flex-shrink: 0;
 }
 
-/* ---- Timeline Main Layout ---- */
-.ve-timeline-main {
+/* Accent button (Add Text) */
+.ve-tb-btn.ve-tb-accent {
+    color: var(--ve-primary);
+}
+.ve-tb-btn.ve-tb-accent:hover {
+    background: rgba(102,126,234,.1);
+    border-color: var(--ve-primary);
+}
+
+/* Toggle button (Snap) */
+.ve-tb-btn.ve-tb-toggle[data-active="true"] {
+    background: rgba(102,126,234,.12);
+    color: var(--ve-primary);
+    border-color: var(--ve-primary);
+}
+
+/* Zoom slider */
+.ve-zoom-slider-wrap {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+}
+
+.ve-zoom-slider-wrap input[type="range"] {
+    -webkit-appearance: none;
+    width: 80px;
+    height: 3px;
+    background: var(--ve-border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.ve-zoom-slider-wrap input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ve-primary);
+    cursor: pointer;
+}
+
+/* ---- Timeline Body: headers + scroll ---- */
+.ve-timeline-body {
     display: flex;
     flex: 1;
     overflow: hidden;
+    min-height: 0;
     position: relative;
-    background: var(--ve-bg-secondary);
 }
 
-.ve-timeline-sidebar {
-    width: 150px;
+/* ---- Track headers (left fixed panel) ---- */
+.ve-tl-headers {
+    width: var(--tl-header-w);
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--ve-border);
-    background: var(--ve-bg);
-    z-index: 100;
+    border-right: 1px solid rgba(51,65,85,0.7);
+    background: linear-gradient(180deg, #020617 0%, #020617 100%);
+    z-index: 20;
 }
 
-.ve-timeline-corner {
-    height: 40px;
-    border-bottom: 1px solid var(--ve-border);
-    background: var(--ve-bg);
+.ve-tl-corner {
+    height: var(--tl-ruler-h);
+    border-bottom: 1px solid rgba(51,65,85,0.7);
     flex-shrink: 0;
-}
-
-.ve-track-headers {
-    display: flex;
-    flex-direction: column;
-}
-
-.ve-timeline-scroll {
-    flex: 1;
-    overflow-x: auto;
-    overflow-y: hidden;
-    position: relative;
-}
-
-/* Custom scrollbar for timeline */
-.ve-timeline-scroll::-webkit-scrollbar {
-    height: 5px;
-}
-
-.ve-timeline-scroll::-webkit-scrollbar-track {
-    background: var(--ve-bg-secondary);
-}
-
-.ve-timeline-scroll::-webkit-scrollbar-thumb {
-    background: var(--ve-border-strong);
-    border-radius: 3px;
-}
-
-/* ---- Time Ruler ---- */
-.ve-time-ruler {
-    height: 40px;
-    position: relative;
-    background: var(--ve-bg);
-    border-bottom: 1px solid var(--ve-border);
-    min-width: 100%;
-}
-
-/* ---- Tracks ---- */
-.ve-timeline-tracks {
-    position: relative;
-    min-width: 100%;
-}
-
-.ve-track {
-    display: flex;
-    flex-direction: column;
-}
-
-.ve-track-header {
-    height: 52px;
+    background: linear-gradient(90deg, #020617 0%, #020617 100%);
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--ve-border);
+    padding: 0 16px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.ve-tl-header {
+    height: var(--tl-track-h);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px 0 16px;
+    border-bottom: 1px solid rgba(51,65,85,0.5);
     box-sizing: border-box;
-}
-
-.ve-track-header:last-child {
-    border-bottom: none;
-}
-
-.ve-track-icon {
-    color: var(--ve-text-muted);
     flex-shrink: 0;
 }
 
-.ve-track-label {
-    font-size: 12px;
+.ve-tl-header:last-child { border-bottom: none; }
+
+.ve-tl-header-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ve-tl-header-icon svg { width: 13px; height: 13px; }
+
+.ve-tl-icon-video  { background: rgba(102,126,234,.15); color: #818cf8; }
+.ve-tl-icon-audio  { background: rgba(16,185,129,.15);  color: #34d399; }
+.ve-tl-icon-text   { background: rgba(245,158,11,.15);  color: #fbbf24; }
+
+.ve-tl-header-label {
+    font-size: 11.5px;
     font-weight: 600;
     color: var(--ve-text-secondary);
     flex: 1;
     white-space: nowrap;
 }
 
-.ve-track-controls {
+.ve-tl-header-btns {
     display: flex;
-    align-items: center;
     gap: 2px;
 }
 
+/* ---- Scrollable canvas ---- */
+.ve-tl-scroll {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    background: linear-gradient(180deg, #020617 0%, #020617 100%);
+    min-width: 0;
+}
+
+/* Themed scrollbar */
+.ve-tl-scroll::-webkit-scrollbar { height: 8px; }
+.ve-tl-scroll::-webkit-scrollbar-track { background: rgba(15,23,42,0.9); }
+.ve-tl-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #667eea 0%, #8b5cf6 100%);
+    border-radius: 8px;
+}
+.ve-tl-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #5a67d8 0%, #7c3aed 100%);
+}
+
+/* ---- Ruler ---- */
+.ve-tl-ruler {
+    height: var(--tl-ruler-h);
+    position: relative;
+    background: linear-gradient(90deg, #020617 0%, #020617 100%);
+    border-bottom: 1px solid rgba(51,65,85,0.6);
+    min-width: 100%;
+    cursor: crosshair;
+    flex-shrink: 0;
+}
+
+/* ---- Track rows ---- */
+.ve-tl-tracks {
+    position: relative;
+    min-width: 100%;
+    height: calc(var(--tl-track-h) * 3);
+}
+
+.ve-tl-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: var(--tl-track-h);
+}
+
+.ve-tl-track-video { top: 0; }
+.ve-tl-track-audio { top: var(--tl-track-h); }
+.ve-tl-track-text  { top: calc(var(--tl-track-h) * 2); }
+
+.ve-track-content {
+    position: absolute;
+    inset: 0;
+    border-bottom: 1px solid rgba(51,65,85,0.4);
+}
+
+/* Alternating row tints */
+.ve-tl-track-video .ve-track-content { background: rgba(102,126,234,0.06); }
+.ve-tl-track-audio .ve-track-content { background: rgba(16,185,129,0.06); }
+.ve-tl-track-text  .ve-track-content { background: rgba(245,158,11,0.06); }
+
+/* Track hover highlight */
+.ve-tl-track:hover .ve-track-content { background: rgba(51,65,85,0.15); }
+
+/* ---- Snap guide ---- */
+.ve-snap-guide {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: #facc15;
+    box-shadow: 0 0 6px #facc15;
+    z-index: 60;
+    display: none;
+    pointer-events: none;
+}
+
+.ve-snap-guide.visible { display: block; }
+
+/* ---- Playhead ---- */
+.ve-playhead {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 100%;
+    z-index: 50;
+    cursor: ew-resize;
+    pointer-events: auto;
+}
+
+.ve-playhead-head {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ve-danger);
+    color: #fff;
+    font-family: ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px 3px 0 0;
+    white-space: nowrap;
+    pointer-events: none;
+    line-height: 1.4;
+}
+
+.ve-playhead-line {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 2px;
+    height: calc(100% - 20px);
+    background: var(--ve-danger);
+    box-shadow: 0 0 8px rgba(239,68,68,.6);
+}
+
+/* ---- Clips ---- */
+.ve-clip {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px 0 22px;  /* left padding for handle space */
+    font-size: 11px;
+    font-weight: 600;
+    cursor: grab;
+    user-select: none;
+    overflow: hidden;
+    transition: box-shadow .1s, outline .1s;
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
+}
+
+.ve-clip:active { cursor: grabbing; }
+
+.ve-clip:hover { box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+
+.ve-clip.ve-clip-selected {
+    outline: 2px solid #facc15;
+    outline-offset: 0;
+    box-shadow: 0 0 0 3px rgba(250,204,21,.25), 0 2px 10px rgba(0,0,0,.35);
+}
+
+/* Clip colours */
+.ve-clip-video {
+    background: linear-gradient(135deg, #4f5ee8 0%, #7c3aed 100%);
+    color: #fff;
+}
+.ve-clip-audio {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: #fff;
+}
+.ve-clip-text {
+    background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
+    color: #fff;
+}
+
+/* Stripe pattern on video clips */
+.ve-clip-video::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(255,255,255,.04) 0px,
+        rgba(255,255,255,.04) 1px,
+        transparent 1px,
+        transparent 8px
+    );
+    pointer-events: none;
+}
+
+.ve-clip-label {
+    position: relative;
+    z-index: 2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 3px rgba(0,0,0,.4);
+    pointer-events: none;
+}
+
+/* Clip resize handles */
+.ve-clip-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    z-index: 3;
+    cursor: ew-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ve-clip-handle::after {
+    content: '';
+    width: 3px;
+    height: 60%;
+    border-radius: 2px;
+    background: rgba(255,255,255,.5);
+}
+
+.ve-clip-handle:hover::after { background: rgba(255,255,255,.9); }
+
+.ve-clip-handle-left  { left: 0;  border-radius: 5px 0 0 5px; }
+.ve-clip-handle-right { right: 0; border-radius: 0 5px 5px 0; }
+
+/* ---- track-btn reused from header ---- */
 .ve-track-btn {
     display: flex;
     align-items: center;
@@ -1118,8 +1428,9 @@ body.dark-mode {
     background: transparent;
     color: var(--ve-text-muted);
     cursor: pointer;
-    border-radius: var(--ve-radius-sm);
-    transition: all 0.15s;
+    border-radius: 4px;
+    transition: all .12s;
+    flex-shrink: 0;
 }
 
 .ve-track-btn:hover {
@@ -1127,182 +1438,160 @@ body.dark-mode {
     color: var(--ve-text);
 }
 
-.ve-track-content {
-    position: relative;
-    height: 52px;
-    background: var(--ve-bg-secondary);
-    border-bottom: 1px solid var(--ve-border);
+.ve-track-btn svg { width: 13px; height: 13px; }
+
+/* Muted / hidden state */
+.ve-track-btn.ve-btn-muted  { color: var(--ve-danger) !important; }
+.ve-track-btn.ve-btn-hidden { color: var(--ve-text-muted); opacity: .4; }
+
+/* ============================================================
+   TEXT ADD MODAL
+   ============================================================ */
+
+.ve-text-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
 }
 
-.ve-track:last-child .ve-track-content {
-    border-bottom: none;
-}
+.ve-text-modal-backdrop.open { display: flex; }
 
-/* ---- Track Colors ---- */
-.ve-track-video .ve-track-content {
-    background: rgba(102, 126, 234, 0.04);
-}
-
-.ve-track-audio .ve-track-content {
-    background: rgba(16, 185, 129, 0.04);
-}
-
-.ve-track-text .ve-track-content {
-    background: rgba(245, 158, 11, 0.04);
-}
-
-/* ---- Playhead ---- */
-.ve-playhead {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 2px;
-    height: 100%;
-    background: transparent;
-    z-index: 50;
-    cursor: ew-resize;
-    pointer-events: auto;
-}
-
-.ve-playhead::after {
-    content: '';
-    position: absolute;
-    top: 24px;
-    left: 0;
-    width: 2px;
-    height: calc(100% - 24px);
-    background: var(--ve-danger);
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-}
-
-.ve-playhead::before {
-    content: '';
-    position: absolute;
-    top: 18px;
-    left: -5px;
-    width: 12px;
-    height: 12px;
-    background: var(--ve-danger);
-    border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.6);
-    z-index: 51;
-}
-
-.ve-playhead-tooltip {
-    position: absolute;
-    top: 2px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--ve-bg-raised);
-    color: var(--ve-text);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 600;
-    white-space: nowrap;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+.ve-text-modal {
+    background: var(--ve-bg);
     border: 1px solid var(--ve-border);
+    border-radius: var(--ve-radius-lg);
+    width: 420px;
+    max-width: 94vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-/* ---- Clips ---- */
-.ve-clip {
-    position: absolute;
-    top: 4px;
-    bottom: 4px;
-    border-radius: var(--ve-radius-sm);
-    padding: 0 8px;
+.ve-text-modal-header {
     display: flex;
     align-items: center;
-    font-size: 11.5px;
-    font-weight: 500;
-    cursor: grab;
-    user-select: none;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-    transition: box-shadow 0.15s;
-    overflow: hidden;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--ve-border);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ve-text);
 }
 
-.ve-clip:active {
-    cursor: grabbing;
+.ve-text-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--ve-text-muted);
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color .12s, background .12s;
 }
 
-.ve-clip:hover {
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+.ve-text-modal-close:hover { background: var(--ve-bg-secondary); color: var(--ve-text); }
+.ve-text-modal-close svg { width: 16px; height: 16px; }
+
+.ve-text-modal-body {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.ve-clip.ve-clip-selected {
-    outline: 2px solid var(--ve-warning);
-    outline-offset: 1px;
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+.ve-text-modal-footer {
+    padding: 14px 18px;
+    border-top: 1px solid var(--ve-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
-.ve-clip-video {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #ffffff;
+/* field-row used in the modal */
+.ve-field-row {
+    display: flex;
+    gap: 10px;
 }
 
-.ve-clip-audio {
-    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-    color: #ffffff;
+/* Inputs inside the modal */
+.ve-text-modal-body .ve-field input[type="text"],
+.ve-text-modal-body .ve-field input[type="number"],
+.ve-text-modal-body .ve-field select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--ve-border);
+    border-radius: var(--ve-radius);
+    background: var(--ve-bg-secondary);
+    color: var(--ve-text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
 }
 
-.ve-clip-text {
-    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
-    color: #1a0e00;
+.ve-text-modal-body .ve-field input:focus,
+.ve-text-modal-body .ve-field select:focus {
+    border-color: var(--ve-primary);
+    box-shadow: 0 0 0 3px rgba(102,126,234,.12);
 }
 
-.ve-clip-handle {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 8px;
-    background: rgba(255, 255, 255, 0.25);
-    cursor: ew-resize;
-    z-index: 2;
-    transition: background 0.15s;
+/* Text-clip list in the side panel */
+.ve-text-clip-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--ve-bg-secondary);
+    border: 1px solid var(--ve-border);
+    border-radius: var(--ve-radius);
+    font-size: 12px;
+    color: var(--ve-text);
+    cursor: pointer;
+    transition: border-color .12s;
 }
 
-.ve-clip-handle:hover {
-    background: rgba(255, 255, 255, 0.45);
+.ve-text-clip-item:hover { border-color: var(--ve-primary); }
+.ve-text-clip-item.selected { border-color: var(--ve-primary); background: rgba(102,126,234,.08); }
+
+.ve-text-clip-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    flex-shrink: 0;
 }
 
-.ve-clip-handle-left {
-    left: 0;
-    border-radius: var(--ve-radius-sm) 0 0 var(--ve-radius-sm);
+.ve-text-clip-info { flex: 1; min-width: 0; }
+.ve-text-clip-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-text-clip-time { font-size: 10px; color: var(--ve-text-muted); }
+
+.ve-text-clip-del {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--ve-text-muted);
+    padding: 2px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    transition: color .12s;
+    flex-shrink: 0;
 }
 
-.ve-clip-handle-right {
-    right: 0;
-    border-radius: 0 var(--ve-radius-sm) var(--ve-radius-sm) 0;
-}
-
-.ve-clip-label {
-    position: relative;
-    z-index: 1;
-    pointer-events: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+.ve-text-clip-del:hover { color: var(--ve-danger); }
+.ve-text-clip-del svg { width: 12px; height: 12px; }
 
 /* ============================================================
    RESPONSIVE
    ============================================================ */
 
-/* When the tool panel is too narrow (tablet/mid-size), stack it below */
-@media (max-width: 1100px) {
-    .ve-editor-grid {
-        grid-template-columns: minmax(0, 1fr) 240px;
-    }
-
-    .ve-tool-panel {
-        width: 240px;
-        min-width: 240px;
-        max-width: 240px;
-    }
-}
-
-@media (max-width: 900px) {
+@media (max-width: 768px) {
     .ve-editor-grid {
         grid-template-columns: 1fr;
         overflow-y: auto;
@@ -1312,24 +1601,14 @@ body.dark-mode {
         width: 100%;
         min-width: unset;
         max-width: 100%;
-        max-height: 300px;
+        height: 240px;
+        min-height: 180px;
         border-left: none;
         border-top: 1px solid var(--ve-border);
     }
 
     .ve-video-stage {
         border-right: none;
-    }
-}
-
-@media (max-width: 768px) {
-    .ve-page {
-        padding: 16px 16px 40px;
-    }
-
-    .ve-project-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 14px;
     }
 
     .ve-player-controls {
@@ -1345,8 +1624,8 @@ body.dark-mode {
     }
 
     .ve-ctrl-play {
-        width: 36px;
-        height: 36px;
+        width: 34px;
+        height: 34px;
         flex-shrink: 0;
     }
 
@@ -1355,46 +1634,39 @@ body.dark-mode {
     }
 
     .ve-timeline {
-        height: 170px;
-        min-height: 150px;
-        max-height: 200px;
+        height: 160px;
+        min-height: 140px;
+        max-height: 190px;
     }
 
     .ve-timeline-toolbar {
         padding: 5px 8px;
     }
 
-    /* Editor page — escape sidebar on mobile (sidebar is hidden) */
-    .ve-editor-page {
-        margin: calc(-1 * clamp(16px, 3vw, 24px));
-        width: calc(100% + 2 * clamp(16px, 3vw, 24px));
+    .ve-page {
+        padding: 16px 16px 40px;
+    }
+
+    .ve-project-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 14px;
     }
 }
 
 
 
 /* ============================================================
-   GLOBAL LAYOUT OVERRIDES for the Editor Page
-   These target the parent containers set by sidebar_base.html
-   to prevent clipping and unwanted scroll on the editor page.
+   BODY-LEVEL OVERRIDES
+   Editor page scrolls normally — no viewport locking.
    ============================================================ */
 
-/* When the editor page is active, remove padding from content-area
-   and prevent overflow-x:hidden from clipping the full-bleed layout */
 body:has(.ve-editor-page) .content-area {
     padding: 0 !important;
-    overflow: hidden !important;
+    margin: 0 !important;
 }
 
-body:has(.ve-editor-page) .main-content {
-    overflow: hidden;
-}
-
-/* Prevent the app-container from creating a scrollbar on the editor */
-body:has(.ve-editor-page) .app-container {
-    overflow: hidden;
-    height: 100vh;
-    max-height: 100vh;
+body:has(.ve-editor-page) .messages-container {
+    display: none !important;
 }
 
 
@@ -1425,8 +1697,12 @@ body:has(.ve-editor-page) .app-container {
 }
 
 .ve-tb-btn svg {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
+}
+
+.ve-tb-btn span {
+    font-size: 11.5px;
 }
 
 .ve-track-btn svg,

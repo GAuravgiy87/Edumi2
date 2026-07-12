@@ -1,8 +1,7 @@
 import os
 import subprocess
-import uuid
 from django.conf import settings
-from .ffmpeg_utils import get_metadata, FFmpegError
+from .ffmpeg_utils import FFmpegError
 
 def compile_timeline_to_ffmpeg(project, timeline_json, output_path):
     """
@@ -17,15 +16,6 @@ def compile_timeline_to_ffmpeg(project, timeline_json, output_path):
     # Index 0 is always the original project file
     inputs.append(project.original_file.path)
     
-    asset_map = {"original": 0}
-    input_idx = 1
-    
-    # We could have extra assets here if we support ProjectAsset
-    if "assets" in timeline_json:
-        for asset in timeline_json["assets"]:
-            # asset map logic here if needed
-            pass
-
     cmd = [ffmpeg_bin, '-y']
     for inp in inputs:
         cmd.extend(['-i', inp])
@@ -34,9 +24,7 @@ def compile_timeline_to_ffmpeg(project, timeline_json, output_path):
     video_outs = []
     audio_outs = []
     
-    # Very basic V1 implementation for a single track with trims and text
-    # In a full implementation, this parses the 'tracks' array.
-    
+    # Get video track from timeline
     v_track = next((t for t in timeline_json.get('tracks', []) if t.get('type') == 'video'), None)
     
     if not v_track or not v_track.get('clips'):
@@ -64,12 +52,12 @@ def compile_timeline_to_ffmpeg(project, timeline_json, output_path):
         audio_outs.append(a_label)
         
     # Concat clips if more than one
+    current_v = None
+    current_a = None
     if len(clips) > 1:
-        concat_v_inputs = "".join(video_outs)
-        concat_a_inputs = "".join(audio_outs)
+        concat_inputs = "".join(video_outs + audio_outs)
         n = len(clips)
-        filter_complex.append(f"{concat_v_inputs}concat=n={n}:v=1:a=0[v_concat]")
-        filter_complex.append(f"{concat_a_inputs}concat=n={n}:v=0:a=1[a_concat]")
+        filter_complex.append(f"{concat_inputs}concat=n={n}:v=1:a=1[v_concat][a_concat]")
         current_v = "[v_concat]"
         current_a = "[a_concat]"
     elif len(clips) == 1:
