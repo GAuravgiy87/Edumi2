@@ -67,6 +67,7 @@
         videoTrack:       document.getElementById('video-track'),
         audioTrack:       document.getElementById('audio-track'),
         textTrack:        document.getElementById('text-track'),
+        effectTrack:      document.getElementById('effect-track'),
         playhead:         document.getElementById('playhead'),
         playheadTime:     document.getElementById('playhead-time'),
         snapGuide:        document.getElementById('snap-guide'),
@@ -307,7 +308,7 @@
     ========================================================= */
     function renderClips() {
         recalcDuration();
-        [el.videoTrack, el.audioTrack, el.textTrack].forEach(t => { if(t) t.innerHTML = ''; });
+        [el.videoTrack, el.audioTrack, el.textTrack, el.effectTrack].forEach(t => { if(t) t.innerHTML = ''; });
 
         state.clips.forEach(clip => {
             const div = document.createElement('div');
@@ -326,13 +327,20 @@
             // Label
             const lbl = document.createElement('div');
             lbl.className = 've-clip-label';
-            lbl.textContent = clip.name || clip.text || clip.type;
+            lbl.textContent = clip.type === 'effect' ? `Effect: ${clip.effect}` : (clip.name || clip.text || clip.type);
 
             // For text clips: show the text content as label with "T" badge
             if (clip.type === 'text') {
                 const badge = document.createElement('span');
                 badge.style.cssText = 'background:rgba(0,0,0,.3);border-radius:3px;padding:0 4px;margin-right:5px;font-size:9px;letter-spacing:.05em;';
                 badge.textContent = 'T';
+                lbl.prepend(badge);
+            }
+            // For effect clips: show "FX" badge
+            if (clip.type === 'effect') {
+                const badge = document.createElement('span');
+                badge.style.cssText = 'background:rgba(0,0,0,.3);border-radius:3px;padding:0 4px;margin-right:5px;font-size:9px;letter-spacing:.05em;';
+                badge.textContent = 'FX';
                 lbl.prepend(badge);
             }
 
@@ -363,6 +371,7 @@
 
             const trackEl = clip.type === 'video' ? el.videoTrack
                           : clip.type === 'audio' ? el.audioTrack
+                          : clip.type === 'effect' ? el.effectTrack
                           : el.textTrack;
             if (trackEl) trackEl.appendChild(div);
 
@@ -682,9 +691,31 @@
             updateTimeDisplay();
         }
 
+        function applyEffectToVideo(effectName) {
+            if (!effectName) {
+                el.video.style.filter = 'none';
+                return;
+            }
+            switch (effectName) {
+                case 'grayscale':  el.video.style.filter = 'grayscale(100%)'; break;
+                case 'sepia':      el.video.style.filter = 'sepia(100%)'; break;
+                case 'blur':       el.video.style.filter = 'blur(4px)'; break;
+                case 'brightness': el.video.style.filter = 'brightness(130%)'; break;
+                case 'contrast':   el.video.style.filter = 'contrast(150%)'; break;
+                case 'saturate':   el.video.style.filter = 'saturate(200%)'; break;
+                default:           el.video.style.filter = 'none'; break;
+            }
+        }
+
         if (el.tlScroll) {
             el.tlScroll.addEventListener('mousedown', e => {
                 if (e.target.closest('.ve-clip') && !e.target.closest('.ve-tl-ruler')) return;
+                
+                // Pause playback if the user starts dragging the playhead
+                if (state.isPlaying) {
+                    togglePlay();
+                }
+
                 seeking = true;
                 document.body.style.cursor = 'ew-resize';
                 // deselect clip on empty area click
@@ -780,9 +811,15 @@
 
             updateTimeDisplay();
             renderTextOverlays();
+            syncVideoEffect(state.timelineTime);
             requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
+    }
+
+    function syncVideoEffect(t) {
+        const ec = state.clips.find(c => c.type === 'effect' && t >= c.start && t < c.end);
+        applyEffectToVideo(ec ? ec.effect : null);
     }
 
     /* =========================================================
@@ -956,8 +993,9 @@
         const fmt2 = document.getElementById('export-format')?.value     || 'mp4';
         const body = {
             tracks: [
-                { type:'video', clips: state.clips.filter(c=>c.type==='video').map(c=>({id:c.id,trimStart:c.sourceStart,trimEnd:c.sourceEnd,start:c.start,end:c.end})) },
-                { type:'text',  clips: state.clips.filter(c=>c.type==='text').map(c=>({id:c.id,text:c.text,position:c.position,fontsize:c.fontSize,color:c.color,start:c.start,end:c.end})) }
+                { type:'video',  clips: state.clips.filter(c=>c.type==='video').map(c=>({id:c.id,trimStart:c.sourceStart,trimEnd:c.sourceEnd,start:c.start,end:c.end})) },
+                { type:'text',   clips: state.clips.filter(c=>c.type==='text').map(c=>({id:c.id,text:c.text,position:c.position,fontsize:c.fontSize,color:c.color,start:c.start,end:c.end})) },
+                { type:'effect', clips: state.clips.filter(c=>c.type==='effect').map(c=>({id:c.id,effect:c.effect,start:c.start,end:c.end})) }
             ],
             exportQuality: qual, exportResolution: res, exportFormat: fmt2
         };
@@ -1156,6 +1194,30 @@
             if ((e.ctrlKey||e.metaKey)&&e.code==='KeyX') { copySelected(); deleteSelected(); }
             if (e.code==='ArrowLeft')  { e.preventDefault(); el.video.currentTime = Math.max(0, el.video.currentTime - (e.shiftKey ? 1/30 : 1)); }
             if (e.code==='ArrowRight') { e.preventDefault(); el.video.currentTime = Math.min(el.video.duration||99999, el.video.currentTime + (e.shiftKey ? 1/30 : 1)); }
+        });
+
+        // Effects
+        // Effects
+        document.querySelectorAll('.ve-effect-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const effect = e.target.dataset.effect;
+                const t = state.timelineTime;
+                const newClip = {
+                    id: `effect-${Date.now()}`,
+                    type: 'effect',
+                    effect: effect,
+                    start: t,
+                    end: t + 5
+                };
+                state.clips.push(newClip);
+                saveUndo();
+                selectClip(newClip.id);
+                renderClips();
+                
+                // Force video filter update if we dropped it at playhead
+                const ec = state.clips.find(c => c.type === 'effect' && t >= c.start && t < c.end);
+                applyEffectToVideo(ec ? ec.effect : null);
+            });
         });
 
         // Initial render

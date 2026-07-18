@@ -67,6 +67,34 @@ def compile_timeline_to_ffmpeg(project, timeline_json, output_path):
         current_v = "[0:v]"
         current_a = "[0:a]"
 
+    # Apply Video Effects Track
+    e_track = next((t for t in timeline_json.get('tracks', []) if t.get('type') == 'effect'), None)
+    if e_track and e_track.get('clips'):
+        for i, effect_clip in enumerate(e_track['clips']):
+            effect = effect_clip.get('effect')
+            start = effect_clip.get('start', 0)
+            end = effect_clip.get('end', 10)
+            enable_str = f"between(t,{start},{end})"
+            
+            effect_filter = ""
+            if effect == "grayscale":
+                effect_filter = f"hue=s=0:enable='{enable_str}'"
+            elif effect == "sepia":
+                effect_filter = f"colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131:enable='{enable_str}'"
+            elif effect == "blur":
+                effect_filter = f"boxblur=5:1:enable='{enable_str}'"
+            elif effect == "brightness":
+                effect_filter = f"eq=brightness=0.2:enable='{enable_str}'"
+            elif effect == "contrast":
+                effect_filter = f"eq=contrast=1.5:enable='{enable_str}'"
+            elif effect == "saturate":
+                effect_filter = f"eq=saturation=2.0:enable='{enable_str}'"
+                
+            if effect_filter:
+                next_v = f"[v_fx{i}]"
+                filter_complex.append(f"{current_v}{effect_filter}{next_v}")
+                current_v = next_v
+
     # Overlay Text if any
     t_track = next((t for t in timeline_json.get('tracks', []) if t.get('type') == 'text'), None)
     if t_track and t_track.get('clips'):

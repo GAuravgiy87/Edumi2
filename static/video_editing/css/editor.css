@@ -1255,6 +1255,7 @@ body.dark-mode .ve-tool-tabs {
 .ve-tl-track-video { top: 0; }
 .ve-tl-track-audio { top: var(--tl-track-h); }
 .ve-tl-track-text  { top: calc(var(--tl-track-h) * 2); }
+.ve-tl-track-effect { top: calc(var(--tl-track-h) * 3); }
 
 .ve-track-content {
     position: absolute;
@@ -1266,6 +1267,7 @@ body.dark-mode .ve-tool-tabs {
 .ve-tl-track-video .ve-track-content { background: rgba(102,126,234,0.06); }
 .ve-tl-track-audio .ve-track-content { background: rgba(16,185,129,0.06); }
 .ve-tl-track-text  .ve-track-content { background: rgba(245,158,11,0.06); }
+.ve-tl-track-effect .ve-track-content { background: rgba(217,70,239,0.06); }
 
 /* Track hover highlight */
 .ve-tl-track:hover .ve-track-content { background: rgba(51,65,85,0.15); }
@@ -1363,6 +1365,10 @@ body.dark-mode .ve-tool-tabs {
 }
 .ve-clip-text {
     background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
+    color: #fff;
+}
+.ve-clip-effect {
+    background: linear-gradient(135deg, #a21caf 0%, #e879f9 100%);
     color: #fff;
 }
 
