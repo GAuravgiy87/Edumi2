@@ -28,7 +28,7 @@ admin.site.logout_template = None
 
 urlpatterns = [
     path('health/', health_check, name='health_check'),
-    path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico', permanent=True)),
+    path('favicon.ico', RedirectView.as_view(url='/static/images/favicon.svg', permanent=True)),
     path('admin/logout/', auth_views.LogoutView.as_view(next_page='/'), name='admin-logout'),
     path('admin/', admin.site.urls),
     # LiveKit HTTP proxy — must be before other routes

@@ -4,7 +4,7 @@
         {% if user.is_authenticated %}
         <div class="nav-left">
             <a href="{% url 'home' %}" class="nav-brand">
-                <img src="{% static 'logo.svg' %}" alt="EduMi" class="nav-logo">
+                <img src="{% static 'images/logo.svg' %}" alt="EduMi" class="nav-logo">
             </a>
 
             {% include 'partials/nav_items.html' with nav_type='topbar' %}
@@ -16,7 +16,7 @@
         {% else %}
         <div class="nav-left">
             <a href="{% url 'login' %}" class="nav-brand">
-                <img src="{% static 'logo.svg' %}" alt="EduMi" class="nav-logo">
+                <img src="{% static 'images/logo.svg' %}" alt="EduMi" class="nav-logo">
             </a>
         </div>
         <div class="nav-right">

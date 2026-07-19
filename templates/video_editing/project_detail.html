@@ -399,7 +399,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://unpkg.com/lucide@latest"></script>
+
 <script>
     window.PROJECT_ID = {{ project.pk }};
     window.PROJECT_DURATION = {{ project.duration_seconds|default:"0" }};

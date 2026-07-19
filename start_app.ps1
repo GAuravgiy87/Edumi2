@@ -24,7 +24,30 @@ $SSL_KEY        = Join-Path $BASE_DIR "certs\edumi.key"
 $SSL_EXPORT     = Join-Path $BASE_DIR "certs\edumi-trust-this.crt"
 $HOSTS_FILE     = "$env:windir\System32\drivers\etc\hosts"
 $DOMAIN         = "edumi.ac.in"
-$PYTHON         = "C:\Users\hp\AppData\Local\Programs\Python\Python311\python.exe"
+# Resolve Python and Celery executables dynamically (check venv first, then system paths)
+$VENV_PYTHON = Join-Path $BASE_DIR "venv\Scripts\python.exe"
+if (Test-Path $VENV_PYTHON) {
+    $PYTHON = $VENV_PYTHON
+} else {
+    $USER_PROFILE = $env:USERPROFILE
+    $SYS_PYTHON = "$USER_PROFILE\AppData\Local\Programs\Python\Python311\python.exe"
+    if (Test-Path $SYS_PYTHON) {
+        $PYTHON = $SYS_PYTHON
+    } else {
+        $PYTHON = "python"
+    }
+}
+
+$CELERY = Join-Path $BASE_DIR "venv\Scripts\celery.exe"
+if (-not (Test-Path $CELERY)) {
+    $USER_PROFILE = $env:USERPROFILE
+    $SYS_CELERY = "$USER_PROFILE\AppData\Local\Programs\Python\Python311\Scripts\celery.exe"
+    if (Test-Path $SYS_CELERY) {
+        $CELERY = $SYS_CELERY
+    } else {
+        $CELERY = "celery"
+    }
+}
 
 Set-Location $BASE_DIR
 
@@ -383,7 +406,7 @@ Write-Host "      [OK] Migrations done, static files collected" -ForegroundColor
 # =======================================================
 Write-Host "[8/9] Starting Celery worker and Camera Service..." -ForegroundColor Yellow
 
-Start-Process "C:\Users\hp\AppData\Local\Programs\Python\Python311\Scripts\celery.exe" `
+Start-Process $CELERY `
     -ArgumentList "-A school_project worker -l info -P threads" `
     -WorkingDirectory $BASE_DIR -WindowStyle Minimized
 

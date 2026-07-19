@@ -279,11 +279,11 @@ fi
 
 # ── Windows trust via PowerShell (browser runs on Windows, not Linux) ─────────
 # WSL can call powershell.exe directly to install into Windows cert store
-WIN_PS_SCRIPT=$(wslpath -w "$BASE_DIR/trust_cert.ps1" 2>/dev/null || echo "")
+WIN_PS_SCRIPT=$(wslpath -w "$BASE_DIR/scripts/trust_ssl_cert.ps1" 2>/dev/null || echo "")
 WIN_CERT=$(wslpath -w "$SSL_EXPORT" 2>/dev/null || echo "")
 
 if command -v powershell.exe &>/dev/null && [ -n "$WIN_PS_SCRIPT" ]; then
-    echo "      Running trust_cert.ps1 via Windows PowerShell..."
+    echo "      Running scripts/trust_ssl_cert.ps1 via Windows PowerShell..."
     powershell.exe -NoProfile -ExecutionPolicy Bypass \
         -File "$WIN_PS_SCRIPT" -CertPath "$WIN_CERT" 2>/dev/null
     EXIT_CODE=$?
@@ -291,8 +291,8 @@ if command -v powershell.exe &>/dev/null && [ -n "$WIN_PS_SCRIPT" ]; then
         echo "      [OK] Certificate trusted in Windows — close ALL Chrome windows and reopen!"
     else
         echo "      [WARN] PowerShell returned code $EXIT_CODE"
-        echo "             Try running trust_cert.ps1 manually as Administrator:"
-        echo "             Right-click trust_cert.ps1 -> Run with PowerShell (as Admin)"
+        echo "             Try running scripts/trust_ssl_cert.ps1 manually as Administrator:"
+        echo "             Right-click scripts/trust_ssl_cert.ps1 -> Run with PowerShell (as Admin)"
     fi
 else
     echo ""
@@ -303,7 +303,7 @@ else
     echo "  │    -FilePath 'D:\\Edumi2-my-work2\\certs\\edumi-trust-this.crt' \\"
     echo "  │    -CertStoreLocation Cert:\\LocalMachine\\Root              │"
     echo "  │                                                             │"
-    echo "  │  OR: double-click trust_cert.ps1 -> Run as Administrator    │"
+    echo "  │  OR: double-click scripts/trust_ssl_cert.bat (as Admin)     │"
     echo "  └─────────────────────────────────────────────────────────────┘"
     echo ""
 fi

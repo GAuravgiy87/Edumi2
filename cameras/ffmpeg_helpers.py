@@ -8,10 +8,12 @@ import os
 import shutil
 
 
-_WINGET_FFMPEG = (
-    r"C:\Users\hp\AppData\Local\Microsoft\WinGet\Packages"
-    r"\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe"
-    r"\ffmpeg-8.1.2-full_build\bin\ffmpeg.exe"
+_user_profile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+_WINGET_FFMPEG = os.path.join(
+    _user_profile,
+    "AppData", "Local", "Microsoft", "WinGet", "Packages",
+    "Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe",
+    "ffmpeg-8.1.2-full_build", "bin", "ffmpeg.exe"
 )
 _WINGET_FFPROBE = _WINGET_FFMPEG.replace("ffmpeg.exe", "ffprobe.exe")
 
