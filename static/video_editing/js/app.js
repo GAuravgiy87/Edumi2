@@ -7,18 +7,22 @@
     "use strict";
 
     // ---- Tool tab switching -------------------------------------------
-    const tabs = document.querySelectorAll(".tool-tab");
-    const panels = document.querySelectorAll(".tool-section");
+    const tabs = document.querySelectorAll(".tool-tab, .ve-tool-tab");
+    const panels = document.querySelectorAll(".tool-section, .ve-tool-section");
 
     tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
             const target = tab.dataset.tab;
 
-            tabs.forEach((t) => t.classList.remove("tool-tab--active"));
-            tab.classList.add("tool-tab--active");
+            tabs.forEach((t) => {
+                t.classList.remove("tool-tab--active", "ve-tool-tab--active");
+            });
+            tab.classList.add("tool-tab--active", "ve-tool-tab--active");
 
             panels.forEach((p) => {
-                p.classList.toggle("tool-section--active", p.dataset.panel === target);
+                const isActive = p.dataset.panel === target;
+                p.classList.toggle("tool-section--active", isActive);
+                p.classList.toggle("ve-tool-section--active", isActive);
             });
         });
     });
@@ -27,7 +31,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const activeTab = urlParams.get("tab");
     if (activeTab) {
-        const targetTab = document.querySelector(`.tool-tab[data-tab="${activeTab}"]`);
+        const targetTab = document.querySelector(`.tool-tab[data-tab="${activeTab}"], .ve-tool-tab[data-tab="${activeTab}"]`);
         if (targetTab) {
             targetTab.click();
         }
@@ -49,9 +53,148 @@
         }, 2500);
     }
 
+    // ---- AJAX Asset Upload (+ Add File) --------------------------------
+    const triggerUploadBtn = document.getElementById("btn-trigger-upload-asset");
+    const assetFileInput = document.getElementById("asset-file-input");
+
+    if (triggerUploadBtn && assetFileInput) {
+        triggerUploadBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            assetFileInput.click();
+        });
+
+        assetFileInput.addEventListener("change", async (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            const file = files[0];
+            const formData = new FormData();
+            formData.append("video_file", file);
+
+            const overlay = document.getElementById("processing-overlay");
+            if (overlay) {
+                overlay.style.display = "flex";
+                const txt = overlay.querySelector("p");
+                if (txt) txt.textContent = "Uploading asset clip...";
+            }
+
+            try {
+                const uploadUrl = window.REEL_UPLOAD_ASSET_URL || (window.location.pathname + "upload-asset/");
+                const csrf = window.REEL_CSRF_TOKEN || document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+
+                const response = await fetch(uploadUrl, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": csrf
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success || data.status === "success") {
+                    window.location.reload();
+                } else {
+                    alert("Upload failed: " + (data.error || "unknown error"));
+                    if (overlay) overlay.style.display = "none";
+                }
+            } catch (err) {
+                console.error("Asset upload error:", err);
+                alert("Upload failed due to connection error.");
+                if (overlay) overlay.style.display = "none";
+            }
+        });
+    }
+
+    // ---- Asset Drag-and-Drop & Click to Insert -------------------------
+    const assetCards = document.querySelectorAll(".asset-card");
+    const timelineContainer = document.getElementById("visual-trim-container");
+    const insertForm = document.getElementById("insert-asset-form");
+    const insertAssetIdInput = document.getElementById("insert-asset-id");
+    const insertAssetTimestampInput = document.getElementById("insert-asset-timestamp");
+
+    if (assetCards.length > 0 && insertForm) {
+        assetCards.forEach((card) => {
+            const insertBtn = card.querySelector(".btn-insert-asset");
+            if (insertBtn) {
+                insertBtn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const assetId = card.dataset.assetId;
+                    const videoEl = document.getElementById("main-video");
+                    const currentTime = videoEl ? videoEl.currentTime : 0.0;
+
+                    const overlay = document.getElementById("processing-overlay");
+                    if (overlay) {
+                        overlay.style.display = "flex";
+                        const txt = overlay.querySelector("p");
+                        if (txt) txt.textContent = "Inserting clip into timeline...";
+                    }
+
+                    if (insertAssetIdInput) insertAssetIdInput.value = assetId;
+                    if (insertAssetTimestampInput) insertAssetTimestampInput.value = currentTime.toFixed(2);
+                    insertForm.submit();
+                });
+            }
+
+            card.addEventListener("dragstart", (e) => {
+                e.dataTransfer.setData("text/plain", card.dataset.assetId);
+                e.dataTransfer.effectAllowed = "copy";
+                if (timelineContainer) {
+                    timelineContainer.classList.add("drag-hover-active");
+                }
+            });
+
+            card.addEventListener("dragend", () => {
+                if (timelineContainer) {
+                    timelineContainer.classList.remove("drag-hover-active");
+                }
+            });
+        });
+    }
+
+    if (timelineContainer && insertForm) {
+        timelineContainer.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+        });
+
+        timelineContainer.addEventListener("dragenter", (e) => {
+            e.preventDefault();
+            timelineContainer.style.borderColor = "var(--ve-primary)";
+            timelineContainer.style.background = "rgba(102, 126, 234, 0.04)";
+        });
+
+        timelineContainer.addEventListener("dragleave", () => {
+            timelineContainer.style.borderColor = "";
+            timelineContainer.style.background = "";
+        });
+
+        timelineContainer.addEventListener("drop", (e) => {
+            e.preventDefault();
+            timelineContainer.style.borderColor = "";
+            timelineContainer.style.background = "";
+
+            const assetId = e.dataTransfer.getData("text/plain");
+            if (!assetId) return;
+
+            const videoEl = document.getElementById("main-video");
+            const currentTime = videoEl ? videoEl.currentTime : 0.0;
+
+            const overlay = document.getElementById("processing-overlay");
+            if (overlay) {
+                overlay.style.display = "flex";
+                const txt = overlay.querySelector("p");
+                if (txt) txt.textContent = "Inserting clip into timeline...";
+            }
+
+            if (insertAssetIdInput) insertAssetIdInput.value = assetId;
+            if (insertAssetTimestampInput) insertAssetTimestampInput.value = currentTime.toFixed(2);
+            insertForm.submit();
+        });
+    }
+
     // ---- Disable submit buttons on form submit to prevent double-clicks
     document.querySelectorAll(".tool-panel form").forEach((form) => {
-        // We will NOT disable form submit on trim-form
         if (form.id === "trim-form" || form.id === "bg-audio-form") return;
         form.addEventListener("submit", () => {
             const btn = form.querySelector("button[type=submit]");
@@ -750,9 +893,10 @@
                 count++;
             }
 
+            let hasText = false;
             if (textTrackRow) {
                 const textContent = document.getElementById("text-track-content");
-                const hasText = textContent && textContent.children && textContent.children.length > 0;
+                hasText = textContent && textContent.children && textContent.children.length > 0;
                 if (hasText) {
                     textTrackRow.style.setProperty("display", "flex", "important");
                     count++;
@@ -761,9 +905,10 @@
                 }
             }
 
+            let hasAudio = false;
             if (audioTrackRow) {
                 const audioContent = document.getElementById("audio-track");
-                const hasAudio = audioContent && (
+                hasAudio = audioContent && (
                     audioContent.children.length > 0 ||
                     (window.REEL_PROJECT_HAS_AUDIO && window.REEL_PROJECT_HAS_AUDIO !== "False" && window.REEL_PROJECT_HAS_AUDIO !== "false")
                 );
@@ -775,11 +920,18 @@
                 }
             }
 
-            // Sync track info badge on bottom toolbar
-            const trackBadge = document.getElementById("tb-bottom-track-info");
-            if (trackBadge) {
-                trackBadge.innerHTML = `<i data-lucide="layers" style="width:13px;height:13px;color:var(--ve-primary);"></i> ${count} Track${count === 1 ? '' : 's'}`;
-                if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (window.dynamicTrackManager) {
+                const textTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'text');
+                const audioTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'audio');
+                if (textTrackModel) textTrackModel.visible = !!hasText;
+                if (audioTrackModel) audioTrackModel.visible = !!hasAudio;
+                window.dynamicTrackManager.updateTrackBadge();
+            } else {
+                const trackBadge = document.getElementById("tb-bottom-track-info");
+                if (trackBadge) {
+                    trackBadge.innerHTML = `<i data-lucide="layers" style="width:13px;height:13px;color:var(--ve-primary);"></i> ${count} Track${count === 1 ? '' : 's'}`;
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                }
             }
         }
 
@@ -1144,8 +1296,8 @@
             }
 
             // Time displays
-            currentDisplay.textContent = formatTime(video.currentTime);
-            totalDisplay.textContent = formatTime(duration);
+            if (currentDisplay) currentDisplay.textContent = formatTime(video.currentTime);
+            if (totalDisplay) totalDisplay.textContent = formatTime(duration);
 
             const tooltipL = document.getElementById("handle-tooltip-left");
             const tooltipR = document.getElementById("handle-tooltip-right");
@@ -1313,6 +1465,14 @@
             if (videoProgressHandle) {
                 videoProgressHandle.style.left = `${progress}%`;
             }
+            const timeCurrentEl = document.getElementById("video-time-current");
+            if (timeCurrentEl) {
+                timeCurrentEl.textContent = formatTime(video.currentTime);
+            }
+            const timeTotalEl = document.getElementById("video-time-total");
+            if (timeTotalEl) {
+                timeTotalEl.textContent = formatTime(video.duration);
+            }
         }
 
         // Update progress bar on timeupdate
@@ -1350,15 +1510,51 @@
 
 
         // --- Custom Player Control Listeners ---
+        const btnMute = document.getElementById("btn-mute");
+        const volumeSlider = document.getElementById("volume-slider");
+
+        const syncVolumeUI = () => {
+            const isMuted = video.muted || video.volume === 0;
+            if (volumeSlider) {
+                volumeSlider.value = video.muted ? 0 : video.volume;
+            }
+            const volumeIcon = document.getElementById("volume-icon");
+            const muteIcon = document.getElementById("mute-icon");
+            if (volumeIcon) volumeIcon.style.display = isMuted ? "none" : "inline-block";
+            if (muteIcon) muteIcon.style.display = isMuted ? "inline-block" : "none";
+        };
+
+        if (volumeSlider) {
+            volumeSlider.addEventListener("input", (e) => {
+                const val = parseFloat(e.target.value);
+                video.volume = val;
+                video.muted = (val === 0);
+                syncVolumeUI();
+            });
+        }
+
+        if (btnMute) {
+            btnMute.addEventListener("click", () => {
+                video.muted = !video.muted;
+                syncVolumeUI();
+            });
+        }
+
+        video.addEventListener("volumechange", syncVolumeUI);
+
         if (btnSkipStart) {
             btnSkipStart.addEventListener("click", () => {
                 video.currentTime = 0;
+                renderTrim();
+                updateVideoProgress();
             });
         }
 
         if (btnBack5) {
             btnBack5.addEventListener("click", () => {
                 video.currentTime = Math.max(0, video.currentTime - 5);
+                renderTrim();
+                updateVideoProgress();
             });
         }
 
@@ -1379,39 +1575,142 @@
         video.addEventListener("play", syncPlayPauseIcons);
         video.addEventListener("pause", syncPlayPauseIcons);
 
-        if (btnPlayPause) {
-            btnPlayPause.addEventListener("click", () => {
-                if (video.paused) {
-                    video.play();
-                } else {
-                    video.pause();
+        const togglePlayPause = () => {
+            const maxDuration = video.duration || duration || 0;
+            if (video.paused) {
+                if (video.ended || video.currentTime >= maxDuration) {
+                    video.currentTime = 0;
                 }
-            });
+                video.play().catch((err) => console.warn("Playback prevented:", err));
+            } else {
+                video.pause();
+            }
+        };
+
+        if (btnPlayPause) {
+            btnPlayPause.addEventListener("click", togglePlayPause);
         }
+
+        // Clicking on video toggle play/pause
+        video.addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePlayPause();
+        });
 
         if (btnForward5) {
             btnForward5.addEventListener("click", () => {
-                video.currentTime = Math.min(duration, video.currentTime + 5);
+                const maxDuration = video.duration || duration || 0;
+                video.currentTime = Math.min(maxDuration, video.currentTime + 5);
+                renderTrim();
+                updateVideoProgress();
             });
         }
 
         if (btnSkipEnd) {
             btnSkipEnd.addEventListener("click", () => {
-                video.currentTime = duration;
+                const maxDuration = video.duration || duration || 0;
+                video.currentTime = maxDuration;
+                renderTrim();
+                updateVideoProgress();
             });
         }
 
-        if (btnFullscreen) {
-            btnFullscreen.addEventListener("click", () => {
-                if (video.requestFullscreen) {
-                    video.requestFullscreen();
-                } else if (video.webkitRequestFullscreen) {
-                    video.webkitRequestFullscreen();
-                } else if (video.msRequestFullscreen) {
-                    video.msRequestFullscreen();
+        // --- Editor Stage Fullscreen (CapCut / Premiere / Canva style) ---
+        const videoStage = document.getElementById("video-stage") || document.querySelector(".ve-video-stage");
+
+        const updateFullscreenUI = () => {
+            const isFs = !!(
+                document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.msFullscreenElement ||
+                (videoStage && videoStage.classList.contains("is-fullscreen"))
+            );
+
+            const fsIcon = document.getElementById("fullscreen-icon");
+            const exitFsIcon = document.getElementById("exit-fullscreen-icon");
+
+            if (videoStage) {
+                videoStage.classList.toggle("is-fullscreen", isFs);
+            }
+
+            if (fsIcon) fsIcon.style.display = isFs ? "none" : "inline-block";
+            if (exitFsIcon) exitFsIcon.style.display = isFs ? "inline-block" : "none";
+
+            setTimeout(renderTextOverlays, 50);
+        };
+
+        const toggleStageFullscreen = () => {
+            if (!videoStage) return;
+
+            const isFs = !!(
+                document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.msFullscreenElement ||
+                videoStage.classList.contains("is-fullscreen")
+            );
+
+            if (!isFs) {
+                if (videoStage.requestFullscreen) {
+                    videoStage.requestFullscreen().catch(() => {
+                        videoStage.classList.add("is-fullscreen");
+                        updateFullscreenUI();
+                    });
+                } else if (videoStage.webkitRequestFullscreen) {
+                    videoStage.webkitRequestFullscreen();
+                } else if (videoStage.msRequestFullscreen) {
+                    videoStage.msRequestFullscreen();
+                } else {
+                    videoStage.classList.add("is-fullscreen");
+                    updateFullscreenUI();
                 }
-            });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().catch(() => {
+                        videoStage.classList.remove("is-fullscreen");
+                        updateFullscreenUI();
+                    });
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                } else {
+                    videoStage.classList.remove("is-fullscreen");
+                    updateFullscreenUI();
+                }
+            }
+        };
+
+        if (btnFullscreen) {
+            btnFullscreen.addEventListener("click", toggleStageFullscreen);
         }
+
+        document.addEventListener("fullscreenchange", updateFullscreenUI);
+        document.addEventListener("webkitfullscreenchange", updateFullscreenUI);
+        document.addEventListener("msfullscreenchange", updateFullscreenUI);
+
+        // Keyboard Shortcuts (Space: Play/Pause, Left/Right: Skip 5s, M: Mute, F: Fullscreen)
+        document.addEventListener("keydown", (e) => {
+            const active = document.activeElement;
+            if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) {
+                return;
+            }
+            if (e.code === "Space") {
+                e.preventDefault();
+                togglePlayPause();
+            } else if (e.code === "ArrowLeft") {
+                e.preventDefault();
+                if (btnBack5) btnBack5.click();
+            } else if (e.code === "ArrowRight") {
+                e.preventDefault();
+                if (btnForward5) btnForward5.click();
+            } else if (e.code === "KeyM") {
+                e.preventDefault();
+                if (btnMute) btnMute.click();
+            } else if (e.code === "KeyF") {
+                e.preventDefault();
+                if (btnFullscreen) btnFullscreen.click();
+            }
+        });
 
         // --- Timeline Bottom Toolbar Listeners ---
         const tbBottomZoomFit = document.getElementById("tb-bottom-zoom-fit");
@@ -1439,6 +1738,91 @@
 
         if (tbBottomFullscreen) tbBottomFullscreen.addEventListener("click", toggleTimelineFullscreen);
         if (fsTimelineBtn) fsTimelineBtn.addEventListener("click", toggleTimelineFullscreen);
+
+        // --- Modular Track Manager & Dynamic Timeline Architecture ---
+        class DynamicTrackManager {
+            constructor() {
+                this.tracks = [];
+                this.initDefaultTracks();
+            }
+
+            initDefaultTracks() {
+                // Generate dynamic track models for Text, Video, and Audio
+                this.tracks = [
+                    {
+                        id: "text-track-row",
+                        type: "text",
+                        name: "Text Overlay Track",
+                        order: 0,
+                        height: 40,
+                        visible: true,
+                        locked: false,
+                        clips: []
+                    },
+                    {
+                        id: "video-track-row",
+                        type: "video",
+                        name: "Main Video Track",
+                        order: 1,
+                        height: 64,
+                        visible: true,
+                        locked: false,
+                        clips: []
+                    },
+                    {
+                        id: "audio-track-row",
+                        type: "audio",
+                        name: "Audio Track",
+                        order: 2,
+                        height: 48,
+                        visible: true,
+                        locked: false,
+                        clips: []
+                    }
+                ];
+            }
+
+            getTracks() {
+                return this.tracks;
+            }
+
+            addTrack(trackObj) {
+                this.tracks.push(trackObj);
+                this.updateTrackBadge();
+            }
+
+            removeTrack(trackId) {
+                this.tracks = this.tracks.filter(t => t.id !== trackId);
+                this.updateTrackBadge();
+            }
+
+            updateTrackBadge() {
+                const trackBadge = document.getElementById("tb-bottom-track-info");
+                if (trackBadge) {
+                    const activeCount = this.tracks.filter(t => t.visible).length;
+                    trackBadge.innerHTML = `<i data-lucide="layers" style="width:13px;height:13px;color:var(--ve-primary);"></i> ${activeCount} Track${activeCount === 1 ? '' : 's'}`;
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                }
+            }
+
+            renderAllTracks() {
+                // Loop through all track models and update visibility & layout dimensions
+                this.tracks.forEach(track => {
+                    const trackEl = document.querySelector(`.${track.id}`);
+                    if (trackEl) {
+                        if (track.visible) {
+                            trackEl.style.setProperty("display", "flex", "important");
+                        } else {
+                            trackEl.style.setProperty("display", "none", "important");
+                        }
+                    }
+                });
+                this.updateTrackBadge();
+            }
+        }
+
+        const trackManager = new DynamicTrackManager();
+        window.dynamicTrackManager = trackManager;
 
         // --- Collapsible & Resizable Timeline Panel (Canva / CapCut Style) ---
         const timelineResizer = document.getElementById("timeline-resizer");
@@ -1488,6 +1872,7 @@
                 e.preventDefault();
                 e.stopPropagation();
                 isResizing = true;
+                trimContainer.classList.add("is-dragging");
                 timelineResizer.classList.add("is-dragging");
                 startY = e.touches ? e.touches[0].clientY : e.clientY;
                 startH = trimContainer.getBoundingClientRect().height;
@@ -1505,12 +1890,12 @@
                 const deltaY = startY - clientY; // Dragging UP increases height
                 let newH = startH + deltaY;
 
-                const maxH = Math.min(window.innerHeight * 0.7, 550);
-                newH = Math.max(128, Math.min(maxH, newH));
+                const maxH = Math.min(window.innerHeight * 0.75, 650);
+                newH = Math.max(96, Math.min(maxH, newH));
 
-                if (newH <= 140) {
+                if (newH <= 135) {
                     trimContainer.classList.add("timeline-collapsed");
-                    trimContainer.style.height = "128px";
+                    trimContainer.style.height = `${newH}px`;
                     if (collapseText) collapseText.textContent = "Expand";
                     if (collapseIcon) collapseIcon.setAttribute("data-lucide", "chevron-up");
                 } else {
@@ -1529,6 +1914,7 @@
             const onStopResize = () => {
                 if (!isResizing) return;
                 isResizing = false;
+                trimContainer.classList.remove("is-dragging");
                 timelineResizer.classList.remove("is-dragging");
                 document.removeEventListener("mousemove", onResizing);
                 document.removeEventListener("mouseup", onStopResize);
@@ -2190,143 +2576,6 @@
                 });
             });
 
-            // ---- AJAX Asset Upload ----
-            const triggerUploadBtn = document.getElementById("btn-trigger-upload-asset");
-            const assetFileInput = document.getElementById("asset-file-input");
-
-            if (triggerUploadBtn && assetFileInput) {
-                triggerUploadBtn.addEventListener("click", () => {
-                    assetFileInput.click();
-                });
-
-                assetFileInput.addEventListener("change", async (e) => {
-                    const files = e.target.files;
-                    if (!files || files.length === 0) return;
-
-                    const file = files[0];
-                    const formData = new FormData();
-                    formData.append("video_file", file);
-
-                    // Show processing overlay
-                    const overlay = document.getElementById("processing-overlay");
-                    if (overlay) {
-                        overlay.style.display = "flex";
-                        const txt = overlay.querySelector("p");
-                        if (txt) txt.textContent = "Uploading asset clip...";
-                    }
-
-                    try {
-                        const response = await fetch(window.REEL_UPLOAD_ASSET_URL, {
-                            method: "POST",
-                            headers: {
-                                "X-CSRFToken": window.REEL_CSRF_TOKEN
-                            },
-                            body: formData
-                        });
-
-                        const data = await response.json();
-                        if (data.success) {
-                            window.location.reload();
-                        } else {
-                            alert("Upload failed: " + (data.error || "unknown error"));
-                            if (overlay) overlay.style.display = "none";
-                        }
-                    } catch (err) {
-                        console.error("Asset upload error:", err);
-                        alert("Upload failed due to connection error.");
-                        if (overlay) overlay.style.display = "none";
-                    }
-                });
-            }
-
-            // ---- Asset Drag-and-Drop & Click to Insert ----
-            const assetCards = document.querySelectorAll(".asset-card");
-            const timelineContainer = document.getElementById("visual-trim-container");
-            const insertForm = document.getElementById("insert-asset-form");
-            const insertAssetIdInput = document.getElementById("insert-asset-id");
-            const insertAssetTimestampInput = document.getElementById("insert-asset-timestamp");
-
-            // Click handler for "+" button on cards
-            assetCards.forEach((card) => {
-                const insertBtn = card.querySelector(".btn-insert-asset");
-                if (insertBtn) {
-                    insertBtn.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        const assetId = card.dataset.assetId;
-                        const currentTime = video ? video.currentTime : 0.0;
-
-                        // Show processing overlay
-                        const overlay = document.getElementById("processing-overlay");
-                        if (overlay) {
-                            overlay.style.display = "flex";
-                            const txt = overlay.querySelector("p");
-                            if (txt) txt.textContent = "Inserting clip into timeline...";
-                        }
-
-                        insertAssetIdInput.value = assetId;
-                        insertAssetTimestampInput.value = currentTime;
-                        insertForm.submit();
-                    });
-                }
-
-                // Drag start
-                card.addEventListener("dragstart", (e) => {
-                    e.dataTransfer.setData("text/plain", card.dataset.assetId);
-                    e.dataTransfer.effectAllowed = "copy";
-
-                    // Add visual cue
-                    if (timelineContainer) {
-                        timelineContainer.classList.add("drag-hover-active");
-                    }
-                });
-
-                card.addEventListener("dragend", () => {
-                    if (timelineContainer) {
-                        timelineContainer.classList.remove("drag-hover-active");
-                    }
-                });
-            });
-
-            // Drag-and-Drop on timeline
-            if (timelineContainer && insertForm) {
-                timelineContainer.addEventListener("dragover", (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "copy";
-                });
-
-                timelineContainer.addEventListener("dragenter", (e) => {
-                    e.preventDefault();
-                    timelineContainer.style.borderColor = "var(--accent)";
-                    timelineContainer.style.background = "rgba(82, 183, 136, 0.04)";
-                });
-
-                timelineContainer.addEventListener("dragleave", () => {
-                    timelineContainer.style.borderColor = "";
-                    timelineContainer.style.background = "";
-                });
-
-                timelineContainer.addEventListener("drop", (e) => {
-                    e.preventDefault();
-                    timelineContainer.style.borderColor = "";
-                    timelineContainer.style.background = "";
-
-                    const assetId = e.dataTransfer.getData("text/plain");
-                    if (!assetId) return;
-
-                    const currentTime = video ? video.currentTime : 0.0;
-
-                    const overlay = document.getElementById("processing-overlay");
-                    if (overlay) {
-                        overlay.style.display = "flex";
-                        const txt = overlay.querySelector("p");
-                        if (txt) txt.textContent = "Inserting clip into timeline...";
-                    }
-
-                    insertAssetIdInput.value = assetId;
-                    insertAssetTimestampInput.value = currentTime;
-                    insertForm.submit();
-                });
-            }
         }
     }
 })();

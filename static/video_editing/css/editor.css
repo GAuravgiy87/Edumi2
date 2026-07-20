@@ -686,7 +686,7 @@ body.dark-mode .ve-video-stage {
     background: radial-gradient(ellipse at center, #ffffff 0%, #e2e8f0 100%);
     overflow: hidden;
     min-height: 250px;
-    padding: 32px;
+    padding: 12px 24px;
 }
 
 body.dark-mode .ve-video-wrapper {
@@ -698,7 +698,7 @@ body.dark-mode .ve-video-wrapper {
     max-height: 100%;
     display: block;
     box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 0 0 1px var(--ve-border);
-    border-radius: 16px;
+    border-radius: 6px;
     background: #000;
 }
 
@@ -711,6 +711,57 @@ body.dark-mode #main-video {
     inset: 0;
     pointer-events: none;
     z-index: 5;
+}
+
+/* ---- True Stage Fullscreen Mode (CapCut / Premiere / Canva style) ---- */
+.ve-video-stage:fullscreen,
+.ve-video-stage:-webkit-full-screen,
+.ve-video-stage.is-fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 999999 !important;
+    background: #090d16 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+
+.ve-video-stage:fullscreen .ve-video-wrapper,
+.ve-video-stage:-webkit-full-screen .ve-video-wrapper,
+.ve-video-stage.is-fullscreen .ve-video-wrapper {
+    flex: 1 !important;
+    height: calc(100vh - 72px) !important;
+    width: 100vw !important;
+    padding: 24px !important;
+    background: radial-gradient(ellipse at center, #1e293b 0%, #020617 100%) !important;
+    box-sizing: border-box !important;
+}
+
+.ve-video-stage:fullscreen #main-video,
+.ve-video-stage:-webkit-full-screen #main-video,
+.ve-video-stage.is-fullscreen #main-video {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+}
+
+.ve-video-stage:fullscreen .ve-player-controls,
+.ve-video-stage:-webkit-full-screen .ve-player-controls,
+.ve-video-stage.is-fullscreen .ve-player-controls {
+    background: rgba(15, 23, 42, 0.95) !important;
+    backdrop-filter: blur(16px) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 12px 32px !important;
+    width: 100vw !important;
+    box-sizing: border-box !important;
 }
 
 /* ---- Player Controls ---- */
@@ -802,27 +853,41 @@ body.dark-mode .ve-ctrl-btn:hover {
 }
 
 .ve-time-display {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
     font-weight: 700;
     color: var(--ve-text);
-    letter-spacing: 0.5px;
-    white-space: nowrap;
     background: var(--ve-bg-raised);
-    padding: 6px 12px;
+    padding: 4px 8px;
     border-radius: 8px;
     border: 1px solid var(--ve-border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    white-space: nowrap;
+}
+
+.ve-time-display .time-current,
+.ve-time-display .time-total {
+    background: var(--ve-bg);
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--ve-border);
+    color: var(--ve-text);
+    letter-spacing: 0.5px;
 }
 
 body.dark-mode .ve-time-display {
-    color: #e2e8f0;
-    background: rgba(30,41,59,0.7);
-    border: 1px solid rgba(71,85,105,0.5);
+    background: rgba(15, 23, 42, 0.6);
+    border-color: rgba(51, 65, 85, 0.7);
 }
 
-.ve-time-divider {
-    color: var(--ve-text-muted);
-    margin: 0 4px;
+body.dark-mode .ve-time-display .time-current,
+body.dark-mode .ve-time-display .time-total {
+    background: rgba(30, 41, 59, 0.85);
+    border-color: rgba(71, 85, 105, 0.6);
+    color: #f1f5f9;
 }
 
 /* Volume slider */
@@ -893,31 +958,30 @@ body.dark-mode .ve-tool-tabs {
 
 .ve-tool-tab {
     flex: 1;
-    min-width: 60px;
-    padding: 10px 12px;
+    min-width: 54px;
+    padding: 7px 10px;
     background: transparent;
     border: none;
     font-size: 11px;
     font-weight: 700;
     color: var(--ve-text-muted);
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    transition: all 0.15s ease-in-out;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     white-space: nowrap;
-    border-radius: 10px;
+    border-radius: 6px;
 }
 
 .ve-tool-tab:hover {
     color: var(--ve-text);
     background: rgba(102, 126, 234, 0.08);
-    transform: translateY(-1px);
 }
 
 .ve-tool-tab--active {
     color: #ffffff;
     background: linear-gradient(135deg, var(--ve-primary) 0%, #8b5cf6 100%);
-    box-shadow: 0 4px 14px rgba(102,126,234,0.35);
+    box-shadow: 0 2px 8px rgba(102,126,234,0.3);
 }
 
 .ve-tool-panels {
@@ -957,10 +1021,124 @@ body.dark-mode .ve-tool-tabs {
 }
 
 .ve-section-title {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--ve-text);
-    margin: 0;
+    margin: 0 0 4px 0;
+}
+
+/* ---- Professional Right Sidebar Form & Inputs Styling ---- */
+.ve-tool-panel label,
+.ve-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ve-text-muted);
+    margin-bottom: 5px;
+}
+
+body.dark-mode .ve-tool-panel label,
+body.dark-mode .ve-field label {
+    color: #94a3b8;
+}
+
+.ve-tool-panel input[type="text"],
+.ve-tool-panel input[type="number"],
+.ve-tool-panel select,
+.ve-tool-panel textarea,
+.ve-field input[type="text"],
+.ve-field input[type="number"],
+.ve-field select,
+.ve-field textarea {
+    width: 100%;
+    height: 34px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--ve-text);
+    background: var(--ve-bg);
+    border: 1px solid var(--ve-border);
+    border-radius: 6px;
+    box-sizing: border-box;
+    transition: all 0.15s ease-in-out;
+}
+
+body.dark-mode .ve-tool-panel input[type="text"],
+body.dark-mode .ve-tool-panel input[type="number"],
+body.dark-mode .ve-tool-panel select,
+body.dark-mode .ve-field input[type="text"],
+body.dark-mode .ve-field input[type="number"],
+body.dark-mode .ve-field select {
+    background: rgba(15, 23, 42, 0.7);
+    border-color: rgba(51, 65, 85, 0.7);
+    color: #f1f5f9;
+}
+
+.ve-tool-panel input:focus,
+.ve-tool-panel select:focus,
+.ve-field input:focus,
+.ve-field select:focus {
+    border-color: var(--ve-primary) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2) !important;
+}
+
+/* Custom File Upload styling for Audio File input */
+.ve-tool-panel input[type="file"],
+.ve-field input[type="file"] {
+    width: 100%;
+    height: 36px;
+    padding: 4px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    background: var(--ve-bg-secondary);
+    border: 1px dashed var(--ve-border);
+    border-radius: 6px;
+    box-sizing: border-box;
+    color: var(--ve-text);
+}
+
+body.dark-mode .ve-tool-panel input[type="file"],
+body.dark-mode .ve-field input[type="file"] {
+    background: rgba(15, 23, 42, 0.5);
+    border-color: rgba(71, 85, 105, 0.6);
+    color: #cbd5e1;
+}
+
+.ve-tool-panel input[type="file"]::file-selector-button,
+.ve-field input[type="file"]::file-selector-button {
+    height: 26px;
+    padding: 0 10px;
+    margin-right: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    border: none;
+    background: linear-gradient(135deg, var(--ve-primary) 0%, #8b5cf6 100%);
+    color: #ffffff;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.ve-tool-panel input[type="file"]::file-selector-button:hover,
+.ve-field input[type="file"]::file-selector-button:hover {
+    opacity: 0.9;
+}
+
+/* Tool Panel Buttons */
+.ve-tool-panel .ve-btn-primary,
+.ve-tool-panel .ve-btn-secondary,
+.ve-tool-panel .ve-btn-full {
+    height: 36px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* ---- Media library ---- */
@@ -1895,13 +2073,13 @@ body:has(.ve-editor-page) .messages-container {
 }
 
 .visual-trim-container {
-    background: #17181c;
-    border-top: 1px solid #282a32;
-    padding: 8px 14px 10px;
+    background: var(--ve-bg-secondary);
+    border-top: 1px solid var(--ve-border);
+    padding: 2px 16px 6px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     user-select: none;
     grid-column: 1 / -1;
 }
@@ -1910,67 +2088,105 @@ body:has(.ve-editor-page) .messages-container {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 0;
-    height: 32px;
-}
-
-.timeline-speed-control input {
-    width: 65px;
-    height: 28px;
-    padding: 2px 6px;
-    font-size: 13px;
-    margin: 0;
-    background: #222;
-    color: #fff;
-    border: 1px solid #444;
-    border-radius: 4px;
-    text-align: center;
-    font-family: var(--font-mono);
+    padding: 2px 0 3px;
+    min-height: 28px;
+    border-bottom: 1px solid var(--ve-border);
+    gap: 8px;
 }
 
 .toolbar-left,
 .toolbar-right {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
 }
 
 .toolbar-center {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    background: var(--ve-bg);
+    padding: 3px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--ve-border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
 .tb-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-dim);
-    font-size: 13px;
+    background: var(--ve-bg);
+    border: 1px solid var(--ve-border);
+    color: var(--ve-text);
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 0 10px;
+    height: 28px;
+    border-radius: 6px;
     transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    gap: 5px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    line-height: 1;
 }
 
-.tb-btn:hover {
-    color: var(--text);
-    background: rgba(255, 255, 255, 0.06);
+.tb-btn:hover:not(:disabled) {
+    color: var(--ve-text);
+    background: var(--ve-bg-raised);
+    border-color: var(--ve-border-strong);
+}
+
+.tb-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.tb-btn.tb-btn-primary {
+    background: var(--ve-primary);
+    color: #ffffff;
+    border-color: var(--ve-primary);
+}
+
+.tb-btn.tb-btn-primary:hover:not(:disabled) {
+    background: var(--ve-primary-dark);
+    border-color: var(--ve-primary-dark);
+    color: #ffffff;
+}
+
+.timeline-speed-control input {
+    width: 52px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0;
+    background: var(--ve-bg);
+    color: var(--ve-text);
+    border: 1px solid var(--ve-border);
+    border-radius: 6px;
+    text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease;
+}
+
+.timeline-speed-control input:focus {
+    border-color: var(--ve-primary);
 }
 
 .time-display {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: #ffffff;
-    font-weight: bold;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    color: var(--ve-text);
+    font-weight: 700;
     letter-spacing: 0.03em;
 }
 
 .time-divider {
-    color: var(--text-faint);
-    font-size: 12px;
+    color: var(--ve-text-muted);
+    font-size: 11px;
 }
 
 /* Timeline Ruler */
@@ -3252,6 +3468,21 @@ body.dark-mode .trim-track {
     box-shadow: 0 0 20px rgba(251, 191, 36, 0.6) !important;
 }
 
+/* Timeline Tracks Wrapper & Rows */
+.timeline-tracks-wrapper {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: fit-content !important;
+    min-width: 100% !important;
+    margin-left: 16px !important;
+}
+
+.timeline-track-row {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
 /* Trim Ruler */
 .trim-ruler {
     background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%) !important;
@@ -3299,6 +3530,8 @@ body.dark-mode .trim-tick-label {
 .trim-playhead {
     background: var(--ve-danger) !important;
     box-shadow: 0 0 8px rgba(239, 68, 68, 0.6) !important;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
 }
 
 body.dark-mode .trim-playhead {
@@ -3505,10 +3738,15 @@ body.dark-mode .trim-dim {
     position: relative !important;
     flex-shrink: 0 !important;
     overflow: hidden !important;
-    height: auto !important;
-    min-height: auto !important;
-    max-height: 60vh !important;
-    transition: height 0.15s ease !important;
+    height: 240px;
+    min-height: 96px !important;
+    max-height: 70vh !important;
+    transition: height 0.15s ease;
+}
+
+.visual-trim-container.is-dragging {
+    transition: none !important;
+    user-select: none !important;
 }
 
 body.dark-mode .visual-trim-container {
@@ -3518,9 +3756,8 @@ body.dark-mode .visual-trim-container {
 
 /* Middle scroll area: Flexes vertically between top toolbar and bottom toolbar */
 .timeline-scroll-area {
-    flex: 0 1 auto !important;
+    flex: 1 1 auto !important;
     min-height: 0 !important;
-    max-height: calc(60vh - 86px) !important;
     overflow-x: auto !important;
     overflow-y: auto !important;
     width: 100% !important;
@@ -3529,21 +3766,24 @@ body.dark-mode .visual-trim-container {
     flex-direction: column !important;
     padding-bottom: 8px !important;
     margin-top: 0 !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 126, 234, 0.6) var(--ve-bg-secondary);
 }
 
 /* Styled custom scrollbars for timeline scroll area */
 .timeline-scroll-area::-webkit-scrollbar {
-    width: 6px !important;
-    height: 6px !important;
+    width: 8px !important;
+    height: 8px !important;
 }
 .timeline-scroll-area::-webkit-scrollbar-track {
     background: var(--ve-bg-secondary) !important;
+    border-radius: 4px !important;
 }
 body.dark-mode .timeline-scroll-area::-webkit-scrollbar-track {
     background: rgba(10, 11, 14, 0.6) !important;
 }
 .timeline-scroll-area::-webkit-scrollbar-thumb {
-    background: rgba(102, 126, 234, 0.6) !important;
+    background: rgba(102, 126, 234, 0.5) !important;
     border-radius: 4px !important;
 }
 .timeline-scroll-area::-webkit-scrollbar-thumb:hover {
@@ -3597,20 +3837,10 @@ body.dark-mode .resizer-pill {
     box-shadow: 0 0 8px rgba(102, 126, 234, 0.6) !important;
 }
 
-/* Collapsed Timeline State (Hides only clip tracks wrapper; top toolbar, ruler, and bottom toolbar remain fixed!) */
+/* Collapsed Timeline State */
 .visual-trim-container.timeline-collapsed {
     height: 128px !important;
     min-height: 128px !important;
-    max-height: 128px !important;
-}
-
-.visual-trim-container.timeline-collapsed .timeline-tracks-wrapper {
-    display: none !important;
-}
-
-.visual-trim-container.timeline-collapsed .timeline-scroll-area {
-    overflow-y: hidden !important;
-    padding-bottom: 0 !important;
 }
 
 /* Fixed Timeline Bottom Toolbar — Always visible and fixed at bottom */
