@@ -735,6 +735,52 @@
 
                 textTrackContent.appendChild(el);
             });
+
+            updateTrackRowVisibility();
+        }
+
+        function updateTrackRowVisibility() {
+            const textTrackRow = document.querySelector('.text-track-row');
+            const audioTrackRow = document.querySelector('.audio-track-row');
+            const videoTrackRow = document.querySelector('.video-track-row');
+
+            let count = 0;
+
+            if (videoTrackRow) {
+                count++;
+            }
+
+            if (textTrackRow) {
+                const textContent = document.getElementById("text-track-content");
+                const hasText = textContent && textContent.children && textContent.children.length > 0;
+                if (hasText) {
+                    textTrackRow.style.setProperty("display", "flex", "important");
+                    count++;
+                } else {
+                    textTrackRow.style.setProperty("display", "none", "important");
+                }
+            }
+
+            if (audioTrackRow) {
+                const audioContent = document.getElementById("audio-track");
+                const hasAudio = audioContent && (
+                    audioContent.children.length > 0 ||
+                    (window.REEL_PROJECT_HAS_AUDIO && window.REEL_PROJECT_HAS_AUDIO !== "False" && window.REEL_PROJECT_HAS_AUDIO !== "false")
+                );
+                if (hasAudio) {
+                    audioTrackRow.style.setProperty("display", "flex", "important");
+                    count++;
+                } else {
+                    audioTrackRow.style.setProperty("display", "none", "important");
+                }
+            }
+
+            // Sync track info badge on bottom toolbar
+            const trackBadge = document.getElementById("tb-bottom-track-info");
+            if (trackBadge) {
+                trackBadge.innerHTML = `<i data-lucide="layers" style="width:13px;height:13px;color:var(--ve-primary);"></i> ${count} Track${count === 1 ? '' : 's'}`;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
         }
 
         // --- Intercept forms to handle preview changes and update state ---
@@ -1027,27 +1073,39 @@
                     const thumbContainer = clipBlock.querySelector(".timeline-clip-thumb");
 
                     thumbContainer.innerHTML = "";
-                    if (!clipDuration || clipDuration <= 0) continue;
+                    if (!clipDuration || clipDuration <= 0 || !clipBlock) continue;
                     
-                    // Calculate thumbnail count per clip
-                    const containerWidth = thumbContainer.clientWidth;
-                    const thumbWidth = 80;
-                    let count = Math.max(2, Math.floor(containerWidth / thumbWidth));
+                    // Calculate target block width across the full timeline length
+                    const blockWidthPx = clipDuration * pxPerSecond;
+                    const targetBlockWidth = Math.max(
+                        clipBlock.offsetWidth || 0,
+                        thumbContainer.clientWidth || 0,
+                        Math.round(blockWidthPx)
+                    );
+
+                    const targetThumbWidth = 70; // 70px optimal frame width
+                    const count = Math.max(2, Math.ceil(targetBlockWidth / targetThumbWidth));
 
                     for (let j = 0; j < count; j++) {
                         if (signal.aborted) return;
-                        const time = clipStart + (clipDuration / (count - 1 || 1)) * j;
-                        tempVideo.currentTime = time;
+                        // Sample time at the center of each thumbnail segment from start to end
+                        const time = clipStart + (clipDuration * (j + 0.5) / count);
+                        tempVideo.currentTime = Math.max(clipStart, Math.min(clipEnd, time));
 
                         try {
                             await Promise.race([
                                 new Promise(r => tempVideo.addEventListener("seeked", r, { once: true })),
-                                new Promise(r => setTimeout(r, 500))
+                                new Promise(r => setTimeout(r, 400))
                             ]);
                             if (signal.aborted) return;
                             const canvas = document.createElement("canvas");
-                            canvas.width = Math.floor(thumbWidth);
-                            canvas.height = thumbContainer.clientHeight;
+                            canvas.width = 140;
+                            canvas.height = 78;
+                            canvas.style.flex = "1 1 0px";
+                            canvas.style.minWidth = "0";
+                            canvas.style.height = "100%";
+                            canvas.style.objectFit = "cover";
+                            canvas.style.display = "block";
                             const ctx = canvas.getContext("2d");
                             ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
                             thumbContainer.appendChild(canvas);
@@ -1112,6 +1170,8 @@
                 trimSelection.classList.remove("selected-delete");
                 if (deleteBtnEl) deleteBtnEl.setAttribute("disabled", "true");
             }
+
+            updateTrackRowVisibility();
         }
 
         function getSecondsFromX(clientX) {
@@ -1835,6 +1895,7 @@
             });
 
             audioTrack.appendChild(el);
+            updateTrackRowVisibility();
         }
 
         if (timelineAddAudioBtn && audioFileIn) {
