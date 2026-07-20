@@ -727,7 +727,8 @@
                     el.style.top = "0";
                     el.style.display = "flex";
                     el.style.alignItems = "center";
-                    el.style.padding = "0 8px";
+                    el.style.justifyContent = "flex-start";
+                    el.style.padding = "0 12px";
                     el.style.boxSizing = "border-box";
                     el.style.borderRadius = "10px";
                     el.style.overflow = "hidden";
@@ -746,7 +747,7 @@
                     const span = document.createElement("span");
                     span.className = "audio-name";
                     span.style.color = "#ffffff";
-                    span.style.fontSize = "11px";
+                    span.style.fontSize = "13px";
                     span.style.overflow = "hidden";
                     span.style.textOverflow = "ellipsis";
                     span.style.whiteSpace = "nowrap";
@@ -804,7 +805,7 @@
                 handleL.className = "text-resize-handle handle-left";
                 const tooltipL = document.createElement("div");
                 tooltipL.className = "handle-tooltip";
-                tooltipL.style.background = "#52b788"; // Green color matching text overlays
+                tooltipL.style.background = "#0d6b6e"; // Teal color matching Canva text overlays
                 tooltipL.textContent = formatTime(overlay.start);
                 handleL.appendChild(tooltipL);
 
@@ -812,7 +813,7 @@
                 handleR.className = "text-resize-handle handle-right";
                 const tooltipR = document.createElement("div");
                 tooltipR.className = "handle-tooltip";
-                tooltipR.style.background = "#52b788"; // Green color matching text overlays
+                tooltipR.style.background = "#0d6b6e"; // Teal color matching Canva text overlays
                 tooltipR.textContent = formatTime(overlay.end);
                 handleR.appendChild(tooltipR);
 
@@ -882,16 +883,120 @@
             updateTrackRowVisibility();
         }
 
+        function renderEffectsTrack() {
+            const effectContent = document.getElementById("effect-track-content");
+            const effectRow = document.getElementById("effect-track-row");
+            if (!effectContent || !effectRow || !duration) return;
+
+            effectContent.innerHTML = "";
+            const activeEffects = [];
+
+            const effectTypes = ["grayscale", "speed", "rotate", "fade", "resize"];
+            const iconMap = {
+                grayscale: "aperture",
+                speed: "zap",
+                rotate: "rotate-cw",
+                fade: "sun",
+                resize: "maximize-2"
+            };
+
+            // 1. Gather applied effect operations from project history
+            if (window.REEL_PROJECT_OPERATIONS && Array.isArray(window.REEL_PROJECT_OPERATIONS)) {
+                window.REEL_PROJECT_OPERATIONS.forEach(op => {
+                    if (effectTypes.includes(op.type)) {
+                        let name = `Effect ${op.title || op.type}`;
+                        if (op.type === "grayscale") {
+                            name = "Effect Grayscale";
+                        } else if (op.description && op.description.toLowerCase().includes("speed")) {
+                            name = `Effect ${op.description}`;
+                        } else if (op.description && op.description.toLowerCase().includes("rotated")) {
+                            name = `Effect ${op.description}`;
+                        } else if (op.description && op.description.toLowerCase().includes("fade")) {
+                            name = `Effect ${op.description}`;
+                        }
+                        activeEffects.push({
+                            name: name,
+                            icon: iconMap[op.type] || "sparkles",
+                            start: op.trim_start || 0,
+                            end: op.trim_end || duration
+                        });
+                    }
+                });
+            }
+
+            // 2. Gather client-side pending state effects
+            if (editorState.speed && editorState.speed !== 1.0) {
+                if (!activeEffects.some(e => e.name.toLowerCase().includes("speed"))) {
+                    activeEffects.push({ name: `Effect Speed (${editorState.speed}x)`, icon: "zap", start: 0, end: duration });
+                }
+            }
+            if (editorState.grayscale) {
+                if (!activeEffects.some(e => e.name.toLowerCase().includes("grayscale"))) {
+                    activeEffects.push({ name: "Effect Grayscale", icon: "aperture", start: 0, end: duration });
+                }
+            }
+            if (editorState.rotate && editorState.rotate !== 0) {
+                if (!activeEffects.some(e => e.name.toLowerCase().includes("rotate"))) {
+                    activeEffects.push({ name: `Effect Rotate (${editorState.rotate}°)`, icon: "rotate-cw", start: 0, end: duration });
+                }
+            }
+            if (editorState.fade) {
+                if (!activeEffects.some(e => e.name.toLowerCase().includes("fade"))) {
+                    activeEffects.push({ name: "Effect Fade", icon: "sun", start: 0, end: duration });
+                }
+            }
+
+            effectRow.style.setProperty("display", "flex", "important");
+            const pxPerSecond = basePxPerSecond * zoomFactor;
+            const totalWidthPx = duration * pxPerSecond;
+            effectContent.style.width = `${totalWidthPx}px`;
+
+            // If no active effects exist, leave the track empty (no hardcoded demo block)
+            if (activeEffects.length === 0) {
+                effectContent.innerHTML = "";
+                return;
+            }
+
+            // Render blocks for applied effects
+            activeEffects.forEach((eff, i) => {
+                const startSec = eff.start || 0;
+                const endSec = (eff.end && eff.end > startSec) ? eff.end : duration;
+                const leftPx = startSec * pxPerSecond;
+                const widthPx = Math.max(60, (endSec - startSec) * pxPerSecond);
+
+                const block = document.createElement("div");
+                block.className = "timeline-effect-block";
+                block.style.position = "absolute";
+                block.style.left = `${leftPx}px`;
+                block.style.top = "8px";
+                block.style.bottom = "8px";
+                block.style.width = `${widthPx}px`;
+                block.style.display = "flex";
+                block.style.alignItems = "center";
+                block.style.padding = "0 12px";
+                block.style.fontSize = "13px";
+                block.style.fontWeight = "700";
+                block.style.borderRadius = "8px";
+                block.style.boxSizing = "border-box";
+                block.innerHTML = `<i data-lucide="${eff.icon}" style="width:14px;height:14px;margin-right:6px;flex-shrink:0;"></i> <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${eff.name}</span>`;
+                effectContent.appendChild(block);
+            });
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
         function updateTrackRowVisibility() {
             const textTrackRow = document.querySelector('.text-track-row');
             const audioTrackRow = document.querySelector('.audio-track-row');
             const videoTrackRow = document.querySelector('.video-track-row');
+            const effectTrackRow = document.querySelector('.effect-track-row');
 
             let count = 0;
 
-            if (videoTrackRow) {
-                count++;
-            }
+            if (videoTrackRow) count++;
+
+            renderEffectsTrack();
+            if (effectTrackRow && effectTrackRow.style.display !== "none") count++;
 
             let hasText = false;
             if (textTrackRow) {
@@ -923,8 +1028,10 @@
             if (window.dynamicTrackManager) {
                 const textTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'text');
                 const audioTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'audio');
+                const effectTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'effect');
                 if (textTrackModel) textTrackModel.visible = !!hasText;
                 if (audioTrackModel) audioTrackModel.visible = !!hasAudio;
+                if (effectTrackModel) effectTrackModel.visible = (effectTrackRow && effectTrackRow.style.display !== "none");
                 window.dynamicTrackManager.updateTrackBadge();
             } else {
                 const trackBadge = document.getElementById("tb-bottom-track-info");
@@ -1047,8 +1154,8 @@
         function generateWaveformSvg(width, height, seed = Math.random()) {
             // Generate professional-looking audio waveform with vertical bars
             let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
-            // Gradient from bright top to dark bottom
-            svg += `<defs><linearGradient id="waveGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#d1d5db;stop-opacity:0.95"/><stop offset="50%" style="stop-color:#9ca3af;stop-opacity:0.85"/><stop offset="100%" style="stop-color:#4b5563;stop-opacity:0.7"/></linearGradient></defs>`;
+            // Pure white gradient for audio wave pattern
+            svg += `<defs><linearGradient id="waveGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#ffffff;stop-opacity:1"/><stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.9"/><stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.75"/></linearGradient></defs>`;
 
             const centerY = height / 2;
             const barWidth = 3;
@@ -1747,7 +1854,7 @@
             }
 
             initDefaultTracks() {
-                // Generate dynamic track models for Text, Video, and Audio
+                // Generate dynamic track models for Text, Effect, Video, and Audio
                 this.tracks = [
                     {
                         id: "text-track-row",
@@ -1760,10 +1867,20 @@
                         clips: []
                     },
                     {
+                        id: "effect-track-row",
+                        type: "effect",
+                        name: "Effects & Filters Track",
+                        order: 1,
+                        height: 32,
+                        visible: false,
+                        locked: false,
+                        clips: []
+                    },
+                    {
                         id: "video-track-row",
                         type: "video",
                         name: "Main Video Track",
-                        order: 1,
+                        order: 2,
                         height: 64,
                         visible: true,
                         locked: false,
@@ -1773,7 +1890,7 @@
                         id: "audio-track-row",
                         type: "audio",
                         name: "Audio Track",
-                        order: 2,
+                        order: 3,
                         height: 48,
                         visible: true,
                         locked: false,

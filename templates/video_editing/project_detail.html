@@ -460,14 +460,21 @@
                 <span id="timeline-bg-volume-val" style="display:none;">0.5</span>
 
                 <!-- 1. Text Track Row -->
-                <div class="timeline-track-row text-track-row">
+                <div class="timeline-track-row text-track-row timeline-track-row--text">
                     <div class="track-content-cell" id="text-track-content">
                         <!-- Text overlay blocks rendered here dynamically by JS -->
                     </div>
                 </div>
 
-                <!-- 2. Video Track Row -->
-                <div class="timeline-track-row video-track-row">
+                <!-- 2. Effects & Filters Track Row -->
+                <div class="timeline-track-row effect-track-row timeline-track-row--effect" id="effect-track-row">
+                    <div class="track-content-cell" id="effect-track-content">
+                        <!-- Compact effect badges rendered here dynamically by JS -->
+                    </div>
+                </div>
+
+                <!-- 3. Video Track Row -->
+                <div class="timeline-track-row video-track-row timeline-track-row--video">
                     <div class="track-content-cell trim-track" id="trim-track">
                         <!-- Filmstrip thumbnails -->
                         <div class="trim-thumbnails" id="trim-thumbnails"></div>
@@ -496,18 +503,17 @@
                     </div>
                 </div>
 
-                <!-- 3. Audio Track Row -->
-                <div class="timeline-track-row audio-track-row">
+                <!-- 4. Audio Track Row -->
+                <div class="timeline-track-row audio-track-row timeline-track-row--audio">
                     <div class="track-content-cell audio-track" id="audio-track">
                         {% if project.has_audio %}
                         <div class="audio-block" id="audio-block"
-                            style="width:100%;height:100%;z-index: 1; position: relative;">
+                            style="width:100%;height:100%;z-index: 1; position: relative; display: flex; align-items: center; justify-content: flex-start;">
                             <div id="original-audio-waveform"
-                                style="position:absolute;inset:0;display:flex;align-items:center;opacity:0.6;z-index: 1;">
+                                style="position:absolute;inset:0;display:flex;align-items:center;opacity:0.85;z-index: 1;">
                             </div>
                             <span class="audio-name"
-                                style="position:relative;z-index:2; padding: 4px 8px; font-size: 11px; font-weight: bold; color: #fff;">Original
-                                Soundtrack</span>
+                                style="position:relative;z-index:2; padding: 0 12px; font-size: 13px; font-weight: 700; color: #ffffff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);">Original Soundtrack</span>
                         </div>
                         {% endif %}
                     </div>
@@ -638,6 +644,17 @@
     window.REEL_PROJECT_TRIM_END = JSON.parse("{{ project.trim_end|default:'null' }}");
     window.REEL_PROJECT_HEIGHT = Number("{{ project.height|default:720 }}");
     window.REEL_PROJECT_CLIPS = JSON.parse('{{ project.clips_json|default:"[]"|escapejs }}');
+    window.REEL_PROJECT_OPERATIONS = [
+        {% for op in operations %}
+        {
+            "type": "{{ op.operation_type|escapejs }}",
+            "title": "{{ op.get_operation_type_display|escapejs }}",
+            "description": "{{ op.description|escapejs }}",
+            "trim_start": {{ op.trim_start|default:0.0 }},
+            "trim_end": {{ op.trim_end|default:0.0 }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
 
     document.addEventListener("DOMContentLoaded", function () {
         if (typeof lucide !== 'undefined') {
