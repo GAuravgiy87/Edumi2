@@ -198,7 +198,7 @@ def merge(input_paths):
     return out_path
 
 
-def add_text_overlay(input_path, text, position="bottom", font_size=32,
+def add_text_overlay(input_path, text, position="bottom", font_size=80,
                       color="white", start_seconds=None, end_seconds=None):
     """
     Burn a text overlay onto the video using the drawtext filter.
@@ -206,14 +206,30 @@ def add_text_overlay(input_path, text, position="bottom", font_size=32,
     start_seconds/end_seconds: optional window during which text is shown;
     if omitted, text shows for the whole video.
     """
+    import sys
+    print("DEBUG: add_text_overlay called with position:", repr(position), file=sys.stderr)
     out_path = _tmp_path()
 
-    position_map = {
-        "top": "x=(w-text_w)/2:y=40",
-        "bottom": "x=(w-text_w)/2:y=h-th-40",
-        "center": "x=(w-text_w)/2:y=(h-text_h)/2",
-    }
-    pos = position_map.get(position, position_map["bottom"])
+    if isinstance(position, str) and position.startswith("custom:"):
+        print("DEBUG: using custom position!", file=sys.stderr)
+        try:
+            parts = position[7:].split(",")
+            x_pct = float(parts[0])
+            y_pct = float(parts[1])
+            print("DEBUG: x_pct, y_pct:", x_pct, y_pct, file=sys.stderr)
+            pos = f"x=(w-text_w)*{x_pct/100:.3f}:y=(h-text_h)*{y_pct/100:.3f}"
+            print("DEBUG: ffmpeg pos string:", pos, file=sys.stderr)
+        except Exception as e:
+            print("DEBUG: exception parsing custom position:", e, file=sys.stderr)
+            pos = "x=(w-text_w)/2:y=h-th-40"
+    else:
+        print("DEBUG: using predefined position:", position, file=sys.stderr)
+        position_map = {
+            "top": "x=(w-text_w)/2:y=40",
+            "bottom": "x=(w-text_w)/2:y=h-th-40",
+            "center": "x=(w-text_w)/2:y=(h-text_h)/2",
+        }
+        pos = position_map.get(position, position_map["bottom"])
 
     # Escape text for the ffmpeg filter graph (colons and quotes are special).
     safe_text = text.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\u2019")
@@ -516,13 +532,22 @@ def process_combined_edits(input_path, state):
         if not txt:
             continue
         pos_name = overlay.get("position", "bottom")
-        position_map = {
-            "top": "x=(w-text_w)/2:y=40",
-            "bottom": "x=(w-text_w)/2:y=h-th-40",
-            "center": "x=(w-text_w)/2:y=(h-text_h)/2",
-        }
-        pos = position_map.get(pos_name, position_map["bottom"])
-        font_size = int(overlay.get("font_size", 32))
+        if isinstance(pos_name, str) and pos_name.startswith("custom:"):
+            try:
+                parts = pos_name[7:].split(",")
+                x_pct = float(parts[0])
+                y_pct = float(parts[1])
+                pos = f"x=(w-text_w)*{x_pct/100:.3f}:y=(h-text_h)*{y_pct/100:.3f}"
+            except Exception:
+                pos = "x=(w-text_w)/2:y=h-th-40"
+        else:
+            position_map = {
+                "top": "x=(w-text_w)/2:y=40",
+                "bottom": "x=(w-text_w)/2:y=h-th-40",
+                "center": "x=(w-text_w)/2:y=(h-text_h)/2",
+            }
+            pos = position_map.get(pos_name, position_map["bottom"])
+        font_size = int(overlay.get("font_size", 80))
         color = overlay.get("color", "white") or "white"
         
         o_start = overlay.get("start")
@@ -713,3 +738,108 @@ def add_background_audio(video_path, audio_path, bg_volume=0.5, video_volume=1.0
     return out_path
 
 
+def delete_range(input_path, start_seconds, end_seconds):
+    """Cut out the [start_seconds, end_seconds] range from the video and stitch the remaining parts together.
+    Uses extremely fast stream copying (-c copy) without re-encoding to minimize latency.
+    """
+    meta = get_metadata(input_path)
+    duration = meta["duration"] or 0.0
+    out_path = _tmp_path()
+
+    start_seconds = float(start_seconds)
+    end_seconds = float(end_seconds)
+
+    # Edge cases
+    if start_seconds <= 0.0:
+        # Just keep the part from end_seconds to the end
+        cmd = [
+            settings.FFMPEG_BINARY, "-y",
+            "-ss", str(end_seconds),
+            "-i", input_path,
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            out_path
+        ]
+        _run(cmd)
+        return out_path
+
+    if end_seconds >= duration:
+        # Just keep the part from start to start_seconds
+        cmd = [
+            settings.FFMPEG_BINARY, "-y",
+            "-ss", "0",
+            "-i", input_path,
+            "-t", str(start_seconds),
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            out_path
+        ]
+        _run(cmd)
+        return out_path
+
+    # General case: slice part 1, slice part 2, concat
+    part1_path = _tmp_path()
+    part2_path = _tmp_path()
+    
+    try:
+        # 1. Slice part 1 (0 to start_seconds)
+        cmd1 = [
+            settings.FFMPEG_BINARY, "-y",
+            "-ss", "0",
+            "-i", input_path,
+            "-t", str(start_seconds),
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            part1_path
+        ]
+        _run(cmd1)
+
+        # 2. Slice part 2 (end_seconds to end)
+        cmd2 = [
+            settings.FFMPEG_BINARY, "-y",
+            "-ss", str(end_seconds),
+            "-i", input_path,
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            part2_path
+        ]
+        _run(cmd2)
+
+        # 3. Write concat text file
+        concat_txt = _tmp_path(suffix=".txt")
+        # In FFmpeg, escape single quotes and backslashes
+        def safe_path(p):
+            return p.replace('\\', '/').replace("'", "'\\''")
+            
+        with open(concat_txt, "w", encoding="utf-8") as f:
+            f.write(f"file '{safe_path(part1_path)}'\n")
+            f.write(f"file '{safe_path(part2_path)}'\n")
+
+        # 4. Perform concat stream copy
+        cmd_concat = [
+            settings.FFMPEG_BINARY, "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_txt,
+            "-c", "copy",
+            out_path
+        ]
+        _run(cmd_concat)
+        
+        # Clean up concat txt
+        if os.path.exists(concat_txt):
+            try:
+                os.remove(concat_txt)
+            except OSError:
+                pass
+
+    finally:
+        # Clean up temporary slices
+        for temp_file in [part1_path, part2_path]:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except OSError:
+                    pass
+
+    return out_path

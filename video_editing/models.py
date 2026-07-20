@@ -48,12 +48,15 @@ class VideoProject(models.Model):
     width = models.IntegerField(blank=True, null=True)
     height = models.IntegerField(blank=True, null=True)
     has_audio = models.BooleanField(default=True)
+    trim_start = models.FloatField(default=0.0)
+    trim_end = models.FloatField(blank=True, null=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ready")
     error_message = models.TextField(blank=True, default="")
     
     # NEW: JSON state of the timeline (clips, tracks, splits, overlays)
     timeline_state = models.JSONField(blank=True, null=True)
+    clips_json = models.TextField(blank=True, default="[]")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -116,12 +119,12 @@ class ProjectAsset(models.Model):
         ("image", "Image"),
     ]
     project = models.ForeignKey(VideoProject, on_delete=models.CASCADE, related_name="assets")
-    asset_type = models.CharField(max_length=10, choices=ASSET_TYPES)
+    asset_type = models.CharField(max_length=10, choices=ASSET_TYPES, default="video")
     file = models.FileField(upload_to=project_upload_path)
     filename = models.CharField(max_length=255, blank=True)
+    title = models.CharField(max_length=255, blank=True, default="")
     duration_seconds = models.FloatField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -129,7 +132,7 @@ class ProjectAsset(models.Model):
 
     @property
     def display_title(self):
-        return self.filename or os.path.basename(self.file.name)
+        return self.title or self.filename or os.path.basename(self.file.name)
 
     def __str__(self):
         return f"{self.display_title} ({self.get_asset_type_display()})"
@@ -177,6 +180,21 @@ class EditOperation(models.Model):
     project = models.ForeignKey(VideoProject, on_delete=models.CASCADE, related_name="operations")
     operation_type = models.CharField(max_length=30, choices=OPERATION_CHOICES)
     description = models.CharField(max_length=500, blank=True, default="")
+
+    # Undo/redo flag — False means this operation has been undone
+    active = models.BooleanField(default=True)
+
+    # Optional snapshot of the result file and a secondary resource (e.g. merge clip)
+    video_file = models.FileField(upload_to=project_upload_path, blank=True, null=True)
+    resource_file = models.FileField(upload_to=project_upload_path, blank=True, null=True)
+
+    # Optional JSON bag of operation parameters for display / replay
+    parameters = models.JSONField(blank=True, null=True)
+
+    # Trim state at the time of this operation
+    trim_start = models.FloatField(default=0.0)
+    trim_end = models.FloatField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

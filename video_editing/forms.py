@@ -33,6 +33,11 @@ class VideoUploadForm(forms.ModelForm):
 class TrimForm(forms.Form):
     start_seconds = forms.FloatField(min_value=0, label="Start (seconds)")
     end_seconds = forms.FloatField(min_value=0, label="End (seconds)")
+    trim_mode = forms.ChoiceField(
+        choices=[("extract", "Extract"), ("delete", "Delete")],
+        initial="extract",
+        required=False
+    )
 
     def clean(self):
         cleaned = super().clean()
@@ -63,10 +68,10 @@ class TextOverlayForm(forms.Form):
     text = forms.CharField(max_length=200, widget=forms.TextInput(attrs={
         "class": "text-input", "placeholder": "Your caption here",
     }))
-    position = forms.ChoiceField(choices=[
+    position = forms.CharField(max_length=100, initial="bottom", widget=forms.Select(choices=[
         ("bottom", "Bottom"), ("top", "Top"), ("center", "Center"),
-    ], initial="bottom")
-    font_size = forms.IntegerField(min_value=10, max_value=200, initial=32)
+    ]))
+    font_size = forms.IntegerField(min_value=10, max_value=400, initial=80)
     color = forms.ChoiceField(choices=[
         ("white", "White"), ("black", "Black"), ("yellow", "Yellow"),
         ("red", "Red"), ("cyan", "Cyan"),

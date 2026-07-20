@@ -3,61 +3,107 @@
 
 {% block page_title %}{{ project.display_title }} — Video Editor{% endblock %}
 
-
-
 {% block ve_content %}
 <div class="ve-editor-page">
-    <!-- Topbar -->
+    <!-- Topbar (Theme: System of Edumi) -->
     <header class="ve-editor-head">
         <div class="ve-editor-head-left">
             <h1 class="ve-editor-title">{{ project.display_title }}</h1>
         </div>
         
         <div class="ve-editor-head-actions">
-            <button class="ve-btn ve-btn-icon" id="tb-undo" title="Undo (Ctrl+Z)">
+            <span class="ve-status-badge {{ project.status }}" id="status-pill" style="{% if project.status == 'ready' %}display: none;{% endif %}">
+                {% if project.status == 'processing' %}<i data-lucide="loader" style="width:11px;height:11px;"></i>{% endif %}
+                {{ project.get_status_display }}
+            </span>
+            <div style="width:1px;height:20px;background:var(--border-color);margin:0 4px;flex-shrink:0;"></div>
+            
+            <!-- Undo / Redo in Topbar -->
+            <button class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-undo" title="Undo (Ctrl+Z)" {% if not operations.1 %}disabled{% endif %}>
                 <i data-lucide="undo"></i>
             </button>
-            <button class="ve-btn ve-btn-icon" id="tb-redo" title="Redo (Ctrl+Shift+Z)">
+            {% with prev_op=operations.1 %}
+            {% if prev_op %}
+            <form id="undo-form" action="{% url 'op_revert' project.pk prev_op.pk %}" method="post" style="display: none;">
+                {% csrf_token %}
+            </form>
+            {% endif %}
+            {% endwith %}
+
+            <button class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-redo" title="Redo (Ctrl+Shift+Z)" {% if not has_redo %}disabled{% endif %}>
                 <i data-lucide="redo"></i>
             </button>
-            <span style="color:var(--text-muted); margin: 0 10px;">|</span>
-            <button class="ve-btn ve-btn-primary" id="btn-master-export" title="Export">
-                <span style="margin-right:5px;">
-                    <i data-lucide="download" style="width:14px;height:14px;"></i>
-                </span> Export
-            </button>
-            {% if request.GET.recording_id %}
-            <form method="POST" action="{% url 'publish_to_lecture' project.pk %}?recording_id={{ request.GET.recording_id }}" style="display:inline-block; margin-left:10px;" onsubmit="return confirm('Publish this edited video to your lectures?');">
+            {% if has_redo %}
+            <form id="redo-form" action="{% url 'op_redo' project.pk %}" method="post" style="display: none;">
                 {% csrf_token %}
-                <button type="submit" class="ve-btn ve-btn-primary" style="background-color: #22c55e; border-color: #22c55e;" title="Publish to Lectures">
-                    <span style="margin-right:5px;">
-                        <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i>
-                    </span> Publish
+            </form>
+            {% endif %}
+
+            <div style="width:1px;height:20px;background:var(--border-color);margin:0 4px;flex-shrink:0;"></div>
+            
+            <!-- History Toggle Button -->
+            <button class="ve-btn ve-btn-secondary" id="btn-show-history" title="View edit history" style="display: inline-flex; align-items: center; gap: 6px;">
+                <i data-lucide="history" style="width: 14px; height: 14px;"></i> History
+            </button>
+
+            <button class="ve-btn ve-btn-primary" id="btn-master-export" title="Export video">
+                <i data-lucide="download" style="width:14px;height:14px;"></i> Export
+            </button>
+
+            {% if request.GET.recording_id %}
+            <form method="POST" action="{% url 'publish_to_lecture' project.pk %}?recording_id={{ request.GET.recording_id }}" style="display:inline-block;" onsubmit="return confirm('Publish this edited video to your lectures?');">
+                {% csrf_token %}
+                <button type="submit" class="ve-btn ve-btn-primary" style="background:#22c55e;border-color:#22c55e;" title="Publish to Lectures">
+                    <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i> Publish
                 </button>
             </form>
             {% else %}
-            <!-- Standalone project without recording_id -->
-            <button type="button" class="ve-btn ve-btn-primary" style="background-color: #22c55e; border-color: #22c55e; margin-left:10px;" title="Publish to Lectures" onclick="alert('This project was created independently and is not linked to a class recording. Please use the \'Export\' button to download the video.');">
-                <span style="margin-right:5px;">
-                    <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i>
-                </span> Publish
+            <button type="button" class="ve-btn ve-btn-primary" style="background:#22c55e;border-color:#22c55e;" title="Publish to Lectures"
+                onclick="alert('This project is not linked to a class recording. Use Export to download the video.')">
+                <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i> Publish
             </button>
             {% endif %}
         </div>
     </header>
 
-    <!-- Main Body Area -->
+    <!-- Main Workspace Area -->
     <main class="ve-editor-grid">
         
         <!-- Center Stage -->
         <div class="ve-video-stage">
-            <div class="ve-video-wrapper" id="video-wrapper">
-                <video preload="metadata" src="{{ project.working_file.url }}" id="main-video"></video>
+            <div class="ve-video-wrapper" id="video-wrapper" style="position: relative;">
+                <div class="processing-overlay" id="processing-overlay"
+                    style="{% if project.status == 'processing' %}display: flex;{% else %}display: none;{% endif %}">
+                    <div class="spinner"></div>
+                    <p>Processing video…</p>
+                </div>
+                {% if project.status == 'error' %}
+                <div class="error-banner" style="position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10; background: rgba(239, 68, 68, 0.9); padding: 10px; border-radius: 6px; color: white;">
+                    <strong>Something went wrong.</strong>
+                    <p style="margin: 4px 0 0 0; font-size: 12px;">{{ project.error_message|truncatechars:300 }}</p>
+                </div>
+                {% endif %}
+                <video preload="auto" src="{% url 'serve_media_ranges' path=project.working_file.name %}" id="main-video"></video>
                 <div id="text-overlay-container"></div>
             </div>
             
+            <!-- Video Time Display (Hidden since visual timeline provides this) -->
+            <div class="video-time-display" id="video-time-display" style="display: none !important;">
+                <span class="time-current" id="video-time-current">00:00:00.000</span>
+                <span class="time-separator">/</span>
+                <span class="time-total" id="video-time-total">00:00:00.000</span>
+            </div>
+
+            <!-- Video Progress Bar (Hidden since visual timeline provides this) -->
+            <div class="video-progress-container" id="video-progress-container" style="display: none !important;">
+                <div class="video-progress-bar" id="video-progress-bar" style="position: relative; width: 100%; height: 6px; background: #374151; border-radius: 3px; cursor: pointer;">
+                    <div class="video-progress-filled" id="video-progress-filled" style="position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #ffffff; border-radius: 3px 0 0 3px;"></div>
+                    <div class="video-progress-handle" id="video-progress-handle" style="position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #ffffff; cursor: ew-resize; z-index: 10;"></div>
+                </div>
+            </div>
+
             <!-- Player Controls -->
-            <div class="ve-player-controls">
+            <div class="ve-player-controls" style="background: #141519; border-top: 1px solid #282a32; justify-content: center;">
                 <button class="ve-ctrl-btn" id="btn-skip-start" title="Skip to start">
                     <i data-lucide="skip-back"></i>
                 </button>
@@ -75,12 +121,6 @@
                     <i data-lucide="skip-forward"></i>
                 </button>
                 
-                <span class="ve-time-display" style="margin-left: 20px;">
-                    <span id="time-current">0:00:00</span> 
-                    <span class="ve-time-divider">/</span> 
-                    <span id="time-total">0:00:00</span>
-                </span>
-                
                 <div class="ve-ctrl-right" style="display:flex; align-items:center; gap:10px;">
                     <button class="ve-ctrl-btn" id="btn-mute" title="Mute/Unmute">
                         <i data-lucide="volume-2" id="volume-icon"></i>
@@ -95,319 +135,600 @@
         </div>
         
         <!-- Right Sidebar (Tools) -->
-        <aside class="ve-tool-panel">
+        <aside class="ve-tool-panel tool-panel">
             <div class="ve-tool-tabs">
-                <button class="ve-tool-tab ve-tool-tab--active" data-tab="import">Media</button>
-                <button class="ve-tool-tab" data-tab="text">Text</button>
-                <button class="ve-tool-tab" data-tab="audio">Audio</button>
-                <button class="ve-tool-tab" data-tab="effects">Effects</button>
-                <button class="ve-tool-tab" data-tab="export">Export</button>
+                <button class="ve-tool-tab tool-tab ve-tool-tab--active tool-tab--active" data-tab="import">Media</button>
+                <button class="ve-tool-tab tool-tab" data-tab="text">Text</button>
+                <button class="ve-tool-tab tool-tab" data-tab="audio">Audio</button>
+                <button class="ve-tool-tab tool-tab" data-tab="effects">Effects</button>
+                <button class="ve-tool-tab tool-tab" data-tab="export">Export</button>
             </div>
             
             <div class="ve-tool-panels">
-                <!-- Import Panel -->
-                <div class="ve-tool-section ve-tool-section--active" data-panel="import">
+                <!-- Hidden Trim Form to keep visual timeline functionality working -->
+                <form id="trim-form" action="{% url 'op_trim' project.pk %}" method="post" style="display: none;">
+                    {% csrf_token %}
+                    {{ trim_form.start_seconds }}
+                    {{ trim_form.end_seconds }}
+                    <input type="radio" name="trim_mode" value="extract" checked>
+                    <input type="radio" name="trim_mode" value="delete">
+                    <input type="checkbox" name="fade_in">
+                    <input type="checkbox" name="fade_out">
+                </form>
+
+                <!-- Media Panel -->
+                <div class="ve-tool-section tool-section ve-tool-section--active tool-section--active" data-panel="import">
                     <h3 class="ve-section-title">Media Library</h3>
-                    <div class="ve-upload-area" id="media-upload-area">
-                        <input type="file" id="media-file-input" accept="video/*,audio/*,image/*" multiple style="display:none;">
-                        <div class="ve-drop-zone" id="drop-zone">
-                            <i data-lucide="upload-cloud" style="width:48px;height:48px;color:var(--text-muted);margin-bottom:10px;"></i>
-                            <p class="ve-muted">Drag & drop files here or click to browse</p>
-                            <button class="ve-btn ve-btn-secondary ve-btn-full" id="btn-browse-media" style="margin-top:10px;">Browse Files</button>
+                    
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button class="ve-btn ve-btn-secondary ve-btn-full" id="btn-trigger-upload-asset">
+                            <i data-lucide="plus" style="width:14px;height:14px;"></i> Add File
+                        </button>
+                        <input type="file" id="asset-file-input" accept="video/*" style="display: none;">
+                    </div>
+                    
+                    <p style="font-size: 11px; color: var(--ve-muted); margin: 8px 0 12px 0; line-height: 1.4;">
+                        Click <b style="color: var(--ve-primary);">+</b> or drag a clip to the bottom timeline to insert it at the current playhead.
+                    </p>
+
+                    <!-- Assets List / Grid -->
+                    <div id="assets-grid-container" style="display:flex; flex-direction:column; gap:8px;">
+                        {% for asset in project.assets.all %}
+                        <div class="ve-media-item asset-card" draggable="true" data-asset-id="{{ asset.id }}" data-asset-title="{{ asset.display_title }}">
+                            <div class="ve-media-thumb">
+                                <i data-lucide="video" style="width: 20px; height: 20px; color: var(--ve-muted);"></i>
+                            </div>
+                            <div class="ve-media-info">
+                                <p class="ve-media-name" title="{{ asset.display_title }}">{{ asset.display_title }}</p>
+                                <p class="ve-media-meta">{{ asset.display_duration }}</p>
+                            </div>
+                            <button type="button" class="btn-insert-asset ve-btn ve-btn-ghost ve-btn-icon" style="padding:4px; width:28px; height:28px;" title="Insert at playhead">
+                                <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
+                            </button>
                         </div>
+                        {% empty %}
+                        <div id="empty-assets-state" style="text-align: center; padding: 24px 10px; border: 1px dashed var(--ve-border); border-radius: var(--ve-r); background: var(--ve-bg-sub);">
+                            <i data-lucide="image" style="width: 24px; height: 24px; color: var(--ve-muted); opacity: 0.5; margin-bottom: 8px;"></i>
+                            <p style="margin: 0; font-size: 12px; color: var(--ve-muted);">No files imported yet.</p>
+                        </div>
+                        {% endfor %}
                     </div>
-                    <div class="ve-media-list" id="media-list" style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">
-                        <!-- Media items will be added here -->
-                    </div>
+
+                    <!-- Hidden form for drag-and-drop / click insertion -->
+                    <form id="insert-asset-form" action="{% url 'insert_asset' project.pk %}" method="post" style="display: none;">
+                        {% csrf_token %}
+                        <input type="hidden" name="asset_id" id="insert-asset-id">
+                        <input type="hidden" name="timestamp" id="insert-asset-timestamp">
+                    </form>
                 </div>
                 
                 <!-- Text Panel -->
-                <div class="ve-tool-section" data-panel="text">
+                <div class="ve-tool-section tool-section" data-panel="text">
                     <h3 class="ve-section-title">Text Overlays</h3>
-                    <p style="font-size:12px;color:var(--ve-text-muted);margin:0 0 10px;">Add text that appears over your video at a specific time.</p>
-                    <button class="ve-btn ve-btn-primary ve-btn-full" id="btn-add-text">
-                        <i data-lucide="plus" style="width:14px;height:14px;"></i> New Text Clip
-                    </button>
-                    <div id="text-clip-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
-                        <!-- populated by JS -->
-                    </div>
+                    <p style="font-size:12px;color:var(--ve-muted);margin:0 0 10px;">Burn a caption onto the video.</p>
+                    
+                    <form action="{% url 'op_text_overlay' project.pk %}" method="post" class="ve-stacked-form" style="display: flex; flex-direction: column; gap: 12px;">
+                        {% csrf_token %}
+                        <div class="ve-field">
+                            <label for="id_text">{{ text_form.text.label }}</label>
+                            {{ text_form.text }}
+                        </div>
+                        <div class="ve-field-row" style="display: flex; gap: 8px;">
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_position">Position</label>
+                                {{ text_form.position }}
+                            </div>
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_color">Color</label>
+                                {{ text_form.color }}
+                            </div>
+                        </div>
+                        <div class="ve-field">
+                            <label for="id_font_size">Font size</label>
+                            {{ text_form.font_size }}
+                        </div>
+                        <div class="ve-field-row" style="display: flex; gap: 8px;">
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_start_seconds">Show from (s)</label>
+                                {{ text_form.start_seconds }}
+                            </div>
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_end_seconds">Show until (s)</label>
+                                {{ text_form.end_seconds }}
+                            </div>
+                        </div>
+                        <p style="font-size: 11px; color: var(--ve-muted); margin: 0;">Leave times blank to show for the whole video.</p>
+                        <button type="submit" class="ve-btn ve-btn-primary ve-btn-full">Add Text Overlay</button>
+                    </form>
                 </div>
                 
                 <!-- Audio Panel -->
-                <div class="ve-tool-section" data-panel="audio">
-                    <h3 class="ve-section-title">Audio</h3>
-                    <button class="ve-btn ve-btn-secondary ve-btn-full" id="btn-add-audio">Add Audio</button>
-                    <div id="audio-properties" style="display:none; margin-top:16px;">
+                <div class="ve-tool-section tool-section" data-panel="audio">
+                    <h3 class="ve-section-title">Add Background Audio</h3>
+                    <p style="font-size:12px;color:var(--ve-muted);margin:0 0 10px;">Select a background track to blend with your video soundtrack.</p>
+                    
+                    <form id="bg-audio-form" action="{% url 'op_background_audio' project.pk %}" method="post" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 12px;">
+                        {% csrf_token %}
                         <div class="ve-field">
-                            <label>Volume</label>
-                            <input type="range" id="audio-volume-slider" min="0" max="2" step="0.01" value="1" style="width:100%;">
+                            <label for="id_audio_file">{{ bg_audio_form.audio_file.label }}</label>
+                            {{ bg_audio_form.audio_file }}
                         </div>
-                    </div>
+                        
+                        <div class="ve-field-row" style="display: flex; gap: 8px;">
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_start_seconds">Start playing at (s)</label>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    {{ bg_audio_form.start_seconds }}
+                                    <button type="button" class="ve-btn ve-btn-secondary" id="btn-bg-set-start" title="Set to current playhead time" style="padding: 0; min-width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><i data-lucide="clock" style="width:14px;height:14px;"></i></button>
+                                </div>
+                            </div>
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_end_seconds">Stop playing at (s)</label>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    {{ bg_audio_form.end_seconds }}
+                                    <button type="button" class="ve-btn ve-btn-secondary" id="btn-bg-set-end" title="Set to current playhead time" style="padding: 0; min-width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><i data-lucide="clock" style="width:14px;height:14px;"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ve-field-row" style="display: none;">
+                            <div class="ve-field">
+                                <label for="id_bg_volume">{{ bg_audio_form.bg_volume.label }}</label>
+                                {{ bg_audio_form.bg_volume }}
+                            </div>
+                            <div class="ve-field">
+                                <label for="id_video_volume">{{ bg_audio_form.video_volume.label }}</label>
+                                {{ bg_audio_form.video_volume }}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="ve-btn ve-btn-primary ve-btn-full">Apply Background Audio</button>
+                    </form>
                 </div>
                 
                 <!-- Effects Panel -->
-                <div class="ve-tool-section" data-panel="effects">
-                    <h3 class="ve-section-title">Effects</h3>
-                    <div class="ve-effects-grid" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-top:10px;">
-                        <button class="ve-effect-btn" data-effect="grayscale">Grayscale</button>
-                        <button class="ve-effect-btn" data-effect="sepia">Sepia</button>
-                        <button class="ve-effect-btn" data-effect="blur">Blur</button>
-                        <button class="ve-effect-btn" data-effect="brightness">Brightness</button>
-                        <button class="ve-effect-btn" data-effect="contrast">Contrast</button>
-                        <button class="ve-effect-btn" data-effect="saturate">Saturate</button>
-                    </div>
+                <div class="ve-tool-section tool-section" data-panel="effects">
+                    <h3 class="ve-section-title">Rotation</h3>
+                    <form action="{% url 'op_rotate' project.pk %}" method="post" style="display: flex; flex-direction: column; gap: 8px;">
+                        {% csrf_token %}
+                        <div class="ve-field">
+                            <label for="id_degrees">Degrees</label>
+                            {{ rotate_form.degrees }}
+                        </div>
+                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply Rotation</button>
+                    </form>
+
+                    <div style="height: 1px; background: var(--ve-border); margin: 12px 0;"></div>
+
+                    <h3 class="ve-section-title">Resize</h3>
+                    <form action="{% url 'op_resize' project.pk %}" method="post" style="display: flex; flex-direction: column; gap: 8px;">
+                        {% csrf_token %}
+                        <div class="ve-field-row" style="display: flex; gap: 8px;">
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_width">Width</label>
+                                {{ resize_form.width }}
+                            </div>
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_height">Height</label>
+                                {{ resize_form.height }}
+                            </div>
+                        </div>
+                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply Resize</button>
+                    </form>
+
+                    <div style="height: 1px; background: var(--ve-border); margin: 12px 0;"></div>
+
+                    <h3 class="ve-section-title">Grayscale</h3>
+                    <form action="{% url 'op_grayscale' project.pk %}" method="post" style="margin-bottom: 12px;">
+                        {% csrf_token %}
+                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply Grayscale Filter</button>
+                    </form>
+
+                    <div style="height: 1px; background: var(--ve-border); margin: 12px 0;"></div>
+
+                    <h3 class="ve-section-title">Fade In / Out</h3>
+                    <form action="{% url 'op_fade' project.pk %}" method="post" style="display: flex; flex-direction: column; gap: 8px;">
+                        {% csrf_token %}
+                        <div class="ve-field-row" style="display: flex; gap: 8px;">
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_fade_in_seconds">Fade in (s)</label>
+                                {{ fade_form.fade_in_seconds }}
+                            </div>
+                            <div class="ve-field" style="flex: 1;">
+                                <label for="id_fade_out_seconds">Fade out (s)</label>
+                                {{ fade_form.fade_out_seconds }}
+                            </div>
+                        </div>
+                        <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply Fade Effects</button>
+                    </form>
                 </div>
                 
                 <!-- Export Panel -->
-                <div class="ve-tool-section" data-panel="export">
-                    <h3 class="ve-section-title">Export Settings</h3>
-                    <div class="ve-field" style="margin-top:10px;">
-                        <label>Resolution</label>
-                        <select id="export-resolution" style="width:100%;">
-                            <option value="480p">480p</option>
-                            <option value="720p">720p</option>
-                            <option value="1080p" selected>1080p Full HD</option>
-                            <option value="1440p">1440p</option>
-                            <option value="4k">4K</option>
-                        </select>
+                <div class="ve-tool-section tool-section" data-panel="export">
+                    <h3 class="ve-section-title">Download &amp; Export</h3>
+                    
+                    <p style="font-size:12px;color:var(--ve-muted);margin:0 0 10px;">Quick Download options for the active working file.</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <a href="{% url 'project_download' project.pk %}" class="ve-btn ve-btn-secondary ve-btn-full">Download (Original Container)</a>
+                        <a href="{% url 'project_download_mkv' project.pk %}" class="ve-btn ve-btn-secondary ve-btn-full" style="border-color: #22c55e; color: #22c55e;">Download MKV (Lossless Container)</a>
                     </div>
-                    <div class="ve-field" style="margin-top:10px;">
-                        <label>Quality</label>
-                        <select id="export-quality" style="width:100%;">
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high" selected>High</option>
-                            <option value="ultra">Ultra</option>
-                        </select>
-                    </div>
-                    <div class="ve-field" style="margin-top:10px;">
-                        <label>Format</label>
-                        <select id="export-format" style="width:100%;">
-                            <option value="mp4" selected>MP4</option>
-                            <option value="webm">WebM</option>
-                            <option value="mov">MOV</option>
-                        </select>
-                    </div>
-                    <button class="ve-btn ve-btn-primary ve-btn-full" id="btn-export" style="margin-top:16px;">Export Video</button>
+
+                    <div style="height: 1px; background: var(--ve-border); margin: 16px 0;"></div>
+                    
+                    <h3 class="ve-section-title">Compile &amp; Export</h3>
+                    <p style="font-size:12px;color:var(--ve-muted);margin:0 0 10px;">Export a new rendering with all edits burned in.</p>
+                    <button class="ve-btn ve-btn-primary ve-btn-full" onclick="document.getElementById('btn-master-export').click();">Process &amp; Export Video</button>
                 </div>
             </div>
         </aside>
         
     </main>
 
-    <!-- Bottom Timeline Area -->
-    <div class="ve-timeline" id="ve-timeline">
+    <!-- Bottom Full Width: Visual Timeline Component (Exact same layout and design as source) -->
+    <div class="visual-trim-container" id="visual-trim-container">
+        <!-- Top Drag/Resize Handle -->
+        <div class="timeline-resizer" id="timeline-resizer" title="Drag up/down to resize timeline height • Double-click to toggle collapse/expand">
+            <div class="resizer-pill"></div>
+        </div>
 
         <!-- Timeline Toolbar -->
-        <div class="ve-timeline-toolbar">
-            <div class="ve-toolbar-left">
-                <!-- Edit actions -->
-                <button class="ve-tb-btn" id="btn-split" title="Split at Playhead (S)">
-                    <i data-lucide="scissors"></i><span>Split</span>
-                </button>
-                <button class="ve-tb-btn ve-tb-danger" id="btn-delete" title="Delete Selected (Del)">
-                    <i data-lucide="trash-2"></i><span>Delete</span>
-                </button>
-                <div class="ve-tb-sep"></div>
-                <button class="ve-tb-btn" id="btn-copy" title="Copy (Ctrl+C)">
-                    <i data-lucide="copy"></i><span>Copy</span>
-                </button>
-                <button class="ve-tb-btn" id="btn-paste" title="Paste (Ctrl+V)">
-                    <i data-lucide="clipboard-paste"></i><span>Paste</span>
-                </button>
-                <div class="ve-tb-sep"></div>
-                <!-- Quick add text to timeline -->
-                <button class="ve-tb-btn ve-tb-accent" id="btn-add-text-quick" title="Add Text Clip at Playhead (T)">
-                    <i data-lucide="type"></i><span>Add Text</span>
-                </button>
-            </div>
+        <div class="timeline-toolbar">
+            <div class="toolbar-left" style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" class="tb-btn text-danger" id="tb-delete" title="Delete Selected Segment"
+                    style="font-size: 14px; padding: 4px 8px;" disabled>🗑️ Delete</button>
+                <button type="button" class="tb-btn" id="tb-split" title="Split Clip at Playhead"
+                    style="font-size: 14px; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;">✂️
+                    Split</button>
 
-            <div class="ve-toolbar-right">
-                <!-- Snap toggle -->
-                <button class="ve-tb-btn ve-tb-toggle" id="btn-snap" title="Toggle Snap" data-active="true">
-                    <i data-lucide="magnet"></i><span>Snap</span>
-                </button>
-                <div class="ve-tb-sep"></div>
-                <!-- Zoom -->
-                <button class="ve-tb-btn" id="btn-zoom-out" title="Zoom Out (-)">
-                    <i data-lucide="minus"></i>
-                </button>
-                <div class="ve-zoom-slider-wrap" title="Zoom">
-                    <input type="range" id="zoom-slider" min="10" max="300" value="50" step="5">
-                </div>
-                <button class="ve-tb-btn" id="btn-zoom-in" title="Zoom In (+)">
-                    <i data-lucide="plus"></i>
-                </button>
-                <button class="ve-tb-btn" id="btn-zoom-fit" title="Fit All (F)">
-                    <i data-lucide="maximize-2"></i>
-                </button>
-            </div>
-        </div>
 
-        <!-- Timeline Body: track headers + scrollable canvas -->
-        <div class="ve-timeline-body">
 
-            <!-- Fixed left: track headers -->
-            <div class="ve-tl-headers" id="tl-headers">
-                <!-- Corner (aligns with ruler) -->
-                <div class="ve-tl-corner"></div>
-
-                <!-- Video track header -->
-                <div class="ve-tl-header" data-track="video">
-                    <div class="ve-tl-header-icon ve-tl-icon-video">
-                        <i data-lucide="film"></i>
-                    </div>
-                    <span class="ve-tl-header-label">Video</span>
-                    <div class="ve-tl-header-btns">
-                        <button class="ve-track-btn" id="mute-video-btn" title="Mute">
-                            <i data-lucide="volume-2"></i>
-                        </button>
-                        <button class="ve-track-btn" id="hide-video-btn" title="Hide">
-                            <i data-lucide="eye"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Audio track header -->
-                <div class="ve-tl-header" data-track="audio">
-                    <div class="ve-tl-header-icon ve-tl-icon-audio">
-                        <i data-lucide="music-2"></i>
-                    </div>
-                    <span class="ve-tl-header-label">Audio</span>
-                    <div class="ve-tl-header-btns">
-                        <button class="ve-track-btn" id="mute-audio-btn" title="Mute">
-                            <i data-lucide="volume-2"></i>
-                        </button>
-                        <button class="ve-track-btn" id="solo-audio-btn" title="Solo">
-                            <i data-lucide="headphones"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Text track header -->
-                <div class="ve-tl-header" data-track="text">
-                    <div class="ve-tl-header-icon ve-tl-icon-text">
-                        <i data-lucide="type"></i>
-                    </div>
-                    <span class="ve-tl-header-label">Text</span>
-                    <div class="ve-tl-header-btns">
-                        <button class="ve-track-btn" id="hide-text-btn" title="Hide">
-                            <i data-lucide="eye"></i>
-                        </button>
-                    </div>
+                <!-- Speed controls in the timeline toolbar -->
+                <div class="timeline-speed-control"
+                    style="display: flex; align-items: center; gap: 6px; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(255,255,255,0.15);">
+                    <form action="{% url 'op_speed' project.pk %}" method="post"
+                        style="display: flex; align-items: center; gap: 6px; margin: 0;">
+                        {% csrf_token %}
+                        <span style="font-size: 13px; color: var(--ve-muted); white-space: nowrap;">Speed:</span>
+                        {{ speed_form.speed_factor }}
+                        <button type="submit" class="tb-btn"
+                            style="font-size: 13px; padding: 4px 8px; height: 28px; background: var(--ve-primary); color: #fff; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">Apply</button>
+                    </form>
                 </div>
             </div>
 
-            <!-- Scrollable right: ruler + tracks -->
-            <div class="ve-tl-scroll" id="timeline-scroll">
-                <!-- Snap guide line (appears on drag) -->
-                <div class="ve-snap-guide" id="snap-guide"></div>
+            <div class="toolbar-center">
+                <span class="time-display" id="time-display-current">0:00.00</span>
+                <span class="time-divider">/</span>
+                <span class="time-display" id="time-display-total">0:00.00</span>
+            </div>
 
-                <!-- Ruler -->
-                <div class="ve-tl-ruler" id="time-ruler"></div>
+            <div class="toolbar-right" style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" class="tb-btn" id="tb-collapse-timeline" title="Minimize / Expand Timeline Panel"
+                    style="font-size: 13px; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;">
+                    <i data-lucide="chevron-down" id="collapse-icon" style="width:14px;height:14px;"></i>
+                    <span id="collapse-text" style="font-size:11px; font-weight:600;">Minimize</span>
+                </button>
+                <button type="button" class="tb-btn" id="tb-zoom-fit" title="Zoom Fit"
+                    style="font-size: 14px; padding: 4px 8px;">⇲</button>
+                <button type="button" class="tb-btn" id="tb-zoom-out" title="Zoom Out"
+                    style="font-size: 14px; padding: 4px 8px;">ー</button>
+                <button type="button" class="tb-btn" id="tb-zoom-in" title="Zoom In"
+                    style="font-size: 14px; padding: 4px 8px;">＋</button>
 
-                <!-- Track rows -->
-                <div class="ve-tl-tracks" id="timeline-tracks">
-                    <div class="ve-tl-track ve-tl-track-video">
-                        <div class="ve-track-content" id="video-track"></div>
-                    </div>
-                    <div class="ve-tl-track ve-tl-track-audio">
-                        <div class="ve-track-content" id="audio-track"></div>
-                    </div>
-                    <div class="ve-tl-track ve-tl-track-text">
-                        <div class="ve-track-content" id="text-track"></div>
-                    </div>
-                    <div class="ve-tl-track ve-tl-track-effect">
-                        <div class="ve-track-content" id="effect-track"></div>
-                    </div>
-                </div>
-
-                <!-- Playhead -->
-                <div class="ve-playhead" id="playhead">
-                    <div class="ve-playhead-head" id="playhead-tooltip">
-                        <span id="playhead-time">0:00</span>
-                    </div>
-                    <div class="ve-playhead-line"></div>
-                </div>
+                <!-- Split form -->
+                <form id="split-form" action="{% url 'op_split' project.pk %}" method="post" style="display: none;">
+                    {% csrf_token %}
+                    <input type="hidden" name="split_at" id="split-at-input" value="0">
+                </form>
+                <button type="button" class="tb-btn" id="btn-fullscreen-timeline" title="Fullscreen"
+                    style="font-size: 14px; padding: 4px 8px;">⛶</button>
             </div>
         </div>
 
-    </div><!-- /.ve-timeline -->
+        <!-- Timeline Scroll Area containing Ruler and Tracks -->
+        <div class="timeline-scroll-area"
+            style="overflow-x: auto; width: 100%; position: relative; padding-bottom: 8px;">
+            <!-- Timeline Ruler -->
+            <div class="trim-ruler" id="trim-ruler" style="position: relative;">
+                <!-- Ticks are dynamically generated by JS -->
+            </div>
 
-    <!-- Inline text-add modal (shown via btn-add-text-quick) -->
-    <div class="ve-text-modal-backdrop" id="text-modal-backdrop">
-        <div class="ve-text-modal" id="text-modal">
-            <div class="ve-text-modal-header">
-                <span>Add Text Overlay</span>
-                <button class="ve-text-modal-close" id="text-modal-close"><i data-lucide="x"></i></button>
+            <!-- Timeline Tracks Wrapper -->
+            <div class="timeline-tracks-wrapper"
+                style="position: relative; display: flex; flex-direction: column; width: fit-content; min-width: 100%; margin-left: 16px;">
+
+                <!-- 1. Text Track Row -->
+                <div class="timeline-track-row text-track-row" style="position: relative; z-index: 1;">
+                    <div class="track-content-cell" id="text-track-content">
+                        <!-- Text overlay blocks rendered here dynamically by JS -->
+                    </div>
+                </div>
+
+                <!-- 2. Video Track Row -->
+                <!-- Hidden volume inputs kept for JS references -->
+                <input type="range" id="timeline-video-volume" min="0" max="2" step="0.1" value="1.0" style="display:none;">
+                <span id="timeline-video-volume-val" style="display:none;">1.0</span>
+                <div class="timeline-track-row video-track-row" style="position: relative; z-index: 1;">
+                    <div class="track-content-cell trim-track" id="trim-track">
+                        <!-- Filmstrip thumbnails -->
+                        <div class="trim-thumbnails" id="trim-thumbnails"></div>
+
+                        <!-- Labeled clip blocks -->
+                        <div class="timeline-clip-blocks" id="timeline-clip-blocks"></div>
+
+                        <!-- Dimmed left overlay -->
+                        <div class="trim-dim trim-dim-left" id="trim-dim-left"></div>
+
+                        <!-- Selection box -->
+                        <div class="trim-selection" id="trim-selection">
+                            <div class="trim-handle trim-handle-left" id="trim-handle-left">
+                                ||
+                                <div class="handle-tooltip" id="handle-tooltip-left">0:00.00</div>
+                            </div>
+                            <div class="trim-handle trim-handle-right" id="trim-handle-right">
+                                ||
+                                <div class="resize-arrow-icon">↔</div>
+                                <div class="handle-tooltip" id="handle-tooltip-right">0:00.00</div>
+                            </div>
+                        </div>
+
+                        <!-- Dimmed right overlay -->
+                        <div class="trim-dim trim-dim-right" id="trim-dim-right"></div>
+                    </div>
+                </div>
+
+                <!-- 3. Audio Track Row -->
+                <!-- Hidden volume inputs kept for JS references -->
+                <input type="range" id="timeline-bg-volume" min="0" max="2" step="0.1" value="0.5" style="display:none;">
+                <span id="timeline-bg-volume-val" style="display:none;">0.5</span>
+                <div class="timeline-track-row audio-track-row" style="position: relative; z-index: 1;">
+                    <div class="track-content-cell audio-track" id="audio-track">
+                        {% if project.has_audio %}
+                        <div class="audio-block" id="audio-block" style="width:100%;height:100%;z-index: 1; position: relative;">
+                            <div id="original-audio-waveform" style="position:absolute;inset:0;display:flex;align-items:center;opacity:0.6;z-index: 1;"></div>
+                            <span class="audio-name" style="position:relative;z-index:2; padding: 4px 8px; font-size: 11px; font-weight: bold; color: #fff;">Original Soundtrack</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Unified Playhead line that spans across ALL tracks -->
+                <div class="trim-playhead" id="trim-playhead"
+                    style="z-index: 9999 !important; pointer-events: auto !important;">
+                    <div class="playhead-tooltip" id="playhead-tooltip">0:00.00</div>
+                </div>
+
             </div>
-            <div class="ve-text-modal-body">
-                <div class="ve-field">
-                    <label>Text content</label>
-                    <input type="text" id="text-input" placeholder="Your text here…" autocomplete="off">
-                </div>
-                <div class="ve-field-row">
-                    <div class="ve-field" style="flex:2">
-                        <label>Font size</label>
-                        <input type="number" id="font-size-input" value="36" min="10" max="200">
-                    </div>
-                    <div class="ve-field" style="flex:1">
-                        <label>Color</label>
-                        <input type="color" id="text-color-input" value="#ffffff" style="height:38px;padding:2px 4px;cursor:pointer;">
-                    </div>
-                </div>
-                <div class="ve-field-row">
-                    <div class="ve-field" style="flex:1">
-                        <label>Position</label>
-                        <select id="text-position-select">
-                            <option value="bottom">Bottom</option>
-                            <option value="center">Center</option>
-                            <option value="top">Top</option>
-                        </select>
-                    </div>
-                    <div class="ve-field" style="flex:1">
-                        <label>Background</label>
-                        <select id="text-bg-select">
-                            <option value="none">None</option>
-                            <option value="dark">Dark</option>
-                            <option value="blur">Blur</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="ve-field-row">
-                    <div class="ve-field" style="flex:1">
-                        <label>Start (s)</label>
-                        <input type="number" id="text-start-input" placeholder="0.00" step="0.1" min="0">
-                    </div>
-                    <div class="ve-field" style="flex:1">
-                        <label>End (s)</label>
-                        <input type="number" id="text-end-input" placeholder="5.00" step="0.1" min="0">
-                    </div>
-                </div>
+        </div>
+
+        <!-- Fixed Timeline Bottom Toolbar -->
+        <div class="timeline-bottom-toolbar" id="timeline-bottom-toolbar">
+            <!-- Left Section: Track status -->
+            <div class="tb-bottom-section tb-bottom-left">
+                <span class="tb-bottom-badge" id="tb-bottom-track-info" title="Active Timeline Tracks">
+                    <i data-lucide="layers" style="width:13px;height:13px;color:var(--ve-primary);"></i> 3 Tracks
+                </span>
             </div>
-            <div class="ve-text-modal-footer">
-                <button class="ve-btn ve-btn-ghost" id="text-modal-cancel">Cancel</button>
-                <button class="ve-btn ve-btn-primary" id="btn-apply-text">
-                    <i data-lucide="plus"></i> Add to Timeline
+
+            <!-- Right Section: Zoom Fit & Fullscreen -->
+            <div class="tb-bottom-section tb-bottom-right">
+                <button type="button" class="tb-btn tb-bottom-btn" id="tb-bottom-zoom-fit" title="Zoom to Fit Entire Timeline">
+                    <i data-lucide="maximize-2" style="width:13px;height:13px;"></i> Fit
+                </button>
+                <div class="tb-bottom-divider"></div>
+                <button type="button" class="tb-btn tb-bottom-btn" id="tb-bottom-fullscreen" title="Maximize Timeline View">
+                    <i data-lucide="expand" style="width:13px;height:13px;"></i>
                 </button>
             </div>
         </div>
     </div>
 
-</div><!-- /.ve-editor-page -->
+    <!-- History Drawer Panel (Slide-out from the right) -->
+    <div class="ve-history-drawer" id="history-drawer">
+        <div class="ve-history-drawer-backdrop" id="history-drawer-backdrop"></div>
+        <div class="ve-history-drawer-content">
+            <div class="ve-history-drawer-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="history" style="width:18px;height:18px;color:var(--ve-primary);"></i>
+                    <h3 style="margin:0; font-size:15px; font-weight:700;">Edit History</h3>
+                </div>
+                <button class="ve-history-drawer-close" id="history-drawer-close" title="Close Drawer">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="ve-history-drawer-body" style="overflow-x: hidden;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+                    <form id="reset-form" action="{% url 'op_reset' project.pk %}" method="post" class="inline-form"
+                        onsubmit="return confirm('Discard all edits and revert to the original upload?');" style="margin: 0;">
+                        {% csrf_token %}
+                        <button type="submit" class="ve-btn ve-btn-danger" style="padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 6px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); display: flex; align-items: center; gap: 6px;">
+                            <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Reset to Original
+                        </button>
+                    </form>
+                </div>
+                
+                {% if operations %}
+                <ul class="history-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
+                    {% for op in operations %}
+                    <li style="display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--ve-bg); border: 1px solid var(--ve-border); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                            <div style="display: flex; gap: 10px; align-items: flex-start; min-width: 0;">
+                                <span class="history-tag" style="background: var(--ve-primary); color: white; padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);">{{ op.get_operation_type_display }}</span>
+                                <div style="display: flex; flex-direction: column; min-width: 0; gap: 4px;">
+                                    <span class="history-desc" data-op-type="{{ op.operation_type }}" data-desc="{{ op.description }}" style="font-weight: 500; font-size: 14px; color: var(--ve-text); line-height: 1.4; word-break: break-word;">{{ op.description|linebreaksbr }}</span>
+                                </div>
+                            </div>
+                            <span class="history-time" style="font-size: 12px; color: var(--ve-text-muted); white-space: nowrap; flex-shrink: 0; padding-top: 2px;">{{ op.created_at|timesince }} ago</span>
+                        </div>
+                        
+                        {% if forloop.first or op.operation_type != 'upload' %}
+                        <div style="display: flex; justify-content: flex-end; align-items: center; border-top: 1px solid var(--ve-border); padding-top: 12px; margin-top: 4px;">
+                            {% if forloop.first %}
+                            <span style="font-size: 12px; color: var(--ve-primary); font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> Current Version
+                            </span>
+                            {% elif op.operation_type != 'upload' %}
+                            <form action="{% url 'op_revert' project.pk op.pk %}" method="post" style="margin: 0;"
+                                onsubmit="return confirm('Revert project to this edit point? Subsequent edits will be lost.');">
+                                {% csrf_token %}
+                                <button type="submit" class="ve-btn" style="padding: 6px 14px; font-size: 12px; height: auto; background: var(--ve-bg-secondary); color: var(--ve-text); border: 1px solid var(--ve-border); border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                                    <i data-lucide="rotate-ccw" style="width: 14px; height: 14px; margin-right: 4px;"></i> Revert
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div style="text-align: center; padding: 32px 16px; border: 1px dashed var(--ve-border); border-radius: 8px; background: var(--ve-bg-secondary); margin-top: 16px;">
+                    <i data-lucide="history" style="width: 24px; height: 24px; color: var(--ve-muted); margin-bottom: 8px;"></i>
+                    <p class="muted-text" style="font-size: 13px; color: var(--ve-muted); margin: 0; font-weight: 500;">No edits yet.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
+</div>
 {% endblock %}
 
-{% block extra_js %}
-
+{% block ve_extra_js %}
 <script>
-    window.PROJECT_ID = {{ project.pk }};
-    window.PROJECT_DURATION = {{ project.duration_seconds|default:"0" }};
-    window.PROJECT_SRC = "{{ project.working_file.url }}";
-    
-    document.addEventListener("DOMContentLoaded", function() {
+    window.REEL_STATUS_URL = "{% url 'project_status' project.pk %}";
+    window.REEL_PROJECT_STATUS = "{{ project.status }}";
+    window.REEL_UPLOAD_ASSET_URL = "{% url 'upload_asset' project.pk %}";
+    window.REEL_CSRF_TOKEN = "{{ csrf_token }}";
+    window.REEL_PROJECT_HAS_AUDIO = "{{ project.has_audio }}";
+    window.REEL_PROJECT_TRIM_START = Number("{{ project.trim_start|default:0.0 }}");
+    window.REEL_PROJECT_TRIM_END = JSON.parse("{{ project.trim_end|default:'null' }}");
+    window.REEL_PROJECT_HEIGHT = Number("{{ project.height|default:720 }}");
+    window.REEL_PROJECT_CLIPS = JSON.parse('{{ project.clips_json|default:"[]"|escapejs }}');
+
+    document.addEventListener("DOMContentLoaded", function () {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
+        }
+
+        // History Drawer Toggle
+        const showHistoryBtn = document.getElementById("btn-show-history");
+        const historyDrawer = document.getElementById("history-drawer");
+        const historyDrawerClose = document.getElementById("history-drawer-close");
+        const historyDrawerBackdrop = document.getElementById("history-drawer-backdrop");
+
+        if (showHistoryBtn && historyDrawer) {
+            showHistoryBtn.addEventListener("click", () => {
+                historyDrawer.classList.add("open");
+            });
+        }
+        if (historyDrawerClose && historyDrawer) {
+            historyDrawerClose.addEventListener("click", () => {
+                historyDrawer.classList.remove("open");
+            });
+        }
+
+        if (historyDrawerBackdrop && historyDrawer) {
+            historyDrawerBackdrop.addEventListener("click", () => {
+                historyDrawer.classList.remove("open");
+            });
+        }
+
+        // Wait for duration to be available (since app.js sets it)
+        function tryAddOriginalWaveform() {
+            const timelineBlock = document.getElementById("visual-trim-container");
+            if (timelineBlock && typeof window.duration !== 'undefined' && window.duration > 0) {
+                const basePxPerSecond = 15; // Same as in app.js
+                const zoomFactor = 1.0;
+                const totalWidth = Math.max(800, window.duration * basePxPerSecond * zoomFactor);
+                const waveformContainer = document.getElementById("original-audio-waveform");
+                if (waveformContainer && typeof window.generateWaveformSvg === 'function') {
+                    waveformContainer.innerHTML = window.generateWaveformSvg(totalWidth, 44, 0);
+                }
+            } else {
+                setTimeout(tryAddOriginalWaveform, 100);
+            }
+        }
+        tryAddOriginalWaveform();
+        
+        // Volume sliders sync logic
+        const timelineVideoVol = document.getElementById('timeline-video-volume');
+        const timelineVideoVolVal = document.getElementById('timeline-video-volume-val');
+        const formVideoVol = document.getElementById('id_video_volume');
+
+        if (timelineVideoVol && formVideoVol) {
+            timelineVideoVol.value = formVideoVol.value;
+            if (timelineVideoVolVal) timelineVideoVolVal.textContent = parseFloat(formVideoVol.value).toFixed(1);
+
+            timelineVideoVol.addEventListener('input', function (e) {
+                let val = e.target.value;
+                formVideoVol.value = val;
+                if (timelineVideoVolVal) timelineVideoVolVal.textContent = parseFloat(val).toFixed(1);
+                const mainVid = document.getElementById('main-video');
+                if (mainVid) mainVid.volume = Math.min(1.0, parseFloat(val));
+            });
+
+            formVideoVol.addEventListener('input', function (e) {
+                let val = e.target.value;
+                timelineVideoVol.value = val;
+                if (timelineVideoVolVal) timelineVideoVolVal.textContent = parseFloat(val).toFixed(1);
+                const mainVid = document.getElementById('main-video');
+                if (mainVid) mainVid.volume = Math.min(1.0, parseFloat(val));
+            });
+        }
+
+        const timelineBgVol = document.getElementById('timeline-bg-volume');
+        const timelineBgVolVal = document.getElementById('timeline-bg-volume-val');
+        const formBgVol = document.getElementById('id_bg_volume');
+
+        if (timelineBgVol && formBgVol) {
+            timelineBgVol.value = formBgVol.value;
+            if (timelineBgVolVal) timelineBgVolVal.textContent = parseFloat(formBgVol.value).toFixed(1);
+
+            timelineBgVol.addEventListener('input', function (e) {
+                formBgVol.value = e.target.value;
+                if (timelineBgVolVal) timelineBgVolVal.textContent = parseFloat(e.target.value).toFixed(1);
+            });
+
+            formBgVol.addEventListener('input', function (e) {
+                timelineBgVol.value = e.target.value;
+                if (timelineBgVolVal) timelineBgVolVal.textContent = parseFloat(e.target.value).toFixed(1);
+            });
+        }
+
+
+
+        const undoBtn = document.getElementById("tb-undo");
+        if (undoBtn) {
+            undoBtn.addEventListener("click", function () {
+                const undoForm = document.getElementById("undo-form");
+                if (undoForm) {
+                    const overlay = document.getElementById("processing-overlay");
+                    if (overlay) {
+                        overlay.style.display = "flex";
+                        const txt = overlay.querySelector("p");
+                        if (txt) txt.textContent = "Undoing last edit...";
+                    }
+                    undoForm.submit();
+                }
+            });
+        }
+
+        const redoBtn = document.getElementById("tb-redo");
+        if (redoBtn) {
+            redoBtn.addEventListener("click", function () {
+                const redoForm = document.getElementById("redo-form");
+                if (redoForm) {
+                    const overlay = document.getElementById("processing-overlay");
+                    if (overlay) {
+                        overlay.style.display = "flex";
+                        const txt = overlay.querySelector("p");
+                        if (txt) txt.textContent = "Redoing last edit...";
+                    }
+                    redoForm.submit();
+                }
+            });
         }
     });
 </script>
