@@ -993,10 +993,24 @@
 
             let count = 0;
 
-            if (videoTrackRow) count++;
+            // Video track is always visible
+            if (videoTrackRow) {
+                count++;
+            }
 
             renderEffectsTrack();
-            if (effectTrackRow && effectTrackRow.style.display !== "none") count++;
+            // Check if effect track is visible after renderEffectsTrack
+            let hasEffect = false;
+            if (effectTrackRow) {
+                const effectContent = document.getElementById("effect-track-content");
+                hasEffect = effectContent && effectContent.children && effectContent.children.length > 0;
+                if (hasEffect) {
+                    effectTrackRow.style.setProperty("display", "flex", "important");
+                    count++;
+                } else {
+                    effectTrackRow.style.setProperty("display", "none", "important");
+                }
+            }
 
             let hasText = false;
             if (textTrackRow) {
@@ -1029,9 +1043,11 @@
                 const textTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'text');
                 const audioTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'audio');
                 const effectTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'effect');
+                const videoTrackModel = window.dynamicTrackManager.tracks.find(t => t.type === 'video');
                 if (textTrackModel) textTrackModel.visible = !!hasText;
                 if (audioTrackModel) audioTrackModel.visible = !!hasAudio;
-                if (effectTrackModel) effectTrackModel.visible = (effectTrackRow && effectTrackRow.style.display !== "none");
+                if (effectTrackModel) effectTrackModel.visible = !!hasEffect;
+                if (videoTrackModel) videoTrackModel.visible = true;
                 window.dynamicTrackManager.updateTrackBadge();
             } else {
                 const trackBadge = document.getElementById("tb-bottom-track-info");
@@ -1248,132 +1264,217 @@
 
         const clipBlocksContainer = document.getElementById("timeline-clip-blocks");
 
+        // ── Canva-style clip thumbnail rendering ───────────────────────────────
+        // Thumbnail frame cache: Map<cacheKey, ImageBitmap>
+        // Key = `${videoSrc}|${timeRounded}` so frames are reused across renders.
+        const _thumbCache = new Map();
+        let _clipThumbAbortController = null;
+
+        // Desired thumbnail width — matches Canva's filmstrip density.
+        const THUMB_DESIRED_W = 56; // px per visible slot
+        const THUMB_RENDER_W  = 112; // canvas pixel width (2× retina)
+        const THUMB_RENDER_H  = 63;  // 16:9
+
+        // Round a seek time to 2 decimal places so nearby seeks reuse the same cache entry.
+        function _thumbKey(t) {
+            return `${Math.round(t * 100) / 100}`;
+        }
+
+        // Seek tempVideo and return an ImageBitmap, reading from cache if available.
+        async function _getThumbFrame(tempVideo, t, signal) {
+            const key = _thumbKey(t);
+            if (_thumbCache.has(key)) return _thumbCache.get(key);
+
+            tempVideo.currentTime = t;
+            await Promise.race([
+                new Promise(r => tempVideo.addEventListener("seeked", r, { once: true })),
+                new Promise(r => setTimeout(r, 700))
+            ]);
+            if (signal && signal.aborted) return null;
+
+            let bitmap = null;
+            try {
+                bitmap = await createImageBitmap(tempVideo, {
+                    resizeWidth: THUMB_RENDER_W,
+                    resizeHeight: THUMB_RENDER_H,
+                    resizeQuality: "medium"
+                });
+            } catch (_) {
+                // createImageBitmap not supported — fall back to canvas drawImage
+                const c = document.createElement("canvas");
+                c.width = THUMB_RENDER_W; c.height = THUMB_RENDER_H;
+                c.getContext("2d").drawImage(tempVideo, 0, 0, THUMB_RENDER_W, THUMB_RENDER_H);
+                // Store a fake bitmap-like object with a canvas instead
+                _thumbCache.set(key, { _canvas: c });
+                return _thumbCache.get(key);
+            }
+
+            _thumbCache.set(key, bitmap);
+            // Limit cache size to 300 entries to avoid memory bloat
+            if (_thumbCache.size > 300) {
+                _thumbCache.delete(_thumbCache.keys().next().value);
+            }
+            return bitmap;
+        }
+
+        // Shared offscreen video element — created once, reused every render.
+        let _clipThumbVideo = null;
+        function _getClipThumbVideo() {
+            if (!_clipThumbVideo) {
+                _clipThumbVideo = document.createElement("video");
+                _clipThumbVideo.muted = true;
+                _clipThumbVideo.playsInline = true;
+                _clipThumbVideo.preload = "auto";
+                _clipThumbVideo.src = video.src;
+            }
+            return _clipThumbVideo;
+        }
+
+        // Track the last rendered state so we can skip redundant passes.
+        let _lastClipRenderKey = "";
+
         async function renderClipBlocks() {
             if (!clipBlocksContainer || !duration) return;
-            clipBlocksContainer.innerHTML = "";
 
             const clipsData = window.REEL_PROJECT_CLIPS || [];
             const pxPerSecond = basePxPerSecond * zoomFactor;
-            const gapPx = 4; // Small gap between clips to show splits
+
+            // Build a cheap state key — if nothing changed, just reposition blocks
+            // without re-generating any thumbnails.
+            const stateKey = `${clipsData.map(c => `${c.start}-${c.end}`).join(",")}|${pxPerSecond.toFixed(3)}`;
+
+            // Abort any in-progress thumbnail pass
+            if (_clipThumbAbortController) {
+                _clipThumbAbortController.abort();
+            }
+            const abortController = new AbortController();
+            _clipThumbAbortController = abortController;
+            const signal = abortController.signal;
+
+            const gapPx = 3;
+
+            // ── Step 1: Create/update DOM blocks synchronously ────────────────
+            // If the state hasn't changed, skip the entire DOM rebuild
+            // (thumbnails are already painted and cached).
+            const domNeedsRebuild = stateKey !== _lastClipRenderKey;
+
+            if (domNeedsRebuild) {
+                clipBlocksContainer.innerHTML = "";
+            }
 
             let accumTime = 0.0;
+            const blockInfos = [];
+
             clipsData.forEach((clip, index) => {
                 const clipDur = parseFloat(clip.duration || 0.0);
-                const clipTitle = clip.title || "Clip";
+                const isFirst = index === 0;
+                const isLast  = index === clipsData.length - 1;
+                const blockLeft  = accumTime * pxPerSecond + (isFirst ? 0 : gapPx);
+                const blockWidth = Math.max(
+                    20,
+                    (clipDur * pxPerSecond) - (isFirst ? 0 : gapPx) - (isLast ? 0 : gapPx)
+                );
 
-                const block = document.createElement("div");
-                block.className = "timeline-clip-block";
-                // Calculate position and width, accounting for gap (except after last clip)
-                const blockLeft = accumTime * pxPerSecond + (index > 0 ? gapPx : 0);
-                const blockWidth = (clipDur * pxPerSecond) - (index < clipsData.length - 1 ? gapPx : 0);
-                
-                block.style.left = `${blockLeft}px`;
-                block.style.width = `${Math.max(blockWidth, 20)}px`; // Minimum 20px width
+                let block, thumbContainer;
 
-                // Thumbnail container for clip (empty flex container)
-                const thumbContainer = document.createElement("div");
-                thumbContainer.className = "timeline-clip-thumb";
-                thumbContainer.style.display = "flex";
-                thumbContainer.style.overflow = "hidden";
-                block.appendChild(thumbContainer);
+                if (domNeedsRebuild) {
+                    block = document.createElement("div");
+                    block.className = "timeline-clip-block";
+                    block.style.overflow = "hidden";
 
-                // Label
-                const label = document.createElement("span");
-                label.className = "timeline-clip-label";
-                label.textContent = clipTitle;
-                label.title = clipTitle;
-                block.appendChild(label);
+                    thumbContainer = document.createElement("div");
+                    thumbContainer.className = "timeline-clip-thumb";
+                    block.appendChild(thumbContainer);
 
-                // Add clear divider
-                if (index < clipsData.length - 1) {
-                    const divider = document.createElement("div");
-                    divider.className = "timeline-clip-divider";
-                    block.appendChild(divider);
+                    const clipStart = parseFloat(clip.start != null ? clip.start : accumTime);
+                    const clipEnd   = parseFloat(clip.end   != null ? clip.end   : accumTime + clipDur);
+                    block.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        startSeconds      = parseFloat(accumTime.toFixed(3));
+                        endSeconds        = parseFloat((accumTime + clipDur).toFixed(3));
+                        selectedClipIndex = index;
+                        video.currentTime = startSeconds;
+                        renderTrim();
+                    });
+                    clipBlocksContainer.appendChild(block);
+                } else {
+                    // Re-use existing block — just reposition it
+                    block = clipBlocksContainer.children[index];
+                    thumbContainer = block ? block.querySelector(".timeline-clip-thumb") : null;
                 }
 
-                // Click handler
-                block.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    startSeconds = parseFloat(accumTime.toFixed(2));
-                    endSeconds = parseFloat((accumTime + clipDur).toFixed(2));
-                    selectedClipIndex = index;
-                    video.currentTime = startSeconds;
-                    renderTrim();
-                });
+                if (block) {
+                    block.style.left  = `${blockLeft}px`;
+                    block.style.width = `${blockWidth}px`;
+                }
 
-                clipBlocksContainer.appendChild(block);
+                const clipStart = parseFloat(clip.start != null ? clip.start : accumTime);
+                const clipEnd   = parseFloat(clip.end   != null ? clip.end   : accumTime + clipDur);
+                blockInfos.push({ block, thumbContainer, clipStart, clipEnd, blockWidthPx: blockWidth });
                 accumTime += clipDur;
             });
 
-            // Now generate filmstrip thumbnails for all clips using tempVideo
-            const tempVideo = document.createElement("video");
-            tempVideo.crossOrigin = "anonymous";
-            tempVideo.muted = true;
-            tempVideo.preload = "auto";
-            tempVideo.src = video.src;
+            if (!domNeedsRebuild) {
+                // Blocks already have their thumbnails — nothing more to do.
+                return;
+            }
 
-            tempVideo.addEventListener("loadedmetadata", async () => {
-                // Clear any existing abort controller
-                if (window.tempVideoAbort) {
-                    window.tempVideoAbort.abort();
-                }
-                const abortController = new AbortController();
-                window.tempVideoAbort = abortController;
-                const signal = abortController.signal;
+            // ── Step 2: Fill filmstrips from cache or by seeking ──────────────
+            await new Promise(r => requestAnimationFrame(r));
+            if (signal.aborted) return;
 
-                const clipBlocks = clipBlocksContainer.querySelectorAll(".timeline-clip-block");
-                for (let i = 0; i < clipsData.length; i++) {
+            const tempVideo = _getClipThumbVideo();
+            const metaReady = tempVideo.readyState >= 1
+                ? Promise.resolve()
+                : new Promise(r => tempVideo.addEventListener("loadedmetadata", r, { once: true }));
+            await Promise.race([metaReady, new Promise(r => setTimeout(r, 3000))]);
+            if (signal.aborted) return;
+
+            for (let i = 0; i < blockInfos.length; i++) {
+                if (signal.aborted) return;
+                const { thumbContainer, clipStart, clipEnd, blockWidthPx } = blockInfos[i];
+                const clipDuration = clipEnd - clipStart;
+                if (clipDuration <= 0 || blockWidthPx <= 0 || !thumbContainer) continue;
+
+                const renderedWidth = blockInfos[i].block.clientWidth || blockWidthPx;
+                const count   = Math.max(1, Math.floor(renderedWidth / THUMB_DESIRED_W));
+                const slotW   = renderedWidth / count;
+
+                thumbContainer.innerHTML = "";
+
+                for (let j = 0; j < count; j++) {
                     if (signal.aborted) return;
-                    const clip = clipsData[i];
-                    const clipStart = parseFloat(clip.start);
-                    const clipEnd = parseFloat(clip.end);
-                    const clipDuration = clipEnd - clipStart;
-                    const clipBlock = clipBlocks[i];
-                    const thumbContainer = clipBlock.querySelector(".timeline-clip-thumb");
 
-                    thumbContainer.innerHTML = "";
-                    if (!clipDuration || clipDuration <= 0 || !clipBlock) continue;
-                    
-                    // Calculate target block width across the full timeline length
-                    const blockWidthPx = clipDuration * pxPerSecond;
-                    const targetBlockWidth = Math.max(
-                        clipBlock.offsetWidth || 0,
-                        thumbContainer.clientWidth || 0,
-                        Math.round(blockWidthPx)
-                    );
+                    const t       = clipStart + (clipDuration * (j + 0.5) / count);
+                    const seekT   = Math.max(clipStart, Math.min(clipEnd - 0.001, t));
+                    const bitmap  = await _getThumbFrame(tempVideo, seekT, signal);
+                    if (signal.aborted) return;
 
-                    const targetThumbWidth = 70; // 70px optimal frame width
-                    const count = Math.max(2, Math.ceil(targetBlockWidth / targetThumbWidth));
+                    const isLastSlot = j === count - 1;
+                    const slotPx = isLastSlot
+                        ? renderedWidth - Math.round(slotW) * (count - 1)
+                        : Math.round(slotW);
 
-                    for (let j = 0; j < count; j++) {
-                        if (signal.aborted) return;
-                        // Sample time at the center of each thumbnail segment from start to end
-                        const time = clipStart + (clipDuration * (j + 0.5) / count);
-                        tempVideo.currentTime = Math.max(clipStart, Math.min(clipEnd, time));
+                    const canvas = document.createElement("canvas");
+                    canvas.width  = THUMB_RENDER_W;
+                    canvas.height = THUMB_RENDER_H;
+                    canvas.style.cssText = `display:block;width:${slotPx}px;height:100%;flex-shrink:0;object-fit:cover;`;
 
-                        try {
-                            await Promise.race([
-                                new Promise(r => tempVideo.addEventListener("seeked", r, { once: true })),
-                                new Promise(r => setTimeout(r, 400))
-                            ]);
-                            if (signal.aborted) return;
-                            const canvas = document.createElement("canvas");
-                            canvas.width = 140;
-                            canvas.height = 78;
-                            canvas.style.flex = "1 1 0px";
-                            canvas.style.minWidth = "0";
-                            canvas.style.height = "100%";
-                            canvas.style.objectFit = "cover";
-                            canvas.style.display = "block";
-                            const ctx = canvas.getContext("2d");
-                            ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
-                            thumbContainer.appendChild(canvas);
-                        } catch (e) {
-                            console.warn("Error drawing clip thumbnail:", e);
+                    try {
+                        const ctx = canvas.getContext("2d");
+                        if (bitmap && bitmap._canvas) {
+                            ctx.drawImage(bitmap._canvas, 0, 0);
+                        } else if (bitmap) {
+                            ctx.drawImage(bitmap, 0, 0, THUMB_RENDER_W, THUMB_RENDER_H);
                         }
+                    } catch (err) {
+                        console.warn("Clip thumbnail draw error:", err);
                     }
+                    thumbContainer.appendChild(canvas);
                 }
-            });
+            }
+
+            _lastClipRenderKey = stateKey;
         }
 
         function renderTrim() {
@@ -1383,6 +1484,15 @@
             const leftPx = startSeconds * pxPerSecond;
             const rightPx = endSeconds * pxPerSecond;
             const playheadPx = video.currentTime * pxPerSecond;
+
+            // Position and size trim thumbnails to only cover selected range
+            trimThumbnails.style.left = `${leftPx}px`;
+            trimThumbnails.style.width = `${rightPx - leftPx}px`;
+            trimThumbnails.style.position = "absolute";
+            trimThumbnails.style.top = "0";
+            trimThumbnails.style.bottom = "0";
+            trimThumbnails.style.overflow = "hidden";
+            trimThumbnails.style.display = "flex";
 
             // Highlight selection box
             trimSelection.style.left = `${leftPx}px`;
@@ -1419,6 +1529,8 @@
             renderTextTrackTimeline();
             renderSplitMarkers();
             renderClipBlocks();
+            // Regenerate trim thumbnails only when selection range changes
+            generateThumbnails();
 
             // Toggle selected-delete highlight class and enable/disable delete button
             const deleteBtnEl = document.getElementById("tb-delete");
@@ -2410,6 +2522,8 @@
         if (btnZoomIn) {
             btnZoomIn.addEventListener("click", () => {
                 zoomFactor = Math.min(10.0, zoomFactor * 1.4);
+                _lastClipRenderKey = ""; // invalidate clip cache on zoom
+                _lastTrimThumbKey  = "";
                 updateRuler();
                 renderTrim();
                 generateThumbnails();
@@ -2420,6 +2534,8 @@
         if (btnZoomOut) {
             btnZoomOut.addEventListener("click", () => {
                 zoomFactor = Math.max(0.001, zoomFactor / 1.4);
+                _lastClipRenderKey = "";
+                _lastTrimThumbKey  = "";
                 updateRuler();
                 renderTrim();
                 generateThumbnails();
@@ -2432,6 +2548,8 @@
                 const parentWidth = trimTrack.parentElement.clientWidth;
                 if (parentWidth && duration) {
                     zoomFactor = parentWidth / (duration * basePxPerSecond);
+                    _lastClipRenderKey = "";
+                    _lastTrimThumbKey  = "";
                     updateRuler();
                     renderTrim();
                     generateThumbnails();
@@ -2607,7 +2725,10 @@
             updateVideoProgress();
         }
 
-        // Dynamic filmstrip thumbnail generator using offscreen video seek
+        // Dynamic filmstrip thumbnail generator for the trim-selection area.
+        // Uses the shared _thumbCache — frames already loaded by renderClipBlocks
+        // are instantly reused without any extra video seeks.
+        let _lastTrimThumbKey = "";
         async function generateThumbnails() {
             if (!duration) return;
 
@@ -2618,81 +2739,79 @@
             currentThumbnailAbortController = abortController;
             const signal = abortController.signal;
 
+            const visibleDuration = endSeconds - startSeconds;
+            if (visibleDuration <= 0) return;
+
+            const pxPerSecond = basePxPerSecond * zoomFactor;
+            const containerW  = trimThumbnails.clientWidth || Math.round(visibleDuration * pxPerSecond);
+            if (containerW <= 0) return;
+
+            const count = Math.max(1, Math.floor(containerW / THUMB_DESIRED_W));
+
+            // Build a state key — skip the whole pass if nothing changed
+            const stateKey = `${startSeconds.toFixed(3)}-${endSeconds.toFixed(3)}|${pxPerSecond.toFixed(3)}|${containerW}`;
+            if (stateKey === _lastTrimThumbKey && trimThumbnails.children.length === count) return;
+
             trimThumbnails.innerHTML = "";
+            const slotW = containerW / count;
 
-            // More thumbnails for fuller filmstrip
-            const count = Math.min(50, Math.max(10, Math.floor(duration * 2)));
+            // Reuse the same shared offscreen video
+            const tempVideo = _getClipThumbVideo();
+            const metaReady = tempVideo.readyState >= 1
+                ? Promise.resolve()
+                : new Promise(r => tempVideo.addEventListener("loadedmetadata", r, { once: true }));
+            await Promise.race([metaReady, new Promise(r => setTimeout(r, 3000))]);
+            if (signal.aborted) return;
 
-            const tempVideo = document.createElement("video");
-            tempVideo.muted = true;
-            tempVideo.playsInline = true;
-            tempVideo.preload = "auto";
+            try {
+                for (let i = 0; i < count; i++) {
+                    if (signal.aborted) return;
 
-            tempVideo.addEventListener("loadedmetadata", async () => {
-                try {
-                    const w = 80;
-                    const h = 64;
-                    for (let i = 0; i < count; i++) {
-                        if (signal.aborted) return;
+                    const t      = startSeconds + (visibleDuration * (i + 0.5) / count);
+                    const seekT  = Math.max(startSeconds, Math.min(endSeconds - 0.001, t));
+                    const bitmap = await _getThumbFrame(tempVideo, seekT, signal);
+                    if (signal.aborted) return;
 
-                        const time = (duration / (count - 1 || 1)) * i;
-                        tempVideo.currentTime = time;
+                    const isLast = i === count - 1;
+                    const slotPx = isLast
+                        ? containerW - Math.round(slotW) * (count - 1)
+                        : Math.round(slotW);
 
-                        // Wait for seek with a timeout of 1000ms so it never hangs
-                        await Promise.race([
-                            new Promise((r) => tempVideo.addEventListener("seeked", r, { once: true })),
-                            new Promise((r) => setTimeout(r, 1000))
-                        ]);
+                    const canvas = document.createElement("canvas");
+                    canvas.width  = THUMB_RENDER_W;
+                    canvas.height = THUMB_RENDER_H;
+                    canvas.style.cssText = `display:block;width:${slotPx}px;height:100%;flex-shrink:0;object-fit:cover;`;
 
-                        if (signal.aborted) return;
-
-                        const canvas = document.createElement("canvas");
-                        canvas.width = w;
-                        canvas.height = h;
-                        const ctx = canvas.getContext("2d");
-                        ctx.drawImage(tempVideo, 0, 0, w, h);
-                        trimThumbnails.appendChild(canvas);
+                    const ctx = canvas.getContext("2d");
+                    if (bitmap && bitmap._canvas) {
+                        ctx.drawImage(bitmap._canvas, 0, 0);
+                    } else if (bitmap) {
+                        ctx.drawImage(bitmap, 0, 0, THUMB_RENDER_W, THUMB_RENDER_H);
                     }
-                } catch (err) {
-                    console.error("Error generating timeline thumbnails:", err);
+                    trimThumbnails.appendChild(canvas);
                 }
-            });
-
-            tempVideo.src = video.src;
-            tempVideo.load();
-
-            // Split button event listener
-            const splitBtn = document.getElementById("tb-split");
-            const splitForm = document.getElementById("split-form");
-            const splitAtInput = document.getElementById("split-at-input");
-            console.log("splitBtn found:", !!splitBtn);
-            console.log("splitForm found:", !!splitForm);
-            console.log("splitAtInput found:", !!splitAtInput);
-            if (splitBtn && splitForm && splitAtInput) {
-                splitBtn.addEventListener("click", () => {
-                    const currentTime = video.currentTime;
-                    console.log("Split button clicked at time:", currentTime);
-                    splitAtInput.value = currentTime.toFixed(2);
-                    splitForm.submit();
-                });
+                _lastTrimThumbKey = stateKey;
+            } catch (err) {
+                console.error("Error generating timeline thumbnails:", err);
             }
-            // ---- Asset Bin Subtab Switching ----
-            const subtabs = document.querySelectorAll(".subtab-btn");
-            const subpanels = document.querySelectorAll(".subtab-panel");
-
-            subtabs.forEach((tab) => {
-                tab.addEventListener("click", () => {
-                    const target = tab.dataset.subtab;
-
-                    subtabs.forEach((t) => t.classList.remove("subtab-btn--active"));
-                    tab.classList.add("subtab-btn--active");
-
-                    subpanels.forEach((p) => {
-                        p.style.display = p.dataset.subpanel === target ? "block" : "none";
-                    });
-                });
-            });
-
         }
+
+        // ── ResizeObserver: re-render thumbnails when timeline width changes ──
+        if (typeof ResizeObserver !== "undefined" && trimTrack) {
+            let _resizeTimer = null;
+            const _roClips = new ResizeObserver(() => {
+                clearTimeout(_resizeTimer);
+                _resizeTimer = setTimeout(() => {
+                    if (duration) {
+                        _lastClipRenderKey = ""; // width changed → recount slots
+                        _lastTrimThumbKey  = "";
+                        renderClipBlocks();
+                        generateThumbnails();
+                    }
+                }, 120);
+            });
+            _roClips.observe(trimTrack);
+        }
+
     }
 })();

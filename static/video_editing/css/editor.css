@@ -2363,54 +2363,31 @@ body:has(.ve-editor-page) .messages-container {
 .trim-track {
   position: relative;
   height: 44px;
-  background-color: #0b0c10;
-  background-image:
-    /* Film perforations top */
-    linear-gradient(90deg, #1f2026 50%, transparent 50%),
-    /* Film perforations bottom */
-    linear-gradient(90deg, #1f2026 50%, transparent 50%);
-  background-size:
-    12px 5px,
-    12px 5px;
-  background-position:
-    0 1px,
-    0 38px;
-  background-repeat: repeat-x, repeat-x;
-  border-radius: 6px;
+  background-color: #0f1014;
+  border-radius: 4px;
   overflow: visible;
-  border: 1px solid #1f2026;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--ve-border);
+  box-shadow: none;
 }
 
 .trim-filename {
-  position: absolute;
-  top: -24px;
-  left: 4px;
-  background: rgba(30, 31, 38, 0.85);
-  color: #e2e4e9;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  font-family: var(--font-body);
-  z-index: 5;
-  pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: none;
 }
 
 .trim-thumbnails {
   position: absolute;
   inset: 0;
   display: flex;
-  overflow: hidden;
+  overflow: hidden;          /* Never spill outside the track */
   pointer-events: none;
-  opacity: 0.75;
-  border-radius: 5px;
+  opacity: 0.85;
+  border-radius: 4px;
 }
 
 .trim-thumbnails canvas {
+  display: block;
   height: 100%;
-  flex: 1;
+  flex-shrink: 0;
   object-fit: cover;
 }
 
@@ -2435,14 +2412,14 @@ body:has(.ve-editor-page) .messages-container {
 
 .trim-selection {
   position: absolute;
-  top: -1px;
-  bottom: -1px;
-  border: 2px solid #52b788;
-  border-radius: 6px;
+  top: 0;
+  bottom: 0;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
   box-sizing: border-box;
   z-index: 2;
   cursor: grab;
-  box-shadow: 0 0 8px rgba(82, 183, 136, 0.2);
+  box-shadow: none;
 }
 
 .trim-selection:active {
@@ -2451,10 +2428,10 @@ body:has(.ve-editor-page) .messages-container {
 
 .trim-handle {
   position: absolute;
-  top: -1px;
-  bottom: -1px;
-  width: 14px;
-  background: #52b788;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background: rgba(59, 130, 246, 0.8);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -2463,32 +2440,26 @@ body:has(.ve-editor-page) .messages-container {
   font-weight: 800;
   cursor: ew-resize;
   z-index: 3;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.trim-track:hover .trim-handle {
+  opacity: 1;
 }
 
 .trim-handle-left {
-  left: -1px;
-  border-radius: 5px 0 0 5px;
+  left: 0;
+  border-radius: 4px 0 0 4px;
 }
 
 .trim-handle-right {
-  right: -1px;
-  border-radius: 0 5px 5px 0;
+  right: 0;
+  border-radius: 0 4px 4px 0;
 }
 
 .resize-arrow-icon {
-  position: absolute;
-  right: -24px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #ffffff;
-  background: rgba(17, 18, 22, 0.85);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 13px;
-  font-weight: bold;
-  pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  display: none;
 }
 
 .trim-playhead {
@@ -2518,47 +2489,42 @@ body:has(.ve-editor-page) .messages-container {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  background: linear-gradient(180deg, #2c35f0 0%, #1a22d8 100%);
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 4px 6px;
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  border: 2px solid #3c46ff;
-  overflow: hidden;
+  background: transparent;
+  border-radius: 4px;
+  overflow: hidden;          /* Thumbnails are clipped to block boundary */
   cursor: pointer;
-  transition:
-    transform 0.1s ease,
-    box-shadow 0.1s ease;
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
 .timeline-clip-block:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  border-color: #5c66ff;
+  border-color: rgba(59, 130, 246, 0.7);
+  background: rgba(59, 130, 246, 0.06);
 }
 
 .timeline-clip-thumb {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 20px;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.9;
+  inset: 0;
+  display: flex;
+  overflow: hidden;          /* Critical: clips last frame to block boundary */
   pointer-events: none;
 }
 
+.timeline-clip-thumb canvas {
+  display: block;
+  height: 100%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
 .timeline-clip-label {
-  position: relative;
-  z-index: 1;
-  color: white;
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  right: 4px;
+  z-index: 2;
+  color: #ffffff;
   font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
@@ -2566,6 +2532,9 @@ body:has(.ve-editor-page) .messages-container {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 4px;
+  border-radius: 3px;
 }
 
 .timeline-clip-divider {
@@ -2573,8 +2542,8 @@ body:has(.ve-editor-page) .messages-container {
   right: 0;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: #0f14a0;
+  width: 1px;
+  background: rgba(100, 116, 139, 0.6);
   pointer-events: none;
 }
 
@@ -3431,11 +3400,11 @@ body.dark-mode .track-content-cell {
 }
 
 .trim-track {
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  background: var(--ve-bg-secondary) !important;
 }
 
 body.dark-mode .trim-track {
-  background: linear-gradient(180deg, #101216 0%, #0d0e11 100%) !important;
+  background: #0f1115 !important;
 }
 
 /* Timeline Clip Blocks - Modern */
@@ -3443,57 +3412,52 @@ body.dark-mode .trim-track {
   position: absolute !important;
   top: 3px !important;
   bottom: 3px !important;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-  border: 2px solid #60a5fa !important;
-  border-radius: 8px !important;
-  box-shadow:
-    0 2px 8px rgba(59, 130, 246, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  background: transparent !important;
+  border: 1px solid rgba(100, 116, 139, 0.4) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
   cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: background 0.15s ease;
   z-index: 1 !important;
   overflow: hidden !important;
 }
 
 .timeline-clip-block:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 4px 16px rgba(59, 130, 246, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  background: rgba(59, 130, 246, 0.1) !important;
+  border-color: rgba(59, 130, 246, 0.6) !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* Timeline Clip Divider */
 .timeline-clip-divider {
   position: absolute;
-  right: -1px;
+  right: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
-  background: rgba(255, 255, 255, 0.8);
-  border-left: 1px solid rgba(0, 0, 0, 0.2);
+  width: 1px;
+  background: rgba(100, 116, 139, 0.6);
   z-index: 5;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+  box-shadow: none;
 }
 
 /* Timeline Clip Label */
 .timeline-clip-label {
   position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 2px;
   color: white !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   font-size: 10px !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
   z-index: 2;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 2px 4px;
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.4) !important;
+  padding: 2px 4px !important;
+  border-radius: 3px !important;
 }
 
 /* Timeline Clip Thumb */
@@ -3514,8 +3478,9 @@ body.dark-mode .trim-track {
 
 .timeline-clip-thumb canvas {
   height: 100% !important;
-  flex: 1 1 0px !important;
-  min-width: 0 !important;
+  width: 60px !important; /* Fixed thumbnail width */
+  min-width: 60px !important;
+  flex-shrink: 0 !important;
   object-fit: cover !important;
   display: block !important;
 }
@@ -3523,23 +3488,30 @@ body.dark-mode .trim-track {
 /* Trim Thumbnails Filmstrip */
 .trim-thumbnails {
   position: absolute !important;
-  top: 4px !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 38px !important;
+  top: 0 !important;
+  bottom: 0 !important;
   display: flex !important;
   align-items: stretch !important;
-  gap: 2px !important;
+  gap: 0 !important;
   padding: 0 !important;
   z-index: 1 !important;
+  overflow: hidden !important;
 }
 
 .trim-thumbnails canvas {
   height: 100% !important;
-  flex: 0 0 auto !important;
-  border-radius: 3px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  width: 60px !important; /* Fixed thumbnail width */
+  min-width: 60px !important;
+  flex-shrink: 0 !important;
+  object-fit: cover !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Ensure trim track clips overflow */
+.trim-track {
+  overflow: hidden !important;
 }
 
 /* Audio Block - Professional */
