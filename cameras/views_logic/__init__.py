@@ -9,7 +9,7 @@ from .utils import (
 from .video_views import (
     like_recording,
     recording_analytics,
-    stream_video, upload_video, recordings_folder, manage_recordings,
+    stream_video, upload_video, camera_chunked_upload, recordings_folder, manage_recordings,
     toggle_recording_publish, watch_recording, stream_recording_chunk,
     recording_playlist, teacher_profile, delete_recording,
     update_recording_edit, apply_recording_trim, generate_recording_thumbnail,

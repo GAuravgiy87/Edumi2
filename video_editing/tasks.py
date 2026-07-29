@@ -42,3 +42,93 @@ def export_video_task(project_id, timeline_json):
             project.save(update_fields=['status', 'error_message'])
         except Exception:
             pass
+
+
+@shared_task
+def extract_metadata_and_proxies_task(project_id):
+    """
+    Asynchronously extracts video metadata (duration, resolution, has_audio)
+    and initializes clips_json in the background.
+    """
+    import json
+    import os
+    try:
+        project = VideoProject.objects.get(pk=project_id)
+        logger.info(f"Extracting metadata asynchronously for project {project_id}")
+        meta = ffmpeg_utils.get_metadata(project.original_file.path)
+        
+        project.duration_seconds = meta.get("duration", 0.0)
+        project.width = meta.get("width", 1920)
+        project.height = meta.get("height", 1080)
+        project.has_audio = meta.get("has_audio", True)
+        project.status = "ready"
+        
+        # Initialize clips_json
+        orig_filename = os.path.basename(project.original_file.name)
+        if len(orig_filename) > 32:
+            orig_filename = project.title + ".mp4"
+        project.clips_json = json.dumps([
+            {"title": orig_filename, "duration": meta.get("duration", 0.0)}
+        ])
+        
+        project.save(update_fields=["duration_seconds", "width", "height", "has_audio", "status", "clips_json"])
+        logger.info(f"Asynchronous metadata extraction success for project {project_id}")
+    except Exception as e:
+        logger.error(f"Asynchronous metadata extraction failed for project {project_id}: {str(e)}")
+        try:
+            project = VideoProject.objects.get(pk=project_id)
+            project.status = "error"
+            project.error_message = f"Metadata extraction failed: {str(e)}"
+            project.save(update_fields=["status", "error_message"])
+        except Exception:
+            pass
+
+@shared_task
+def generate_hls_proxy(project_id):
+    """
+    Generates a 480p HLS proxy for a video project.
+    """
+    import os
+    import subprocess
+    from django.conf import settings
+    
+    try:
+        project = VideoProject.objects.get(pk=project_id)
+        project.proxy_status = "processing"
+        project.save(update_fields=["proxy_status"])
+        
+        logger.info(f"Generating HLS proxy for Project {project_id}")
+        
+        input_path = project.original_file.path
+        
+        # Create output directory for the HLS stream
+        proxy_dir = os.path.join(settings.MEDIA_ROOT, 'proxies', str(project.owner_id), str(project_id))
+        os.makedirs(proxy_dir, exist_ok=True)
+        
+        playlist_path = os.path.join(proxy_dir, 'proxy.m3u8')
+        
+        cmd = [
+            "ffmpeg", "-y", "-i", input_path,
+            "-profile:v", "baseline", "-level", "3.0",
+            "-s", "854x480", "-start_number", "0",
+            "-hls_time", "10", "-hls_list_size", "0",
+            "-f", "hls", playlist_path
+        ]
+        
+        process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if process.returncode != 0:
+            raise Exception(f"FFmpeg HLS proxy failed: {process.stderr.decode('utf-8', errors='ignore')}")
+            
+        project.proxy_url = f"{settings.MEDIA_URL}proxies/{project.owner_id}/{project_id}/proxy.m3u8"
+        project.proxy_status = "completed"
+        project.save(update_fields=["proxy_status", "proxy_url"])
+        logger.info(f"HLS proxy generation completed for Project {project_id}")
+        
+    except Exception as e:
+        logger.error(f"HLS proxy generation failed for Project {project_id}: {str(e)}")
+        try:
+            project = VideoProject.objects.get(pk=project_id)
+            project.proxy_status = "failed"
+            project.save(update_fields=["proxy_status"])
+        except Exception:
+            pass

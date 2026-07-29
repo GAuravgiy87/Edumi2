@@ -8,26 +8,28 @@
 /* ---- Theme Bridge: Map ve- vars to global vars ---- */
 :root {
   /* Primary accent — uses global --primary from base.css */
-  --ve-primary: #667eea;
-  --ve-primary-dark: #5568d3;
+  --ve-primary: var(--primary, #667eea);
+  --ve-primary-dark: var(--primary-dark, #5568d3);
   --ve-primary-light: #818cf8;
-  --ve-danger: #ef4444;
-  --ve-success: #10b981;
-  --ve-warning: #f59e0b;
+  --ve-danger: var(--danger, #ef4444);
+  --ve-success: var(--success, #10b981);
+  --ve-warning: var(--warning, #f59e0b);
 
-  /* Backgrounds — light mode */
-  --ve-bg: #ffffff;
-  --ve-bg-secondary: #f9fafb;
-  --ve-bg-raised: #f3f4f6;
+  /* Backgrounds — mapped to global theme variables */
+  --ve-bg: var(--bg-card, #ffffff);
+  --ve-bg-secondary: var(--bg-main, #f9fafb);
+  --ve-bg-raised: var(--hover-bg, #f3f4f6);
+  --ve-bg-sub: var(--gray-100, #e2e8f0);
+  --ve-hover: var(--hover-bg, #f3f4f6);
 
-  /* Text — light mode */
-  --ve-text: #111827;
-  --ve-text-secondary: #374151;
-  --ve-text-muted: #6b7280;
+  /* Text — mapped to global theme variables */
+  --ve-text: var(--text-main, #111827);
+  --ve-text-secondary: var(--gray-700, #374151);
+  --ve-text-muted: var(--text-muted, #6b7280);
 
-  /* Borders — light mode */
-  --ve-border: #e5e7eb;
-  --ve-border-strong: #d1d5db;
+  /* Borders — mapped to global theme variables */
+  --ve-border: var(--border-color, #e5e7eb);
+  --ve-border-strong: var(--gray-300, #d1d5db);
 
   /* Shadows */
   --ve-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -42,21 +44,36 @@
   /* Glassmorphism — light mode */
   --ve-glass-bg: rgba(255, 255, 255, 0.92);
   --ve-glass-border: rgba(229, 231, 235, 0.6);
+
+  /* Stage backgrounds — light mode */
+  --ve-stage-bg: var(--bg-main, #f9fafb);
+  --ve-wrapper-bg: var(--bg-card, #ffffff);
+  --ve-tabs-bg: var(--bg-main, #f9fafb);
 }
 
-/* Dark mode overrides — mirrors the dark-mode vars set by base.css */
+/* Dark Mode Theme Overrides */
 body.dark-mode,
-html.dark-mode body {
-  --ve-bg: #1e293b;
-  --ve-bg-secondary: #0f172a;
-  --ve-bg-raised: #334155;
-  --ve-text: #f1f5f9;
+html.dark-mode,
+.dark-mode {
+  --ve-bg: var(--bg-card, #1e293b);
+  --ve-bg-secondary: var(--bg-main, #0f172a);
+  --ve-bg-raised: var(--hover-bg, #334155);
+  --ve-bg-sub: #1e293b;
+  --ve-hover: var(--hover-bg, #334155);
+
+  --ve-text: var(--text-main, #f1f5f9);
   --ve-text-secondary: #cbd5e1;
-  --ve-text-muted: #64748b;
-  --ve-border: #334155;
+  --ve-text-muted: var(--text-muted, #94a3b8);
+
+  --ve-border: var(--border-color, #334155);
   --ve-border-strong: #475569;
+
   --ve-glass-bg: rgba(15, 23, 42, 0.92);
-  --ve-glass-border: rgba(51, 65, 85, 0.7);
+  --ve-glass-border: rgba(51, 65, 85, 0.6);
+
+  --ve-stage-bg: var(--bg-main, #0f172a);
+  --ve-wrapper-bg: var(--bg-card, #1e293b);
+  --ve-tabs-bg: var(--bg-main, #0f172a);
 }
 
 /* ============================================================
@@ -612,9 +629,11 @@ html body:has(.ve-editor-page) .content-area {
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background: linear-gradient(135deg,
-      var(--ve-bg) 0%,
-      var(--ve-bg-secondary) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--ve-bg) 0%,
+    var(--ve-bg-secondary) 100%
+  );
   border-bottom: 1px solid var(--ve-border);
   flex-shrink: 0;
   gap: 16px;
@@ -676,16 +695,11 @@ html body:has(.ve-editor-page) .content-area {
 .ve-video-stage {
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  background: var(--ve-stage-bg);
   overflow: hidden;
   border-right: 1px solid var(--ve-border);
   height: 100%;
   min-width: 0;
-}
-
-body.dark-mode .ve-video-stage {
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-  border-right: 1px solid #334155;
 }
 
 .ve-video-wrapper {
@@ -694,14 +708,10 @@ body.dark-mode .ve-video-stage {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, #ffffff 0%, #e2e8f0 100%);
+  background: var(--ve-wrapper-bg);
   overflow: hidden;
   min-height: 250px;
   padding: 12px 24px;
-}
-
-body.dark-mode .ve-video-wrapper {
-  background: radial-gradient(ellipse at center, #1e293b 0%, #020617 100%);
 }
 
 #main-video {
@@ -715,7 +725,7 @@ body.dark-mode .ve-video-wrapper {
   background: #000;
 }
 
-body.dark-mode #main-video {
+body #main-video {
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.7),
     0 0 0 1px rgba(148, 163, 184, 0.1);
@@ -755,9 +765,11 @@ body.dark-mode #main-video {
   height: calc(100vh - 72px) !important;
   width: 100vw !important;
   padding: 24px !important;
-  background: radial-gradient(ellipse at center,
-      #1e293b 0%,
-      #020617 100%) !important;
+  background: radial-gradient(
+    ellipse at center,
+    #1e293b 0%,
+    #020617 100%
+  ) !important;
   box-sizing: border-box !important;
 }
 
@@ -799,11 +811,6 @@ body.dark-mode #main-video {
   min-height: 72px;
 }
 
-body.dark-mode .ve-player-controls {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, #020617 100%);
-  border-top: 1px solid rgba(51, 65, 85, 0.6);
-}
-
 .ve-ctrl-btn {
   display: flex;
   align-items: center;
@@ -826,20 +833,6 @@ body.dark-mode .ve-player-controls {
   border-color: var(--ve-border-strong);
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-}
-
-body.dark-mode .ve-ctrl-btn {
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(71, 85, 105, 0.5);
-  color: #e2e8f0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-body.dark-mode .ve-ctrl-btn:hover {
-  background: rgba(51, 65, 85, 0.9);
-  color: #ffffff;
-  border-color: rgba(148, 163, 184, 0.6);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .ve-ctrl-btn:active {
@@ -899,16 +892,16 @@ body.dark-mode .ve-ctrl-btn:hover {
   letter-spacing: 0.5px;
 }
 
-body.dark-mode .ve-time-display {
-  background: rgba(15, 23, 42, 0.6);
-  border-color: rgba(51, 65, 85, 0.7);
+body .ve-time-display {
+  background: var(--ve-bg-secondary);
+  border-color: var(--ve-border);
 }
 
-body.dark-mode .ve-time-display .time-current,
-body.dark-mode .ve-time-display .time-total {
-  background: rgba(30, 41, 59, 0.85);
-  border-color: rgba(71, 85, 105, 0.6);
-  color: #f1f5f9;
+body .ve-time-display .time-current,
+body .ve-time-display .time-total {
+  background: var(--ve-bg);
+  border-color: var(--ve-border);
+  color: var(--ve-text);
 }
 
 /* Volume slider */
@@ -944,9 +937,11 @@ body.dark-mode .ve-time-display .time-total {
    ============================================================ */
 
 .ve-tool-panel {
-  background: linear-gradient(180deg,
-      var(--ve-bg) 0%,
-      var(--ve-bg-secondary) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--ve-bg) 0%,
+    var(--ve-bg-secondary) 100%
+  );
   border-left: 1px solid var(--ve-border);
   display: flex;
   flex-direction: column;
@@ -959,19 +954,11 @@ body.dark-mode .ve-time-display .time-total {
 .ve-tool-tabs {
   display: flex;
   border-bottom: 1px solid var(--ve-border);
-  background: linear-gradient(135deg,
-      rgba(248, 250, 252, 0.9) 0%,
-      rgba(241, 245, 249, 0.9) 100%);
+  background: var(--ve-tabs-bg);
   overflow-x: auto;
   flex-shrink: 0;
   padding: 8px 12px;
   gap: 6px;
-}
-
-body.dark-mode .ve-tool-tabs {
-  background: linear-gradient(135deg,
-      rgba(30, 41, 59, 0.95) 0%,
-      rgba(15, 23, 42, 0.95) 100%);
 }
 
 .ve-tool-tabs::-webkit-scrollbar {
@@ -1099,9 +1086,9 @@ body.dark-mode .ve-tool-panel select,
 body.dark-mode .ve-field input[type="text"],
 body.dark-mode .ve-field input[type="number"],
 body.dark-mode .ve-field select {
-  background: rgba(15, 23, 42, 0.7);
-  border-color: rgba(51, 65, 85, 0.7);
-  color: #f1f5f9;
+  background: var(--ve-bg);
+  border-color: var(--ve-border);
+  color: var(--ve-text);
 }
 
 .ve-tool-panel input:focus,
@@ -1700,11 +1687,13 @@ body.dark-mode .ve-field input[type="file"] {
   content: "";
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(90deg,
-      rgba(255, 255, 255, 0.04) 0px,
-      rgba(255, 255, 255, 0.04) 1px,
-      transparent 1px,
-      transparent 8px);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0px,
+    rgba(255, 255, 255, 0.04) 1px,
+    transparent 1px,
+    transparent 8px
+  );
   pointer-events: none;
 }
 
@@ -2107,29 +2096,30 @@ body:has(.ve-editor-page) .messages-container {
   justify-content: center;
   gap: 8px;
   padding: 8px 16px 4px;
-  background: #141519;
+  background: var(--ve-bg-secondary);
+  color: var(--ve-text);
   font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
   font-size: 16px;
   font-weight: 500;
 }
 
 .video-time-display .time-current {
-  color: var(--accent);
+  color: var(--ve-primary);
   letter-spacing: 1px;
 }
 
 .video-time-display .time-separator {
-  color: var(--text-dim);
+  color: var(--ve-text-muted);
 }
 
 .video-time-display .time-total {
-  color: var(--text-dim);
+  color: var(--ve-text-muted);
   letter-spacing: 1px;
 }
 
 /* Video Progress Bar */
 .video-progress-container {
-  background: #141519;
+  background: var(--ve-bg-secondary);
   padding: 8px 16px 4px;
 }
 
@@ -2137,7 +2127,7 @@ body:has(.ve-editor-page) .messages-container {
   position: relative;
   width: 100%;
   height: 8px;
-  background: #374151;
+  background: var(--ve-border);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -2148,7 +2138,7 @@ body:has(.ve-editor-page) .messages-container {
   top: 0;
   height: 100%;
   width: 0%;
-  background: #ffffff;
+  background: var(--ve-primary);
   border-radius: 4px 0 0 4px;
 }
 
@@ -2159,8 +2149,9 @@ body:has(.ve-editor-page) .messages-container {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  background: var(--ve-bg);
+  border: 2px solid var(--ve-primary);
+  box-shadow: 0 0 8px rgba(102, 126, 234, 0.4);
   cursor: ew-resize;
   z-index: 10;
 }
@@ -2171,8 +2162,8 @@ body:has(.ve-editor-page) .messages-container {
   justify-content: center;
   gap: 16px;
   padding: 4px 16px 12px;
-  background: #141519;
-  border-top: 1px solid var(--border-soft);
+  background: var(--ve-bg-secondary);
+  border-top: 1px solid var(--ve-border);
   position: relative;
   user-select: none;
 }
@@ -2341,12 +2332,21 @@ body:has(.ve-editor-page) .messages-container {
   position: absolute;
   bottom: 0;
   width: 1px;
-  height: 4px;
   background: rgba(255, 255, 255, 0.15);
 }
 
+.trim-tick.minor {
+  height: 4px;
+  opacity: 0.45;
+}
+
+.trim-tick.medium {
+  height: 6px;
+  opacity: 0.75;
+}
+
 .trim-tick.major {
-  height: 8px;
+  height: 10px;
   background: rgba(255, 255, 255, 0.35);
 }
 
@@ -2362,10 +2362,10 @@ body:has(.ve-editor-page) .messages-container {
 /* Trim Track */
 .trim-track {
   position: relative;
-  height: 44px;
-  background-color: #0f1014;
-  border-radius: 4px;
-  overflow: visible;
+  height: 72px;
+  background: var(--ve-bg);
+  border-radius: 0;
+  overflow: hidden;
   border: 1px solid var(--ve-border);
   box-shadow: none;
 }
@@ -2378,7 +2378,8 @@ body:has(.ve-editor-page) .messages-container {
   position: absolute;
   inset: 0;
   display: flex;
-  overflow: hidden;          /* Never spill outside the track */
+  overflow: hidden;
+  /* Never spill outside the track */
   pointer-events: none;
   opacity: 0.85;
   border-radius: 4px;
@@ -2395,7 +2396,7 @@ body:has(.ve-editor-page) .messages-container {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: rgba(10, 11, 14, 0.8);
+  background: rgba(15, 23, 42, 0.16);
   z-index: 1;
   pointer-events: none;
 }
@@ -2414,16 +2415,13 @@ body:has(.ve-editor-page) .messages-container {
   position: absolute;
   top: 0;
   bottom: 0;
-  border: 2px solid #3b82f6;
-  border-radius: 4px;
+  border: 1px solid var(--ve-border-strong);
+  border-radius: 0;
   box-sizing: border-box;
   z-index: 2;
-  cursor: grab;
+  pointer-events: none;
+  background: transparent;
   box-shadow: none;
-}
-
-.trim-selection:active {
-  cursor: grabbing;
 }
 
 .trim-handle {
@@ -2431,7 +2429,7 @@ body:has(.ve-editor-page) .messages-container {
   top: 0;
   bottom: 0;
   width: 10px;
-  background: rgba(59, 130, 246, 0.8);
+  background: rgba(59, 130, 246, 0.9);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -2441,6 +2439,7 @@ body:has(.ve-editor-page) .messages-container {
   cursor: ew-resize;
   z-index: 3;
   opacity: 0;
+  pointer-events: auto;
   transition: opacity 0.15s ease;
 }
 
@@ -2484,30 +2483,68 @@ body:has(.ve-editor-page) .messages-container {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
+/* Magnetic Snap Guide Line */
+.timeline-snap-guide {
+  position: absolute;
+  top: -20px;
+  bottom: 0;
+  width: 2px;
+  background: #a855f7;
+  z-index: 30;
+  pointer-events: none;
+  box-shadow:
+    0 0 10px #a855f7,
+    0 0 20px #a855f7;
+  transition: opacity 0.1s ease;
+}
+
+.timeline-snap-guide::after {
+  content: "SNAP";
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #a855f7;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
 /* Professional Timeline Clip Styles */
 .timeline-clip-block {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
+  top: 4px;
+  bottom: 4px;
   background: transparent;
-  border-radius: 4px;
-  overflow: hidden;          /* Thumbnails are clipped to block boundary */
+  border-radius: 0;
+  overflow: hidden;
   cursor: pointer;
-  border: 1px solid rgba(100, 116, 139, 0.45);
-  transition: border-color 0.15s ease;
+  border: 1px solid var(--ve-border);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
   box-sizing: border-box;
+  box-shadow: none;
 }
 
 .timeline-clip-block:hover {
-  border-color: rgba(59, 130, 246, 0.7);
-  background: rgba(59, 130, 246, 0.06);
+  border-color: var(--ve-border-strong);
+  background: transparent;
+  transform: none;
+  box-shadow: none;
 }
 
 .timeline-clip-thumb {
   position: absolute;
   inset: 0;
   display: flex;
-  overflow: hidden;          /* Critical: clips last frame to block boundary */
+  overflow: hidden;
+  /* Critical: clips last frame to block boundary */
   pointer-events: none;
 }
 
@@ -2524,17 +2561,16 @@ body:has(.ve-editor-page) .messages-container {
   left: 4px;
   right: 4px;
   z-index: 2;
-  color: #ffffff;
+  color: var(--ve-text);
   font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(255, 255, 255, 0.7);
   padding: 2px 4px;
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 .timeline-clip-divider {
@@ -2612,9 +2648,22 @@ body:has(.ve-editor-page) .messages-container {
 
 .timeline-track-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   width: max-content;
   min-width: 100%;
+  position: relative;
+  border-radius: var(--ve-radius-sm);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.timeline-track-row--selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.35) !important;
+  border-radius: 6px;
+  z-index: 10;
 }
 
 .track-badge {
@@ -2653,10 +2702,12 @@ body:has(.ve-editor-page) .messages-container {
 
 /* Specific content overrides */
 .track-content-cell.trim-track {
-  height: 45px;
+  height: 72px;
   margin: 0;
-  border: 1px solid var(--border-soft);
-  overflow: visible;
+  border: 1px solid var(--ve-border);
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  border-radius: 0;
   background-position:
     0 1px,
     0 46px;
@@ -2908,11 +2959,11 @@ body:has(.ve-editor-page) .messages-container {
 /* Timeline Audio Block styling */
 .timeline-audio-block {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
-  background: rgba(30, 41, 59, 0.85);
-  border: 1.5px solid #5d6cfc;
-  border-radius: 4px;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  border: 2px solid #34d399;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -2920,9 +2971,9 @@ body:has(.ve-editor-page) .messages-container {
   font-size: 13px;
   font-weight: bold;
   cursor: move;
-  overflow: visible;
+  overflow: hidden;
   z-index: 10;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .timeline-audio-block .audio-name {
@@ -2976,6 +3027,197 @@ body:has(.ve-editor-page) .messages-container {
 .timeline-audio-block.selected .audio-resize-handle.handle-right {
   right: -1px;
   border-radius: 0 5px 5px 0;
+}
+
+/* ═══ Unified Timeline Selection — Canva / CapCut Style ═══ */
+
+/* Video clip selected */
+.timeline-item--selected.timeline-clip-block {
+  border: 2px solid #ffa200 !important;
+  box-shadow: 0 0 14px rgba(255, 162, 0, 0.5) !important;
+  z-index: 20 !important;
+  overflow: visible !important;
+}
+
+/* Video clip trim/resize handles — visible only when clip is selected */
+.clip-trim-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 800;
+  color: #16171c;
+  background: #ffa200;
+  user-select: none;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.clip-trim-handle.handle-left {
+  left: -1px;
+  border-radius: 4px 0 0 4px;
+}
+
+.clip-trim-handle.handle-right {
+  right: -1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.timeline-item--selected .clip-trim-handle {
+  opacity: 1;
+}
+
+.clip-trim-handle .handle-tooltip {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1b20;
+  color: #ffa200;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid #ffa200;
+  white-space: nowrap;
+  pointer-events: none;
+  display: none;
+}
+
+.clip-trim-handle:hover .handle-tooltip {
+  display: block;
+}
+
+/* Universal item trim/resize handles for all tracks */
+.item-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 800;
+  color: #16171c;
+  background: #ffa200;
+  user-select: none;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.item-resize-handle.handle-left {
+  left: -1px;
+  border-radius: 4px 0 0 4px;
+}
+
+.item-resize-handle.handle-right {
+  right: -1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.timeline-item--selected .item-resize-handle,
+.timeline-item--selected .clip-trim-handle,
+.timeline-item--selected .text-resize-handle,
+.timeline-item--selected .audio-resize-handle {
+  opacity: 1 !important;
+  display: flex !important;
+}
+
+.item-resize-handle .handle-tooltip {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1b20;
+  color: #ffa200;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid #ffa200;
+  white-space: nowrap;
+  pointer-events: none;
+  display: none;
+}
+
+.item-resize-handle:hover .handle-tooltip,
+.clip-trim-handle:hover .handle-tooltip,
+.text-resize-handle:hover .handle-tooltip,
+.audio-resize-handle:hover .handle-tooltip {
+  display: block !important;
+}
+
+/* Text block selected */
+.timeline-item--selected.timeline-text-block {
+  background: linear-gradient(180deg, #149197 0%, #0d5c60 100%);
+  border: 2px solid #ffa200 !important;
+  box-shadow: 0 0 14px rgba(255, 162, 0, 0.5) !important;
+  z-index: 20 !important;
+}
+
+.timeline-item--selected.timeline-text-block .text-resize-handle {
+  width: 14px;
+  background: #ffa200 !important;
+  color: #16171c !important;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.timeline-item--selected.timeline-text-block .text-resize-handle.handle-left {
+  left: -1px;
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+}
+
+.timeline-item--selected.timeline-text-block .text-resize-handle.handle-right {
+  right: -1px;
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+
+.timeline-item--selected.timeline-text-block .handle-tooltip {
+  display: block;
+}
+
+/* Audio block selected (saved and temp) */
+.timeline-item--selected.timeline-audio-block,
+.timeline-item--selected.timeline-audio-block--saved,
+.timeline-item--selected.audio-block,
+.timeline-item--selected.temp-audio-block {
+  border: 2px solid #ffa200 !important;
+  box-shadow: 0 0 14px rgba(255, 162, 0, 0.5) !important;
+  z-index: 20 !important;
+  cursor: pointer;
+}
+
+/* Effect block — make interactive */
+.timeline-effect-block {
+  cursor: pointer;
+}
+
+.timeline-effect-block:hover {
+  outline: 1.5px solid rgba(255, 162, 0, 0.4);
+  outline-offset: -1.5px;
+}
+
+.timeline-item--selected.timeline-effect-block {
+  outline: 2px solid #ffa200 !important;
+  outline-offset: -2px;
+  box-shadow: 0 0 14px rgba(255, 162, 0, 0.5) !important;
+  z-index: 20 !important;
 }
 
 body:has(.editor-layout) .main {
@@ -3280,7 +3522,7 @@ input[type="range"].timeline-volume-slider::-webkit-slider-thumb:hover {
   font-size: 15px;
 }
 
-/* Professional Timeline Styles - DaVinci Style */
+/* Professional Timeline Styles — Fully Theme-Aware */
 .timeline-scroll-area {
   background: var(--ve-bg-secondary) !important;
   border-radius: 0px !important;
@@ -3290,11 +3532,6 @@ input[type="range"].timeline-volume-slider::-webkit-slider-thumb:hover {
   overflow-y: auto !important;
   padding: 0 !important;
   margin-top: 0 !important;
-}
-
-body.dark-mode .timeline-scroll-area {
-  background: linear-gradient(180deg, #1a1b1e 0%, #121316 100%) !important;
-  border-top: 1px solid #282a32 !important;
 }
 
 .timeline-tracks-wrapper {
@@ -3317,10 +3554,6 @@ body.dark-mode .timeline-scroll-area {
   margin: 0 !important;
 }
 
-body.dark-mode .timeline-track-row {
-  border-bottom: 1px solid #2a2c31 !important;
-}
-
 /* Automatically hide empty track rows that contain no track content blocks */
 .timeline-track-row:empty,
 .text-track-row:has(#text-track-content:empty),
@@ -3328,22 +3561,23 @@ body.dark-mode .timeline-track-row {
   display: none !important;
 }
 
+/* Track label sidebar column */
 .track-label-cell {
   min-width: 100px !important;
   width: 100px !important;
-  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  background: var(--ve-bg-raised);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
   border-right: 1px solid var(--ve-border);
-  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.02);
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.04);
 }
 
 body.dark-mode .track-label-cell {
-  background: linear-gradient(135deg, #23252a 0%, #1c1d22 100%);
-  border-right: 1px solid #2a2c31;
+  background: var(--ve-bg-raised);
+  border-right: 1px solid var(--ve-border);
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -3358,10 +3592,6 @@ body.dark-mode .track-label-cell {
   text-transform: uppercase;
 }
 
-body.dark-mode .track-name {
-  color: #e8eaee;
-}
-
 .track-icon {
   font-size: 16px;
 }
@@ -3373,6 +3603,7 @@ body.dark-mode .track-name {
   width: 100%;
 }
 
+/* Track content area */
 .track-content-cell {
   background: var(--ve-bg) !important;
   border: none !important;
@@ -3382,13 +3613,10 @@ body.dark-mode .track-name {
   height: 72px !important;
 }
 
-body.dark-mode .track-content-cell {
-  background: #18191d !important;
-  border-left: 1px solid #2a2c31 !important;
-}
-
 .trim-track {
   height: 68px !important;
+  background: var(--ve-bg) !important;
+  overflow: hidden !important;
 }
 
 .track-content-cell.audio-track {
@@ -3399,34 +3627,29 @@ body.dark-mode .track-content-cell {
   padding: 4px 10px;
 }
 
-.trim-track {
-  background: var(--ve-bg-secondary) !important;
-}
-
-body.dark-mode .trim-track {
-  background: #0f1115 !important;
-}
-
-/* Timeline Clip Blocks - Modern */
+/* Timeline Clip Blocks — Theme-Aware */
 .timeline-clip-block {
   position: absolute !important;
-  top: 3px !important;
-  bottom: 3px !important;
-  background: transparent !important;
-  border: 1px solid rgba(100, 116, 139, 0.4) !important;
-  border-radius: 4px !important;
-  box-shadow: none !important;
+  top: 4px !important;
+  bottom: 4px !important;
+  background: var(--ve-bg-raised) !important;
+  border: 1px solid var(--ve-border-strong) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--ve-shadow-sm) !important;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
   z-index: 1 !important;
   overflow: hidden !important;
 }
 
 .timeline-clip-block:hover {
-  background: rgba(59, 130, 246, 0.1) !important;
-  border-color: rgba(59, 130, 246, 0.6) !important;
-  transform: none !important;
-  box-shadow: none !important;
+  background: var(--ve-bg-raised) !important;
+  border-color: var(--ve-primary) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.18) !important;
 }
 
 /* Timeline Clip Divider */
@@ -3447,7 +3670,7 @@ body.dark-mode .trim-track {
   left: 4px;
   right: 4px;
   bottom: 2px;
-  color: white !important;
+  color: #ffffff !important;
   font-weight: 600 !important;
   font-size: 10px !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
@@ -3455,7 +3678,7 @@ body.dark-mode .trim-track {
   overflow: hidden;
   white-space: nowrap;
   z-index: 2;
-  background: rgba(0, 0, 0, 0.4) !important;
+  background: rgba(15, 23, 42, 0.45) !important;
   padding: 2px 4px !important;
   border-radius: 3px !important;
 }
@@ -3478,11 +3701,12 @@ body.dark-mode .trim-track {
 
 .timeline-clip-thumb canvas {
   height: 100% !important;
-  width: 60px !important; /* Fixed thumbnail width */
+  width: 60px !important;
   min-width: 60px !important;
   flex-shrink: 0 !important;
   object-fit: cover !important;
   display: block !important;
+  border-radius: 6px !important;
 }
 
 /* Trim Thumbnails Filmstrip */
@@ -3500,7 +3724,8 @@ body.dark-mode .trim-track {
 
 .trim-thumbnails canvas {
   height: 100% !important;
-  width: 60px !important; /* Fixed thumbnail width */
+  width: 60px !important;
+  /* Fixed thumbnail width */
   min-width: 60px !important;
   flex-shrink: 0 !important;
   object-fit: cover !important;
@@ -3534,8 +3759,8 @@ body.dark-mode .trim-track {
   bottom: 0 !important;
   height: 22px !important;
   z-index: 2 !important;
-  background: rgba(15, 23, 42, 0.95) !important;
-  border-top: 1px solid rgba(59, 130, 246, 0.6) !important;
+  background: rgba(0, 0, 0, 0.35) !important;
+  border-top: 1px solid rgba(59, 130, 246, 0.4) !important;
 }
 
 .integrated-audio-waveform {
@@ -3543,32 +3768,27 @@ body.dark-mode .trim-track {
   height: 100% !important;
 }
 
+/* Volume draggable line — visible in both themes */
 .volume-draggable-line {
   position: absolute !important;
   left: 0 !important;
   right: 0 !important;
   height: 3px !important;
-  background: #ffffff !important;
+  background: var(--ve-primary) !important;
   top: 50%;
   transform: translateY(-50%);
   cursor: row-resize !important;
   z-index: 10 !important;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 0 8px rgba(102, 126, 234, 0.6) !important;
 }
 
-.timeline-clip-block:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 6px 16px rgba(59, 130, 246, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
-  border-color: #93c5fd !important;
-}
+/* Note: .timeline-clip-block:hover is defined above; this duplicate removed */
 
 .timeline-clip-label {
   color: #ffffff !important;
   font-weight: 700 !important;
   font-size: 10px !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
 }
 
 /* Audio Track - Waveform */
@@ -3664,7 +3884,11 @@ body.dark-mode .trim-track {
 }
 
 .timeline-effect-block--empty {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(109, 40, 217, 0.2) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.2) 0%,
+    rgba(109, 40, 217, 0.2) 100%
+  ) !important;
   border: 1px dashed rgba(167, 139, 250, 0.5) !important;
   color: rgba(255, 255, 255, 0.75) !important;
 }
@@ -3684,6 +3908,7 @@ body.dark-mode .trim-track {
 
 /* Image Track Blocks */
 .timeline-image-block {
+  position: absolute;
   background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
   border: 2px solid #67e8f9 !important;
   border-radius: 8px !important;
@@ -3698,6 +3923,8 @@ body.dark-mode .trim-track {
   gap: 6px !important;
   padding: 2px 8px !important;
   z-index: 1 !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .timeline-image-block:hover {
@@ -3705,6 +3932,80 @@ body.dark-mode .trim-track {
     0 6px 16px rgba(6, 182, 212, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
   border-color: #a5f3fc !important;
+}
+
+.timeline-item--selected.timeline-image-block {
+  border: 2px solid #ffa200 !important;
+  box-shadow: 0 0 14px rgba(255, 162, 0, 0.5) !important;
+  z-index: 20 !important;
+}
+
+/* Sticker Track Blocks */
+.timeline-sticker-block {
+  position: absolute;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  border: 2px solid #fbbf24 !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 4px 12px rgba(245, 158, 11, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 2px 8px !important;
+  z-index: 1 !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.timeline-sticker-block:hover {
+  box-shadow:
+    0 6px 16px rgba(245, 158, 11, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  border-color: #fcd34d !important;
+}
+
+.timeline-item--selected.timeline-sticker-block {
+  border: 2px solid #ffa200 !important;
+  box-shadow: 0 0 14px rgba(255, 162, 0, 0.5) !important;
+  z-index: 20 !important;
+}
+
+/* Transition Track Blocks */
+.timeline-transition-block {
+  position: absolute;
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%) !important;
+  border: 2px solid #f9a8d4 !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 4px 12px rgba(236, 72, 153, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 2px 8px !important;
+  z-index: 1 !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.timeline-transition-block:hover {
+  box-shadow:
+    0 6px 16px rgba(236, 72, 153, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  border-color: #fbcfe8 !important;
+}
+
+.timeline-item--selected.timeline-transition-block {
+  border: 2px solid #ffa200 !important;
+  box-shadow: 0 0 14px rgba(255, 162, 0, 0.5) !important;
+  z-index: 20 !important;
 }
 
 /* Specialized Track Row Variants */
@@ -3728,6 +4029,14 @@ body.dark-mode .trim-track {
   border-left: 3px solid #06b6d4 !important;
 }
 
+.timeline-track-row--sticker {
+  border-left: 3px solid #f59e0b !important;
+}
+
+.timeline-track-row--transition {
+  border-left: 3px solid #ec4899 !important;
+}
+
 /* Timeline Tracks Wrapper & Rows */
 .timeline-tracks-wrapper {
   position: relative !important;
@@ -3746,45 +4055,64 @@ body.dark-mode .trim-track {
 
 /* Trim Ruler */
 .trim-ruler {
-  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%) !important;
-  border: 1px solid var(--ve-border) !important;
-  border-radius: 8px !important;
-  margin-bottom: 4px !important;
-  padding: 8px 0 6px 0 !important;
-  margin-left: 16px !important;
+  background: var(--ve-bg-secondary) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ve-border) !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  margin-bottom: 6px !important;
+  padding: 0 !important;
+  height: 26px !important;
+  position: relative !important;
+  box-shadow: none !important;
 }
 
 body.dark-mode .trim-ruler {
-  background: linear-gradient(180deg, #202129 0%, #1a1b22 100%) !important;
-  border: 1px solid #2d2f3a !important;
+  background: var(--ve-bg-secondary) !important;
+  border-bottom: 1px solid var(--ve-border) !important;
 }
 
 .trim-tick {
-  background: #cbd5e1 !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  width: 1px !important;
+  background: var(--ve-text-muted) !important;
+  pointer-events: none !important;
 }
 
-body.dark-mode .trim-tick {
-  background: #3d404d !important;
+.trim-tick.minor {
+  height: 5px !important;
+  opacity: 0.35 !important;
+}
+
+.trim-tick.medium {
+  height: 8px !important;
+  opacity: 0.6 !important;
 }
 
 .trim-tick.major {
-  background: #94a3b8 !important;
-  height: 10px !important;
-}
-
-body.dark-mode .trim-tick.major {
-  background: #6e7280 !important;
+  height: 12px !important;
+  width: 1.5px !important;
+  opacity: 0.85 !important;
+  background: var(--ve-text-muted) !important;
 }
 
 .trim-tick-label {
+  position: absolute !important;
+  top: 2px !important;
+  transform: translateX(-50%) !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
   color: var(--ve-text-muted) !important;
-  font-weight: 600 !important;
-  font-size: 10px !important;
-  font-family: var(--font-mono) !important;
-}
-
-body.dark-mode .trim-tick-label {
-  color: #b0b3c0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
 }
 
 /* Playhead */
@@ -3840,15 +4168,16 @@ body.dark-mode .playhead-tooltip {
 
 /* Timeline Toolbar */
 .timeline-toolbar {
-  background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%) !important;
+  background: var(--ve-bg-secondary) !important;
   border-bottom: 1px solid var(--ve-border) !important;
-  padding: 10px 16px !important;
-  border-radius: 12px 12px 0 0 !important;
+  padding: 8px 16px !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
 }
 
 body.dark-mode .timeline-toolbar {
-  background: linear-gradient(90deg, #1a1b22 0%, #15161b 100%) !important;
-  border-bottom: 1px solid #2d2f3a !important;
+  background: var(--ve-bg-secondary) !important;
+  border-bottom: 1px solid var(--ve-border) !important;
 }
 
 .tb-btn {
@@ -3862,21 +4191,9 @@ body.dark-mode .timeline-toolbar {
 }
 
 .tb-btn:hover {
-  background: var(--ve-border) !important;
+  background: var(--ve-hover) !important;
   border-color: var(--ve-border-strong) !important;
   color: var(--ve-text) !important;
-}
-
-body.dark-mode .tb-btn {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #d1d5db !important;
-}
-
-body.dark-mode .tb-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  color: #ffffff !important;
 }
 
 .tb-btn:disabled {
@@ -3894,19 +4211,9 @@ body.dark-mode .tb-btn:hover {
   border: 1px solid var(--ve-border) !important;
 }
 
-body.dark-mode .time-display {
-  color: #f3f4f6 !important;
-  background: rgba(0, 0, 0, 0.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
 .time-divider {
   color: var(--ve-text-muted) !important;
   font-size: 14px !important;
-}
-
-body.dark-mode .time-divider {
-  color: #6b7280 !important;
 }
 
 /* Timeline Speed Control */
@@ -3917,23 +4224,12 @@ body.dark-mode .time-divider {
   border-left: 1px solid var(--ve-border) !important;
 }
 
-body.dark-mode .timeline-speed-control {
-  background: rgba(0, 0, 0, 0.2) !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
 .timeline-speed-control input {
   background: var(--ve-bg) !important;
   border: 1px solid var(--ve-border) !important;
   border-radius: 6px !important;
   color: var(--ve-text) !important;
   font-family: var(--font-mono) !important;
-}
-
-body.dark-mode .timeline-speed-control input {
-  background: #374151 !important;
-  border: 1px solid #4b5563 !important;
-  color: #f3f4f6 !important;
 }
 
 /* Volume Slider Styling */
@@ -3946,7 +4242,7 @@ input[type="range"] {
 }
 
 body.dark-mode input[type="range"] {
-  background: linear-gradient(90deg, #374151 0%, #4b5563 100%) !important;
+  background: var(--ve-border) !important;
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -3967,15 +4263,19 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Trim Dim */
 .trim-dim {
-  background: linear-gradient(90deg,
-      rgba(0, 0, 0, 0.15) 0%,
-      rgba(0, 0, 0, 0.1) 100%) !important;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.15) 0%,
+    rgba(0, 0, 0, 0.1) 100%
+  ) !important;
 }
 
 body.dark-mode .trim-dim {
-  background: linear-gradient(90deg,
-      rgba(0, 0, 0, 0.6) 0%,
-      rgba(0, 0, 0, 0.4) 100%) !important;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0, 0.4) 100%
+  ) !important;
 }
 
 .trim-selection {
@@ -4015,8 +4315,8 @@ body.dark-mode .trim-dim {
 }
 
 body.dark-mode .visual-trim-container {
-  background: linear-gradient(180deg, #0a0b0e 0%, #0f1115 100%) !important;
-  border-top: 1px solid #282a32 !important;
+  background: var(--ve-bg-secondary) !important;
+  border-top: 1px solid var(--ve-border) !important;
 }
 
 /* Middle scroll area: Flexes vertically between top toolbar and bottom toolbar */
@@ -4047,7 +4347,7 @@ body.dark-mode .visual-trim-container {
 }
 
 body.dark-mode .timeline-scroll-area::-webkit-scrollbar-track {
-  background: rgba(10, 11, 14, 0.6) !important;
+  background: var(--ve-bg-secondary) !important;
 }
 
 .timeline-scroll-area::-webkit-scrollbar-thumb {
@@ -4077,9 +4377,9 @@ body.dark-mode .timeline-scroll-area::-webkit-scrollbar-track {
 }
 
 body.dark-mode .timeline-resizer {
-  background: linear-gradient(180deg, #181a20 0%, #101217 100%) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.4) !important;
+  background: var(--ve-bg-raised) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  border-bottom: 1px solid var(--ve-border) !important;
 }
 
 .timeline-resizer:hover,
@@ -4098,7 +4398,7 @@ body.dark-mode .timeline-resizer {
 }
 
 body.dark-mode .resizer-pill {
-  background: rgba(255, 255, 255, 0.25) !important;
+  background: var(--ve-border-strong) !important;
 }
 
 .timeline-resizer:hover .resizer-pill,
@@ -4119,9 +4419,9 @@ body.dark-mode .resizer-pill {
   position: relative !important;
   z-index: 1000 !important;
   height: 42px !important;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  background: var(--ve-bg-secondary) !important;
   border-top: 1px solid var(--ve-border) !important;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -4133,9 +4433,9 @@ body.dark-mode .resizer-pill {
 }
 
 body.dark-mode .timeline-bottom-toolbar {
-  background: linear-gradient(180deg, #161820 0%, #0d0e12 100%) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5) !important;
+  background: var(--ve-bg-secondary) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  box-shadow: none !important;
 }
 
 .tb-bottom-section {
@@ -4216,9 +4516,11 @@ body.dark-mode .tb-bottom-btn:hover {
 }
 
 .tb-bottom-play {
-  background: linear-gradient(135deg,
-      var(--ve-primary) 0%,
-      #8b5cf6 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--ve-primary) 0%,
+    #8b5cf6 100%
+  ) !important;
   color: #ffffff !important;
   border: none !important;
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4) !important;
@@ -4380,14 +4682,9 @@ body.dark-mode .tb-bottom-zoom-range {
 .ve-history-drawer-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px);
-  opacity: 0;
-  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.ve-history-drawer.open .ve-history-drawer-backdrop {
-  opacity: 1;
+  background: rgba(15, 23, 42, 0.2);
+  pointer-events: auto;
+  z-index: 1;
 }
 
 .ve-history-drawer-content {
@@ -4452,5 +4749,445 @@ body.dark-mode .tb-bottom-zoom-range {
 .ve-history-drawer-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  overflow-x: hidden;
+  padding: 20px;
 }
+
+/* ── History List Items ─────────────────────────────────────── */
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--ve-bg);
+  border: 1px solid var(--ve-border);
+  border-radius: 10px;
+  box-shadow: var(--ve-shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.history-item:hover {
+  border-color: var(--ve-border-strong);
+  box-shadow: var(--ve-shadow);
+}
+
+.history-item--current {
+  border-color: var(--ve-primary);
+  border-left: 3px solid var(--ve-primary);
+}
+
+/* Top row: badge + timestamp */
+.history-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.history-op-badge {
+  display: inline-block;
+  background: var(--ve-primary);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.history-time {
+  font-size: 11px;
+  color: var(--ve-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Description paragraph */
+.history-desc {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ve-text);
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Footer row: current-version label or revert button */
+.history-item-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--ve-border);
+  margin-top: 2px;
+}
+
+.history-current-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ve-primary);
+}
+
+.history-revert-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 5px 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  height: auto !important;
+  background: var(--ve-bg-raised) !important;
+  color: var(--ve-text) !important;
+  border: 1px solid var(--ve-border) !important;
+  border-radius: 6px !important;
+  cursor: pointer;
+  transition: all 0.15s ease !important;
+}
+
+.history-revert-btn:hover {
+  background: var(--ve-hover) !important;
+  border-color: var(--ve-border-strong) !important;
+}
+
+/* Empty state */
+.history-empty {
+  text-align: center;
+  padding: 40px 20px;
+  border: 1px dashed var(--ve-border);
+  border-radius: 12px;
+  background: var(--ve-bg-raised);
+  margin-top: 8px;
+}
+
+/* ================================================================
+   CANVA-STYLE TIMELINE THEME (Redesigned UI/UX)
+   ================================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* Font Family and Base Workspace Styling */
+.visual-trim-container,
+.timeline-scroll-area,
+.timeline-tracks-wrapper,
+.timeline-track-row,
+.timeline-clip-label,
+.trim-tick-label,
+.trim-duration-badge {
+  font-family:
+    "Inter",
+    "SF Pro Display",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif !important;
+}
+
+/* Overall Container & Background */
+.visual-trim-container {
+  background: var(--ve-bg-secondary) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  height: 240px;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.timeline-scroll-area {
+  background: var(--ve-bg-secondary) !important;
+  padding: 0 0 12px 16px !important;
+  margin: 0 !important;
+}
+
+/* Track Row Layout */
+.timeline-tracks-wrapper {
+  gap: 8px !important;
+  margin-left: 0 !important;
+  background: var(--ve-bg-secondary) !important;
+}
+
+.timeline-track-row {
+  display: flex;
+  background: transparent !important;
+  border: none !important;
+  margin-bottom: 0 !important;
+}
+
+/* Track Contents */
+.track-content-cell {
+  background: var(--ve-bg-raised) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--ve-border) !important;
+  padding: 8px !important;
+}
+
+/* Heights */
+.track-content-cell.trim-track,
+.trim-track {
+  height: 64px !important;
+  background: var(--ve-bg-raised) !important;
+}
+
+#text-track-content {
+  height: 40px !important;
+}
+
+.track-content-cell.audio-track {
+  height: 40px !important;
+  padding: 0 !important;
+}
+
+/* Video Clips */
+.timeline-clip-block {
+  top: 6px !important;
+  bottom: 6px !important;
+  border: 1px solid var(--ve-border) !important;
+  border-radius: 8px !important;
+  background: var(--ve-bg) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+  overflow: hidden !important;
+  transition: all 150ms ease !important;
+}
+
+body.dark-mode .timeline-clip-block {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: #262932 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+}
+
+.timeline-clip-block:hover {
+  outline: 2px solid rgba(92, 153, 255, 0.5) !important;
+  outline-offset: -2px !important;
+  box-shadow: 0 0 6px rgba(92, 153, 255, 0.25) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Selected outline style - Blue glow (no purple, no red) */
+.timeline-item--selected.timeline-clip-block,
+.timeline-item--selected.timeline-text-block,
+.timeline-item--selected.timeline-audio-block,
+.timeline-item--selected.timeline-audio-block--saved,
+.timeline-item--selected.audio-block,
+.timeline-item--selected.temp-audio-block,
+.timeline-item--selected.timeline-effect-block,
+.timeline-item--selected.timeline-image-block,
+.timeline-item--selected.timeline-sticker-block,
+.timeline-item--selected.timeline-transition-block {
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  outline: 2px solid #5c99ff !important;
+  outline-offset: -2px !important;
+  box-shadow: 0 0 10px rgba(92, 153, 255, 0.45) !important;
+  z-index: 20 !important;
+}
+
+/* Continuous filmstrip spacing */
+.timeline-clip-thumb canvas,
+.trim-thumbnails canvas {
+  object-fit: cover !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+}
+
+/* Floating Duration Badge */
+.trim-duration-badge {
+  position: absolute !important;
+  bottom: 6px !important;
+  left: 8px !important;
+  background: rgba(0, 0, 0, 0.65) !important;
+  color: #ffffff !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+}
+
+/* Hide plain text labels inside clips if they clash with design */
+.timeline-clip-label {
+  display: none !important;
+}
+
+/* Resize Handles - White Rounded Vertical Bars */
+.text-resize-handle,
+.clip-trim-handle,
+.audio-resize-handle,
+.trim-handle {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: ew-resize !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  overflow: visible !important;
+  opacity: 0 !important;
+  transition: opacity 150ms ease !important;
+}
+
+.timeline-item--selected .text-resize-handle,
+.timeline-item--selected .clip-trim-handle,
+.timeline-item--selected .audio-resize-handle,
+.trim-handle:hover,
+.trim-handle.dragging {
+  opacity: 1 !important;
+}
+
+.text-resize-handle::after,
+.clip-trim-handle::after,
+.audio-resize-handle::after,
+.trim-handle::after {
+  content: "" !important;
+  display: block !important;
+  width: 4px !important;
+  height: 20px !important;
+  background: #ffffff !important;
+  border-radius: 2px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.text-resize-handle.handle-left,
+.clip-trim-handle.handle-left,
+.audio-resize-handle.handle-left,
+.trim-handle-left {
+  left: 2px !important;
+}
+
+.text-resize-handle.handle-right,
+.clip-trim-handle.handle-right,
+.audio-resize-handle.handle-right,
+.trim-handle-right {
+  right: 2px !important;
+}
+
+/* Audio Track Styling */
+.audio-block,
+.timeline-audio-block,
+.timeline-audio-block--saved,
+.temp-audio-block {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%) !important;
+  border: 2px solid #34d399 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18) !important;
+  overflow: hidden !important;
+}
+
+/* Ruler Styling */
+.trim-ruler {
+  background: var(--ve-bg-secondary) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ve-border) !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  margin-bottom: 6px !important;
+  padding: 0 !important;
+  height: 26px !important;
+  position: relative !important;
+  box-shadow: none !important;
+}
+
+.trim-tick {
+  position: absolute !important;
+  bottom: 0 !important;
+  width: 1px !important;
+  background: var(--ve-text-muted) !important;
+  pointer-events: none !important;
+}
+
+.trim-tick.minor {
+  height: 5px !important;
+  opacity: 0.35 !important;
+}
+
+.trim-tick.medium {
+  height: 8px !important;
+  opacity: 0.6 !important;
+}
+
+.trim-tick.major {
+  height: 12px !important;
+  width: 1.5px !important;
+  opacity: 0.85 !important;
+  background: var(--ve-text-muted) !important;
+}
+
+.trim-tick-label {
+  position: absolute !important;
+  top: 2px !important;
+  transform: translateX(-50%) !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: var(--ve-text-muted) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+/* Playhead Styling - Circular white top handle, 2px white line */
+.timeline-tracks-wrapper .trim-playhead {
+  background: #ffffff !important;
+  width: 2px !important;
+  box-shadow: none !important;
+}
+
+.timeline-tracks-wrapper .trim-playhead::after {
+  content: "" !important;
+  position: absolute !important;
+  top: -6px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: #ffffff !important;
+  border-radius: 50% !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Selection Range Overlay Box (trim selection) */
+.trim-selection,
+.trim-selection.selected-delete {
+  border: 2px solid #5c99ff !important;
+  background: transparent !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 10px rgba(92, 153, 255, 0.45) !important;
+}
+
+/* Fixed Timeline Bottom Toolbar */
+.timeline-bottom-toolbar {
+  background: var(--ve-bg-secondary) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  border-radius: 0 !important;
+  padding: 6px 16px !important;
+}
+

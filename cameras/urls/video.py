@@ -8,6 +8,7 @@ urlpatterns = [
     path('manage-recordings/analytics/', views.recording_analytics, name='recording_analytics'),
     path('recordings-folder/', views.recordings_folder, name='recordings_folder'),
     path('upload-video/', views.upload_video, name='camera_upload_video'),
+    path('chunked-upload/', views.camera_chunked_upload, name='camera_chunked_upload'),
     path('stream-video/<int:recording_id>/', views.stream_video, name='stream_video'),
     path('recording-playlist/<int:recording_id>/', views.recording_playlist, name='recording_playlist'),
     path('stream-chunk/<int:recording_id>/<int:sequence>/', views.stream_recording_chunk, name='stream_chunk'),

@@ -35,6 +35,14 @@ class VideoProject(models.Model):
         ("error", "Error"),
     ]
 
+    PROXY_STATUS_CHOICES = [
+        ("none", "None"),
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="projects")
     title = models.CharField(max_length=255, blank=True, default="")
 
@@ -53,6 +61,9 @@ class VideoProject(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ready")
     error_message = models.TextField(blank=True, default="")
+    
+    proxy_status = models.CharField(max_length=20, choices=PROXY_STATUS_CHOICES, default="none")
+    proxy_url = models.CharField(max_length=500, blank=True, null=True)
     
     # NEW: JSON state of the timeline (clips, tracks, splits, overlays)
     timeline_state = models.JSONField(blank=True, null=True)

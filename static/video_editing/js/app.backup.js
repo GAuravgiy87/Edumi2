@@ -6,14 +6,13 @@
 (function () {
   "use strict";
 
-  // ---- Event Delegation for Tool Tabs & History Drawer -------------------
-  document.addEventListener("click", (e) => {
-    // 1. Tool Tab Switching
-    const tab = e.target.closest(".tool-tab, .ve-tool-tab");
-    if (tab) {
+  // ---- Tool tab switching -------------------------------------------
+  const tabs = document.querySelectorAll(".tool-tab, .ve-tool-tab");
+  const panels = document.querySelectorAll(".tool-section, .ve-tool-section");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
       const target = tab.dataset.tab;
-      const tabs = document.querySelectorAll(".tool-tab, .ve-tool-tab");
-      const panels = document.querySelectorAll(".tool-section, .ve-tool-section");
 
       tabs.forEach((t) => {
         t.classList.remove("tool-tab--active", "ve-tool-tab--active");
@@ -25,53 +24,20 @@
         p.classList.toggle("tool-section--active", isActive);
         p.classList.toggle("ve-tool-section--active", isActive);
       });
-      return;
-    }
-
-    // 2. History Drawer Show
-    const showHistoryBtn = e.target.closest("#btn-show-history");
-    if (showHistoryBtn) {
-      e.preventDefault();
-      const historyDrawer = document.getElementById("history-drawer");
-      if (historyDrawer) {
-        historyDrawer.classList.add("open");
-      }
-      return;
-    }
-
-    // 3. History Drawer Close & Backdrop
-    const closeHistoryBtn = e.target.closest("#history-drawer-close, #history-drawer-backdrop");
-    if (closeHistoryBtn) {
-      e.preventDefault();
-      const historyDrawer = document.getElementById("history-drawer");
-      if (historyDrawer) {
-        historyDrawer.classList.remove("open");
-      }
-      return;
-    }
+    });
   });
 
   // Activate tab from URL query parameter if present
-  const activateTabFromUrl = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    let activeTab = urlParams.get("tab");
-    if (activeTab === "fx") activeTab = "effects";
-    if (activeTab) {
-      const targetTab = document.querySelector(
-        `.tool-tab[data-tab="${activeTab}"], .ve-tool-tab[data-tab="${activeTab}"]`,
-      );
-      if (targetTab) {
-        targetTab.click();
-      }
+  const urlParams = new URLSearchParams(window.location.search);
+  const activeTab = urlParams.get("tab");
+  if (activeTab) {
+    const targetTab = document.querySelector(
+      `.tool-tab[data-tab="${activeTab}"], .ve-tool-tab[data-tab="${activeTab}"]`,
+    );
+    if (targetTab) {
+      targetTab.click();
     }
-  };
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", activateTabFromUrl);
-  } else {
-    activateTabFromUrl();
   }
-  document.addEventListener("turbo:load", activateTabFromUrl);
 
   // ---- Processing status polling -------------------------------------
   if (window.REEL_STATUS_URL && window.REEL_PROJECT_STATUS === "processing") {
@@ -139,39 +105,19 @@
           window.REEL_CSRF_TOKEN ||
           document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
 
-        let response = null;
-        let data = null;
-        let attempts = 0;
-        const maxRetries = 5;
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrf,
+          },
+          body: formData,
+        });
 
-        while (attempts < maxRetries) {
-          try {
-            if (attempts > 0) {
-              await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * Math.pow(1.5, attempts - 1), 8000)));
-            }
-            response = await fetch(uploadUrl, {
-              method: "POST",
-              headers: {
-                "X-CSRFToken": csrf,
-              },
-              body: formData,
-            });
-            if (response.ok) {
-              data = await response.json();
-              break;
-            }
-            attempts++;
-          } catch (err) {
-            attempts++;
-            console.warn(`Asset upload retry ${attempts}/${maxRetries}...`, err);
-            if (attempts >= maxRetries) throw err;
-          }
-        }
-
-        if (data && (data.success || data.status === "success")) {
+        const data = await response.json();
+        if (data.success || data.status === "success") {
           window.location.reload();
         } else {
-          alert("Upload failed: " + (data ? (data.error || "unknown error") : "Server error"));
+          alert("Upload failed: " + (data.error || "unknown error"));
           if (overlay) overlay.style.display = "none";
         }
       } catch (err) {
@@ -277,31 +223,26 @@
   // ---- Intercept Tool Forms to Update Local State Instead of Backend Submit
   document.querySelectorAll(".tool-panel form").forEach((form) => {
     if (form.id === "trim-form" || form.id === "insert-asset-form") return;
-
+    
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-
+      
       const action = form.getAttribute("action");
-
+      
       if (form.id === "bg-audio-form") {
         const fileInput = form.querySelector('input[type="file"]');
         if (!fileInput.files.length) return;
-
+        
         const btn = form.querySelector("button[type=submit]");
         const originalText = btn.textContent;
         btn.textContent = "Uploading...";
-
+        
         const formData = new FormData();
         formData.append("audio_file", fileInput.files[0]);
-
-        const csrf = document.querySelector(
-          'input[name="csrfmiddlewaretoken"]',
-        )?.value;
-        const uploadUrl = action.replace(
-          "background-audio",
-          "upload-audio-temp",
-        );
-
+        
+        const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+        const uploadUrl = action.replace("background-audio", "upload-audio-temp");
+        
         try {
           const res = await fetch(uploadUrl, {
             method: "POST",
@@ -310,15 +251,11 @@
           });
           const data = await res.json();
           if (data.status === "success") {
-            const bgVol =
-              parseFloat(form.querySelector("#id_bg_volume").value) || 0.5;
-            const vidVol =
-              parseFloat(form.querySelector("#id_video_volume").value) || 1.0;
-            const startSec =
-              parseFloat(form.querySelector("#id_start_seconds").value) || 0;
-            const endSec =
-              parseFloat(form.querySelector("#id_end_seconds").value) || null;
-
+            const bgVol = parseFloat(form.querySelector("#id_bg_volume").value) || 0.5;
+            const vidVol = parseFloat(form.querySelector("#id_video_volume").value) || 1.0;
+            const startSec = parseFloat(form.querySelector("#id_start_seconds").value) || 0;
+            const endSec = parseFloat(form.querySelector("#id_end_seconds").value) || null;
+            
             editorState.background_audios = editorState.background_audios || [];
             editorState.background_audios.push({
               temp_path: data.temp_path,
@@ -327,16 +264,12 @@
               video_volume: vidVol,
               start: startSec,
               end: endSec,
-              name: data.filename,
+              name: data.filename
             });
             editorState.volume = vidVol;
             applyCSSEffects();
-
-            if (window.updateLocalState)
-              window.updateLocalState(
-                "BgAudio",
-                `Added background audio ${data.filename}`,
-              );
+            
+            if (window.updateLocalState) window.updateLocalState("BgAudio", `Added background audio ${data.filename}`);
             btn.textContent = "Added!";
           } else {
             alert("Upload failed");
@@ -346,56 +279,42 @@
           alert("Error: " + err);
           btn.textContent = originalText;
         }
-        setTimeout(() => {
-          btn.textContent = originalText;
-        }, 2000);
+        setTimeout(() => { btn.textContent = originalText; }, 2000);
         return;
       }
-
+      
+      
       if (action.includes("/rotate/")) {
         const deg = form.querySelector("#id_degrees").value;
-        if (window.updateLocalState)
-          window.updateLocalState("Rotate", `Rotated ${deg} degrees`);
+        if (window.updateLocalState) window.updateLocalState("Rotate", `Rotated ${deg} degrees`);
       } else if (action.includes("/resize/")) {
         const w = form.querySelector("#id_width").value;
         const h = form.querySelector("#id_height").value;
-        if (window.updateLocalState)
-          window.updateLocalState("Resize", `Resized to ${w}x${h}`);
+        if (window.updateLocalState) window.updateLocalState("Resize", `Resized to ${w}x${h}`);
       } else if (action.includes("/grayscale/")) {
-        if (window.updateLocalState)
-          window.updateLocalState("Grayscale", `Applied Grayscale`);
+        if (window.updateLocalState) window.updateLocalState("Grayscale", `Applied Grayscale`);
       } else if (action.includes("/fade/")) {
         const fin = form.querySelector("#id_fade_in_seconds").value;
         const fout = form.querySelector("#id_fade_out_seconds").value;
-        if (window.updateLocalState)
-          window.updateLocalState(
-            "Fade",
-            `Fade in: ${fin}s, Fade out: ${fout}s`,
-          );
+        if (window.updateLocalState) window.updateLocalState("Fade", `Fade in: ${fin}s, Fade out: ${fout}s`);
       } else if (action.includes("/speed/")) {
         const speed = form.querySelector("#id_speed_factor").value;
-        if (window.updateLocalState)
-          window.updateLocalState("Speed", `Speed ${speed}x`);
+        if (window.updateLocalState) window.updateLocalState("Speed", `Speed ${speed}x`);
       } else if (action.includes("/volume/")) {
         const vol = form.querySelector("#id_volume_factor").value;
-        if (window.updateLocalState)
-          window.updateLocalState("Volume", `Volume ${vol}x`);
+        if (window.updateLocalState) window.updateLocalState("Volume", `Volume ${vol}x`);
       } else if (action.includes("/mute/")) {
-        if (window.updateLocalState)
-          window.updateLocalState("Mute", `Muted video`);
+        if (window.updateLocalState) window.updateLocalState("Mute", `Muted video`);
       } else if (action.includes("/text/")) {
-        if (window.updateLocalState)
-          window.updateLocalState("Text", `Added text overlay`);
+        if (window.updateLocalState) window.updateLocalState("Text", `Added text overlay`);
       }
-
+      
       // Visual feedback
       const btn = form.querySelector("button[type=submit]");
       if (btn) {
         const originalText = btn.textContent;
         btn.textContent = "Applied!";
-        setTimeout(() => {
-          btn.textContent = originalText;
-        }, 1500);
+        setTimeout(() => { btn.textContent = originalText; }, 1500);
       }
     });
   });
@@ -453,13 +372,17 @@
 
     // --- Client-side Accumulative State ---
     const editorState = {
-      video_clips: [],
+      trim: {
+        start: 0,
+        end: 0,
+        mode: "extract",
+        fade_in: false,
+        fade_out: false,
+      },
       speed: 1.0,
       volume: 1.0,
       muted: false,
       text_overlays: [],
-      background_audios: [],
-      active_effects: [],
       rotate: 0,
       resize: null,
       grayscale: false,
@@ -480,65 +403,43 @@
       } else {
         video.style.transform = "";
       }
-
+      
       // Playback speed and volume
       video.playbackRate = editorState.speed || 1.0;
-      video.volume =
-        editorState.volume !== undefined ? editorState.volume : 1.0;
+      video.volume = editorState.volume !== undefined ? editorState.volume : 1.0;
     };
 
     // Add item to custom edit history list
     const addHistoryItem = (type, description) => {
       const list = document.querySelector(".history-list");
-      const emptyHint = document.querySelector(
-        ".ve-history-drawer-body .muted-text, .history-panel .muted-text",
-      );
-      if (emptyHint) {
-        const hintBox = emptyHint.closest("div") || emptyHint;
-        hintBox.remove();
-      }
+      const emptyHint = document.querySelector(".history-panel p.muted-text");
+      if (emptyHint) emptyHint.remove();
 
       let ul = list;
       if (!ul) {
         ul = document.createElement("ul");
         ul.className = "history-list";
-        ul.style.cssText =
-          "list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;";
-        const panel = document.querySelector(
-          ".ve-history-drawer-body, .history-panel",
-        );
+        const panel = document.querySelector(".history-panel");
         if (panel) {
           panel.appendChild(ul);
         }
       }
 
-      if (ul) {
-        const li = document.createElement("li");
-        li.style.cssText =
-          "display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--ve-bg); border: 1px solid var(--ve-border); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);";
-        li.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-            <div style="display: flex; gap: 10px; align-items: flex-start; min-width: 0;">
-              <span class="history-tag" style="background: var(--ve-primary); color: white; padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 6px; text-transform: uppercase;">${type}</span>
-              <span class="history-desc" style="font-weight: 500; font-size: 14px; color: var(--ve-text); line-height: 1.4;">${description}</span>
-            </div>
-            <span class="history-time" style="font-size: 12px; color: var(--ve-text-muted); white-space: nowrap;">Just now</span>
-          </div>
-          <div style="display: flex; justify-content: flex-end; align-items: center; border-top: 1px solid var(--ve-border); padding-top: 12px; margin-top: 4px;">
-            <button type="button" class="history-revert-btn ve-btn" style="padding: 6px 14px; font-size: 12px; height: auto; background: var(--ve-bg-secondary); color: var(--ve-text); border: 1px solid var(--ve-border); border-radius: 6px; font-weight: 600; cursor: pointer;">Undo</button>
-          </div>
-        `;
+      const li = document.createElement("li");
+      li.innerHTML = `
+                <span class="history-tag">${type}</span>
+                <span class="history-desc">${description}</span>
+                <span class="history-time">Just now</span>
+                <button type="button" class="history-revert-btn" style="background:none; border:none; color:#ff4a4a; cursor:pointer; font-size:11px; margin-left:10px;">Undo</button>
+            `;
 
-        const revertBtn = li.querySelector(".history-revert-btn");
-        if (revertBtn) {
-          revertBtn.addEventListener("click", () => {
-            revertStateChange(type, description);
-            li.remove();
-          });
-        }
+      // Setup revert action for client-side state
+      li.querySelector(".history-revert-btn").addEventListener("click", () => {
+        revertStateChange(type, description);
+        li.remove();
+      });
 
-        ul.insertBefore(li, ul.firstChild);
-      }
+      ul.appendChild(li);
     };
 
     window.updateLocalState = (type, description) => {
@@ -548,40 +449,35 @@
       } else if (type === "Rotate") {
         const form = document.querySelector('form[action*="/rotate/"]');
         if (form) {
-          editorState.rotate =
-            parseInt(form.querySelector("#id_degrees").value) || 0;
+          editorState.rotate = parseInt(form.querySelector("#id_degrees").value) || 0;
         }
         applyCSSEffects();
       } else if (type === "Resize") {
         const form = document.querySelector('form[action*="/resize/"]');
         if (form) {
           editorState.resize = {
-            width: form.querySelector("#id_width").value,
-            height: form.querySelector("#id_height").value,
+             width: form.querySelector("#id_width").value,
+             height: form.querySelector("#id_height").value
           };
         }
       } else if (type === "Fade") {
         const form = document.querySelector('form[action*="/fade/"]');
         if (form) {
           editorState.fade = {
-            in:
-              parseFloat(form.querySelector("#id_fade_in_seconds").value) || 0,
-            out:
-              parseFloat(form.querySelector("#id_fade_out_seconds").value) || 0,
+             in: parseFloat(form.querySelector("#id_fade_in_seconds").value) || 0,
+             out: parseFloat(form.querySelector("#id_fade_out_seconds").value) || 0
           };
         }
       } else if (type === "Speed") {
         const form = document.querySelector('form[action*="/speed/"]');
         if (form) {
-          editorState.speed =
-            parseFloat(form.querySelector("#id_speed_factor").value) || 1.0;
+          editorState.speed = parseFloat(form.querySelector("#id_speed_factor").value) || 1.0;
         }
         applyCSSEffects();
       } else if (type === "Volume") {
         const form = document.querySelector('form[action*="/volume/"]');
         if (form) {
-          editorState.volume =
-            parseFloat(form.querySelector("#id_volume_factor").value) || 1.0;
+          editorState.volume = parseFloat(form.querySelector("#id_volume_factor").value) || 1.0;
         }
         applyCSSEffects();
       } else if (type === "Mute") {
@@ -612,7 +508,7 @@
       } else if (type === "Text") {
         const cleanDesc = description.replace('Caption: "', "").slice(0, -1);
         const idx = editorState.text_overlays.findIndex(
-          (o) => o.text === cleanDesc || description === "Added text overlay",
+          (o) => o.text === cleanDesc || description === 'Added text overlay',
         );
         if (idx !== -1) {
           editorState.text_overlays.splice(idx, 1);
@@ -820,7 +716,7 @@
         el.addEventListener("mousedown", onMouseDown);
         el.addEventListener("touchstart", onMouseDown, { passive: false });
       });
-      renderAllTimelineTracks();
+      renderTextTrackTimeline();
     };
 
     // --- Real-time sync of Text Overlay Form fields to editorState & preview ---
@@ -903,7 +799,7 @@
           const overlay = editorState.text_overlays[selectedOverlayIndex];
           if (playheadTime < overlay.end) {
             overlay.start = playheadTime;
-            renderAllTimelineTracks();
+            renderTextTrackTimeline();
             renderTextOverlays();
           }
         }
@@ -926,7 +822,7 @@
           const overlay = editorState.text_overlays[selectedOverlayIndex];
           if (playheadTime > overlay.start) {
             overlay.end = playheadTime;
-            renderAllTimelineTracks();
+            renderTextTrackTimeline();
             renderTextOverlays();
           }
         }
@@ -960,285 +856,360 @@
     }
     let globalSelection = { track: null, index: -1 };
 
-    const TRACK_CONFIG = {
-      text: {
-        stateKey: "text_overlays",
-        containerId: "text-track-content",
-        color: "linear-gradient(135deg, #0d6b6e 0%, #08494b 100%)",
-        borderColor: "#119296",
-        icon: "type",
-      },
-      audio: {
-        stateKey: "background_audios",
-        containerId: "audio-track",
-        color: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-        borderColor: "#34d399",
-        icon: "music",
-      },
-      effect: {
-        stateKey: "active_effects",
-        containerId: "effect-track-content",
-        color: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-        borderColor: "#fbbf24",
-        icon: "sparkles",
-      },
-    };
-
     function clearGlobalSelection() {
       globalSelection = { track: null, index: -1 };
-      if (typeof duration !== "undefined" && duration) {
-        startSeconds = Math.min(Math.max(startSeconds, 0), duration);
-        endSeconds = Math.max(
-          startSeconds,
-          Math.min(endSeconds || duration, duration),
-        );
-      }
-      if (typeof renderTrim === "function") renderTrim();
+      if (typeof renderTrim === 'function') renderTrim();
+      renderTextTrackTimeline();
+      renderAudioTrackTimeline();
     }
 
-    function selectTimelineItem(trackType, index, item, options = {}) {
-      globalSelection = { track: trackType, index };
-
-      if (
-        item &&
-        typeof item.start === "number" &&
-        typeof item.end === "number"
-      ) {
-        startSeconds = options.start ?? item.start;
-        endSeconds = options.end ?? item.end;
-      } else if (typeof duration !== "undefined" && duration) {
-        startSeconds = options.start ?? startSeconds ?? 0;
-        endSeconds = options.end ?? endSeconds ?? duration;
-      }
-
-      if (options.syncForm !== false && trackType === "text") {
-        const textFormEl = document.querySelector('form[action*="/text/"]');
-        if (textFormEl) {
-          textFormEl.querySelector("#id_text").value = item?.text || "";
-          textFormEl.querySelector("#id_position").value =
-            item?.position || "bottom";
-          textFormEl.querySelector("#id_color").value = item?.color || "white";
-          textFormEl.querySelector("#id_font_size").value =
-            item?.font_size || 80;
-          textFormEl.querySelector("#id_start_seconds").value =
-            item?.start ?? startSeconds;
-          textFormEl.querySelector("#id_end_seconds").value =
-            item?.end ?? endSeconds;
-        }
-      } else if (options.syncForm !== false && trackType === "audio") {
-        const bgForm = document.getElementById("bg-audio-form");
-        if (bgForm) {
-          bgForm.querySelector("#id_bg_volume").value = item?.bg_volume || 0.5;
-          bgForm.querySelector("#id_video_volume").value =
-            item?.video_volume || 1.0;
-          bgForm.querySelector("#id_start_seconds").value =
-            item?.start ?? startSeconds;
-          bgForm.querySelector("#id_end_seconds").value =
-            item?.end ?? endSeconds;
-        }
-      }
-
-      if (typeof renderTrim === "function") renderTrim();
-    }
-
-    function renderAllTimelineTracks() {
-      if (!duration) return;
+    function renderTextTrackTimeline() {
+      if (!textTrackContent || !duration) return;
+      textTrackContent.innerHTML = "";
+      
       const pxPerSecond = basePxPerSecond * zoomFactor;
+      textTrackContent.style.width = `${duration * pxPerSecond}px`;
 
-      syncEffectsToTrack();
+      editorState.text_overlays.forEach((overlay, index) => {
+        const leftPx = overlay.start * pxPerSecond;
+        const widthPx = (overlay.end - overlay.start) * pxPerSecond;
 
-      Object.keys(TRACK_CONFIG).forEach((trackType) => {
-        const config = TRACK_CONFIG[trackType];
-        const container = document.getElementById(config.containerId);
-        if (!container) return;
+        const el = document.createElement("div");
+        el.className = "timeline-text-block";
+        el.style.zIndex = "3";
+        if (globalSelection.track === 'text' && globalSelection.index === index) {
+          el.className += " timeline-item--selected";
+        }
+        el.style.left = `${leftPx}px`;
+        el.style.width = `${widthPx}px`;
 
-        container.innerHTML = "";
-        container.style.width = `${duration * pxPerSecond}px`;
+        // Resize handles
+        const handleL = document.createElement("div");
+        handleL.className = "text-resize-handle handle-left";
+        const tooltipL = document.createElement("div");
+        tooltipL.className = "handle-tooltip";
+        tooltipL.style.background = "#0d6b6e";
+        tooltipL.textContent = formatTime(overlay.start);
+        handleL.appendChild(tooltipL);
 
-        const items = editorState[config.stateKey] || [];
+        const handleR = document.createElement("div");
+        handleR.className = "text-resize-handle handle-right";
+        const tooltipR = document.createElement("div");
+        tooltipR.className = "handle-tooltip";
+        tooltipR.style.background = "#0d6b6e";
+        tooltipR.textContent = formatTime(overlay.end);
+        handleR.appendChild(tooltipR);
 
-        items.forEach((item, index) => {
-          const startSec = item.start || 0;
-          const endSec = item.end || duration;
-          const leftPx = startSec * pxPerSecond;
-          const widthPx = Math.max(20, (endSec - startSec) * pxPerSecond);
+        const textSpan = document.createElement("span");
+        textSpan.className = "text-content";
+        textSpan.textContent = overlay.text;
 
-          const el = document.createElement("div");
-          el.className = `timeline-generic-block`;
-          el.style.position = "absolute";
-          el.style.left = `${leftPx}px`;
-          el.style.width = `${widthPx}px`;
-          el.style.height =
-            trackType === "effect" ? "calc(100% - 16px)" : "100%";
-          el.style.top = trackType === "effect" ? "8px" : "0";
-          el.style.background = config.color;
-          el.style.border = `2px solid ${config.borderColor}`;
-          el.style.borderRadius = "8px";
-          el.style.display = "flex";
-          el.style.alignItems = "center";
-          el.style.padding = "0 12px";
-          el.style.boxSizing = "border-box";
-          el.style.color = "white";
-          el.style.fontSize = "13px";
-          el.style.fontWeight = "bold";
-          el.style.overflow = "hidden";
-          el.style.zIndex = "3";
+        el.appendChild(handleL);
+        el.appendChild(textSpan);
+        el.appendChild(handleR);
 
-          if (
-            globalSelection.track === trackType &&
-            globalSelection.index === index
-          ) {
-            el.style.outline = "2px solid #ffffff";
-            el.style.outlineOffset = "2px";
-            el.style.boxShadow = "0 0 10px rgba(255,255,255,0.5)";
-          }
-
-          let name = item.name || item.text || "Item";
-          el.innerHTML = `<i data-lucide="${config.icon}" style="width:14px;height:14px;margin-right:6px;flex-shrink:0;"></i> <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</span>`;
-
-          const handleL = document.createElement("div");
-          handleL.style.position = "absolute";
-          handleL.style.left = "-4px";
-          handleL.style.top = "0";
-          handleL.style.width = "8px";
-          handleL.style.height = "100%";
-          handleL.style.cursor = "ew-resize";
-          handleL.style.zIndex = "4";
-
-          let dragOffsetSeconds = 0;
-          const startBlockDrag = (clientX) => {
-            const itemDuration = Math.max(
-              0.5,
-              (item.end || duration) - (item.start || 0),
-            );
-            dragOffsetSeconds = getSecondsFromX(clientX) - (item.start || 0);
-            const move = (moveEvent) => {
-              const moveClientX = moveEvent.touches
-                ? moveEvent.touches[0].clientX
-                : moveEvent.clientX;
-              const newStart = Math.max(
-                0,
-                Math.min(
-                  duration - itemDuration,
-                  getSecondsFromX(moveClientX) - dragOffsetSeconds,
-                ),
-              );
-              item.start = parseFloat(newStart.toFixed(2));
-              item.end = parseFloat((newStart + itemDuration).toFixed(2));
-              el.style.left = `${item.start * pxPerSecond}px`;
-              el.style.width = `${Math.max(20, (item.end - item.start) * pxPerSecond)}px`;
-              if (typeof renderTrim === "function") renderTrim();
-            };
-            const stop = () => {
-              window.removeEventListener("mousemove", move);
-              window.removeEventListener("mouseup", stop);
-              window.removeEventListener("touchmove", move);
-              window.removeEventListener("touchend", stop);
-            };
-            window.addEventListener("mousemove", move);
-            window.addEventListener("mouseup", stop);
-            window.addEventListener("touchmove", move, { passive: false });
-            window.addEventListener("touchend", stop);
-          };
-
-          el.addEventListener("mousedown", (e) => {
-            if (e.target.closest(".trim-handle")) return;
-            e.preventDefault();
-            e.stopPropagation();
-            startBlockDrag(e.clientX);
-          });
-          el.addEventListener(
-            "touchstart",
-            (e) => {
-              if (e.target.closest(".trim-handle")) return;
-              e.preventDefault();
-              e.stopPropagation();
-              startBlockDrag(e.touches[0].clientX);
-            },
-            { passive: false },
-          );
-
-          const handleR = document.createElement("div");
-          handleR.style.position = "absolute";
-          handleR.style.right = "-4px";
-          handleR.style.top = "0";
-          handleR.style.width = "8px";
-          handleR.style.height = "100%";
-          handleR.style.cursor = "ew-resize";
-          handleR.style.zIndex = "4";
-
-          el.appendChild(handleL);
-          el.appendChild(handleR);
-          container.appendChild(el);
-
-          el.addEventListener("click", (e) => {
-            e.stopPropagation();
-            selectTimelineItem(trackType, index, item, {
-              start: startSec,
-              end: endSec,
-            });
-          });
-
-          if (typeof setupDrag === "function") {
-            setupDrag(handleL, (clientX) => {
-              let s = getSecondsFromX(clientX);
-              if (s < 0) s = 0;
-              if (s > endSec - 1.0) s = endSec - 1.0;
-              item.start = parseFloat(s.toFixed(2));
-              renderAllTimelineTracks();
-              if (window.updateLocalState)
-                window.updateLocalState("Trim", `Trimmed ${trackType} item`);
-            });
-
-            setupDrag(handleR, (clientX) => {
-              let e = getSecondsFromX(clientX);
-              if (e > duration) e = duration;
-              if (e < startSec + 1.0) e = startSec + 1.0;
-              item.end = parseFloat(e.toFixed(2));
-              renderAllTimelineTracks();
-              if (window.updateLocalState)
-                window.updateLocalState("Trim", `Trimmed ${trackType} item`);
-            });
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          globalSelection = { track: 'text', index: index };
+          if (typeof renderTrim === 'function') renderTrim();
+          renderAudioTrackTimeline();
+          renderTextTrackTimeline();
+          
+          const textFormEl = document.querySelector('form[action*="/text/"]');
+          if (textFormEl) {
+            textFormEl.querySelector("#id_text").value = overlay.text;
+            textFormEl.querySelector("#id_position").value = overlay.position;
+            textFormEl.querySelector("#id_color").value = overlay.color;
+            textFormEl.querySelector("#id_font_size").value = overlay.font_size;
+            textFormEl.querySelector("#id_start_seconds").value = overlay.start;
+            textFormEl.querySelector("#id_end_seconds").value = overlay.end;
           }
         });
-      });
 
-      if (typeof lucide !== "undefined") lucide.createIcons();
+        // Dragging logic
+        setupDrag(handleL, (clientX) => {
+          let s = getSecondsFromX(clientX);
+          if (s < 0) s = 0;
+          if (s > overlay.end - 1.0) s = overlay.end - 1.0;
+          overlay.start = parseFloat(s.toFixed(2));
+          el.style.left = `${overlay.start * pxPerSecond}px`;
+          el.style.width = `${(overlay.end - overlay.start) * pxPerSecond}px`;
+          tooltipL.textContent = formatTime(overlay.start);
+          renderTextOverlays();
+          if (window.updateLocalState) window.updateLocalState("Text", `Trimmed text overlay`);
+        });
+
+        setupDrag(handleR, (clientX) => {
+          let e = getSecondsFromX(clientX);
+          if (e > duration) e = duration;
+          if (e < overlay.start + 1.0) e = overlay.start + 1.0;
+          overlay.end = parseFloat(e.toFixed(2));
+          el.style.width = `${(overlay.end - overlay.start) * pxPerSecond}px`;
+          tooltipR.textContent = formatTime(overlay.end);
+          renderTextOverlays();
+          if (window.updateLocalState) window.updateLocalState("Text", `Trimmed text overlay`);
+        });
+
+        textTrackContent.appendChild(el);
+      });
       updateTrackRowVisibility();
     }
 
-    function syncEffectsToTrack() {
-      editorState.active_effects = editorState.active_effects || [];
-      if (editorState.active_effects.length === 0) {
-        if (editorState.speed && editorState.speed !== 1.0)
-          editorState.active_effects.push({
-            name: `Speed (${editorState.speed}x)`,
-            type: "speed",
-            start: 0,
-            end: duration,
-          });
-        if (editorState.grayscale)
-          editorState.active_effects.push({
-            name: "Grayscale",
-            type: "grayscale",
-            start: 0,
-            end: duration,
-          });
-        if (editorState.rotate)
-          editorState.active_effects.push({
-            name: `Rotate (${editorState.rotate}°)`,
-            type: "rotate",
-            start: 0,
-            end: duration,
-          });
-        if (editorState.fade)
-          editorState.active_effects.push({
-            name: "Fade",
-            type: "fade",
-            start: 0,
-            end: duration,
-          });
+    function renderAudioTrackTimeline() {
+      const audioTrack = document.getElementById("audio-track");
+      if (!audioTrack || !duration) return;
+      
+      const pxPerSecond = basePxPerSecond * zoomFactor;
+      audioTrack.style.width = `${duration * pxPerSecond}px`;
+
+      audioTrack.querySelectorAll(".timeline-audio-block--saved, .audio-block-dynamic").forEach(e => e.remove());
+
+      editorState.background_audios = editorState.background_audios || [];
+      editorState.background_audios.forEach((overlay, index) => {
+        const leftPx = overlay.start * pxPerSecond;
+        const bgEnd = overlay.end || duration;
+        const widthPx = (bgEnd - overlay.start) * pxPerSecond;
+
+        const el = document.createElement("div");
+        el.className = "audio-block audio-block-dynamic";
+        el.style.zIndex = "2";
+        if (globalSelection.track === 'audio' && globalSelection.index === index) {
+          el.className += " timeline-item--selected";
+        }
+        el.style.left = `${leftPx}px`;
+        el.style.width = `${widthPx}px`;
+        el.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+        el.style.border = "2px solid #34d399";
+        el.style.position = "absolute";
+        el.style.height = "100%";
+        el.style.top = "0";
+        el.style.display = "flex";
+        el.style.alignItems = "center";
+        el.style.padding = "0 12px";
+        el.style.boxSizing = "border-box";
+        el.style.borderRadius = "10px";
+        el.style.overflow = "hidden";
+
+        // Waveform
+        const waveformContainer = document.createElement("div");
+        waveformContainer.innerHTML = generateWaveformSvg(widthPx, 44, index);
+        waveformContainer.style.position = "absolute";
+        waveformContainer.style.inset = "0";
+        waveformContainer.style.display = "flex";
+        waveformContainer.style.alignItems = "center";
+        waveformContainer.style.opacity = "0.7";
+        el.appendChild(waveformContainer);
+
+        // Text label
+        const span = document.createElement("span");
+        span.className = "audio-name";
+        span.style.color = "#ffffff";
+        span.style.fontSize = "13px";
+        span.style.whiteSpace = "nowrap";
+        span.style.position = "relative";
+        span.style.zIndex = "1";
+        span.style.fontWeight = "bold";
+        span.textContent = `🎵 ${overlay.name || "Audio"}`;
+        el.appendChild(span);
+
+        // Resize handles
+        const handleL = document.createElement("div");
+        handleL.style.position = "absolute";
+        handleL.style.left = "-4px";
+        handleL.style.top = "0";
+        handleL.style.width = "8px";
+        handleL.style.height = "100%";
+        handleL.style.cursor = "ew-resize";
+        handleL.style.zIndex = "4";
+
+        const handleR = document.createElement("div");
+        handleR.style.position = "absolute";
+        handleR.style.right = "-4px";
+        handleR.style.top = "0";
+        handleR.style.width = "8px";
+        handleR.style.height = "100%";
+        handleR.style.cursor = "ew-resize";
+        handleR.style.zIndex = "4";
+
+        el.appendChild(handleL);
+        el.appendChild(handleR);
+        audioTrack.appendChild(el);
+
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          globalSelection = { track: 'audio', index: index };
+          if (typeof renderTrim === 'function') renderTrim();
+          renderTextTrackTimeline();
+          renderAudioTrackTimeline();
+          
+          const bgForm = document.getElementById("bg-audio-form");
+          if (bgForm) {
+            bgForm.querySelector("#id_bg_volume").value = overlay.bg_volume;
+            bgForm.querySelector("#id_video_volume").value = overlay.video_volume;
+            bgForm.querySelector("#id_start_seconds").value = overlay.start;
+            bgForm.querySelector("#id_end_seconds").value = bgEnd;
+          }
+        });
+
+        setupDrag(handleL, (clientX) => {
+          let s = getSecondsFromX(clientX);
+          if (s < 0) s = 0;
+          if (s > bgEnd - 1.0) s = bgEnd - 1.0;
+          overlay.start = parseFloat(s.toFixed(2));
+          el.style.left = `${overlay.start * pxPerSecond}px`;
+          el.style.width = `${(bgEnd - overlay.start) * pxPerSecond}px`;
+          if (window.updateLocalState) window.updateLocalState("BgAudio", `Trimmed audio`);
+        });
+
+        setupDrag(handleR, (clientX) => {
+          let e = getSecondsFromX(clientX);
+          if (e > duration) e = duration;
+          if (e < overlay.start + 1.0) e = overlay.start + 1.0;
+          overlay.end = parseFloat(e.toFixed(2));
+          el.style.width = `${(overlay.end - overlay.start) * pxPerSecond}px`;
+          if (window.updateLocalState) window.updateLocalState("BgAudio", `Trimmed audio`);
+        });
+      });
+    }
+
+    function renderEffectsTrack() {
+      const effectContent = document.getElementById("effect-track-content");
+      const effectRow = document.getElementById("effect-track-row");
+      if (!effectContent || !effectRow || !duration) return;
+
+      effectContent.innerHTML = "";
+      const activeEffects = [];
+
+      const effectTypes = ["grayscale", "speed", "rotate", "fade", "resize"];
+      const iconMap = {
+        grayscale: "aperture",
+        speed: "zap",
+        rotate: "rotate-cw",
+        fade: "sun",
+        resize: "maximize-2",
+      };
+
+      // 1. Gather applied effect operations from project history
+      if (
+        window.REEL_PROJECT_OPERATIONS &&
+        Array.isArray(window.REEL_PROJECT_OPERATIONS)
+      ) {
+        window.REEL_PROJECT_OPERATIONS.forEach((op) => {
+          if (effectTypes.includes(op.type)) {
+            let name = `Effect ${op.title || op.type}`;
+            if (op.type === "grayscale") {
+              name = "Effect Grayscale";
+            } else if (
+              op.description &&
+              op.description.toLowerCase().includes("speed")
+            ) {
+              name = `Effect ${op.description}`;
+            } else if (
+              op.description &&
+              op.description.toLowerCase().includes("rotated")
+            ) {
+              name = `Effect ${op.description}`;
+            } else if (
+              op.description &&
+              op.description.toLowerCase().includes("fade")
+            ) {
+              name = `Effect ${op.description}`;
+            }
+            activeEffects.push({
+              name: name,
+              icon: iconMap[op.type] || "sparkles",
+              start: op.trim_start || 0,
+              end: op.trim_end || duration,
+            });
+          }
+        });
       }
+
+      // 2. Gather client-side pending state effects
+      if (editorState.speed && editorState.speed !== 1.0) {
+        if (
+          !activeEffects.some((e) => e.name.toLowerCase().includes("speed"))
+        ) {
+          activeEffects.push({
+            name: `Effect Speed (${editorState.speed}x)`,
+            icon: "zap",
+            start: 0,
+            end: duration,
+          });
+        }
+      }
+      if (editorState.grayscale) {
+        if (
+          !activeEffects.some((e) => e.name.toLowerCase().includes("grayscale"))
+        ) {
+          activeEffects.push({
+            name: "Effect Grayscale",
+            icon: "aperture",
+            start: 0,
+            end: duration,
+          });
+        }
+      }
+      if (editorState.rotate && editorState.rotate !== 0) {
+        if (
+          !activeEffects.some((e) => e.name.toLowerCase().includes("rotate"))
+        ) {
+          activeEffects.push({
+            name: `Effect Rotate (${editorState.rotate}°)`,
+            icon: "rotate-cw",
+            start: 0,
+            end: duration,
+          });
+        }
+      }
+      if (editorState.fade) {
+        if (!activeEffects.some((e) => e.name.toLowerCase().includes("fade"))) {
+          activeEffects.push({
+            name: "Effect Fade",
+            icon: "sun",
+            start: 0,
+            end: duration,
+          });
+        }
+      }
+
+      effectRow.style.setProperty("display", "flex", "important");
+      const pxPerSecond = basePxPerSecond * zoomFactor;
+      const totalWidthPx = duration * pxPerSecond;
+      effectContent.style.width = `${totalWidthPx}px`;
+
+      // If no active effects exist, leave the track empty (no hardcoded demo block)
+      if (activeEffects.length === 0) {
+        effectContent.innerHTML = "";
+        return;
+      }
+
+      // Render blocks for applied effects
+      activeEffects.forEach((eff, i) => {
+        const startSec = eff.start || 0;
+        const endSec = eff.end && eff.end > startSec ? eff.end : duration;
+        const leftPx = startSec * pxPerSecond;
+        const widthPx = Math.max(60, (endSec - startSec) * pxPerSecond);
+
+        const block = document.createElement("div");
+        block.className = "timeline-effect-block";
+        block.style.position = "absolute";
+        block.style.left = `${leftPx}px`;
+        block.style.top = "8px";
+        block.style.bottom = "8px";
+        block.style.width = `${widthPx}px`;
+        block.style.display = "flex";
+        block.style.alignItems = "center";
+        block.style.padding = "0 12px";
+        block.style.fontSize = "13px";
+        block.style.fontWeight = "700";
+        block.style.borderRadius = "8px";
+        block.style.boxSizing = "border-box";
+        block.innerHTML = `<i data-lucide="${eff.icon}" style="width:14px;height:14px;margin-right:6px;flex-shrink:0;"></i> <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${eff.name}</span>`;
+        effectContent.appendChild(block);
+      });
+
+      if (typeof lucide !== "undefined") lucide.createIcons();
     }
 
     function updateTrackRowVisibility() {
@@ -1254,6 +1225,8 @@
         count++;
       }
 
+      renderEffectsTrack();
+      // Check if effect track is visible after renderEffectsTrack
       let hasEffect = false;
       if (effectTrackRow) {
         const effectContent = document.getElementById("effect-track-content");
@@ -1369,15 +1342,15 @@
           speed: editorState.speed,
           audio: {
             volume: editorState.volume,
-            muted: editorState.muted,
+            muted: editorState.muted
           },
           text_overlays: editorState.text_overlays,
           resize: editorState.resize,
           effects: {
             grayscale: editorState.grayscale,
             rotate: editorState.rotate,
-            fade: editorState.fade,
-          },
+            fade: editorState.fade
+          }
         };
 
         try {
@@ -1436,7 +1409,8 @@
         selectedOverlayIndex = 0;
 
         renderTextOverlays();
-        renderAllTimelineTracks();
+        renderTextTrackTimeline();
+
         const textFormEl = document.querySelector('form[action*="/text/"]');
         if (textFormEl) {
           textFormEl.querySelector("#id_text").value = text.trim();
@@ -1555,7 +1529,7 @@
       const pxPerSecond = basePxPerSecond * zoomFactor;
       const trackOffset = trimTrack?.offsetLeft || 0;
       const parentWidth = trimTrack?.parentElement
-        ? trimTrack.parentElement.clientWidth - 16
+        ? trimTrack.parentElement.clientWidth - 32
         : 800;
       const totalWidth = Math.max(parentWidth, duration * pxPerSecond);
       const { visibleStartTime, visibleEndTime } =
@@ -1762,15 +1736,14 @@
             clip.start != null ? clip.start : accumTime,
           );
           block.addEventListener("click", () => {
-            startSeconds = parseFloat(clipStart.toFixed(3));
-            endSeconds = parseFloat(clipEnd.toFixed(3));
+            startSeconds = parseFloat(accumTime.toFixed(3));
+            endSeconds = parseFloat((accumTime + clipDur).toFixed(3));
             selectedClipIndex = index;
-            selectTimelineItem("video", index, {
-              start: startSeconds,
-              end: endSeconds,
-              name: clip.name || `Clip ${index + 1}`,
-            });
+            globalSelection = { track: 'video', index: index };
+            if (typeof renderAudioTrackTimeline === 'function') renderAudioTrackTimeline();
+            if (typeof renderTextTrackTimeline === 'function') renderTextTrackTimeline();
             video.currentTime = startSeconds;
+            renderTrim();
           });
           clipBlocksContainer.appendChild(block);
         } else {
@@ -1925,7 +1898,7 @@
       if (endInput) endInput.value = endSeconds.toFixed(2);
 
       // Render multi-track timeline blocks
-      renderAllTimelineTracks();
+      renderTextTrackTimeline();
       renderSplitMarkers();
       renderClipBlocks();
       // Regenerate trim thumbnails only when selection range changes
@@ -1938,8 +1911,8 @@
       } else {
         if (deleteBtnEl) deleteBtnEl.setAttribute("disabled", "true");
       }
-
-      if (globalSelection.track === "video") {
+      
+      if (globalSelection.track === 'video') {
         trimSelection.classList.add("selected-delete");
       } else {
         trimSelection.classList.remove("selected-delete");
@@ -3069,106 +3042,126 @@
         const index = clips.findIndex((c) => t >= c.start && t <= c.end);
         if (index !== -1) {
           selectedClipIndex = index;
-          const clip = clips[index];
-          selectTimelineItem("video", index, {
-            start: clip.start,
-            end: clip.end,
-            name: `Clip ${index + 1}`,
-          });
-          video.currentTime = clip.start;
+          globalSelection = { track: 'video', index: index };
+          if (typeof renderAudioTrackTimeline === 'function') renderAudioTrackTimeline();
+          if (typeof renderTextTrackTimeline === 'function') renderTextTrackTimeline();
+          startSeconds = clips[index].start;
+          endSeconds = clips[index].end;
+          renderTrim();
+          video.currentTime = startSeconds;
         }
       });
-    }
-
-    function splitSelectedTimelineItem() {
-      if (!globalSelection.track) return;
-
-      const curT = parseFloat(video.currentTime.toFixed(2));
-      if (!Number.isFinite(curT) || curT <= 0 || curT >= duration) return;
-
-      if (globalSelection.track === "video") {
-        const index = globalSelection.index;
-        const clip = editorState.video_clips?.[index];
-        if (
-          !clip ||
-          curT <= (clip.start || 0) ||
-          curT >= (clip.end || duration)
-        )
-          return;
-
-        const newClip = JSON.parse(JSON.stringify(clip));
-        clip.end = curT;
-        newClip.start = curT;
-        editorState.video_clips.splice(index + 1, 0, newClip);
-        clearGlobalSelection();
-        if (window.updateLocalState)
-          window.updateLocalState("Video", "Split video clip");
-        return;
-      }
-
-      const config = TRACK_CONFIG[globalSelection.track];
-      if (!config) return;
-
-      const items = editorState[config.stateKey] || [];
-      const item = items[globalSelection.index];
-      if (!item || curT <= (item.start || 0) || curT >= (item.end || duration))
-        return;
-
-      const newItem = JSON.parse(JSON.stringify(item));
-      item.end = curT;
-      newItem.start = curT;
-      items.splice(globalSelection.index + 1, 0, newItem);
-      clearGlobalSelection();
-      if (window.updateLocalState)
-        window.updateLocalState(globalSelection.track, "Split item");
-    }
-
-    function deleteSelectedTimelineItem() {
-      if (!globalSelection.track) return;
-
-      if (globalSelection.track === "video") {
-        editorState.video_clips?.splice(globalSelection.index, 1);
-        clearGlobalSelection();
-        if (window.updateLocalState)
-          window.updateLocalState("Video", "Deleted video clip");
-        return;
-      }
-
-      const config = TRACK_CONFIG[globalSelection.track];
-      if (!config) return;
-
-      const items = editorState[config.stateKey] || [];
-      items.splice(globalSelection.index, 1);
-      clearGlobalSelection();
-      if (window.updateLocalState)
-        window.updateLocalState(globalSelection.track, "Deleted item");
     }
 
     // Split button click
     const splitBtn = document.getElementById("tb-split");
     if (splitBtn) {
-      splitBtn.addEventListener("click", splitSelectedTimelineItem);
+      splitBtn.addEventListener("click", () => {
+        const curT = parseFloat(video.currentTime.toFixed(2));
+        if (globalSelection.track === 'text') {
+            const index = globalSelection.index;
+            const overlay = editorState.text_overlays[index];
+            if (curT > overlay.start && curT < overlay.end) {
+                const newOverlay = JSON.parse(JSON.stringify(overlay));
+                overlay.end = curT;
+                newOverlay.start = curT;
+                editorState.text_overlays.splice(index + 1, 0, newOverlay);
+                globalSelection = { track: null, index: -1 };
+                if (typeof renderTrim === 'function') renderTrim();
+                renderTextTrackTimeline();
+                if (window.updateLocalState) window.updateLocalState("Text", `Split text overlay`);
+            }
+        } else if (globalSelection.track === 'audio') {
+            const index = globalSelection.index;
+            const overlay = editorState.background_audios[index];
+            const end = overlay.end || duration;
+            if (curT > overlay.start && curT < end) {
+                const newOverlay = JSON.parse(JSON.stringify(overlay));
+                overlay.end = curT;
+                newOverlay.start = curT;
+                editorState.background_audios.splice(index + 1, 0, newOverlay);
+                globalSelection = { track: null, index: -1 };
+                if (typeof renderTrim === 'function') renderTrim();
+                renderAudioTrackTimeline();
+                if (window.updateLocalState) window.updateLocalState("Audio", `Split audio overlay`);
+            }
+        } else {
+            // Default Video Split
+            if (curT > 0 && curT < duration && !splitPoints.includes(curT)) {
+              splitPoints.push(curT);
+              selectedClipIndex = -1; // reset selection
+              globalSelection = { track: null, index: -1 };
+              if (typeof renderAudioTrackTimeline === 'function') renderAudioTrackTimeline();
+              if (typeof renderTextTrackTimeline === 'function') renderTextTrackTimeline();
+              updateRuler();
+              renderTrim();
+            }
+        }
+      });
     }
 
+    // Delete segment button click
     const deleteBtn = document.getElementById("tb-delete");
     if (deleteBtn) {
-      deleteBtn.addEventListener("click", deleteSelectedTimelineItem);
+      deleteBtn.addEventListener("click", () => {
+        if (globalSelection.track === 'text') {
+            editorState.text_overlays.splice(globalSelection.index, 1);
+            clearGlobalSelection();
+            if (window.updateLocalState) window.updateLocalState("Text", `Deleted text overlay`);
+            return;
+        }
+        if (globalSelection.track === 'audio') {
+            editorState.background_audios.splice(globalSelection.index, 1);
+            clearGlobalSelection();
+            if (window.updateLocalState) window.updateLocalState("Audio", `Deleted background audio`);
+            return;
+        }
+        if (selectedClipIndex === -1) return;
+        const clips = getClips();
+        const clip = clips[selectedClipIndex];
+        if (
+          confirm(
+            `Are you sure you want to cut out the selected segment from ${formatTime(clip.start)} to ${formatTime(clip.end)}?`,
+          )
+        ) {
+          if (startInput) startInput.value = clip.start.toFixed(2);
+          if (endInput) endInput.value = clip.end.toFixed(2);
+
+          const trimForm = document.getElementById("trim-form");
+          if (trimForm) {
+            // Set trim_mode to delete
+            const deleteRadio = trimForm.querySelector(
+              'input[name="trim_mode"][value="delete"]',
+            );
+            if (deleteRadio) {
+              deleteRadio.checked = true;
+            }
+            const overlay = document.getElementById("processing-overlay");
+            if (overlay) {
+              overlay.style.display = "flex";
+              const txt = overlay.querySelector("p");
+              if (txt) txt.textContent = "Cutting out selected segment...";
+            }
+            trimForm.submit();
+          }
+        }
+      });
     }
 
     // Initialization
     video.addEventListener("loadedmetadata", initTrim);
     video.addEventListener("timeupdate", onTimeUpdate);
-
+    
     function onTimeUpdate() {
       if (!duration) return;
       const t = video.currentTime;
-
+      
       // Trim loop
       if (t > endSeconds && !video.paused) {
         video.currentTime = startSeconds;
         video.play();
       }
-
+      
       // Text overlays visibility
       const textContainer = document.getElementById("text-overlay-container");
       if (textContainer) {
@@ -3183,7 +3176,7 @@
           }
         });
       }
-
+      
       // Background Audio sync
       if (editorState.background_audios) {
         editorState.background_audios.forEach((bg, i) => {
@@ -3194,15 +3187,15 @@
             audioEl.src = bg.url;
             document.body.appendChild(audioEl);
           }
-
+          
           audioEl.volume = bg.bg_volume;
           const bgEnd = bg.end || duration;
-
+          
           if (t >= bg.start && t <= bgEnd) {
             // Need to play it and keep it synced
             if (audioEl.paused) {
               audioEl.currentTime = t - bg.start;
-              audioEl.play().catch((e) => console.log("Audio play blocked", e));
+              audioEl.play().catch(e => console.log("Audio play blocked", e));
             } else {
               // Drift correction
               if (Math.abs(audioEl.currentTime - (t - bg.start)) > 0.3) {
@@ -3212,7 +3205,7 @@
           } else {
             if (!audioEl.paused) audioEl.pause();
           }
-
+          
           // Stop audio if video is paused
           if (video.paused && !audioEl.paused) {
             audioEl.pause();
@@ -3220,7 +3213,7 @@
         });
       }
     }
-
+    
     video.addEventListener("play", () => onTimeUpdate());
     video.addEventListener("pause", () => onTimeUpdate());
     if (video.readyState >= 1) {

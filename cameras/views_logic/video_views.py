@@ -6,8 +6,11 @@ from django.shortcuts import render, redirect, get_object_or_404, reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.db.models import Q
+from django.core.files import File
+from django.conf import settings
 from ..models import Camera, CameraRecording, RecordingChunk
 from .utils import get_video_stream, is_admin
 
@@ -143,6 +146,92 @@ def upload_video(request):
 
     cameras = Camera.objects.all() if request.user.is_superuser else Camera.objects.filter(camerapermission__teacher=request.user)
     return render(request, 'cameras/upload_video.html', {'cameras': cameras})
+
+
+@csrf_exempt
+@login_required
+def camera_chunked_upload(request):
+    """Chunked video upload for lecture recordings with background tab & retry resilience."""
+    if request.method == 'POST':
+        chunk = request.FILES.get('chunk')
+        filename = request.POST.get('filename')
+        chunk_index = int(request.POST.get('chunkIndex', 0))
+        total_chunks = int(request.POST.get('totalChunks', 1))
+        upload_id = request.POST.get('uploadId')
+        title = request.POST.get('title', 'Untitled Lecture')
+        description = request.POST.get('description', '')
+        camera_id = request.POST.get('camera')
+        thumbnail_file = request.FILES.get('thumbnail')
+
+        if not all([chunk, filename, upload_id]):
+            return JsonResponse({'status': 'error', 'message': 'Missing chunk data'}, status=400)
+
+        temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_uploads', upload_id)
+        os.makedirs(temp_dir, exist_ok=True)
+
+        chunk_path = os.path.join(temp_dir, f'chunk_{chunk_index}')
+        with open(chunk_path, 'wb+') as f:
+            for data in chunk.chunks():
+                f.write(data)
+
+        if chunk_index == total_chunks - 1:
+            # Final chunk received, assemble video file
+            final_file_path = os.path.join(temp_dir, filename)
+            with open(final_file_path, 'wb+') as final_file:
+                for i in range(total_chunks):
+                    part_path = os.path.join(temp_dir, f'chunk_{i}')
+                    if os.path.exists(part_path):
+                        with open(part_path, 'rb') as part:
+                            final_file.write(part.read())
+                        os.remove(part_path)
+
+            camera = None
+            if camera_id:
+                camera = Camera.objects.filter(id=camera_id).first()
+
+            recording = CameraRecording(
+                teacher=request.user,
+                camera=camera,
+                title=title,
+                description=description,
+                recording_status='completed',
+                is_published=False
+            )
+            with open(final_file_path, 'rb') as final_file:
+                recording.video_file.save(filename, File(final_file))
+
+            if thumbnail_file:
+                recording.thumbnail = thumbnail_file
+                recording.save()
+            else:
+                try:
+                    recording.generate_thumbnail(time_sec=1.0)
+                except Exception as e:
+                    logger.warning(f"Failed to generate thumbnail: {e}")
+
+            try:
+                from ..ffmpeg_helpers import get_video_duration
+                from datetime import timedelta
+                duration_sec = get_video_duration(recording.video_file.path)
+                if duration_sec:
+                    recording.duration = timedelta(seconds=duration_sec)
+                    recording.save()
+            except Exception as e:
+                logger.warning(f"Failed to extract video duration: {e}")
+
+            os.remove(final_file_path)
+            try:
+                os.rmdir(temp_dir)
+            except OSError:
+                pass
+
+            redirect_url = reverse('edit_recording', args=[recording.id])
+            return JsonResponse({'status': 'success', 'redirect_url': redirect_url})
+
+        return JsonResponse({'status': 'success', 'message': f'Chunk {chunk_index+1}/{total_chunks} received'})
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
 
 
 @login_required

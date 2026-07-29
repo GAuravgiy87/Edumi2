@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files import File
 from django.http import FileResponse, JsonResponse, HttpResponseForbidden, StreamingHttpResponse, Http404
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import ffmpeg_utils
@@ -65,7 +66,7 @@ def serve_media_ranges(request, path):
 
 
 # ---------------------------------------------------------------------------
-# Project list / upload
+# Project list / upload (triggered reload check)
 # ---------------------------------------------------------------------------
 
 @login_required
@@ -75,42 +76,26 @@ def project_list(request):
         if form.is_valid():
             project = form.save(commit=False)
             project.owner = request.user
-            project.status = "processing"
+            # Set initial ready status so the editor can load immediately
+            project.status = "ready"
             if not project.title or not project.title.strip():
                 orig_filename = request.FILES["original_file"].name
                 project.title = os.path.splitext(orig_filename)[0]
             project.save()
 
-            try:
-                meta = ffmpeg_utils.get_metadata(project.original_file.path)
-                project.duration_seconds = meta["duration"]
-                project.width = meta["width"]
-                project.height = meta["height"]
-                project.has_audio = meta["has_audio"]
-                project.status = "ready"
-                
-                # Initialize clips_json
-                orig_filename = os.path.basename(project.original_file.name)
-                if len(orig_filename) > 32:
-                    orig_filename = project.title + ".mp4"
-                project.clips_json = json.dumps([
-                    {"title": orig_filename, "duration": meta["duration"]}
-                ])
-                project.save()
-
-                EditOperation.objects.create(
-                    project=project,
-                    operation_type="upload",
-                    description=f"Uploaded {project.original_file.name.split('/')[-1]}",
-                )
-                messages.success(request, "Video uploaded successfully.")
-                return redirect("project_detail", pk=project.pk)
-            except ffmpeg_utils.FFmpegError as e:
-                project.status = "error"
-                project.error_message = str(e)
-                project.save()
-                messages.error(request, "Could not read video metadata. Is the file a valid video?")
-                return redirect("project_detail", pk=project.pk)
+            # Create the upload operation entry
+            EditOperation.objects.create(
+                project=project,
+                operation_type="upload",
+                description=f"Uploaded {project.original_file.name.split('/')[-1]}",
+            )
+            
+            # Start background metadata extraction task
+            from .tasks import extract_metadata_and_proxies_task
+            extract_metadata_and_proxies_task.delay(project.id)
+            
+            messages.success(request, "Video uploaded. Editor is loading...")
+            return redirect("project_detail", pk=project.pk)
     else:
         form = VideoUploadForm()
     
@@ -322,14 +307,14 @@ def _handle_operation(request, pk, form_class, run_ffmpeg_fn, operation_type,
     tab_map = {
         "text_overlay": "text",
         "volume": "audio",
-        "speed": "fx",
-        "rotate": "fx",
-        "resize": "fx",
-        "grayscale": "fx",
-        "fade": "fx",
+        "speed": "effects",
+        "rotate": "effects",
+        "resize": "effects",
+        "grayscale": "effects",
+        "fade": "effects",
         "trim": "audio",
     }
-    tab = tab_map.get(operation_type, "audio")
+    tab = tab_map.get(operation_type, "import")
     from django.urls import reverse
     return redirect(reverse("project_detail", args=[pk]) + f"?tab={tab}")
 
@@ -889,6 +874,8 @@ def project_status(request, pk):
         "status": project.status,
         "error_message": project.error_message,
         "duration_seconds": project.duration_seconds,
+        "proxy_status": project.proxy_status,
+        "proxy_url": project.proxy_url,
     })
 
 
@@ -1185,7 +1172,12 @@ def save_timeline(request, pk):
     project = get_object_or_404(VideoProject, pk=pk)
     try:
         data = json.loads(request.body)
-        project.timeline_state = data
+        # Store as a JSON string, same convention as clips_json elsewhere in
+        # this file — assigning the raw dict here previously meant the
+        # template's `{{ project.timeline_state|escapejs }}` rendered Python's
+        # dict repr (single-quoted) instead of valid JSON, breaking the
+        # client-side `JSON.parse(...)` on page load.
+        project.timeline_state = json.dumps(data)
         project.save(update_fields=['timeline_state'])
         return JsonResponse({"status": "success"})
     except json.JSONDecodeError:
@@ -1198,11 +1190,13 @@ def export_timeline(request, pk):
     project = get_object_or_404(VideoProject, pk=pk)
     try:
         data = json.loads(request.body)
-        project.timeline_state = data
+        project.timeline_state = json.dumps(data)
         project.save(update_fields=['timeline_state'])
         project.status = "processing"
         project.save(update_fields=['status'])
         from .tasks import export_video_task
+        # Pass the parsed dict (not the JSON string) — export_video_task /
+        # compile_timeline_to_ffmpeg expect a dict with a "tracks" list.
         export_video_task.delay(project.id, data)
         return JsonResponse({"status": "processing"})
     except Exception as e:
@@ -1210,3 +1204,78 @@ def export_timeline(request, pk):
         project.error_message = str(e)
         project.save(update_fields=['status', 'error_message'])
         return JsonResponse({"error": str(e)}, status=500)
+
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files import File
+
+@csrf_exempt
+@login_required
+def chunked_upload_view(request):
+    if request.method == 'POST':
+        chunk = request.FILES.get('chunk')
+        filename = request.POST.get('filename')
+        chunk_index = int(request.POST.get('chunkIndex', 0))
+        total_chunks = int(request.POST.get('totalChunks', 1))
+        upload_id = request.POST.get('uploadId')
+        
+        if not all([chunk, filename, upload_id]):
+            return JsonResponse({'success': False, 'error': 'Missing data'}, status=400)
+            
+        import os
+        temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_uploads', upload_id)
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        chunk_path = os.path.join(temp_dir, f'chunk_{chunk_index}')
+        with open(chunk_path, 'wb+') as f:
+            for data in chunk.chunks():
+                f.write(data)
+                
+        if chunk_index == total_chunks - 1:
+            # Final chunk received, assemble file
+            final_file_path = os.path.join(temp_dir, filename)
+            with open(final_file_path, 'wb+') as final_file:
+                for i in range(total_chunks):
+                    part_path = os.path.join(temp_dir, f'chunk_{i}')
+                    with open(part_path, 'rb') as part:
+                        final_file.write(part.read())
+                    os.remove(part_path)
+                    
+            # Create VideoProject
+            project = VideoProject.objects.create(
+                owner=request.user,
+                title=filename
+            )
+            with open(final_file_path, 'rb') as final_file:
+                project.original_file.save(filename, File(final_file))
+                
+            project.proxy_status = 'pending'
+            project.save()
+            os.remove(final_file_path)
+            try:
+                os.rmdir(temp_dir)
+            except OSError:
+                pass
+            
+            # Start proxy generation task
+            try:
+                from .tasks import generate_hls_proxy
+                generate_hls_proxy.delay(project.id)
+            except ImportError:
+                pass
+            
+            return JsonResponse({'success': True, 'project_id': project.id})
+            
+        return JsonResponse({'success': True, 'message': 'Chunk received'})
+        
+    return JsonResponse({'success': False}, status=405)
+
+@login_required
+def proxy_status_view(request, pk):
+    try:
+        project = VideoProject.objects.get(pk=pk, owner=request.user)
+        return JsonResponse({
+            'status': project.proxy_status,
+            'url': project.proxy_url
+        })
+    except VideoProject.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)

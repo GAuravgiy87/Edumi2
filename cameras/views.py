@@ -15,7 +15,7 @@ from cameras.views_logic import (
     # utils
     get_video_stream, is_admin, can_view_camera, test_rtsp_paths, broadcast_live_status,
     # video
-    stream_video, upload_video, recordings_folder, manage_recordings,
+    stream_video, upload_video, camera_chunked_upload, recordings_folder, manage_recordings,
     toggle_recording_publish, watch_recording, stream_recording_chunk,
     recording_playlist, teacher_profile, delete_recording,
     update_recording_edit, apply_recording_trim, generate_recording_thumbnail,

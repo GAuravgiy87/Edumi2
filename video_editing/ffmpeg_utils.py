@@ -426,52 +426,58 @@ def process_combined_edits(input_path, state):
     v_in = "0:v"
     a_in = "0:a"
     
-    # 1. Trim Operation
-    trim_state = state.get("trim", {})
-    trim_start = float(trim_state.get("start", 0.0))
-    trim_end = float(trim_state.get("end", duration))
-    trim_mode = trim_state.get("mode", "extract")
+    # 1. Clips Operation (Multiple sequential extractions)
+    clips = state.get("clips", [{"start": 0.0, "end": duration}])
     
-    is_trimmed = False
-    if trim_mode == "delete":
-        is_trimmed = (trim_start > 0.0 or trim_end < duration)
-    else:
-        is_trimmed = (trim_start > 0.0 or trim_end < duration)
-
     final_duration = duration
     temp_files_to_cleanup = []
 
-    if is_trimmed:
-        if trim_mode == "delete":
-            filter_complex_parts.append(f"[{v_in}]trim=start=0:end={trim_start},setpts=PTS-STARTPTS[v_d1]")
-            filter_complex_parts.append(f"[{v_in}]trim=start={trim_end}:end={duration},setpts=PTS-STARTPTS[v_d2]")
-            filter_complex_parts.append("[v_d1][v_d2]concat=n=2:v=1:a=0[v_trim]")
-            v_in = "v_trim"
+    if len(clips) == 1 and (float(clips[0].get("start", 0)) > 0.0 or float(clips[0].get("end", duration)) < duration):
+        # OPTIMIZATION: Single clip uses -c copy to pre-trim instantly!
+        trim_start = float(clips[0]["start"])
+        trim_end = float(clips[0]["end"])
+        trim_duration = max(0.0, trim_end - trim_start)
+        pre_trimmed_path = _tmp_path()
+        trim_cmd = [
+            settings.FFMPEG_BINARY, "-y",
+            "-ss", str(trim_start),
+            "-i", input_path,
+            "-t", str(trim_duration),
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            pre_trimmed_path
+        ]
+        _run(trim_cmd)
+        input_path = pre_trimmed_path
+        temp_files_to_cleanup.append(pre_trimmed_path)
+        final_duration = trim_duration
+    elif len(clips) > 1:
+        # Complex concatenation of multiple clips
+        concat_inputs = ""
+        total_dur = 0.0
+        for i, clip in enumerate(clips):
+            start = float(clip["start"])
+            end = float(clip["end"])
+            total_dur += max(0.0, end - start)
+            
+            filter_complex_parts.append(f"[{v_in}]trim=start={start}:end={end},setpts=PTS-STARTPTS[v_clip{i}]")
+            concat_inputs += f"[v_clip{i}]"
             
             if has_audio:
-                filter_complex_parts.append(f"[{a_in}]atrim=start=0:end={trim_start},asetpts=PTS-STARTPTS[a_d1]")
-                filter_complex_parts.append(f"[{a_in}]atrim=start={trim_end}:end={duration},asetpts=PTS-STARTPTS[a_d2]")
-                filter_complex_parts.append("[a_d1][a_d2]concat=n=2:v=0:a=1[a_trim]")
-                a_in = "a_trim"
+                filter_complex_parts.append(f"[{a_in}]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a_clip{i}]")
+                concat_inputs += f"[a_clip{i}]"
                 
-            final_duration = trim_start + max(0.0, duration - trim_end)
+        if has_audio:
+            filter_complex_parts.append(f"{concat_inputs}concat=n={len(clips)}:v=1:a=1[v_concat][a_concat]")
+            v_in = "v_concat"
+            a_in = "a_concat"
         else:
-            # OPTIMIZATION: Extract mode uses -c copy to pre-trim instantly!
-            trim_duration = max(0.0, trim_end - trim_start)
-            pre_trimmed_path = _tmp_path()
-            trim_cmd = [
-                settings.FFMPEG_BINARY, "-y",
-                "-ss", str(trim_start),
-                "-i", input_path,
-                "-t", str(trim_duration),
-                "-c", "copy",
-                "-avoid_negative_ts", "make_zero",
-                pre_trimmed_path
-            ]
-            _run(trim_cmd)
-            input_path = pre_trimmed_path
-            temp_files_to_cleanup.append(pre_trimmed_path)
-            final_duration = trim_duration
+            filter_complex_parts.append(f"{concat_inputs}concat=n={len(clips)}:v=1:a=0[v_concat]")
+            v_in = "v_concat"
+            
+        final_duration = total_dur
+    elif len(clips) == 0:
+        final_duration = 0.0
 
     # 2. Speed Operation
     speed_factor = float(state.get("speed", 1.0))

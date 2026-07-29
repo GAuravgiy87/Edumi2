@@ -109,6 +109,46 @@
     const form       = document.getElementById('upload-form');
     const input      = document.querySelector('#upload-form input[type="file"]');
     
+    let isUploading = false;
+
+    window.addEventListener('beforeunload', (e) => {
+        if (isUploading) {
+            e.preventDefault();
+            e.returnValue = 'Video upload is in progress. Leaving this page will cancel the upload.';
+            return e.returnValue;
+        }
+    });
+
+    // Helper to send a chunk with automatic retries on tab throttle / network glitches
+    async function sendChunkWithRetry(url, formData, maxRetries = 5, initialDelay = 1000) {
+        let attempts = 0;
+        while (attempts < maxRetries) {
+            try {
+                if (attempts > 0) {
+                    await new Promise(resolve => setTimeout(resolve, Math.min(initialDelay * Math.pow(1.5, attempts - 1), 8000)));
+                }
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success !== false) {
+                        return data;
+                    }
+                }
+                attempts++;
+            } catch (err) {
+                attempts++;
+                console.warn(`Chunk upload retry ${attempts}/${maxRetries}...`, err);
+                if (attempts >= maxRetries) {
+                    throw err;
+                }
+            }
+        }
+        throw new Error('Chunk upload failed after maximum retries');
+    }
+    
     // Instead of a modal, click directly triggers the file input
     function triggerFileInput() {
         if (input) input.click();
@@ -119,24 +159,69 @@
     
     // Auto-submit the form as soon as a file is selected
     if (input) {
-        input.addEventListener('change', () => {
+        input.addEventListener('change', async () => {
             if (input.files.length > 0) {
-                // Change button text to indicate upload
+                const file = input.files[0];
+                const chunkSize = 5 * 1024 * 1024; // 5MB
+                const totalChunks = Math.ceil(file.size / chunkSize);
+                const uploadId = Date.now().toString() + Math.random().toString(36).substring(7);
+                
+                isUploading = true;
+
                 if (openBtn) {
                     openBtn.disabled = true;
-                    openBtn.innerHTML = '<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading...';
+                    openBtn.innerHTML = '<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading 0%';
                 }
                 if (openBtnE) {
                     openBtnE.disabled = true;
-                    openBtnE.innerHTML = '<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading...';
+                    openBtnE.innerHTML = '<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading 0%';
                 }
                 if (typeof lucide !== 'undefined') lucide.createIcons();
-                form.submit();
+
+                let completed = false;
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+                    
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('filename', file.name);
+                    formData.append('chunkIndex', i);
+                    formData.append('totalChunks', totalChunks);
+                    formData.append('uploadId', uploadId);
+                    
+                    try {
+                        const data = await sendChunkWithRetry("{% url 'chunked_upload' %}", formData);
+                        
+                        const percent = Math.round(((i + 1) / totalChunks) * 100);
+                        if (openBtn) openBtn.innerHTML = `<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading ${percent}%`;
+                        if (openBtnE) openBtnE.innerHTML = `<i data-lucide="loader" style="width:15px;height:15px;" class="lucide-spin"></i> Uploading ${percent}%`;
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                        
+                        if (data.project_id) {
+                            completed = true;
+                            isUploading = false;
+                            window.location.href = `{% url 'project_list' %}project/${data.project_id}/`;
+                            break;
+                        }
+                    } catch (err) {
+                        console.error("Chunked upload error:", err);
+                        isUploading = false;
+                        alert("Upload connection interrupted. Please try uploading again.");
+                        if (openBtn) { openBtn.disabled = false; openBtn.innerHTML = '<i data-lucide="upload" style="width:15px;height:15px;"></i> Upload Video'; }
+                        if (openBtnE) { openBtnE.disabled = false; openBtnE.innerHTML = '<i data-lucide="upload" style="width:15px;height:15px;"></i> Upload your first video'; }
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                        break;
+                    }
+                }
+                if (!completed) {
+                    isUploading = false;
+                }
             }
         });
     }
 
-    // Since we no longer use the modal visually, if there are form errors, we can just alert them.
     {% if form.errors %}
         alert("There was an error uploading the video. Please try again.");
     {% endif %}

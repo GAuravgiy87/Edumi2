@@ -12,25 +12,27 @@
         </div>
 
         <div class="ve-editor-head-actions">
-            <span class="ve-status-badge {{ project.status }}" id="status-pill" style="{% if project.status == 'ready' %}display: none;{% endif %}">
+            <span class="ve-status-badge {{ project.status }}" id="status-pill"
+                style="{% if project.status == 'ready' %}display: none;{% endif %}">
                 {% if project.status == 'processing' %}<i data-lucide="loader" style="width:11px;height:11px;"></i>{% endif %}
                 {{ project.get_status_display }}
             </span>
             <div style="width:1px;height:20px;background:var(--border-color);margin:0 4px;flex-shrink:0;"></div>
 
             <!-- Undo / Redo in Topbar -->
-            <button class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-undo" title="Undo (Ctrl+Z)" {% if not operations.1 %}disabled{% endif %}>
+            <button type="button" class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-undo" title="Undo (Ctrl+Z)" {% if not operations.1 %}disabled{% endif %}>
                 <i data-lucide="undo"></i>
             </button>
             {% with prev_op=operations.1 %}
             {% if prev_op %}
-            <form id="undo-form" action="{% url 'op_revert' project.pk prev_op.pk %}" method="post" style="display: none;">
+            <form id="undo-form" action="{% url 'op_revert' project.pk prev_op.pk %}" method="post"
+                style="display: none;">
                 {% csrf_token %}
             </form>
             {% endif %}
             {% endwith %}
 
-            <button class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-redo" title="Redo (Ctrl+Shift+Z)" {% if not has_redo %}disabled{% endif %}>
+            <button type="button" class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-redo" title="Redo (Ctrl+Shift+Z)" {% if not has_redo %}disabled{% endif %}>
                 <i data-lucide="redo"></i>
             </button>
             {% if has_redo %}
@@ -42,12 +44,12 @@
             <div style="width:1px;height:20px;background:var(--border-color);margin:0 4px;flex-shrink:0;"></div>
 
             <!-- History Toggle Button -->
-            <button class="ve-btn ve-btn-secondary" id="btn-show-history" title="View edit history"
+            <button type="button" class="ve-btn ve-btn-secondary" id="btn-show-history" title="View edit history"
                 style="display: inline-flex; align-items: center; gap: 6px;">
                 <i data-lucide="history" style="width: 14px; height: 14px;"></i> History
             </button>
 
-            <button class="ve-btn ve-btn-primary" id="btn-master-export" title="Export video">
+            <button type="button" class="ve-btn ve-btn-primary" id="btn-master-export" title="Export video">
                 <i data-lucide="download" style="width:14px;height:14px;"></i> Export
             </button>
 
@@ -78,9 +80,9 @@
         <div class="ve-video-stage" id="video-stage">
             <div class="ve-video-wrapper" id="video-wrapper" style="position: relative;">
                 <div class="processing-overlay" id="processing-overlay"
-                    style="{% if project.status == 'processing' %}display: flex;{% else %}display: none;{% endif %}">
+                    style="{% if project.status == 'processing' or project.proxy_status == 'processing' %}display: flex;{% else %}display: none;{% endif %}">
                     <div class="spinner"></div>
-                    <p>Processing video…</p>
+                    <p>{% if project.proxy_status == 'processing' %}Generating Playback Proxy…{% else %}Processing video…{% endif %}</p>
                 </div>
                 {% if project.status == 'error' %}
                 <div class="error-banner"
@@ -89,9 +91,15 @@
                     <p style="margin: 4px 0 0 0; font-size: 12px;">{{ project.error_message|truncatechars:300 }}</p>
                 </div>
                 {% endif %}
-                <video preload="auto" src="{% url 'serve_media_ranges' path=project.working_file.name %}"
-                    id="main-video"></video>
+                <video preload="auto" id="main-video"
+                    {% if project.proxy_url and project.proxy_status == 'completed' %}
+                    {% else %}
+                    src="{% url 'serve_media_ranges' path=project.original_file.name %}"
+                    {% endif %}
+                ></video>
                 <div id="text-overlay-container"></div>
+                <canvas id="fabric-stage-canvas"
+                    style="position: absolute; top: 0; left: 0; pointer-events: auto;"></canvas>
             </div>
 
             <!-- Player Controls -->
@@ -392,13 +400,26 @@
         <!-- Timeline Toolbar -->
         <div class="timeline-toolbar">
             <div class="toolbar-left">
-                <button type="button" class="tb-btn" id="tb-delete" title="Delete Selected Segment" disabled>
+                <button type="button" class="tb-btn" id="tb-delete" title="Delete Selected Item (Delete)" disabled>
                     <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
                     <span>Delete</span>
                 </button>
-                <button type="button" class="tb-btn" id="tb-split" title="Split Clip at Playhead">
+                <button type="button" class="tb-btn" id="tb-split" title="Split Item at Playhead (S)">
                     <i data-lucide="scissors" style="width:13px;height:13px;"></i>
                     <span>Split</span>
+                </button>
+                <button type="button" class="tb-btn" id="tb-duplicate" title="Duplicate Selected Item (Ctrl+D)"
+                    disabled>
+                    <i data-lucide="copy" style="width:13px;height:13px;"></i>
+                    <span>Duplicate</span>
+                </button>
+                <button type="button" class="tb-btn" id="tb-copy" title="Copy Selected Item (Ctrl+C)" disabled>
+                    <i data-lucide="clipboard-copy" style="width:13px;height:13px;"></i>
+                    <span>Copy</span>
+                </button>
+                <button type="button" class="tb-btn" id="tb-paste" title="Paste Item at Playhead (Ctrl+V)" disabled>
+                    <i data-lucide="clipboard-paste" style="width:13px;height:13px;"></i>
+                    <span>Paste</span>
                 </button>
 
                 <!-- Speed controls in the timeline toolbar -->
@@ -460,7 +481,7 @@
                 <span id="timeline-bg-volume-val" style="display:none;">0.5</span>
 
                 <!-- 1. Text Track Row -->
-                <div class="timeline-track-row text-track-row timeline-track-row--text">
+                <div class="timeline-track-row text-track-row timeline-track-row--text" id="text-track-row">
                     <div class="track-content-cell" id="text-track-content">
                         <!-- Text overlay blocks rendered here dynamically by JS -->
                     </div>
@@ -474,7 +495,7 @@
                 </div>
 
                 <!-- 3. Video Track Row -->
-                <div class="timeline-track-row video-track-row timeline-track-row--video">
+                <div class="timeline-track-row video-track-row timeline-track-row--video" id="video-track-row">
                     <div class="track-content-cell trim-track" id="trim-track">
                         <!-- Filmstrip thumbnails -->
                         <div class="trim-thumbnails" id="trim-thumbnails"></div>
@@ -491,6 +512,7 @@
                                 ||
                                 <div class="handle-tooltip" id="handle-tooltip-left">0:00.00</div>
                             </div>
+                            <span class="trim-duration-badge" id="trim-duration-badge">0.0s</span>
                             <div class="trim-handle trim-handle-right" id="trim-handle-right">
                                 ||
                                 <div class="resize-arrow-icon">↔</div>
@@ -504,7 +526,7 @@
                 </div>
 
                 <!-- 4. Audio Track Row -->
-                <div class="timeline-track-row audio-track-row timeline-track-row--audio">
+                <div class="timeline-track-row audio-track-row timeline-track-row--audio" id="audio-track-row">
                     <div class="track-content-cell audio-track" id="audio-track">
                         {% if project.has_audio %}
                         <div class="audio-block" id="audio-block"
@@ -513,9 +535,16 @@
                                 style="position:absolute;inset:0;display:flex;align-items:center;opacity:0.85;z-index: 1;">
                             </div>
                             <span class="audio-name"
-                                style="position:relative;z-index:2; padding: 0 12px; font-size: 13px; font-weight: 700; color: #ffffff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);">Original Soundtrack</span>
+                                style="position:relative;z-index:2; padding: 0 12px; font-size: 13px; font-weight: 700; color: #ffffff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);">Original
+                                Soundtrack</span>
                         </div>
                         {% endif %}
+                        <!-- Canva-style empty-state prompt; JS toggles this via updateAddAudioPlaceholder() -->
+                        <button type="button" class="timeline-add-audio-btn" id="timeline-add-audio-btn"
+                            title="Add background audio" style="display:none;">
+                            <i data-lucide="music" style="width:15px;height:15px;"></i>
+                            <span>Add audio</span>
+                        </button>
                     </div>
                 </div>
 
@@ -523,6 +552,9 @@
                 <div class="trim-playhead" id="trim-playhead">
                     <div class="playhead-tooltip" id="playhead-tooltip">0:00.00</div>
                 </div>
+
+                <!-- Magnetic Snap Guide Line -->
+                <div class="timeline-snap-guide" id="timeline-snap-guide" style="display:none;"></div>
 
             </div>
         </div>
@@ -558,72 +590,65 @@
             <div class="ve-history-drawer-header">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <i data-lucide="history" style="width:18px;height:18px;color:var(--ve-primary);"></i>
-                    <h3 style="margin:0; font-size:15px; font-weight:700;">Edit History</h3>
+                    <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--ve-text);">Edit History</h3>
                 </div>
                 <button class="ve-history-drawer-close" id="history-drawer-close" title="Close Drawer">
                     <i data-lucide="x"></i>
                 </button>
             </div>
-            <div class="ve-history-drawer-body" style="overflow-x: hidden;">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+
+            <div class="ve-history-drawer-body">
+                <!-- Reset button -->
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
                     <form id="reset-form" action="{% url 'op_reset' project.pk %}" method="post" class="inline-form"
                         onsubmit="return confirm('Discard all edits and revert to the original upload?');"
                         style="margin: 0;">
                         {% csrf_token %}
-                        <button type="submit" class="ve-btn ve-btn-danger"
-                            style="padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 6px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); display: flex; align-items: center; gap: 6px;">
+                        <button type="submit" class="ve-btn ve-btn-danger" style="padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
                             <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Reset to Original
                         </button>
                     </form>
                 </div>
 
                 {% if operations %}
-                <ul class="history-list"
-                    style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
+                <ul class="history-list">
                     {% for op in operations %}
-                    <li
-                        style="display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--ve-bg); border: 1px solid var(--ve-border); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                            <div style="display: flex; gap: 10px; align-items: flex-start; min-width: 0;">
-                                <span class="history-tag" style="background: var(--ve-primary); color: white; padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);">{{ op.get_operation_type_display }}</span>
-                                <div style="display: flex; flex-direction: column; min-width: 0; gap: 4px;">
-                                    <span class="history-desc" data-op-type="{{ op.operation_type }}" data-desc="{{ op.description }}" style="font-weight: 500; font-size: 14px; color: var(--ve-text); line-height: 1.4; word-break: break-word;">{{ op.description|linebreaksbr }}</span>
-                                </div>
-                            </div>
-                            <span class="history-time" style="font-size: 12px; color: var(--ve-text-muted); white-space: nowrap; flex-shrink: 0; padding-top: 2px;">{{ op.created_at|timesince }} ago</span>
+                    <li class="history-item{% if forloop.first %} history-item--current{% endif %}">
+                        <!-- Row 1: badge + time -->
+                        <div class="history-item-top">
+                            <span class="history-op-badge">{{ op.get_operation_type_display }}</span>
+                            <span class="history-time">{{ op.created_at|timesince }} ago</span>
                         </div>
-
-                        {% if forloop.first or op.operation_type != 'upload' %}
-                        <div
-                            style="display: flex; justify-content: flex-end; align-items: center; border-top: 1px solid var(--ve-border); padding-top: 12px; margin-top: 4px;">
-                            {% if forloop.first %}
-                            <span
-                                style="font-size: 12px; color: var(--ve-primary); font-weight: 600; display: flex; align-items: center; gap: 4px;">
-                                <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> Current Version
+                        <!-- Row 2: description -->
+                        {% if op.description %}
+                        <p class="history-desc">{{ op.description }}</p>
+                        {% endif %}
+                        <!-- Row 3: action -->
+                        {% if forloop.first %}
+                        <div class="history-item-footer">
+                            <span class="history-current-badge">
+                                <i data-lucide="check-circle" style="width:13px;height:13px;"></i> Current Version
                             </span>
-                            {% elif op.operation_type != 'upload' %}
+                        </div>
+                        {% elif op.operation_type != 'upload' %}
+                        <div class="history-item-footer">
                             <form action="{% url 'op_revert' project.pk op.pk %}" method="post" style="margin: 0;"
                                 onsubmit="return confirm('Revert project to this edit point? Subsequent edits will be lost.');">
                                 {% csrf_token %}
-                                <button type="submit" class="ve-btn"
-                                    style="padding: 6px 14px; font-size: 12px; height: auto; background: var(--ve-bg-secondary); color: var(--ve-text); border: 1px solid var(--ve-border); border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-                                    <i data-lucide="rotate-ccw"
-                                        style="width: 14px; height: 14px; margin-right: 4px;"></i> Revert
+                                <button type="submit" class="ve-btn history-revert-btn">
+                                    <i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i> Revert
                                 </button>
                             </form>
-                            {% endif %}
                         </div>
                         {% endif %}
                     </li>
                     {% endfor %}
                 </ul>
                 {% else %}
-                <div
-                    style="text-align: center; padding: 32px 16px; border: 1px dashed var(--ve-border); border-radius: 8px; background: var(--ve-bg-secondary); margin-top: 16px;">
-                    <i data-lucide="history"
-                        style="width: 24px; height: 24px; color: var(--ve-muted); margin-bottom: 8px;"></i>
-                    <p class="muted-text" style="font-size: 13px; color: var(--ve-muted); margin: 0; font-weight: 500;">
-                        No edits yet.</p>
+                <div class="history-empty">
+                    <i data-lucide="history" style="width:36px;height:36px;color:var(--ve-primary);opacity:0.7;margin-bottom:12px;display:inline-block;"></i>
+                    <p style="font-size:15px;font-weight:600;color:var(--ve-text);margin:0 0 6px;">No edits yet</p>
+                    <p style="font-size:13px;color:var(--ve-text-muted);margin:0;line-height:1.5;">Your edit history will appear here as you trim, crop, or add effects.</p>
                 </div>
                 {% endif %}
             </div>
@@ -631,9 +656,29 @@
     </div>
 
 </div>
+
 {% endblock %}
 
 {% block ve_extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var video = document.getElementById('main-video');
+        var proxyUrl = "{{ project.proxy_url|default:'' }}";
+        var proxyStatus = "{{ project.proxy_status }}";
+        
+        if (proxyUrl && proxyStatus === 'completed') {
+            if (Hls.isSupported()) {
+                var hls = new Hls();
+                hls.loadSource(proxyUrl);
+                hls.attachMedia(video);
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = proxyUrl;
+            }
+        }
+    });
+</script>
 <script>
     window.REEL_STATUS_URL = "{% url 'project_status' project.pk %}";
     window.REEL_PROJECT_STATUS = "{{ project.status }}";
@@ -644,19 +689,24 @@
     window.REEL_PROJECT_TRIM_END = JSON.parse("{{ project.trim_end|default:'null' }}");
     window.REEL_PROJECT_HEIGHT = Number("{{ project.height|default:720 }}");
     window.REEL_PROJECT_CLIPS = JSON.parse('{{ project.clips_json|default:"[]"|escapejs }}');
+    window.REEL_PROJECT_TIMELINE_STATE = JSON.parse('{{ project.timeline_state|default:"null"|escapejs }}');
+    window.REEL_PROJECT_PROXY_STATUS = "{{ project.proxy_status }}";
+    window.REEL_PROJECT_PROXY_URL = "{{ project.proxy_url|default:'' }}";
+    window.REEL_PROJECT_SAVE_TIMELINE_URL = "{% url 'save_timeline' project.pk %}";
+    window.REEL_PROJECT_EXPORT_TIMELINE_URL = "{% url 'export_timeline' project.pk %}";
     window.REEL_PROJECT_OPERATIONS = [
         {% for op in operations %}
-        {
-            "type": "{{ op.operation_type|escapejs }}",
+    {
+        "type": "{{ op.operation_type|escapejs }}",
             "title": "{{ op.get_operation_type_display|escapejs }}",
-            "description": "{{ op.description|escapejs }}",
-            "trim_start": {{ op.trim_start|default:0.0 }},
-            "trim_end": {{ op.trim_end|default:0.0 }}
-        }{% if not forloop.last %},{% endif %}
-        {% endfor %}
+                "description": "{{ op.description|escapejs }}",
+                    "trim_start": {{ op.trim_start|default:0.0 }},
+                    "trim_end": {{ op.trim_end|default:0.0 }}
+    } {% if not forloop.last %}, {% endif %}
+    {% endfor %}
     ];
 
-    document.addEventListener("DOMContentLoaded", function () {
+    function initEditorScript() {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
@@ -668,21 +718,31 @@
         const historyDrawerBackdrop = document.getElementById("history-drawer-backdrop");
 
         if (showHistoryBtn && historyDrawer) {
-            showHistoryBtn.addEventListener("click", () => {
+            showHistoryBtn.addEventListener("click", (e) => {
+                e.preventDefault();
                 historyDrawer.classList.add("open");
             });
         }
         if (historyDrawerClose && historyDrawer) {
-            historyDrawerClose.addEventListener("click", () => {
+            historyDrawerClose.addEventListener("click", (e) => {
+                e.preventDefault();
                 historyDrawer.classList.remove("open");
             });
         }
 
         if (historyDrawerBackdrop && historyDrawer) {
-            historyDrawerBackdrop.addEventListener("click", () => {
+            historyDrawerBackdrop.addEventListener("click", (e) => {
+                e.preventDefault();
                 historyDrawer.classList.remove("open");
             });
         }
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initEditorScript);
+    } else {
+        initEditorScript();
+    }
 
         // Wait for duration to be available (since app.js sets it)
         function tryAddOriginalWaveform() {

@@ -365,11 +365,59 @@
         }
     });
 
-    // Form submission with progress
-    document.getElementById('lectureUploadForm').addEventListener('submit', function(e) {
+    let isUploading = false;
+    window.addEventListener('beforeunload', (e) => {
+        if (isUploading) {
+            e.preventDefault();
+            e.returnValue = 'Lecture upload is in progress. Leaving this page will cancel the upload.';
+            return e.returnValue;
+        }
+    });
+
+    async function sendChunkWithRetry(url, formData, maxRetries = 5, initialDelay = 1000) {
+        let attempts = 0;
+        while (attempts < maxRetries) {
+            try {
+                if (attempts > 0) {
+                    await new Promise(resolve => setTimeout(resolve, Math.min(initialDelay * Math.pow(1.5, attempts - 1), 8000)));
+                }
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success' || data.success !== false) {
+                        return data;
+                    }
+                }
+                attempts++;
+            } catch (err) {
+                attempts++;
+                console.warn(`Chunk upload retry ${attempts}/${maxRetries}...`, err);
+                if (attempts >= maxRetries) {
+                    throw err;
+                }
+            }
+        }
+        throw new Error('Chunk upload failed after maximum retries');
+    }
+
+    // Form submission with progress & chunk retry resilience
+    document.getElementById('lectureUploadForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        const formData = new FormData(this);
+        const videoFile = videoInput.files[0];
+        if (!videoFile) {
+            alert('Please select a video file.');
+            return;
+        }
+
+        const title = this.querySelector('[name="title"]')?.value || 'Untitled Lecture';
+        const description = this.querySelector('[name="description"]')?.value || '';
+        const camera = this.querySelector('[name="camera"]')?.value || '';
+        const thumbFile = thumbInput.files[0];
+
         const submitBtn = document.getElementById('submitBtn');
         const progressDiv = document.getElementById('uploadProgress');
         const progressBar = document.getElementById('progressBar');
@@ -377,45 +425,49 @@
 
         submitBtn.disabled = true;
         progressDiv.classList.remove('d-none');
+        isUploading = true;
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '{% url "camera_upload_video" %}', true);
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        const chunkSize = 5 * 1024 * 1024; // 5MB
+        const totalChunks = Math.ceil(videoFile.size / chunkSize);
+        const uploadId = Date.now().toString() + Math.random().toString(36).substring(7);
 
-        xhr.upload.onprogress = function(e) {
-            if (e.lengthComputable) {
-                const percent = Math.round((e.loaded / e.total) * 100);
+        try {
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, videoFile.size);
+                const chunk = videoFile.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('chunk', chunk);
+                formData.append('filename', videoFile.name);
+                formData.append('chunkIndex', i);
+                formData.append('totalChunks', totalChunks);
+                formData.append('uploadId', uploadId);
+                formData.append('title', title);
+                formData.append('description', description);
+                if (camera) formData.append('camera', camera);
+                if (thumbFile && i === totalChunks - 1) {
+                    formData.append('thumbnail', thumbFile);
+                }
+
+                const data = await sendChunkWithRetry('{% url "camera_chunked_upload" %}', formData);
+
+                const percent = Math.round(((i + 1) / totalChunks) * 100);
                 progressBar.style.width = percent + '%';
                 progressPercent.textContent = percent + '%';
-            }
-        };
 
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.status === 'success') {
-                        window.location.href = response.redirect_url || '{% url "manage_recordings" %}';
-                    } else {
-                        alert('Error: ' + response.message);
-                        submitBtn.disabled = false;
-                    }
-                } catch (e) {
-                    alert("Invalid server response. Please try again.");
-                    submitBtn.disabled = false;
+                if (data.redirect_url) {
+                    isUploading = false;
+                    window.location.href = data.redirect_url;
+                    return;
                 }
-            } else {
-                alert('Error uploading video. Status: ' + xhr.status);
-                submitBtn.disabled = false;
             }
-        };
-
-        xhr.onerror = function() {
-            alert('Network error. Please check your connection.');
+        } catch (err) {
+            console.error('Upload failed:', err);
+            alert('Upload connection interrupted. Please try again.');
+            isUploading = false;
             submitBtn.disabled = false;
-        };
-
-        xhr.send(formData);
+        }
     });
 })();
 </script>

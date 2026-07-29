@@ -6,7 +6,9 @@ urlpatterns = [
     # Projects
     path("", views.project_list, name="project_list"),
     path("upload/", views.project_list, name="project_upload"),  # kept for back-compat
+    path("chunked-upload/", views.chunked_upload_view, name="chunked_upload"),
     path("project/<int:pk>/", views.project_detail, name="project_detail"),
+    path("project/<int:pk>/proxy-status/", views.proxy_status_view, name="proxy_status"),
     path("project/<int:pk>/delete/", views.project_delete, name="project_delete"),
     path("project/<int:pk>/download/", views.project_download, name="project_download"),
     path("project/<int:pk>/download/mkv/", views.project_download_mkv, name="project_download_mkv"),
