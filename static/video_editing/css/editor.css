@@ -5,9 +5,9 @@
    light and dark modes without overriding body/html styles.
    ============================================================= */
 
-/* ---- Theme Bridge: Map ve- vars to global vars ---- */
+/* ---- Theme Bridge: Map ve- vars to global vars & full light/dark mode support ---- */
 :root {
-  /* Primary accent — uses global --primary from base.css */
+  /* Primary Accent & Status */
   --ve-primary: #667eea;
   --ve-primary-dark: #5568d3;
   --ve-primary-light: #818cf8;
@@ -15,47 +15,78 @@
   --ve-success: #10b981;
   --ve-warning: #f59e0b;
 
-  /* Backgrounds — light mode */
+  /* Backgrounds — Light Mode */
   --ve-bg: #ffffff;
-  --ve-bg-secondary: #f9fafb;
-  --ve-bg-raised: #f3f4f6;
+  --ve-bg-secondary: #f8fafc;
+  --ve-bg-raised: #f1f5f9;
+  --ve-bg-hover: #e2e8f0;
+  --ve-stage-bg: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --ve-toolbar-bg: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%);
+  --ve-track-bg: #ffffff;
+  --ve-track-label-bg: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  --ve-ruler-bg: #ffffff;
+  --ve-resizer-bg: #e2e8f0;
+  --ve-resizer-pill: #94a3b8;
+  --ve-clip-bg: #ffffff;
 
-  /* Text — light mode */
-  --ve-text: #111827;
-  --ve-text-secondary: #374151;
-  --ve-text-muted: #6b7280;
+  /* Text — Light Mode */
+  --ve-text: #0f172a;
+  --ve-text-secondary: #334155;
+  --ve-text-muted: #64748b;
 
-  /* Borders — light mode */
-  --ve-border: #e5e7eb;
-  --ve-border-strong: #d1d5db;
+  /* Borders — Light Mode */
+  --ve-border: #e2e8f0;
+  --ve-border-strong: #cbd5e1;
 
-  /* Shadows */
+  /* Playhead & Accent elements */
+  --ve-playhead-color: #3b82f6;
+
+  /* Glassmorphism & Shadows */
+  --ve-glass-bg: rgba(255, 255, 255, 0.92);
+  --ve-glass-border: rgba(226, 232, 240, 0.8);
   --ve-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --ve-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --ve-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
   --ve-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
   /* Radius */
-  --ve-radius: 8px;
   --ve-radius-sm: 6px;
+  --ve-radius: 8px;
   --ve-radius-lg: 12px;
-
-  /* Glassmorphism — light mode */
-  --ve-glass-bg: rgba(255, 255, 255, 0.92);
-  --ve-glass-border: rgba(229, 231, 235, 0.6);
 }
 
-/* Theme fallback — keep the editor aligned with the app's normal light theme. */
-body {
-  --ve-bg: #ffffff;
-  --ve-bg-secondary: #f9fafb;
-  --ve-bg-raised: #f3f4f6;
-  --ve-text: #111827;
-  --ve-text-secondary: #374151;
-  --ve-text-muted: #6b7280;
-  --ve-border: #e5e7eb;
-  --ve-border-strong: #d1d5db;
-  --ve-glass-bg: rgba(255, 255, 255, 0.92);
-  --ve-glass-border: rgba(229, 231, 235, 0.6);
+body.dark-mode {
+  /* Backgrounds — Dark Mode (Matching Edumi Slate Navy Theme) */
+  --ve-bg: #1e293b;
+  --ve-bg-secondary: #0f172a;
+  --ve-bg-raised: #334155;
+  --ve-bg-hover: #475569;
+  --ve-stage-bg: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  --ve-toolbar-bg: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+  --ve-track-bg: #0f172a;
+  --ve-track-label-bg: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  --ve-ruler-bg: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  --ve-resizer-bg: #0f172a;
+  --ve-resizer-pill: #64748b;
+  --ve-clip-bg: #1e293b;
+
+  /* Text — Dark Mode */
+  --ve-text: #f8fafc;
+  --ve-text-secondary: #cbd5e1;
+  --ve-text-muted: #94a3b8;
+
+  /* Borders — Dark Mode */
+  --ve-border: #334155;
+  --ve-border-strong: #475569;
+
+  /* Playhead & Accent elements */
+  --ve-playhead-color: #6366f1;
+
+  /* Glassmorphism & Shadows */
+  --ve-glass-bg: rgba(15, 23, 42, 0.92);
+  --ve-glass-border: rgba(51, 65, 85, 0.6);
+  --ve-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ve-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --ve-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 }
 
 /* ============================================================
@@ -684,25 +715,16 @@ html body:has(.ve-editor-page) .content-area {
   min-width: 0;
 }
 
-body .ve-video-stage {
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-  border-right: 1px solid #334155;
-}
-
 .ve-video-wrapper {
   position: relative;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, #ffffff 0%, #e2e8f0 100%);
+  background: var(--ve-bg-secondary);
   overflow: hidden;
   min-height: 250px;
   padding: 12px 24px;
-}
-
-body .ve-video-wrapper {
-  background: radial-gradient(ellipse at center, #1e293b 0%, #020617 100%);
 }
 
 #main-video {
@@ -802,11 +824,6 @@ body #main-video {
   min-height: 72px;
 }
 
-body .ve-player-controls {
-  background: var(--ve-bg);
-  border-top: 1px solid var(--ve-border);
-}
-
 .ve-ctrl-btn {
   display: flex;
   align-items: center;
@@ -828,20 +845,6 @@ body .ve-player-controls {
   color: var(--ve-text);
   border-color: var(--ve-border-strong);
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-}
-
-body .ve-ctrl-btn {
-  background: var(--ve-bg-raised);
-  border: 1px solid var(--ve-border);
-  color: var(--ve-text);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-}
-
-body .ve-ctrl-btn:hover {
-  background: var(--ve-border);
-  color: var(--ve-text);
-  border-color: var(--ve-border-strong);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
@@ -875,43 +878,38 @@ body .ve-ctrl-btn:hover {
 }
 
 .ve-time-display {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ve-text);
-  background: var(--ve-bg-raised);
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--ve-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  white-space: nowrap;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--ve-text) !important;
+  background: var(--ve-bg-raised) !important;
+  padding: 4px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--ve-border) !important;
+  box-shadow: var(--ve-shadow-sm) !important;
+  white-space: nowrap !important;
 }
 
 .ve-time-display .time-current,
 .ve-time-display .time-total {
-  background: var(--ve-bg);
-  padding: 3px 8px;
-  border-radius: 5px;
-  border: 1px solid var(--ve-border);
-  color: var(--ve-text);
-  letter-spacing: 0.5px;
+  background: var(--ve-bg) !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--ve-border) !important;
+  color: var(--ve-text) !important;
+  letter-spacing: 0.5px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
 }
 
-body .ve-time-display {
-  background: var(--ve-bg-secondary);
-  border-color: var(--ve-border);
-}
-
-body .ve-time-display .time-current,
-body .ve-time-display .time-total {
-  background: var(--ve-bg);
-  border-color: var(--ve-border);
-  color: var(--ve-text);
+.ve-time-display .time-separator {
+  color: var(--ve-text-muted) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 0 2px !important;
 }
 
 /* Volume slider */
@@ -964,23 +962,11 @@ body .ve-time-display .time-total {
 .ve-tool-tabs {
   display: flex;
   border-bottom: 1px solid var(--ve-border);
-  background: linear-gradient(
-    135deg,
-    rgba(248, 250, 252, 0.9) 0%,
-    rgba(241, 245, 249, 0.9) 100%
-  );
+  background: var(--ve-bg-secondary);
   overflow-x: auto;
   flex-shrink: 0;
   padding: 8px 12px;
   gap: 6px;
-}
-
-body .ve-tool-tabs {
-  background: linear-gradient(
-    135deg,
-    rgba(248, 250, 252, 0.95) 0%,
-    rgba(241, 245, 249, 0.95) 100%
-  );
 }
 
 .ve-tool-tabs::-webkit-scrollbar {
@@ -1011,7 +997,7 @@ body .ve-tool-tabs {
 
 .ve-tool-tab:hover {
   color: var(--ve-text);
-  background: rgba(102, 126, 234, 0.08);
+  background: var(--ve-bg-raised);
 }
 
 .ve-tool-tab--active {
@@ -1075,11 +1061,6 @@ body .ve-tool-tabs {
   margin-bottom: 5px;
 }
 
-body .ve-tool-panel label,
-body .ve-field label {
-  color: #94a3b8;
-}
-
 .ve-tool-panel input[type="text"],
 .ve-tool-panel input[type="number"],
 .ve-tool-panel select,
@@ -1100,17 +1081,6 @@ body .ve-field label {
   border-radius: 6px;
   box-sizing: border-box;
   transition: all 0.15s ease-in-out;
-}
-
-body .ve-tool-panel input[type="text"],
-body .ve-tool-panel input[type="number"],
-body .ve-tool-panel select,
-body .ve-field input[type="text"],
-body .ve-field input[type="number"],
-body .ve-field select {
-  background: var(--ve-bg);
-  border-color: var(--ve-border);
-  color: var(--ve-text);
 }
 
 .ve-tool-panel input:focus,
@@ -1135,13 +1105,6 @@ body .ve-field select {
   border-radius: 6px;
   box-sizing: border-box;
   color: var(--ve-text);
-}
-
-body .ve-tool-panel input[type="file"],
-body .ve-field input[type="file"] {
-  background: rgba(15, 23, 42, 0.5);
-  border-color: rgba(71, 85, 105, 0.6);
-  color: #cbd5e1;
 }
 
 .ve-tool-panel input[type="file"]::file-selector-button,
@@ -2118,7 +2081,7 @@ body:has(.ve-editor-page) .messages-container {
   justify-content: center;
   gap: 8px;
   padding: 8px 16px 4px;
-  background: #141519;
+  background: var(--ve-bg);
   font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
   font-size: 16px;
   font-weight: 500;
@@ -2140,7 +2103,7 @@ body:has(.ve-editor-page) .messages-container {
 
 /* Video Progress Bar */
 .video-progress-container {
-  background: #141519;
+  background: var(--ve-bg);
   padding: 8px 16px 4px;
 }
 
@@ -2182,7 +2145,7 @@ body:has(.ve-editor-page) .messages-container {
   justify-content: center;
   gap: 16px;
   padding: 4px 16px 12px;
-  background: #141519;
+  background: var(--ve-bg);
   border-top: 1px solid var(--border-soft);
   position: relative;
   user-select: none;
@@ -2341,43 +2304,15 @@ body:has(.ve-editor-page) .messages-container {
 }
 
 /* Timeline Ruler */
-.trim-ruler {
-  position: relative;
-  height: 20px;
-  width: 100%;
-  margin-left: 16px;
-}
 
-.trim-tick {
-  position: absolute;
-  bottom: 0;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.15);
-}
 
-.trim-tick.minor {
-  height: 4px;
-  opacity: 0.45;
-}
 
-.trim-tick.medium {
-  height: 6px;
-  opacity: 0.75;
-}
 
-.trim-tick.major {
-  height: 10px;
-  background: rgba(255, 255, 255, 0.35);
-}
+/* Minor/medium tick overrides removed — handled by end-of-file Canva ruler styles */
 
-.trim-tick-label {
-  position: absolute;
-  top: -2px;
-  transform: translateX(-50%);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-faint);
-}
+
+
+
 
 /* Trim Track */
 .trim-track {
@@ -2651,10 +2586,10 @@ body:has(.ve-editor-page) .messages-container {
 
 /* Multi-track Timeline Styles */
 .timeline-scroll-area {
-  background: #0f1014;
+  background: var(--ve-bg-secondary);
   border-radius: var(--radius);
   border: 1px solid var(--border-soft);
-  padding: 10px 10px 8px 16px;
+  padding: 0 10px 8px 12px;
   margin-top: 10px;
 }
 
@@ -2712,7 +2647,7 @@ body:has(.ve-editor-page) .messages-container {
   flex: 1;
   flex-shrink: 0;
   height: 52px;
-  background: #07080b;
+  background: var(--ve-track-bg);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   overflow: visible;
@@ -2886,16 +2821,14 @@ body:has(.ve-editor-page) .messages-container {
   color: #16171c !important;
 }
 
-/* Update playhead style to span from ruler top through all tracks */
+/* Playhead extends up through the 36px ruler + border + small gap */
 .timeline-tracks-wrapper .trim-playhead {
   position: absolute;
-  top: -48px;
-  /* extends up through ruler height (30px) + margin-bottom (12px) + gap (6px) */
+  top: -46px;
   bottom: 0;
   width: 2px;
   background: #ffffff;
   z-index: 9999 !important;
-  /* High z-index to stay on top of all elements */
   pointer-events: auto;
   cursor: ew-resize;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
@@ -3099,7 +3032,7 @@ body:has(.ve-editor-page) .messages-container {
   bottom: calc(100% + 5px);
   left: 50%;
   transform: translateX(-50%);
-  background: #1a1b20;
+  background: var(--ve-bg-raised);
   color: #ffa200;
   font-size: 10px;
   font-weight: 700;
@@ -3160,7 +3093,7 @@ body:has(.ve-editor-page) .messages-container {
   bottom: calc(100% + 5px);
   left: 50%;
   transform: translateX(-50%);
-  background: #1a1b20;
+  background: var(--ve-bg-raised);
   color: #ffa200;
   font-size: 10px;
   font-weight: 700;
@@ -3381,8 +3314,8 @@ input[type="range"].timeline-volume-slider::-webkit-slider-thumb:hover {
 }
 
 .asset-card {
-  background: #1c1d22;
-  border: 1px solid #2e313c;
+  background: var(--ve-bg);
+  border: 1px solid var(--ve-border);
   border-radius: 6px;
   overflow: hidden;
   cursor: grab;
@@ -3502,8 +3435,8 @@ input[type="range"].timeline-volume-slider::-webkit-slider-thumb:hover {
 }
 
 .upload-area {
-  background: #121317;
-  border: 2px dashed #353847;
+  background: var(--ve-bg);
+  border: 2px dashed var(--ve-border-strong);
   border-radius: 12px;
   padding: 60px 40px;
   text-align: center;
@@ -3515,7 +3448,7 @@ input[type="range"].timeline-volume-slider::-webkit-slider-thumb:hover {
 .upload-area:hover,
 .upload-area.drag-over {
   border-color: #5865f2;
-  background: #171820;
+  background: var(--ve-bg-raised);
 }
 
 .upload-area__icon {
@@ -3554,11 +3487,6 @@ input[type="range"].timeline-volume-slider::-webkit-slider-thumb:hover {
   margin-top: 0 !important;
 }
 
-body .timeline-scroll-area {
-  background: linear-gradient(180deg, #1a1b1e 0%, #121316 100%) !important;
-  border-top: 1px solid #282a32 !important;
-}
-
 .timeline-tracks-wrapper {
   display: flex !important;
   flex-direction: column !important;
@@ -3577,10 +3505,6 @@ body .timeline-scroll-area {
   padding: 0 !important;
   border-bottom: 1px solid var(--ve-border) !important;
   margin: 0 !important;
-}
-
-body .timeline-track-row {
-  border-bottom: 1px solid #2a2c31 !important;
 }
 
 /* Automatically hide empty track rows that contain no track content blocks */
@@ -3603,12 +3527,6 @@ body .timeline-track-row {
   box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.02);
 }
 
-body .track-label-cell {
-  background: linear-gradient(135deg, #23252a 0%, #1c1d22 100%);
-  border-right: 1px solid #2a2c31;
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
-}
-
 .track-name {
   display: flex;
   align-items: center;
@@ -3618,10 +3536,6 @@ body .track-label-cell {
   color: var(--ve-text);
   letter-spacing: 0.8px;
   text-transform: uppercase;
-}
-
-body .track-name {
-  color: #e8eaee;
 }
 
 .track-icon {
@@ -3644,11 +3558,6 @@ body .track-name {
   height: 72px !important;
 }
 
-body .track-content-cell {
-  background: #18191d !important;
-  border-left: 1px solid #2a2c31 !important;
-}
-
 .trim-track {
   height: 68px !important;
 }
@@ -3663,10 +3572,6 @@ body .track-content-cell {
 
 .trim-track {
   background: var(--ve-bg-secondary) !important;
-}
-
-body .trim-track {
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%) !important;
 }
 
 /* Timeline Clip Blocks - Modern */
@@ -4101,47 +4006,13 @@ body .trim-track {
 }
 
 /* Trim Ruler */
-.trim-ruler {
-  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%) !important;
-  border: 1px solid var(--ve-border) !important;
-  border-radius: 8px !important;
-  margin-bottom: 4px !important;
-  padding: 8px 0 6px 0 !important;
-  margin-left: 16px !important;
-}
 
-body .trim-ruler {
-  background: linear-gradient(180deg, #202129 0%, #1a1b22 100%) !important;
-  border: 1px solid #2d2f3a !important;
-}
 
-.trim-tick {
-  background: #cbd5e1 !important;
-}
 
-body .trim-tick {
-  background: #3d404d !important;
-}
 
-.trim-tick.major {
-  background: #94a3b8 !important;
-  height: 10px !important;
-}
 
-body .trim-tick.major {
-  background: #6e7280 !important;
-}
 
-.trim-tick-label {
-  color: var(--ve-text-muted) !important;
-  font-weight: 600 !important;
-  font-size: 10px !important;
-  font-family: var(--font-mono) !important;
-}
 
-body .trim-tick-label {
-  color: #b0b3c0 !important;
-}
 
 /* Playhead */
 .trim-playhead {
@@ -4151,20 +4022,10 @@ body .trim-tick-label {
   pointer-events: auto !important;
 }
 
-body .trim-playhead {
-  background: #ffffff !important;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
-}
-
 .trim-playhead::after {
   background: var(--ve-danger) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
   border-radius: 4px !important;
-}
-
-body .trim-playhead::after {
-  background: linear-gradient(180deg, #ffffff 0%, #e5e7eb 100%) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }
 
 .playhead-tooltip {
@@ -4172,12 +4033,6 @@ body .trim-playhead::after {
   color: var(--ve-bg) !important;
   font-weight: 700 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-}
-
-body .playhead-tooltip {
-  background: #ffffff !important;
-  color: #111827 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Trim Handles */
@@ -4202,11 +4057,6 @@ body .playhead-tooltip {
   border-radius: 12px 12px 0 0 !important;
 }
 
-body .timeline-toolbar {
-  background: linear-gradient(90deg, #1a1b22 0%, #15161b 100%) !important;
-  border-bottom: 1px solid #2d2f3a !important;
-}
-
 .tb-btn {
   background: var(--ve-bg-raised) !important;
   border: 1px solid var(--ve-border) !important;
@@ -4221,18 +4071,6 @@ body .timeline-toolbar {
   background: var(--ve-border) !important;
   border-color: var(--ve-border-strong) !important;
   color: var(--ve-text) !important;
-}
-
-body .tb-btn {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #d1d5db !important;
-}
-
-body .tb-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  color: #ffffff !important;
 }
 
 .tb-btn:disabled {
@@ -4250,19 +4088,9 @@ body .tb-btn:hover {
   border: 1px solid var(--ve-border) !important;
 }
 
-body .time-display {
-  color: #f3f4f6 !important;
-  background: rgba(0, 0, 0, 0.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
 .time-divider {
   color: var(--ve-text-muted) !important;
   font-size: 14px !important;
-}
-
-body .time-divider {
-  color: #6b7280 !important;
 }
 
 /* Timeline Speed Control */
@@ -4273,23 +4101,12 @@ body .time-divider {
   border-left: 1px solid var(--ve-border) !important;
 }
 
-body .timeline-speed-control {
-  background: rgba(0, 0, 0, 0.2) !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
 .timeline-speed-control input {
   background: var(--ve-bg) !important;
   border: 1px solid var(--ve-border) !important;
   border-radius: 6px !important;
   color: var(--ve-text) !important;
   font-family: var(--font-mono) !important;
-}
-
-body .timeline-speed-control input {
-  background: #374151 !important;
-  border: 1px solid #4b5563 !important;
-  color: #f3f4f6 !important;
 }
 
 /* Volume Slider Styling */
@@ -4330,14 +4147,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
   ) !important;
 }
 
-body .trim-dim {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.6) 0%,
-    rgba(0, 0, 0, 0.4) 100%
-  ) !important;
-}
-
 .trim-selection {
   border-color: #f59e0b !important;
   background: rgba(245, 158, 11, 0.1) !important;
@@ -4374,11 +4183,6 @@ body .trim-dim {
   user-select: none !important;
 }
 
-body .visual-trim-container {
-  background: linear-gradient(180deg, #0a0b0e 0%, #0f1115 100%) !important;
-  border-top: 1px solid #282a32 !important;
-}
-
 /* Middle scroll area: Flexes vertically between top toolbar and bottom toolbar */
 .timeline-scroll-area {
   flex: 1 1 auto !important;
@@ -4404,10 +4208,6 @@ body .visual-trim-container {
 .timeline-scroll-area::-webkit-scrollbar-track {
   background: var(--ve-bg-secondary) !important;
   border-radius: 4px !important;
-}
-
-body .timeline-scroll-area::-webkit-scrollbar-track {
-  background: rgba(10, 11, 14, 0.6) !important;
 }
 
 .timeline-scroll-area::-webkit-scrollbar-thumb {
@@ -4436,12 +4236,6 @@ body .timeline-scroll-area::-webkit-scrollbar-track {
   transition: background 0.15s ease !important;
 }
 
-body .timeline-resizer {
-  background: linear-gradient(180deg, #181a20 0%, #101217 100%) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.4) !important;
-}
-
 .timeline-resizer:hover,
 .timeline-resizer.is-dragging {
   background: rgba(102, 126, 234, 0.15) !important;
@@ -4455,10 +4249,6 @@ body .timeline-resizer {
   transition:
     background 0.15s ease,
     width 0.15s ease !important;
-}
-
-body .resizer-pill {
-  background: rgba(255, 255, 255, 0.25) !important;
 }
 
 .timeline-resizer:hover .resizer-pill,
@@ -4492,12 +4282,6 @@ body .resizer-pill {
   flex-shrink: 0 !important;
 }
 
-body .timeline-bottom-toolbar {
-  background: linear-gradient(180deg, #161820 0%, #0d0e12 100%) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5) !important;
-}
-
 .tb-bottom-section {
   display: flex !important;
   align-items: center !important;
@@ -4525,10 +4309,6 @@ body .timeline-bottom-toolbar {
   flex-shrink: 0 !important;
 }
 
-body .tb-bottom-divider {
-  background: rgba(255, 255, 255, 0.12) !important;
-}
-
 .tb-bottom-btn {
   background: var(--ve-bg-raised) !important;
   border: 1px solid var(--ve-border) !important;
@@ -4551,18 +4331,6 @@ body .tb-bottom-divider {
   border-color: var(--ve-border-strong) !important;
   color: var(--ve-text) !important;
   transform: translateY(-1px) !important;
-}
-
-body .tb-bottom-btn {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #e2e8f0 !important;
-}
-
-body .tb-bottom-btn:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: rgba(255, 255, 255, 0.22) !important;
-  color: #ffffff !important;
 }
 
 .tb-bottom-btn:active {
@@ -4606,12 +4374,6 @@ body .tb-bottom-btn:hover {
   white-space: nowrap !important;
 }
 
-body .tb-bottom-badge {
-  color: #cbd5e1 !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
 .tb-bottom-info {
   display: inline-flex !important;
   align-items: center !important;
@@ -4621,19 +4383,11 @@ body .tb-bottom-badge {
   white-space: nowrap !important;
 }
 
-body .tb-bottom-info {
-  color: #94a3b8 !important;
-}
-
 .tb-bottom-info strong {
   color: var(--ve-text) !important;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-size: 11px !important;
-}
-
-body .tb-bottom-info strong {
-  color: #f3f4f6 !important;
 }
 
 .tb-bottom-timecode {
@@ -4652,18 +4406,8 @@ body .tb-bottom-info strong {
   letter-spacing: 0.5px !important;
 }
 
-body .tb-bottom-timecode {
-  color: #f8fafc !important;
-  background: rgba(0, 0, 0, 0.35) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
 .tb-bottom-time-sep {
   color: var(--ve-text-muted) !important;
-}
-
-body .tb-bottom-time-sep {
-  color: #64748b !important;
 }
 
 .tb-bottom-zoom-label {
@@ -4672,18 +4416,10 @@ body .tb-bottom-time-sep {
   white-space: nowrap !important;
 }
 
-body .tb-bottom-zoom-label {
-  color: #94a3b8 !important;
-}
-
 .tb-bottom-zoom-label strong {
   color: var(--ve-text) !important;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-}
-
-body .tb-bottom-zoom-label strong {
-  color: #f1f5f9 !important;
 }
 
 .tb-bottom-zoom-range {
@@ -4696,10 +4432,6 @@ body .tb-bottom-zoom-label strong {
   outline: none !important;
   cursor: pointer !important;
   transition: background 0.15s !important;
-}
-
-body .tb-bottom-zoom-range {
-  background: rgba(255, 255, 255, 0.15) !important;
 }
 
 .tb-bottom-zoom-range::-webkit-slider-thumb {
@@ -4850,7 +4582,7 @@ body .tb-bottom-zoom-range {
 
 .timeline-scroll-area {
   background: var(--ve-bg-secondary) !important;
-  padding: 12px !important;
+  padding: 0 12px 12px 12px !important;
 }
 
 /* Track Row Layout */
@@ -4901,12 +4633,6 @@ body .tb-bottom-zoom-range {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
   overflow: hidden !important;
   transition: all 150ms ease !important;
-}
-
-body .timeline-clip-block {
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  background: #262932 !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
 }
 
 .timeline-clip-block:hover {
@@ -5034,34 +4760,19 @@ body .timeline-clip-block {
 }
 
 /* Ruler Styling */
-.trim-ruler {
-  background: var(--ve-bg) !important;
-  border: none !important;
-  margin-bottom: 8px !important;
-  padding: 8px 0 6px 0 !important;
-  margin-left: 0 !important;
-}
 
-.trim-tick {
-  background: rgba(17, 24, 39, 0.15) !important;
-}
 
-.trim-tick.major {
-  background: rgba(17, 24, 39, 0.35) !important;
-  height: 8px !important;
-}
 
-.trim-tick-label {
-  color: var(--ve-text-muted) !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-}
+
+
+
+
 
 /* Playhead Styling - Circular white top handle, 2px white line */
 .timeline-tracks-wrapper .trim-playhead {
-  background: #ffffff !important;
+  background: #3b82f6 !important;
   width: 2px !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.5) !important;
 }
 
 .timeline-tracks-wrapper .trim-playhead::after {
@@ -5072,9 +4783,9 @@ body .timeline-clip-block {
   transform: translateX(-50%) !important;
   width: 12px !important;
   height: 12px !important;
-  background: #ffffff !important;
+  background: #3b82f6 !important;
   border-radius: 50% !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Selection Range Overlay Box (trim selection) */
@@ -5084,4 +4795,427 @@ body .timeline-clip-block {
   background: transparent !important;
   border-radius: 10px !important;
   box-shadow: 0 0 10px rgba(92, 153, 255, 0.45) !important;
+}
+
+
+/* ============================================================
+   DYNAMIC THEMED TIMELINE COMPONENTS
+   ============================================================ */
+
+/* Success Button Utility Class */
+.ve-btn-success {
+  background: var(--ve-success) !important;
+  border-color: var(--ve-success) !important;
+  color: #ffffff !important;
+}
+.ve-btn-success:hover {
+  background: #059669 !important;
+  border-color: #059669 !important;
+}
+
+/* Delete project button in list */
+.ve-btn-delete-project {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  color: var(--ve-danger) !important;
+  border-radius: 6px !important;
+  padding: 6px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+}
+.ve-btn-delete-project:hover {
+  background: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* Timeline Toolbar (Top) */
+.timeline-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background: var(--ve-toolbar-bg) !important;
+  border-bottom: 1px solid var(--ve-border) !important;
+  padding: 10px 16px !important;
+  border-radius: 12px 12px 0 0 !important;
+  user-select: none !important;
+}
+
+.tb-btn {
+  background: var(--ve-bg-raised) !important;
+  border: 1px solid var(--ve-border) !important;
+  color: var(--ve-text) !important;
+  font-weight: 600 !important;
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.tb-btn:hover {
+  background: var(--ve-bg-hover) !important;
+  border-color: var(--ve-border-strong) !important;
+  color: var(--ve-text) !important;
+}
+
+.tb-btn:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+
+.time-display {
+  color: var(--ve-text) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  background: var(--ve-bg-raised) !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--ve-border) !important;
+}
+
+.time-divider {
+  color: var(--ve-text-muted) !important;
+  font-size: 14px !important;
+}
+
+.timeline-speed-control {
+  background: var(--ve-bg-secondary) !important;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  border-left: 1px solid var(--ve-border) !important;
+}
+
+.timeline-speed-control input {
+  background: var(--ve-bg) !important;
+  border: 1px solid var(--ve-border) !important;
+  border-radius: 6px !important;
+  color: var(--ve-text) !important;
+  font-family: var(--font-mono) !important;
+}
+
+/* Timeline Scroll & Track Layout */
+.visual-trim-container {
+  background: var(--ve-bg-secondary) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+  height: 240px;
+  min-height: 124px !important;
+  max-height: 70vh !important;
+  transition: height 0.15s ease;
+}
+
+.timeline-scroll-area {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  width: 100% !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 12px 12px 12px !important;
+  margin-top: 0 !important;
+  background: var(--ve-bg-secondary) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.6) var(--ve-bg-secondary);
+}
+
+.timeline-scroll-area::-webkit-scrollbar-track {
+  background: var(--ve-bg-secondary) !important;
+  border-radius: 4px !important;
+}
+
+.timeline-tracks-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  margin-left: 0 !important;
+  background: var(--ve-bg-secondary) !important;
+}
+
+.timeline-track-row {
+  display: flex !important;
+  gap: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  border-bottom: 1px solid var(--ve-border) !important;
+  margin: 0 !important;
+}
+
+.track-label-cell {
+  min-width: 100px !important;
+  width: 100px !important;
+  background: var(--ve-track-label-bg) !important;
+  padding: 8px 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  border-right: 1px solid var(--ve-border) !important;
+}
+
+.track-name {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  color: var(--ve-text) !important;
+  letter-spacing: 0.8px !important;
+  text-transform: uppercase !important;
+}
+
+.track-content-cell {
+  background: var(--ve-track-bg) !important;
+  border-radius: 0 !important;
+  border-top: 1.5px solid var(--ve-border) !important;
+  border-bottom: 1.5px solid var(--ve-border) !important;
+  border-left: none !important;
+  border-right: none !important;
+  padding: 8px !important;
+  height: 72px !important;
+  position: relative !important;
+}
+
+.trim-track {
+  height: 68px !important;
+  background: var(--ve-bg-raised) !important;
+}
+
+.timeline-clip-block {
+  position: absolute !important;
+  top: 4px !important;
+  bottom: 4px !important;
+  background: var(--ve-clip-bg) !important;
+  border: 1px solid var(--ve-border) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--ve-shadow-sm) !important;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  z-index: 1 !important;
+  overflow: hidden !important;
+  color: var(--ve-text) !important;
+}
+
+
+
+
+
+
+
+
+
+.trim-playhead {
+  background: var(--ve-playhead-color) !important;
+  width: 2px !important;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.4) !important;
+  z-index: 9999 !important;
+}
+
+.trim-playhead::after {
+  content: "" !important;
+  position: absolute !important;
+  top: -6px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: var(--ve-playhead-color) !important;
+  border-radius: 50% !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+.timeline-resizer {
+  height: 8px !important;
+  background: var(--ve-resizer-bg) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  border-bottom: 1px solid var(--ve-border) !important;
+  cursor: ns-resize !important;
+  position: relative !important;
+  z-index: 1050 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  user-select: none !important;
+  flex-shrink: 0 !important;
+  transition: background 0.15s ease !important;
+}
+
+.resizer-pill {
+  width: 38px !important;
+  height: 4px !important;
+  background: var(--ve-resizer-pill) !important;
+  border-radius: 2px !important;
+  transition: background 0.15s ease, width 0.15s ease !important;
+}
+
+.timeline-bottom-toolbar {
+  position: relative !important;
+  z-index: 1000 !important;
+  height: 42px !important;
+  background: var(--ve-toolbar-bg) !important;
+  border-top: 1px solid var(--ve-border) !important;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.05) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 14px !important;
+  gap: 10px !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+.tb-bottom-divider {
+  width: 1px !important;
+  height: 18px !important;
+  background: var(--ve-border) !important;
+  margin: 0 2px !important;
+  flex-shrink: 0 !important;
+}
+
+.tb-bottom-btn {
+  background: var(--ve-bg-raised) !important;
+  border: 1px solid var(--ve-border) !important;
+  color: var(--ve-text) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+}
+
+.tb-bottom-btn:hover {
+  background: var(--ve-border) !important;
+  border-color: var(--ve-border-strong) !important;
+  color: var(--ve-text) !important;
+}
+
+.tb-bottom-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--ve-text) !important;
+  background: var(--ve-bg-raised) !important;
+  border: 1px solid var(--ve-border) !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  white-space: nowrap !important;
+}
+
+.tb-bottom-info {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 11px !important;
+  color: var(--ve-text-muted) !important;
+  white-space: nowrap !important;
+}
+
+.tb-bottom-info strong {
+  color: var(--ve-text) !important;
+  font-size: 11px !important;
+}
+
+.tb-bottom-timecode {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--ve-text) !important;
+  background: var(--ve-bg-raised) !important;
+  border: 1px solid var(--ve-border) !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+}
+
+
+
+
+/* ---- Fixed Pinned Timeline Ruler Header — Canva Style ---- */
+.trim-ruler-header {
+  position: relative !important;
+  z-index: 100 !important;
+  width: 100% !important;
+  height: 36px !important;
+  background: var(--ve-ruler-bg) !important;
+  border-bottom: 1.5px solid var(--ve-border) !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+  user-select: none !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06) !important;
+}
+
+.trim-ruler {
+  position: relative !important;
+  height: 36px !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  user-select: none !important;
+}
+
+/* Minor ticks — very subtle, bottom-anchored */
+.trim-tick {
+  position: absolute !important;
+  bottom: 0 !important;
+  width: 1px !important;
+  height: 5px !important;
+  background: var(--ve-border-strong) !important;
+  opacity: 0.5 !important;
+}
+
+/* Major ticks — taller, more visible, with slight accent */
+.trim-tick.major {
+  height: 14px !important;
+  width: 1px !important;
+  background: var(--ve-text-muted) !important;
+  opacity: 1 !important;
+}
+
+/* Time labels — Canva uses small, clean, non-bold monospace above the major ticks */
+.trim-tick-label {
+  position: absolute !important;
+  bottom: 15px !important;
+  transform: translateX(-50%) !important;
+  color: var(--ve-text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace !important;
+  letter-spacing: 0.2px !important;
+  pointer-events: none !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+/* Origin label "0s" — left-aligned so it doesn't get clipped */
+.trim-tick-label.first-tick-label {
+  transform: translateX(2px) !important;
+  font-weight: 700 !important;
+  color: var(--ve-text) !important;
 }

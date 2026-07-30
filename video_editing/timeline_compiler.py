@@ -165,6 +165,68 @@ def compile_timeline_to_ffmpeg(project, timeline_json, output_path):
         filter_complex.append(f"{current_v}{vf_rot}{next_v}")
         current_v = next_v
 
+    # Custom Resize
+    resize_state = timeline_json.get('resize')
+    if resize_state:
+        r_width = resize_state.get("width")
+        r_height = resize_state.get("height")
+        if r_width and r_height:
+            try:
+                w = int(r_width)
+                h = int(r_height)
+                w = w + (w % 2)
+                h = h + (h % 2)
+                next_v = "[v_resize]"
+                filter_complex.append(f"{current_v}scale={w}:{h}{next_v}")
+                current_v = next_v
+            except (TypeError, ValueError):
+                pass
+
+    # Fade In / Out
+    fade_state = effects_state.get("fade")
+    trim_state = timeline_json.get("trim", {})
+    fade_in_sec = 0.0
+    fade_out_sec = 0.0
+    if fade_state:
+        fade_in_sec = float(fade_state.get("in", 0.0))
+        fade_out_sec = float(fade_state.get("out", 0.0))
+    else:
+        if trim_state.get("fade_in"):
+            fade_in_sec = 1.0
+        if trim_state.get("fade_out"):
+            fade_out_sec = 1.0
+
+    if fade_in_sec > 0.0 or fade_out_sec > 0.0:
+        # Calculate timeline duration
+        v_duration = 0.0
+        for clip in clips:
+            c_start = float(clip.get('trimStart', clip.get('start', 0)))
+            c_end = float(clip.get('trimEnd', clip.get('end', 10)))
+            v_duration += max(0.0, c_end - c_start)
+        if speed_factor != 1.0:
+            v_duration /= speed_factor
+
+        fade_out_start = max(0.0, v_duration - fade_out_sec)
+        vf_fade_parts = []
+        if fade_in_sec > 0.0:
+            vf_fade_parts.append(f"fade=t=in:st=0:d={fade_in_sec}")
+        if fade_out_sec > 0.0:
+            vf_fade_parts.append(f"fade=t=out:st={fade_out_start}:d={fade_out_sec}")
+
+        next_v = "[v_fade]"
+        filter_complex.append(f"{current_v}{','.join(vf_fade_parts)}{next_v}")
+        current_v = next_v
+
+        if has_audio:
+            af_fade_parts = []
+            if fade_in_sec > 0.0:
+                af_fade_parts.append(f"afade=t=in:ss=0:d={fade_in_sec}")
+            if fade_out_sec > 0.0:
+                af_fade_parts.append(f"afade=t=out:st={fade_out_start}:d={fade_out_sec}")
+            next_a = "[a_fade]"
+            filter_complex.append(f"{current_a}{','.join(af_fade_parts)}{next_a}")
+            current_a = next_a
+
     # Overlay Text layers
     for idx, text_clip in enumerate(text_clips):
         txt = text_clip.get('text', '').replace("'", "").replace(":", r"\:")
@@ -222,6 +284,21 @@ def compile_timeline_to_ffmpeg(project, timeline_json, output_path):
     else: # default 1080p
         filter_complex.append(f"{current_v}scale=-2:1080{scale_label}")
         current_v = scale_label
+
+    # Volume / Mute
+    audio_state = timeline_json.get("audio", {})
+    vol_multiplier = float(audio_state.get("volume", 1.0))
+    is_muted = audio_state.get("muted", False)
+    
+    if has_audio:
+        if is_muted:
+            next_a = "[a_vol]"
+            filter_complex.append(f"{current_a}volume=0{next_a}")
+            current_a = next_a
+        elif vol_multiplier != 1.0:
+            next_a = "[a_vol]"
+            filter_complex.append(f"{current_a}volume={vol_multiplier}{next_a}")
+            current_a = next_a
 
     # Mix background audio inputs
     mixed_audio_out = current_a

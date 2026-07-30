@@ -40,7 +40,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Collect static files at build time (WhiteNoise will serve them)
-
-
+RUN python manage.py collectstatic --noinput
 # Default command – overridden per service in docker‑compose.yml
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

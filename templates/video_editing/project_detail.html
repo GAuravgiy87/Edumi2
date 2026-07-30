@@ -20,26 +20,12 @@
             <div style="width:1px;height:20px;background:var(--border-color);margin:0 4px;flex-shrink:0;"></div>
 
             <!-- Undo / Redo in Topbar -->
-            <button type="button" class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-undo" title="Undo (Ctrl+Z)" {% if not operations.1 %}disabled{% endif %}>
+            <button type="button" class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-undo" title="Undo (Ctrl+Z)" disabled>
                 <i data-lucide="undo"></i>
             </button>
-            {% with prev_op=operations.1 %}
-            {% if prev_op %}
-            <form id="undo-form" action="{% url 'op_revert' project.pk prev_op.pk %}" method="post"
-                style="display: none;">
-                {% csrf_token %}
-            </form>
-            {% endif %}
-            {% endwith %}
-
-            <button type="button" class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-redo" title="Redo (Ctrl+Shift+Z)" {% if not has_redo %}disabled{% endif %}>
+            <button type="button" class="ve-btn ve-btn-icon ve-btn-ghost" id="tb-redo" title="Redo (Ctrl+Shift+Z)" disabled>
                 <i data-lucide="redo"></i>
             </button>
-            {% if has_redo %}
-            <form id="redo-form" action="{% url 'op_redo' project.pk %}" method="post" style="display: none;">
-                {% csrf_token %}
-            </form>
-            {% endif %}
 
             <div style="width:1px;height:20px;background:var(--border-color);margin:0 4px;flex-shrink:0;"></div>
 
@@ -58,13 +44,13 @@
                 action="{% url 'publish_to_lecture' project.pk %}?recording_id={{ request.GET.recording_id }}"
                 style="display:inline-block;" onsubmit="return confirm('Publish this edited video to your lectures?');">
                 {% csrf_token %}
-                <button type="submit" class="ve-btn ve-btn-primary" style="background:#22c55e;border-color:#22c55e;"
+                <button type="submit" class="ve-btn ve-btn-success"
                     title="Publish to Lectures">
                     <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i> Publish
                 </button>
             </form>
             {% else %}
-            <button type="button" class="ve-btn ve-btn-primary" style="background:#22c55e;border-color:#22c55e;"
+            <button type="button" class="ve-btn ve-btn-success"
                 title="Publish to Lectures"
                 onclick="alert('This project is not linked to a class recording. Use Export to download the video.')">
                 <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i> Publish
@@ -126,7 +112,7 @@
                 <!-- Video Time Display Pill -->
                 <div class="ve-time-display" id="video-time-display">
                     <span class="time-current" id="video-time-current">00:00:00.000</span>
-                    <span class="time-separator" style="color:var(--ve-text-muted); font-size:11px;">/</span>
+                    <span class="time-separator">/</span>
                     <span class="time-total" id="video-time-total">00:00:00.000</span>
                 </div>
 
@@ -157,7 +143,7 @@
 
             <div class="ve-tool-panels">
                 <!-- Hidden Trim Form to keep visual timeline functionality working -->
-                <form id="trim-form" action="{% url 'op_trim' project.pk %}" method="post" style="display: none;">
+                <form id="trim-form" action="/video-editing/project/{{ project.pk }}/trim/" method="post" style="display: none;">
                     {% csrf_token %}
                     {{ trim_form.start_seconds }}
                     {{ trim_form.end_seconds }}
@@ -183,7 +169,9 @@
                     <div id="assets-grid-container" style="display:flex; flex-direction:column; gap:8px;">
                         {% for asset in project.assets.all %}
                         <div class="ve-media-item asset-card" draggable="true" data-asset-id="{{ asset.id }}"
-                            data-asset-title="{{ asset.display_title }}">
+                            data-asset-title="{{ asset.display_title }}"
+                            data-asset-duration="{{ asset.duration_seconds|default:0.0 }}"
+                            data-asset-url="{{ asset.file.url }}">
                             <div class="ve-media-thumb">
                                 <i data-lucide="video" style="width: 20px; height: 20px; color: var(--ve-muted);"></i>
                             </div>
@@ -205,21 +193,13 @@
                         </div>
                         {% endfor %}
                     </div>
-
-                    <!-- Hidden form for drag-and-drop / click insertion -->
-                    <form id="insert-asset-form" action="{% url 'insert_asset' project.pk %}" method="post"
-                        style="display: none;">
-                        {% csrf_token %}
-                        <input type="hidden" name="asset_id" id="insert-asset-id">
-                        <input type="hidden" name="timestamp" id="insert-asset-timestamp">
-                    </form>
                 </div>
 
                 <!-- Text Panel -->
                 <div class="ve-tool-section tool-section" data-panel="text">
                     <h3 class="ve-section-title">Text Overlays</h3>
 
-                    <form action="{% url 'op_text_overlay' project.pk %}" method="post" class="ve-stacked-form"
+                    <form action="/video-editing/project/{{ project.pk }}/text/" method="post" class="ve-stacked-form"
                         style="display: flex; flex-direction: column; gap: 12px;">
                         {% csrf_token %}
                         <div class="ve-field">
@@ -258,7 +238,7 @@
                 <div class="ve-tool-section tool-section" data-panel="audio">
                     <h3 class="ve-section-title">Add Background Audio</h3>
 
-                    <form id="bg-audio-form" action="{% url 'op_background_audio' project.pk %}" method="post"
+                    <form id="bg-audio-form" action="/video-editing/project/{{ project.pk }}/background-audio/" method="post"
                         enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 12px;">
                         {% csrf_token %}
                         <div class="ve-field">
@@ -307,7 +287,7 @@
                 <!-- Effects Panel -->
                 <div class="ve-tool-section tool-section" data-panel="effects">
                     <h3 class="ve-section-title">Rotation</h3>
-                    <form action="{% url 'op_rotate' project.pk %}" method="post"
+                    <form action="/video-editing/project/{{ project.pk }}/rotate/" method="post"
                         style="display: flex; flex-direction: column; gap: 8px;">
                         {% csrf_token %}
                         <div class="ve-field">
@@ -320,7 +300,7 @@
                     <div style="height: 1px; background: var(--ve-border); margin: 12px 0;"></div>
 
                     <h3 class="ve-section-title">Resize</h3>
-                    <form action="{% url 'op_resize' project.pk %}" method="post"
+                    <form action="/video-editing/project/{{ project.pk }}/resize/" method="post"
                         style="display: flex; flex-direction: column; gap: 8px;">
                         {% csrf_token %}
                         <div class="ve-field-row" style="display: flex; gap: 8px;">
@@ -339,7 +319,7 @@
                     <div style="height: 1px; background: var(--ve-border); margin: 12px 0;"></div>
 
                     <h3 class="ve-section-title">Grayscale</h3>
-                    <form action="{% url 'op_grayscale' project.pk %}" method="post" style="margin-bottom: 12px;">
+                    <form action="/video-editing/project/{{ project.pk }}/grayscale/" method="post" style="margin-bottom: 12px;">
                         {% csrf_token %}
                         <button type="submit" class="ve-btn ve-btn-secondary ve-btn-full">Apply Grayscale
                             Filter</button>
@@ -348,7 +328,7 @@
                     <div style="height: 1px; background: var(--ve-border); margin: 12px 0;"></div>
 
                     <h3 class="ve-section-title">Fade In / Out</h3>
-                    <form action="{% url 'op_fade' project.pk %}" method="post"
+                    <form action="/video-editing/project/{{ project.pk }}/fade/" method="post"
                         style="display: flex; flex-direction: column; gap: 8px;">
                         {% csrf_token %}
                         <div class="ve-field-row" style="display: flex; gap: 8px;">
@@ -386,7 +366,6 @@
                 </div>
             </div>
         </aside>
-
     </main>
 
     <!-- Bottom Full Width: Visual Timeline Component (Exact same layout and design as source) -->
@@ -425,7 +404,7 @@
                 <!-- Speed controls in the timeline toolbar -->
                 <div class="timeline-speed-control"
                     style="display: flex; align-items: center; gap: 6px; margin-left: 4px; padding-left: 8px; border-left: 1px solid var(--ve-border);">
-                    <form action="{% url 'op_speed' project.pk %}" method="post"
+                    <form action="/video-editing/project/{{ project.pk }}/speed/" method="post"
                         style="display: flex; align-items: center; gap: 6px; margin: 0;">
                         {% csrf_token %}
                         <span
@@ -452,7 +431,7 @@
                 </button>
 
                 <!-- Split form -->
-                <form id="split-form" action="{% url 'op_split' project.pk %}" method="post" style="display: none;">
+                <form id="split-form" action="/video-editing/project/{{ project.pk }}/split/" method="post" style="display: none;">
                     {% csrf_token %}
                     <input type="hidden" name="split_at" id="split-at-input" value="0">
                 </form>
@@ -462,13 +441,15 @@
             </div>
         </div>
 
-        <!-- Timeline Scroll Area containing Ruler and Tracks -->
-        <div class="timeline-scroll-area" id="timeline-scroll-area">
-            <!-- Timeline Ruler -->
+        <!-- Pinned Timeline Ruler Header (Never scrolls vertically out of view) -->
+        <div class="trim-ruler-header" id="trim-ruler-header">
             <div class="trim-ruler" id="trim-ruler">
                 <!-- Ticks are dynamically generated by JS -->
             </div>
+        </div>
 
+        <!-- Timeline Scroll Area containing Tracks -->
+        <div class="timeline-scroll-area" id="timeline-scroll-area">
             <!-- Timeline Tracks Wrapper (Dynamic track rows generated by TrackManager) -->
             <div class="timeline-tracks-wrapper" id="timeline-tracks-wrapper">
 
@@ -611,41 +592,34 @@
                 </div>
 
                 {% if operations %}
-                <ul class="history-list">
+                <ul class="history-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
                     {% for op in operations %}
-                    <li class="history-item{% if forloop.first %} history-item--current{% endif %}">
+                    <li class="history-item{% if forloop.first %} history-item--current{% endif %}"
+                        style="display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--ve-bg); border: 1px solid {% if forloop.first %}var(--ve-primary){% else %}var(--ve-border){% endif %}; {% if forloop.first %}border-left: 3px solid var(--ve-primary);{% endif %} border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: border-color 0.15s ease, box-shadow 0.15s ease;">
                         <!-- Row 1: badge + time -->
-                        <div class="history-item-top">
-                            <span class="history-op-badge">{{ op.get_operation_type_display }}</span>
-                            <span class="history-time">{{ op.created_at|timesince }} ago</span>
+                        <div class="history-item-top" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                            <div style="display: flex; gap: 10px; align-items: flex-start; min-width: 0; flex-wrap: wrap;">
+                                <span class="history-op-badge" style="background: var(--ve-primary); color: white; padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 6px; text-transform: uppercase; white-space: nowrap;">{{ op.get_operation_type_display }}</span>
+                            </div>
+                            <span class="history-time" style="font-size: 12px; color: var(--ve-text-muted); white-space: nowrap;">{{ op.created_at|timesince }} ago</span>
                         </div>
                         <!-- Row 2: description -->
                         {% if op.description %}
-                        <p class="history-desc">{{ op.description }}</p>
+                        <p class="history-desc" style="margin: 0; font-weight: 500; font-size: 13px; color: var(--ve-text); line-height: 1.4; word-break: break-word; overflow-wrap: anywhere;">{{ op.description }}</p>
                         {% endif %}
                         <!-- Row 3: action -->
                         {% if forloop.first %}
-                        <div class="history-item-footer">
-                            <span class="history-current-badge">
+                        <div class="history-item-footer" style="display: flex; justify-content: flex-end; align-items: center; border-top: 1px solid var(--ve-border); padding-top: 10px; margin-top: 2px;">
+                            <span class="history-current-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ve-primary);">
                                 <i data-lucide="check-circle" style="width:13px;height:13px;"></i> Current Version
                             </span>
-                        </div>
-                        {% elif op.operation_type != 'upload' %}
-                        <div class="history-item-footer">
-                            <form action="{% url 'op_revert' project.pk op.pk %}" method="post" style="margin: 0;"
-                                onsubmit="return confirm('Revert project to this edit point? Subsequent edits will be lost.');">
-                                {% csrf_token %}
-                                <button type="submit" class="ve-btn history-revert-btn">
-                                    <i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i> Revert
-                                </button>
-                            </form>
                         </div>
                         {% endif %}
                     </li>
                     {% endfor %}
                 </ul>
                 {% else %}
-                <div class="history-empty">
+                <div class="history-empty" style="text-align: center; padding: 40px 20px; border: 1px dashed var(--ve-border); border-radius: 12px; background: var(--ve-bg-secondary); margin-top: 8px;">
                     <i data-lucide="history" style="width:36px;height:36px;color:var(--ve-primary);opacity:0.7;margin-bottom:12px;display:inline-block;"></i>
                     <p style="font-size:15px;font-weight:600;color:var(--ve-text);margin:0 0 6px;">No edits yet</p>
                     <p style="font-size:13px;color:var(--ve-text-muted);margin:0;line-height:1.5;">Your edit history will appear here as you trim, crop, or add effects.</p>
@@ -689,7 +663,7 @@
     window.REEL_PROJECT_TRIM_END = JSON.parse("{{ project.trim_end|default:'null' }}");
     window.REEL_PROJECT_HEIGHT = Number("{{ project.height|default:720 }}");
     window.REEL_PROJECT_CLIPS = JSON.parse('{{ project.clips_json|default:"[]"|escapejs }}');
-    window.REEL_PROJECT_TIMELINE_STATE = JSON.parse('{{ project.timeline_state|default:"null"|escapejs }}');
+    window.REEL_PROJECT_TIMELINE_STATE = JSON.parse('{{ timeline_state_json|escapejs }}');
     window.REEL_PROJECT_PROXY_STATUS = "{{ project.proxy_status }}";
     window.REEL_PROJECT_PROXY_URL = "{{ project.proxy_url|default:'' }}";
     window.REEL_PROJECT_SAVE_TIMELINE_URL = "{% url 'save_timeline' project.pk %}";
@@ -811,15 +785,9 @@
         const undoBtn = document.getElementById("tb-undo");
         if (undoBtn) {
             undoBtn.addEventListener("click", function () {
-                const undoForm = document.getElementById("undo-form");
-                if (undoForm) {
-                    const overlay = document.getElementById("processing-overlay");
-                    if (overlay) {
-                        overlay.style.display = "flex";
-                        const txt = overlay.querySelector("p");
-                        if (txt) txt.textContent = "Undoing last edit...";
-                    }
-                    undoForm.submit();
+                const firstHistoryUndo = document.querySelector(".history-list li:first-child .history-revert-btn");
+                if (firstHistoryUndo) {
+                    firstHistoryUndo.click();
                 }
             });
         }
@@ -827,16 +795,7 @@
         const redoBtn = document.getElementById("tb-redo");
         if (redoBtn) {
             redoBtn.addEventListener("click", function () {
-                const redoForm = document.getElementById("redo-form");
-                if (redoForm) {
-                    const overlay = document.getElementById("processing-overlay");
-                    if (overlay) {
-                        overlay.style.display = "flex";
-                        const txt = overlay.querySelector("p");
-                        if (txt) txt.textContent = "Redoing last edit...";
-                    }
-                    redoForm.submit();
-                }
+                // Client-side Redo placeholder
             });
         }
     });
