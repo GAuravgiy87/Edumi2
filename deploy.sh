@@ -90,12 +90,20 @@ info "RAM Capacity: ${TOTAL_RAM_GB:0:4} GB"
 if [ "$IS_ROOT" = true ]; then
     info "Installing/updating required Ubuntu system packages..."
     apt-get update -qq
+    apt-get install -y -qq software-properties-common curl wget git openssl net-tools
+
+    # Add deadsnakes PPA for Python 3.11 if python3.11 is not available in default repos (e.g. Ubuntu 20.04)
+    if ! apt-cache show python3.11 &>/dev/null; then
+        info "Adding deadsnakes PPA for Python 3.11 support..."
+        add-apt-repository -y ppa:deadsnakes/ppa -y 2>/dev/null || true
+        apt-get update -qq
+    fi
+
     apt-get install -y -qq \
         python3.11 python3.11-venv python3.11-dev python3-pip \
         build-essential cmake g++ libpq-dev libffi-dev \
         ffmpeg postgresql postgresql-contrib redis-server nginx supervisor \
-        libopenblas-dev liblapack-dev libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev \
-        curl wget git openssl net-tools
+        libopenblas-dev liblapack-dev libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev
     log "Ubuntu system packages installed."
 fi
 
@@ -178,7 +186,7 @@ step "STEP 6: Environment File (.env) Setup"
 ENV_FILE="$APP_DIR/.env"
 if [ ! -f "$ENV_FILE" ]; then
     info "Creating production .env file..."
-    SECRET_KEY=$(./venv/bin/python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())" 2>/dev/null || echo "secret_edumi_$(date +%s)_key")
+    SECRET_KEY=$(openssl rand -base64 32 | tr -d '/+=' | head -c 50 2>/dev/null || ./venv/bin/python -c "import secrets; print(secrets.token_urlsafe(40))" 2>/dev/null || echo "secret_edumi_$(date +%s)_key")
     FACE_KEY=$(./venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || echo "ZxYxWvUtSrQpOnMlKjIhGfEdCbA9876543210")
     
     ALLOWED_HOSTS_VAL="localhost,127.0.0.1"
