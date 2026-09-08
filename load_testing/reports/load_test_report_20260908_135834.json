@@ -1,0 +1,42 @@
+{
+  "target_url": "https://eclass.dei.ac.in",
+  "timestamp": "2026-09-08T13:58:34.343586",
+  "waves_config": [
+    10
+  ],
+  "duration_per_wave_sec": 8,
+  "saturation_point": {
+    "users": null,
+    "reason": "None detected within tested limits"
+  },
+  "waves": [
+    {
+      "wave_num": 1,
+      "users": 10,
+      "duration_sec": 8,
+      "rps": 10.0,
+      "total_requests": 80,
+      "success_count": 80,
+      "http_4xx": 0,
+      "http_5xx": 0,
+      "network_errors": 0,
+      "error_rate_pct": 0.0,
+      "latency": {
+        "avg_ms": 186.8,
+        "p50_ms": 23.13,
+        "p95_ms": 1334.27,
+        "p99_ms": 1624.01,
+        "min_ms": 9.36,
+        "max_ms": 1624.01
+      },
+      "websockets": {
+        "attempts": 9,
+        "connected": 6,
+        "failures": 3,
+        "messages_sent": 12,
+        "messages_received": 0
+      },
+      "degradation_factor": 1.0
+    }
+  ]
+}
